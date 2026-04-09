@@ -17,7 +17,7 @@ Both capabilities live in a single web application, hosted separately from the c
 
 **The markdown is king.** The GitHub resources repo (`Noble-Imprint-Resources`) is the single source of truth for all content. Every other system — the mobile app, the website, the editor — reads from it and writes back to it. No content lives anywhere else.
 
-**Your files are never at risk.** The editing workflow cannot corrupt, reformat, or silently alter your markdown. The custom syntax (`<Question>` tags, `<<` attributions, `<Callout>` blocks, heading hierarchies) is structurally protected. An editor working in suggestion mode literally cannot touch the tags — only the text content inside them.
+**Your files are never at risk.** The editing workflow cannot corrupt, reformat, or silently alter your markdown. The custom syntax (`<Question>` tags, `<<` attributions, `<Callout>` blocks, heading hierarchies) is structurally protected. A reviewer working in suggestion mode literally cannot touch the tags — only the text content inside them.
 
 **Changes only happen through Git.** When a suggestion is accepted, the result is a normal Git commit to the resources repo — the same kind of commit you'd make from Obsidian or any other tool. The full commit history is preserved. You can always see exactly what changed, when, and who approved it.
 
@@ -39,13 +39,13 @@ An authorized reviewer opens a session on the website and clicks "Suggest edits.
 
 But behind the scenes, they're editing the actual markdown file. When they change a word, they're changing it in the real file. When they delete a sentence, it's deleted in the real file. The structural syntax — the `<Question id=...>` tags, the `<Callout>` wrappers, the `<<` markers, the `#` headings — is invisible and untouchable. The editor simply cannot break it.
 
-When finished, they submit their suggestions. An approver reviews the changes (shown as colored insertions and strikethrough deletions), and with one click, the accepted changes are committed to the GitHub repo — flowing through to both the website and the next mobile app build.
+When finished, they submit their suggestions. An admin reviews the changes (shown as colored insertions and strikethrough deletions), and with one click, the accepted changes are committed to the GitHub repo — flowing through to both the website and the next mobile app build.
 
 ### The three phases
 
 **Phase 1 — Public website (read-only).** Build the website, the rendering engine for custom markdown, the browsing interface, and the automatic deployment pipeline. Anyone can read public content. No login required. Preview/Pre-Release books are visible with a status banner. Hidden books are excluded.
 
-**Phase 2 — Authentication and editing workflow.** Add Google sign-in and the masked editor. Authenticated editors can suggest changes; approvers can review and accept them, committing changes back to the resources repo.
+**Phase 2 — Authentication and editing workflow.** Add Google sign-in and the masked editor. Authenticated users with the suggest-comment role can suggest changes and leave comments; admins can review and accept them, committing changes back to the resources repo.
 
 ---
 
@@ -95,7 +95,7 @@ There are three separate systems, each with a clear job:
 When someone suggests an edit through the website, this is how the change flows from suggestion to published content:
 
 ```
-  Editor opens a session and clicks "Suggest edits"
+  A reviewer opens a session and clicks "Suggest edits"
                       │
                       ▼
   ┌──────────────────────────────────────┐
@@ -106,7 +106,7 @@ When someone suggests an edit through the website, this is how the change flows 
   │  formatted text visible)             │
   └──────────────────┬───────────────────┘
                      │
-                     │ Editor makes changes to visible
+                     │ Reviewer makes changes to visible
                      │ text and clicks "Submit"
                      ▼
   ┌──────────────────────────────────────┐
@@ -116,11 +116,11 @@ When someone suggests an edit through the website, this is how the change flows 
   │  is NOT changed yet.                 │
   └──────────────────┬───────────────────┘
                      │
-                     │ Approver opens the review queue
+                     │ Admin opens the review queue
                      │ and reviews the suggestion
                      ▼
   ┌──────────────────────────────────────┐
-  │  Approver sees rendered diff:        │
+  │  Admin sees rendered diff:           │
   │  red strikethrough = deletions       │
   │  green text = insertions             │
   │                                      │
@@ -139,7 +139,7 @@ When someone suggests an edit through the website, this is how the change flows 
   │  GitHub API.                         │
   │                                      │
   │  If changed: flags as "stale,"       │
-  │  asks approver to re-review.         │
+  │  asks admin to re-review.            │
   └──────────────────┬───────────────────┘
                      │
                      │ Commit triggers automatic
@@ -196,14 +196,14 @@ When the reviewer clicks "Submit suggestions," the system computes a diff — th
 
 The original file in the resources repo is untouched at this point. Nothing has been committed. The suggestion is just a record of "here's what I'd change."
 
-### What happens when an approver accepts
+### What happens when an admin accepts
 
-An approver reviews the suggestion, seeing the changes rendered visually (deletions in red strikethrough, insertions in green). If they accept, the system does the following:
+An admin reviews the suggestion, seeing the changes rendered visually (deletions in red strikethrough, insertions in green). If they accept, the system does the following:
 
 1. Fetches the current file from the resources repo.
 2. Checks: has this file changed since the suggestion was made? (It compares the stored commit SHA against the current one.)
 3. If the file hasn't changed: applies the edit and commits it to the resources repo. Done.
-4. If the file *has* changed (someone else edited it in the meantime): flags the suggestion as "stale" and asks the approver to review it against the updated content. The edit is never applied blindly.
+4. If the file *has* changed (someone else edited it in the meantime): flags the suggestion as "stale" and asks the admin to review it against the updated content. The edit is never applied blindly.
 
 ### Safety guarantees
 
@@ -219,11 +219,11 @@ An approver reviews the suggestion, seeing the changes rendered visually (deleti
 
 The website uses Google sign-in for authentication. Access levels are defined in a simple configuration file:
 
-| Role | Browse and read content | Suggest edits | Accept / reject suggestions |
+| Role | Browse and read content | Suggest edits and leave comments | Accept / reject suggestions |
 |---|---|---|---|
 | **Anyone** (no login) | Yes | — | — |
-| **Editor** | Yes | Yes | — |
-| **Approver** | Yes | Yes | Yes |
+| **Suggest-Comment** | Yes | Yes | — |
+| **Admin** | Yes | Yes | Yes |
 
 Roles are assigned by email address in the website's configuration file. Adding or removing someone's access is a one-line change.
 
@@ -305,7 +305,7 @@ comment:           Optional description of the changes
 status:            pending | accepted | rejected | stale
 created_at:        Timestamp
 resolved_at:       Timestamp (when accepted/rejected)
-resolved_by:       Email of the approver
+resolved_by:       Email of the admin
 ```
 
 Storing both the full original and modified content (along with the diff) provides flexibility for rendering the review view and handles edge cases gracefully.
@@ -327,9 +327,9 @@ The website repo uses a GitHub App (installed on both repos) for scoped API acce
 # website-config.yaml (lives in the website repo)
 
 roles:
-  editor:
+  suggest-comment:
     - "author@noblecollective.org"
-  approver:
+  admin:
     - "lead@noblecollective.org"
     - "editor@noblecollective.org"
 
