@@ -31,7 +31,7 @@ Both capabilities live in a single web application, hosted separately from the c
 
 Visitors arrive at `resources.noblecollective.org` and see the full library organized by series, sub-series, and books. They can browse, open a book, and read its sessions — all rendered beautifully from the same markdown files that power the mobile app.
 
-Some content isn't ready for the public yet. Books marked as "Preview" or "Pre-Release" (using the existing `banner` field in `meta.json`) are only visible to people who sign in. Books marked as "Hidden" don't appear at all.
+Some content isn't ready for the public yet. Books marked as "Hidden" (a new tag) won't appear at all, and other books marked as "Preview" or "Pre-Release" will indicate that to the user with a kind of banner.  
 
 ### Goal 2: A collaborative editing workflow
 
