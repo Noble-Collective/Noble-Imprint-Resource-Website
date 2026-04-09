@@ -31,7 +31,7 @@ Both capabilities live in a single web application, hosted separately from the c
 
 Visitors arrive at `resources.noblecollective.org` and see the full library organized by series, sub-series, and books. They can browse, open a book, and read its sessions — all rendered beautifully from the same markdown files that power the mobile app.
 
-Some content isn't ready for the public yet. Books marked as "Hidden" (a new tag) won't appear at all, and other books marked as "Preview" or "Pre-Release" will indicate that to the user with a kind of banner.  
+Books marked as "Hidden" (a new tag) won't appear at all, and other books marked as "Preview" or "Pre-Release" will indicate that to the user with a kind of banner.
 
 ### Goal 2: A collaborative editing workflow
 
@@ -43,11 +43,9 @@ When finished, they submit their suggestions. An approver reviews the changes (s
 
 ### The three phases
 
-**Phase 1 — Public website (read-only).** Build the website, the rendering engine for custom markdown, the browsing interface, and the automatic deployment pipeline. Anyone can read public content. No login required.
+**Phase 1 — Public website (read-only).** Build the website, the rendering engine for custom markdown, the browsing interface, and the automatic deployment pipeline. Anyone can read public content. No login required. Preview/Pre-Release books are visible with a status banner. Hidden books are excluded.
 
-**Phase 2 — Authentication and gated content.** Add Google sign-in so authorized users can see Preview and Pre-Release books. Define roles: who can preview, who can edit, who can approve.
-
-**Phase 3 — Suggestion and editing workflow.** Add the masked editor, suggestion submission, review queue, and the acceptance flow that commits changes back to GitHub.
+**Phase 2 — Authentication and editing workflow.** Add Google sign-in and the masked editor. Authenticated editors can suggest changes; approvers can review and accept them, committing changes back to the resources repo.
 
 ---
 
@@ -92,35 +90,73 @@ There are three separate systems, each with a clear job:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### The automatic update flow
+### The suggest and edit flow
 
-When you push a change to the resources repo — whether from Obsidian, a text editor, or an accepted suggestion on the website — the following happens automatically:
+When someone suggests an edit through the website, this is how the change flows from suggestion to published content:
 
 ```
- You edit a markdown file and push to GitHub
-                    │
-                    ▼
-   ┌────────────────────────────────┐
-   │  Noble-Imprint-Resources repo  │
-   │  (change lands on main branch) │
-   └───────────────┬────────────────┘
-                   │
-                   │ GitHub Actions fires a
-                   │ notification to the website repo
-                   ▼
-   ┌────────────────────────────────┐
-   │  Website repo receives signal, │
-   │  rebuilds, and redeploys       │
-   └───────────────┬────────────────┘
-                   │
-                   ▼
-   ┌────────────────────────────────┐
-   │  resources.noblecollective.org │
-   │  now shows updated content     │
-   └────────────────────────────────┘
+  Editor opens a session and clicks "Suggest edits"
+                      │
+                      ▼
+  ┌──────────────────────────────────────┐
+  │  Website loads the raw markdown      │
+  │  from the resources repo and         │
+  │  displays it in the masked editor    │
+  │  (structural syntax hidden,          │
+  │  formatted text visible)             │
+  └──────────────────┬───────────────────┘
+                     │
+                     │ Editor makes changes to visible
+                     │ text and clicks "Submit"
+                     ▼
+  ┌──────────────────────────────────────┐
+  │  Website computes a diff and         │
+  │  stores the suggestion in its        │
+  │  database. The resources repo        │
+  │  is NOT changed yet.                 │
+  └──────────────────┬───────────────────┘
+                     │
+                     │ Approver opens the review queue
+                     │ and reviews the suggestion
+                     ▼
+  ┌──────────────────────────────────────┐
+  │  Approver sees rendered diff:        │
+  │  red strikethrough = deletions       │
+  │  green text = insertions             │
+  │                                      │
+  │  Clicks "Accept" or "Reject"         │
+  └──────────────────┬───────────────────┘
+                     │
+                     │ If accepted:
+                     ▼
+  ┌──────────────────────────────────────┐
+  │  Website checks: has the file        │
+  │  changed since the suggestion?       │
+  │  (SHA comparison)                    │
+  │                                      │
+  │  If unchanged: commits the edit      │
+  │  to the resources repo via           │
+  │  GitHub API.                         │
+  │                                      │
+  │  If changed: flags as "stale,"       │
+  │  asks approver to re-review.         │
+  └──────────────────┬───────────────────┘
+                     │
+                     │ Commit triggers automatic
+                     │ website rebuild
+                     ▼
+  ┌──────────────────────────────────────┐
+  │  resources.noblecollective.org       │
+  │  now shows the updated content.      │
+  │                                      │
+  │  The resources repo has a clean      │
+  │  Git commit with the change.         │
+  │  Mobile app picks it up on           │
+  │  next build.                         │
+  └──────────────────────────────────────┘
 ```
 
-The whole process takes a few minutes. No manual steps. No one needs to "publish" anything — pushing to the resources repo *is* publishing.
+The key point: at no stage is the resources repo in a dirty or intermediate state. The edit either commits cleanly or doesn't commit at all.
 
 ---
 
@@ -183,12 +219,11 @@ An approver reviews the suggestion, seeing the changes rendered visually (deleti
 
 The website uses Google sign-in for authentication. Access levels are defined in a simple configuration file:
 
-| Role | Browse public content | See Preview / Pre-Release books | Suggest edits | Accept / reject suggestions |
-|---|---|---|---|---|
-| **Anyone** (no login) | Yes | — | — | — |
-| **Previewer** | Yes | Yes | — | — |
-| **Editor** | Yes | Yes | Yes | — |
-| **Approver** | Yes | Yes | Yes | Yes |
+| Role | Browse and read content | Suggest edits | Accept / reject suggestions |
+|---|---|---|---|
+| **Anyone** (no login) | Yes | — | — |
+| **Editor** | Yes | Yes | — |
+| **Approver** | Yes | Yes | Yes |
 
 Roles are assigned by email address in the website's configuration file. Adding or removing someone's access is a one-line change.
 
@@ -200,14 +235,14 @@ The website reads each book's `meta.json` to determine its visibility. The exist
 
 | `banner` value in meta.json | Website behavior |
 |---|---|
-| *(not present)* | Fully public — anyone can see it |
-| `"Preview"` | Only visible to signed-in Previewers, Editors, and Approvers |
-| `"Pre-Release"` | Same as Preview |
-| `"Hidden"` | Not shown on the website at all, to anyone |
+| *(not present)* | Fully public — no status indicator |
+| `"Preview"` | Public, shown with a "Preview" banner |
+| `"Pre-Release"` | Public, shown with a "Pre-Release" banner |
+| `"Hidden"` | Not shown on the website at all |
 
 This means: to publish a book on the website, just remove the `banner` field from its `meta.json` (or never add one). To hide a book, set `"banner": "Hidden"`. No website configuration changes needed for most cases.
 
-For rare exceptions — like showing a book publicly on the website that still has a "Preview" banner for the mobile app — a small overrides section in the website's configuration handles it.
+For rare exceptions — like hiding a book on the website that doesn't have a "Hidden" banner in its `meta.json` — a small overrides section in the website's configuration handles it.
 
 ---
 
@@ -292,8 +327,6 @@ The website repo uses a GitHub App (installed on both repos) for scoped API acce
 # website-config.yaml (lives in the website repo)
 
 roles:
-  previewer:
-    - "reviewer@noblecollective.org"
   editor:
     - "author@noblecollective.org"
   approver:
