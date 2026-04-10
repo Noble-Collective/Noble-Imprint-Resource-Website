@@ -136,11 +136,23 @@
     });
   }
 
+  /* ----- Mobile Sidebar Toggle ----- */
+
+  function initMobileSidebarToggle() {
+    var title = document.querySelector('.sidebar .sidebar-title');
+    if (!title) return;
+    title.addEventListener('click', function () {
+      var sidebar = title.closest('.sidebar');
+      if (sidebar) sidebar.classList.toggle('sidebar-expanded');
+    });
+  }
+
   /* ----- Init on DOM Ready ----- */
 
   document.addEventListener('DOMContentLoaded', function () {
     initSidebarToggle();
     initViewToggle();
     initMenuDrawer();
+    initMobileSidebarToggle();
   });
 })();

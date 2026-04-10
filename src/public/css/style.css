@@ -1663,40 +1663,88 @@ body.drawer-open {
   }
 }
 
+/* ---- Tablet (≤ 768px) ---- */
 @media (max-width: 768px) {
 
+  /* Layout: stack sidebar above main */
   .layout {
     flex-direction: column;
   }
 
+  /* Sidebar becomes a collapsible panel */
   .sidebar {
     width: 100%;
     min-width: 100%;
     position: relative;
     top: 0;
     height: auto;
-    max-height: 50vh;
+    max-height: none;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
+    overflow: visible;
+  }
+
+  /* Hide sidebar content by default on homepage, show toggle */
+  .sidebar .nav-series {
+    display: none;
+  }
+
+  .sidebar.sidebar-expanded .nav-series {
+    display: block;
+  }
+
+  .sidebar .sidebar-title {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 1.25rem;
+  }
+
+  .sidebar .sidebar-title::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--color-text-light);
+    border-bottom: 2px solid var(--color-text-light);
+    transform: rotate(45deg);
+    transition: transform 200ms ease;
+  }
+
+  .sidebar.sidebar-expanded .sidebar-title::after {
+    transform: rotate(-135deg);
+  }
+
+  /* Book/session sidebar (not homepage) — keep visible */
+  .sidebar .sidebar-back,
+  .sidebar .sidebar-book-info,
+  .sidebar .sidebar-sessions-title,
+  .sidebar .nav-session-list {
+    display: block;
   }
 
   .main {
     padding: 1.5rem 1rem;
   }
 
-  .book-detail-header {
+  /* Homepage */
+  .home-header-row {
     flex-direction: column;
-    align-items: center;
-    text-align: center;
+    gap: 0.75rem;
+    align-items: flex-start;
   }
 
-  .book-detail-cover {
-    width: 150px;
-    min-width: 150px;
+  .page-title {
+    font-size: 1.8rem;
   }
 
-  .book-detail-meta {
-    justify-content: center;
+  .page-subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .series-heading {
+    font-size: 1.25rem;
   }
 
   .book-grid {
@@ -1704,15 +1752,150 @@ body.drawer-open {
     gap: 1rem;
   }
 
-  .reading-content {
-    padding: 0 0.5rem;
+  .book-cover {
+    font-size: 0.8rem;
+    padding: 0.5rem;
   }
 
-  .session-nav {
+  .book-card-title {
+    font-size: 0.78rem;
+  }
+
+  /* List view mobile */
+  .text-book-row {
+    padding: 0.5rem;
+    gap: 0.6rem;
+  }
+
+  .text-book-title {
+    font-size: 0.82rem;
+  }
+
+  /* Book detail page */
+  .book-detail-header {
     flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .book-detail-cover {
+    width: 140px;
+    min-width: 140px;
+  }
+
+  .book-detail-meta {
+    justify-content: center;
+  }
+
+  .book-detail-subtitle {
+    font-size: 0.9rem;
+  }
+
+  /* Session reading page */
+  .reading-content {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  .session-content h1,
+  .reading-content h1 {
+    font-size: 1.6rem;
+  }
+
+  .session-content h2,
+  .reading-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .session-content p,
+  .reading-content p,
+  .session-content li,
+  .reading-content li {
+    font-size: 16px;
+  }
+
+  .pullquote {
+    max-width: 100%;
+    padding: 1.5rem 1.25rem 1.25rem;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .pullquote p {
+    font-size: 1.1em;
+  }
+
+  .question-block {
+    padding: 0.75rem 1rem;
+  }
+
+  .session-content blockquote,
+  .reading-content blockquote {
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+  }
+
+  /* Breadcrumbs */
+  .breadcrumb {
+    font-size: 0.72rem;
+    line-height: 1.6;
+  }
+
+  /* Session prev/next — keep side by side */
+  .session-nav {
+    flex-direction: row;
   }
 
   .session-nav-link {
-    max-width: 100%;
+    max-width: 45%;
+  }
+
+  /* Footer */
+  .site-footer {
+    padding: 1.5rem 1rem;
+  }
+}
+
+/* ---- Small phone (≤ 480px) ---- */
+@media (max-width: 480px) {
+  .header-inner {
+    padding: 4px 10px;
+  }
+
+  .logo-img {
+    width: 110px;
+  }
+
+  .main {
+    padding: 1rem 0.75rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .book-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .book-detail-cover {
+    width: 120px;
+    min-width: 120px;
+  }
+
+  .session-content p,
+  .reading-content p,
+  .session-content li,
+  .reading-content li {
+    font-size: 15px;
+  }
+
+  .pullquote {
+    padding: 1.25rem 1rem 1rem;
+  }
+
+  .pullquote p {
+    font-size: 1.05em;
   }
 }
