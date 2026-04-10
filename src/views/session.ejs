@@ -25,6 +25,31 @@
     </ul>
   </aside>
 
+  <!-- ===== MOBILE TOC BAR ===== -->
+  <div class="mobile-toc-bar" data-mobile-toc>
+    <button class="mobile-toc-toggle" data-mobile-toc-toggle>
+      <span class="mobile-toc-label"><%= session.title || session.displayName %></span>
+      <svg class="mobile-toc-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="mobile-toc-panel" data-mobile-toc-panel>
+      <% if (h2s && h2s.length > 0) { %>
+        <ul class="mobile-toc-list">
+          <% h2s.forEach(function(h) { %>
+            <li><a href="#<%= h.slug %>" class="mobile-toc-link"><%= h.text %></a></li>
+          <% }); %>
+        </ul>
+      <% } %>
+      <div class="mobile-toc-nav">
+        <% if (prevSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, prevSession) %>" class="mobile-toc-nav-link">&larr; <%= prevSession.displayName %></a>
+        <% } %>
+        <% if (nextSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, nextSession) %>" class="mobile-toc-nav-link mobile-toc-nav-next"><%= nextSession.displayName %> &rarr;</a>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MAIN CONTENT ===== -->
   <main class="main">
     <div class="reading-top">

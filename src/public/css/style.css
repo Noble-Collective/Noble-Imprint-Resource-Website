@@ -1846,6 +1846,11 @@ body.drawer-open {
   overflow: hidden;
 }
 
+/* Mobile TOC — hidden on desktop */
+.mobile-toc-bar {
+  display: none;
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
@@ -1878,6 +1883,10 @@ body.drawer-open {
   .give-btn {
     font-size: 13px;
     padding: 6px 20px;
+  }
+
+  .mobile-toc-bar {
+    display: block;
   }
 }
 
@@ -2063,6 +2072,104 @@ body.drawer-open {
   .breadcrumb {
     font-size: 0.72rem;
     line-height: 1.6;
+  }
+
+  /* Mobile TOC bar — fixed below header */
+  .mobile-toc-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 95;
+    background: var(--color-bg-warm);
+    border-bottom: 1px solid var(--color-border);
+    transition: transform 200ms ease;
+  }
+
+  .mobile-toc-bar.is-hidden {
+    transform: translateY(-100%);
+  }
+
+  .mobile-toc-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-green);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .mobile-toc-chevron {
+    transition: transform 200ms ease;
+  }
+
+  .mobile-toc-bar.is-open .mobile-toc-chevron {
+    transform: rotate(180deg);
+  }
+
+  .mobile-toc-panel {
+    display: none;
+    padding: 0 1rem 0.75rem;
+  }
+
+  .mobile-toc-bar.is-open .mobile-toc-panel {
+    display: block;
+  }
+
+  .mobile-toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.75rem;
+  }
+
+  .mobile-toc-list li {
+    margin: 0;
+  }
+
+  .mobile-toc-link {
+    display: block;
+    padding: 0.4rem 0;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--color-text);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .mobile-toc-link:hover {
+    color: var(--color-green);
+  }
+
+  .mobile-toc-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .mobile-toc-nav-link {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--color-green);
+    text-decoration: none;
+  }
+
+  .mobile-toc-nav-next {
+    margin-left: auto;
+  }
+
+  /* H2 sub-nav mobile */
+  .nav-h2-item {
+    padding-left: 2.5rem;
+    font-size: 0.7rem;
   }
 
   /* Session prev/next — keep side by side */

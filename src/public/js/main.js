@@ -245,6 +245,66 @@
     });
   }
 
+  /* ----- Mobile TOC Bar ----- */
+
+  function initMobileToc() {
+    var bar = document.querySelector('[data-mobile-toc]');
+    var toggle = document.querySelector('[data-mobile-toc-toggle]');
+    if (!bar || !toggle) return;
+
+    var panel = document.querySelector('[data-mobile-toc-panel]');
+    var lastScroll = window.scrollY;
+    var scrolling = false;
+
+    // Position below header
+    var header = document.querySelector('.site-header');
+    function positionBar() {
+      if (header) {
+        bar.style.top = header.offsetHeight + 'px';
+      }
+    }
+    positionBar();
+    window.addEventListener('resize', positionBar);
+
+    toggle.addEventListener('click', function () {
+      bar.classList.toggle('is-open');
+    });
+
+    // Tap anywhere on page to toggle bar visibility
+    document.addEventListener('click', function (e) {
+      // Don't toggle if clicking inside the bar itself, a link, or a popup
+      if (bar.contains(e.target)) return;
+      if (e.target.closest('a, button, .verse-popup-overlay')) return;
+      bar.classList.toggle('is-hidden');
+      if (bar.classList.contains('is-open')) {
+        bar.classList.remove('is-open');
+      }
+    });
+
+    // Hide bar when scrolling down, show when scrolling up
+    window.addEventListener('scroll', function () {
+      var current = window.scrollY;
+      if (bar.classList.contains('is-open')) {
+        bar.classList.remove('is-open');
+      }
+      if (current > lastScroll && current > 100) {
+        bar.classList.add('is-hidden');
+      } else {
+        bar.classList.remove('is-hidden');
+      }
+      lastScroll = current;
+    }, { passive: true });
+
+    // Close when a TOC link is tapped
+    if (panel) {
+      panel.addEventListener('click', function (e) {
+        if (e.target.classList.contains('mobile-toc-link')) {
+          bar.classList.remove('is-open');
+        }
+      });
+    }
+  }
+
   /* ----- Init on DOM Ready ----- */
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -253,5 +313,6 @@
     initMenuDrawer();
     initMobileSidebarToggle();
     initVersePopup();
+    initMobileToc();
   });
 })();
