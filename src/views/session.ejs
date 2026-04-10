@@ -11,6 +11,15 @@
             <span class="session-num"><%= i + 1 %></span>
             <span class="nav-session-name"><%= s.displayName %></span>
           </a>
+          <% if (s.slug === session.slug && h2s && h2s.length > 0) { %>
+            <ul class="nav-h2-list">
+              <% h2s.forEach(function(h) { %>
+                <li>
+                  <a href="#<%= h.slug %>" class="nav-h2-item"><%= h.text %></a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
         </li>
       <% }); %>
     </ul>

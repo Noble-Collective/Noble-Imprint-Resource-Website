@@ -145,6 +145,16 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const commonHtml = renderCommonContent(commonParts);
       const sessionHtml = renderMarkdown(sessionData.content, { color: book.color });
 
+      // Extract h2 headings for sidebar table of contents
+      const h2s = [];
+      const h2Pattern = /^##\s+(.+)$/gm;
+      let h2Match;
+      while ((h2Match = h2Pattern.exec(sessionData.content)) !== null) {
+        const text = h2Match[1].trim();
+        const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        h2s.push({ text, slug });
+      }
+
       // Find prev/next sessions
       const idx = book.sessions.findIndex(s => s.slug === session.slug);
       const prevSession = idx > 0 ? book.sessions[idx - 1] : null;
@@ -155,6 +165,7 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         subseries: subseries || null,
         book,
         session: { ...session, title: sessionData.title },
+        h2s,
         commonHtml,
         sessionHtml,
         prevSession,

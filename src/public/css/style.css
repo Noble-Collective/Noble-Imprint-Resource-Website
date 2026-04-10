@@ -516,6 +516,28 @@ img {
   font-size: 0.8rem;
 }
 
+/* H2 sub-nav under active session */
+.nav-h2-list {
+  list-style: none;
+  padding: 0.25rem 0 0.5rem 0;
+  margin: 0;
+}
+
+.nav-h2-item {
+  display: block;
+  padding: 0.3rem 1.25rem 0.3rem 3.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--color-text-light);
+  text-decoration: none;
+  transition: color 0.15s;
+  line-height: 1.4;
+}
+
+.nav-h2-item:hover {
+  color: var(--color-green);
+}
+
 /* ============================================================
    4. HOMEPAGE — Visual Mode (default)
    ============================================================ */
@@ -983,6 +1005,7 @@ body.text-mode .home-text {
   color: var(--color-charcoal);
   margin: 2.5rem 0 1rem;
   line-height: 1.3;
+  scroll-margin-top: 100px;
 }
 
 .session-content h3,

@@ -68,7 +68,7 @@ function createRenderer(options = {}) {
     typographer: true,
   });
 
-  // ── Heading colors from meta.json ──
+  // ── Heading colors + id slugs from meta.json ──
   const defaultOpen = md.renderer.rules.heading_open;
   md.renderer.rules.heading_open = function (tokens, idx, opts, env, self) {
     const token = tokens[idx];
@@ -77,6 +77,14 @@ function createRenderer(options = {}) {
     const color = headingColors[mdLevel];
     if (color && color !== '#000000') {
       token.attrSet('style', `color: ${color}`);
+    }
+    // Add id slug to h2 elements for anchor linking
+    if (level === 'h2') {
+      const contentToken = tokens[idx + 1];
+      if (contentToken && contentToken.content) {
+        const slug = contentToken.content.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        token.attrSet('id', slug);
+      }
     }
     if (defaultOpen) return defaultOpen(tokens, idx, opts, env, self);
     return self.renderToken(tokens, idx, opts);
