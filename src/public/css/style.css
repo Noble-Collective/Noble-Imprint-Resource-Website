@@ -77,7 +77,7 @@ img {
 .header-inner {
   display: grid;
   grid-template-areas: 'heading navigation icons';
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto auto;
   align-items: center;
   column-gap: 2rem;
   padding: 8px 50px;
@@ -190,7 +190,8 @@ img {
   grid-area: icons;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-self: start;
+  padding-left: 1rem;
 }
 
 .give-btn {
