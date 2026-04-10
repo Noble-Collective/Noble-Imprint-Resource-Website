@@ -160,23 +160,52 @@ function getVerses(translation, refString) {
 
     const [, bookName, chapter, verseSpec] = bookMatch;
 
-    // Parse verse spec: "1-5" or "23, 25-31, 33-35" or just "1"
+    // Parse verse spec: "1-5" or "23, 25-31" or "1-19:38" (cross-chapter)
     const segments = verseSpec.split(/,\s*/);
 
-    // Get the chapter's verse objects (with paragraph/heading data)
     const ch = parseInt(chapter);
     const book = t.books.get(bookName);
     const chapterVerses = book ? book.chapters.get(ch) : null;
 
     let lastVerse = null;
     for (const seg of segments) {
+      // Cross-chapter range: "1-19:38" means chapter:1 through chapter 19:38
+      const crossMatch = seg.trim().match(/^(\d+)[–-](\d+):(\d+)$/);
+      if (crossMatch && book) {
+        const startVerse = parseInt(crossMatch[1]);
+        const endChapter = parseInt(crossMatch[2]);
+        const endVerse = parseInt(crossMatch[3]);
+
+        for (let c = ch; c <= endChapter; c++) {
+          const cVerses = book.chapters.get(c);
+          if (!cVerses) continue;
+          const vStart = (c === ch) ? startVerse : 1;
+          const vEnd = (c === endChapter) ? endVerse : Math.max(...cVerses.map(v => v.verse));
+
+          for (let v = vStart; v <= vEnd; v++) {
+            const key = `${bookName} ${c}:${v}`;
+            const text = t.verses[key];
+            if (text) {
+              const entry = { ref: key, verse: v, text };
+              const verseObj = cVerses.find(cv => cv.verse === v);
+              if (verseObj) {
+                if (verseObj.paragraphStart) entry.paragraphStart = true;
+                if (verseObj.sectionHeading) entry.sectionHeading = verseObj.sectionHeading;
+              }
+              results.push(entry);
+            }
+          }
+        }
+        continue;
+      }
+
+      // Single-chapter range: "1-5" or just "1"
       const rangeMatch = seg.trim().match(/^(\d+)(?:[–-](\d+))?$/);
       if (!rangeMatch) continue;
 
       const start = parseInt(rangeMatch[1]);
       const end = rangeMatch[2] ? parseInt(rangeMatch[2]) : start;
 
-      // Mark a gap if verses aren't continuous
       if (lastVerse !== null && start !== lastVerse + 1) {
         results.push({ gap: true });
       }
@@ -186,7 +215,6 @@ function getVerses(translation, refString) {
         const text = t.verses[key];
         if (text) {
           const entry = { ref: key, verse: v, text };
-          // Add paragraph/heading info from chapter data
           if (chapterVerses) {
             const verseObj = chapterVerses.find(cv => cv.verse === v);
             if (verseObj) {

@@ -1547,6 +1547,16 @@ body.text-mode .home-text {
   text-decoration: underline;
 }
 
+.verse-popup-chapter {
+  font-family: var(--font-sans);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--color-charcoal);
+  margin: 2rem 0 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
 .verse-popup-heading {
   font-family: var(--font-sans);
   font-size: 0.85rem;

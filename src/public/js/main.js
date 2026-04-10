@@ -198,11 +198,24 @@
 
           var html = '';
           var inParagraph = false;
+          var currentChapter = null;
           data.verses.forEach(function (v, i) {
             if (v.gap) {
               if (inParagraph) { html += '</p>'; inParagraph = false; }
               html += '<div class="verse-gap"></div>';
               return;
+            }
+            // Detect chapter change from ref like "Genesis 16:1"
+            var chMatch = v.ref && v.ref.match(/(\d+):\d+$/);
+            var ch = chMatch ? chMatch[1] : null;
+            if (ch && ch !== currentChapter) {
+              if (inParagraph) { html += '</p>'; inParagraph = false; }
+              if (currentChapter !== null) {
+                // Not the first chapter — show chapter heading
+                var bookName = v.ref.replace(/\s\d+:\d+$/, '');
+                html += '<h2 class="verse-popup-chapter">' + bookName + ' ' + ch + '</h2>';
+              }
+              currentChapter = ch;
             }
             if (v.sectionHeading) {
               if (inParagraph) { html += '</p>'; inParagraph = false; }

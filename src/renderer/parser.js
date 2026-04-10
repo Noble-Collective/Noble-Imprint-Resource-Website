@@ -156,12 +156,13 @@ function renderMarkdown(content, options = {}) {
   // Build regex from known names (longest first to avoid partial matches)
   const bookNamePat = BIBLE_BOOKS.sort((a, b) => b.length - a.length)
     .map(b => b.replace(/\s/g, '\\s')).join('|');
-  const verseSpecPat = '\\d+:\\d+(?:[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
-  // Full reference: "Acts 2:1-47" or "1 Peter 2:24-25"
+  // Verse spec: "15:1-19:38" or "2:1-47" or "2:23, 25-31, 33-35"
+  // Cross-chapter range: \d+:\d+ optionally followed by –\d+:\d+ or –\d+
+  const verseSpecPat = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
   const fullRefPat = new RegExp(`(${bookNamePat})\\s(${verseSpecPat})`, 'g');
-  // Shorthand refs inside parens — handles semicolons and cf.:
-  // "(2:30; cf. 2:22)" or "(cf. 2:14–21)" or "(2:23, 25-31)"
-  const shorthandPat = /\(((?:cf\.\s?)?(\d+:\d+(?:[–\-]\d+)?(?:,\s?\d+(?:[–\-]\d+)?)*)(?:;\s?(?:cf\.\s?)?(\d+:\d+(?:[–\-]\d+)?(?:,\s?\d+(?:[–\-]\d+?)?)*))*)\)/g;
+  // Shorthand refs inside parens — handles semicolons, cf., cross-chapter ranges
+  const shorthandVerseSpec = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
+  const shorthandPat = new RegExp(`\\(((?:cf\\.\\s?)?(?:${shorthandVerseSpec})(?:;\\s?(?:cf\\.\\s?)?(?:${shorthandVerseSpec}))*)\\)`, 'g');
 
   // First pass: find all full references to build a context map.
   // Only track current book from "Biblical Narrative (Book Ch:V)" section
