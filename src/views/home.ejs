@@ -4,29 +4,39 @@
   <aside class="sidebar">
     <div class="sidebar-title">Library</div>
     <ul class="nav-series">
-      <% tree.series.forEach(function(series) { %>
-        <li>
-          <a href="#series-<%= series.slug %>" class="nav-series-link"><%= series.title %></a>
+      <% tree.series.forEach(function(series, si) { %>
+        <li class="nav-series-group">
+          <button class="nav-series-link" data-toggle-series aria-expanded="true">
+            <span><%= series.title %></span>
+            <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
           <% if (series.children && series.children.length > 0) { %>
-            <ul class="nav-subseries">
+            <ul class="nav-subseries is-expanded">
               <% series.children.forEach(function(child) { %>
                 <% if (child.type === 'subseries') { %>
-                  <li><span class="nav-sub-label"><%= child.title %></span></li>
-                  <% child.books.forEach(function(book) { %>
-                    <li>
-                      <a href="<%= content.bookUrl(series, child, book) %>" class="nav-book-item">
-                        <div class="nav-thumb<% if (!book.coverPath) { %> cover-green<% } %>"><% if (book.coverPath) { %><img src="/cover/<%= book.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
-                        <div>
-                          <div class="nav-book-name"><%= book.title %></div>
-                          <% if (book.banner === 'Preview') { %>
-                            <span class="badge badge-preview">Preview</span>
-                          <% } else if (book.banner === 'Pre-Release') { %>
-                            <span class="badge badge-prerelease">Pre-Release</span>
-                          <% } %>
-                        </div>
-                      </a>
-                    </li>
-                  <% }); %>
+                  <li class="nav-subseries-group">
+                    <button class="nav-sub-label" data-toggle-subseries aria-expanded="true">
+                      <span><%= child.title %></span>
+                      <svg class="nav-sub-caret" width="8" height="5" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <ul class="nav-sub-books is-expanded">
+                      <% child.books.forEach(function(book) { %>
+                        <li>
+                          <a href="<%= content.bookUrl(series, child, book) %>" class="nav-book-item">
+                            <div class="nav-thumb<% if (!book.coverPath) { %> cover-green<% } %>"><% if (book.coverPath) { %><img src="/cover/<%= book.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
+                            <div>
+                              <div class="nav-book-name"><%= book.title %></div>
+                              <% if (book.banner === 'Preview') { %>
+                                <span class="badge badge-preview">Preview</span>
+                              <% } else if (book.banner === 'Pre-Release') { %>
+                                <span class="badge badge-prerelease">Pre-Release</span>
+                              <% } %>
+                            </div>
+                          </a>
+                        </li>
+                      <% }); %>
+                    </ul>
+                  </li>
                 <% } else if (child.type === 'book') { %>
                   <li>
                     <a href="<%= content.bookUrl(series, null, child) %>" class="nav-book-item">
@@ -78,10 +88,10 @@
             <p class="series-subtitle"><%= series.subtitle %></p>
           <% } %>
 
-          <% series.children.forEach(function(child) { %>
-            <% if (child.type === 'subseries') { %>
-              <div class="subseries-label"><%= child.title %><% if (child.subtitle) { %> &mdash; <%= child.subtitle %><% } %></div>
-              <div class="book-grid">
+          <div class="book-grid">
+            <% series.children.forEach(function(child) { %>
+              <% if (child.type === 'subseries') { %>
+                <div class="subseries-label grid-full-width"><%= child.title %><% if (child.subtitle) { %> &mdash; <%= child.subtitle %><% } %></div>
                 <% child.books.forEach(function(book) { %>
                   <a href="<%= content.bookUrl(series, child, book) %>" class="book-card">
                     <div class="book-cover<% if (!book.coverPath) { %> cover-green<% } %>">
@@ -100,9 +110,7 @@
                     <div class="book-card-sub"><%= book.sessions.length %> <%= book.sessions.length === 1 ? 'session' : 'sessions' %></div>
                   </a>
                 <% }); %>
-              </div>
-            <% } else if (child.type === 'book') { %>
-              <div class="book-grid">
+              <% } else if (child.type === 'book') { %>
                 <a href="<%= content.bookUrl(series, null, child) %>" class="book-card">
                   <div class="book-cover<% if (!child.coverPath) { %> cover-green<% } %>">
                     <% if (child.coverPath) { %>
@@ -119,9 +127,9 @@
                   <div class="book-card-title"><%= child.title %></div>
                   <div class="book-card-sub"><%= child.sessions.length %> <%= child.sessions.length === 1 ? 'session' : 'sessions' %></div>
                 </a>
-              </div>
-            <% } %>
-          <% }); %>
+              <% } %>
+            <% }); %>
+          </div>
         </section>
       <% }); %>
     </div>

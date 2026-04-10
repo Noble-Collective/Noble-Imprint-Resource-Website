@@ -32,13 +32,28 @@
   /* ----- Sidebar Series Expand / Collapse ----- */
 
   function initSidebarToggle() {
-    var seriesHeaders = document.querySelectorAll('.sidebar-series-name');
+    var toggles = document.querySelectorAll('[data-toggle-series]');
 
-    seriesHeaders.forEach(function (header) {
-      header.addEventListener('click', function () {
-        var parent = header.closest('.sidebar-series');
-        if (!parent) return;
-        parent.classList.toggle('expanded');
+    toggles.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        var list = btn.nextElementSibling;
+        if (list && list.classList.contains('nav-subseries')) {
+          list.classList.toggle('is-expanded');
+        }
+      });
+    });
+
+    var subToggles = document.querySelectorAll('[data-toggle-subseries]');
+    subToggles.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        var books = btn.closest('.nav-subseries-group').querySelector('.nav-sub-books');
+        if (books) {
+          books.classList.toggle('is-expanded');
+        }
       });
     });
   }
