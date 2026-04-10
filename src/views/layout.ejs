@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | Noble Collective Resources</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-left">
+    <a href="/" class="logo">
+      <div class="logo-mark"><span>N</span></div>
+      <span class="logo-text">Noble Collective</span>
+    </a>
+    <nav>
+      <a href="https://noblecollective.org/about">About</a>
+      <a href="https://noblecollective.org/cohorts">Cohorts</a>
+      <a href="https://noblecollective.org/conferences">Conferences</a>
+      <a href="https://noblecollective.org/store">Store</a>
+      <a href="/" class="active">Resources</a>
+      <a href="https://noblecollective.org/give" class="give-link">Give &rsaquo;</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <%- body %>
+</div>
+
+<footer class="site-footer">&copy; 2026 Noble Collective. All rights reserved.</footer>
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>

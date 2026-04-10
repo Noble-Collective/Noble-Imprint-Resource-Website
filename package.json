@@ -1,0 +1,17 @@
+{
+  "name": "noble-imprint-resource-website",
+  "version": "1.0.0",
+  "description": "Public website for Noble Imprint discipleship resources",
+  "main": "src/server/index.js",
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "node --watch src/server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ejs": "^3.1.10",
+    "octokit": "^4.1.0",
+    "markdown-it": "^14.1.0",
+    "js-yaml": "^4.1.0"
+  }
+}

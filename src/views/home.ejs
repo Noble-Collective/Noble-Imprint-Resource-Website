@@ -1,0 +1,197 @@
+<%- include('partials/header') %>
+
+  <!-- ===== SIDEBAR: Library Navigation Tree ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Library</div>
+    <ul class="nav-series">
+      <% tree.series.forEach(function(series) { %>
+        <li>
+          <a href="#series-<%= series.slug %>" class="nav-series-link"><%= series.title %></a>
+          <% if (series.children && series.children.length > 0) { %>
+            <ul class="nav-subseries">
+              <% series.children.forEach(function(child) { %>
+                <% if (child.type === 'subseries') { %>
+                  <li><span class="nav-sub-label"><%= child.title %></span></li>
+                  <% child.books.forEach(function(book) { %>
+                    <li>
+                      <a href="<%= content.bookUrl(series, child, book) %>" class="nav-book-item">
+                        <div class="nav-thumb<% if (!book.coverPath) { %> cover-green<% } %>"><% if (book.coverPath) { %><img src="/cover/<%= book.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
+                        <div>
+                          <div class="nav-book-name"><%= book.title %></div>
+                          <% if (book.banner === 'Preview') { %>
+                            <span class="badge badge-preview">Preview</span>
+                          <% } else if (book.banner === 'Pre-Release') { %>
+                            <span class="badge badge-prerelease">Pre-Release</span>
+                          <% } %>
+                        </div>
+                      </a>
+                    </li>
+                  <% }); %>
+                <% } else if (child.type === 'book') { %>
+                  <li>
+                    <a href="<%= content.bookUrl(series, null, child) %>" class="nav-book-item">
+                      <div class="nav-thumb<% if (!child.coverPath) { %> cover-green<% } %>"><% if (child.coverPath) { %><img src="/cover/<%= child.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
+                      <div>
+                        <div class="nav-book-name"><%= child.title %></div>
+                        <% if (child.banner === 'Preview') { %>
+                          <span class="badge badge-preview">Preview</span>
+                        <% } else if (child.banner === 'Pre-Release') { %>
+                          <span class="badge badge-prerelease">Pre-Release</span>
+                        <% } %>
+                      </div>
+                    </a>
+                  </li>
+                <% } %>
+              <% }); %>
+            </ul>
+          <% } %>
+        </li>
+      <% }); %>
+    </ul>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main">
+    <div class="home-header-row">
+      <h1 class="page-title">Resource Library</h1>
+      <div class="view-toggle">
+        <button class="toggle-btn active" data-mode="visual" aria-label="Visual view">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="1" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="1" y="10" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="10" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          Visual
+        </button>
+        <button class="toggle-btn" data-mode="text" aria-label="List view">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><line x1="1" y1="3" x2="17" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/></svg>
+          List
+        </button>
+      </div>
+    </div>
+    <p class="page-subtitle">A growing collection of discipleship resources for the church.</p>
+
+    <!-- ===== VISUAL MODE (default) ===== -->
+    <div class="home-visual">
+      <% tree.series.forEach(function(series) { %>
+        <section class="series-section" id="series-<%= series.slug %>">
+          <div class="series-header">
+            <h2 class="series-heading"><%= series.title %></h2>
+          </div>
+          <% if (series.subtitle) { %>
+            <p class="series-subtitle"><%= series.subtitle %></p>
+          <% } %>
+
+          <% series.children.forEach(function(child) { %>
+            <% if (child.type === 'subseries') { %>
+              <div class="subseries-label"><%= child.title %><% if (child.subtitle) { %> &mdash; <%= child.subtitle %><% } %></div>
+              <div class="book-grid">
+                <% child.books.forEach(function(book) { %>
+                  <a href="<%= content.bookUrl(series, child, book) %>" class="book-card">
+                    <div class="book-cover<% if (!book.coverPath) { %> cover-green<% } %>">
+                      <% if (book.coverPath) { %>
+                        <img src="/cover/<%= book.coverPath %>" alt="<%= book.title %>" class="book-cover-img">
+                      <% } else { %>
+                        <%= book.title %>
+                      <% } %>
+                      <% if (book.banner === 'Preview') { %>
+                        <span class="cover-badge preview">Preview</span>
+                      <% } else if (book.banner === 'Pre-Release') { %>
+                        <span class="cover-badge prerelease">Pre-Release</span>
+                      <% } %>
+                    </div>
+                    <div class="book-card-title"><%= book.title %></div>
+                    <div class="book-card-sub"><%= book.sessions.length %> <%= book.sessions.length === 1 ? 'session' : 'sessions' %></div>
+                  </a>
+                <% }); %>
+              </div>
+            <% } else if (child.type === 'book') { %>
+              <div class="book-grid">
+                <a href="<%= content.bookUrl(series, null, child) %>" class="book-card">
+                  <div class="book-cover<% if (!child.coverPath) { %> cover-green<% } %>">
+                    <% if (child.coverPath) { %>
+                      <img src="/cover/<%= child.coverPath %>" alt="<%= child.title %>" class="book-cover-img">
+                    <% } else { %>
+                      <%= child.title %>
+                    <% } %>
+                    <% if (child.banner === 'Preview') { %>
+                      <span class="cover-badge preview">Preview</span>
+                    <% } else if (child.banner === 'Pre-Release') { %>
+                      <span class="cover-badge prerelease">Pre-Release</span>
+                    <% } %>
+                  </div>
+                  <div class="book-card-title"><%= child.title %></div>
+                  <div class="book-card-sub"><%= child.sessions.length %> <%= child.sessions.length === 1 ? 'session' : 'sessions' %></div>
+                </a>
+              </div>
+            <% } %>
+          <% }); %>
+        </section>
+      <% }); %>
+    </div>
+
+    <!-- ===== TEXT/LIST MODE (hidden by default, shown when body.text-mode) ===== -->
+    <div class="home-text">
+      <% tree.series.forEach(function(series) { %>
+        <div class="text-series-block">
+          <div class="text-series-header">
+            <div>
+              <h2 class="series-heading"><%= series.title %></h2>
+              <% if (series.subtitle) { %>
+                <p class="series-subtitle"><%= series.subtitle %></p>
+              <% } %>
+            </div>
+            <span class="text-series-count"><%= series.bookCount %> <%= series.bookCount === 1 ? 'book' : 'books' %></span>
+          </div>
+
+          <% series.children.forEach(function(child) { %>
+            <% if (child.type === 'subseries') { %>
+              <div class="text-subseries-header">
+                <span class="text-subseries-title"><%= child.title %></span>
+                <% if (child.subtitle) { %>
+                  <span class="text-subseries-desc">&mdash; <%= child.subtitle %></span>
+                <% } %>
+              </div>
+              <% child.books.forEach(function(book) { %>
+                <a href="<%= content.bookUrl(series, child, book) %>" class="text-book-row">
+                  <% var _bk = (typeof book !== 'undefined' && book) ? book : child; %><div class="text-book-thumb<% if (!_bk.coverPath) { %> cover-green<% } %>"><% if (_bk.coverPath) { %><img src="/cover/<%= _bk.coverPath %>" alt="" class="text-book-thumb-img"><% } %></div>
+                  <div class="text-book-info">
+                    <div class="text-book-title">
+                      <%= book.title %>
+                      <% if (book.banner === 'Preview') { %>
+                        <span class="badge badge-preview">Preview</span>
+                      <% } else if (book.banner === 'Pre-Release') { %>
+                        <span class="badge badge-prerelease">Pre-Release</span>
+                      <% } %>
+                    </div>
+                    <% if (book.subtitle) { %>
+                      <div class="text-book-subtitle"><%= book.subtitle %></div>
+                    <% } %>
+                    <div class="text-book-meta"><%= book.sessions.length %> <%= book.sessions.length === 1 ? 'session' : 'sessions' %></div>
+                  </div>
+                  <span class="text-book-arrow">&rsaquo;</span>
+                </a>
+              <% }); %>
+            <% } else if (child.type === 'book') { %>
+              <a href="<%= content.bookUrl(series, null, child) %>" class="text-book-row">
+                <% var _bk = (typeof book !== 'undefined' && book) ? book : child; %><div class="text-book-thumb<% if (!_bk.coverPath) { %> cover-green<% } %>"><% if (_bk.coverPath) { %><img src="/cover/<%= _bk.coverPath %>" alt="" class="text-book-thumb-img"><% } %></div>
+                <div class="text-book-info">
+                  <div class="text-book-title">
+                    <%= child.title %>
+                    <% if (child.banner === 'Preview') { %>
+                      <span class="badge badge-preview">Preview</span>
+                    <% } else if (child.banner === 'Pre-Release') { %>
+                      <span class="badge badge-prerelease">Pre-Release</span>
+                    <% } %>
+                  </div>
+                  <% if (child.subtitle) { %>
+                    <div class="text-book-subtitle"><%= child.subtitle %></div>
+                  <% } %>
+                  <div class="text-book-meta"><%= child.sessions.length %> <%= child.sessions.length === 1 ? 'session' : 'sessions' %></div>
+                </div>
+                <span class="text-book-arrow">&rsaquo;</span>
+              </a>
+            <% } %>
+          <% }); %>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

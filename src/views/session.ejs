@@ -1,0 +1,62 @@
+<%- include('partials/header') %>
+
+  <!-- ===== SIDEBAR: Session Navigation ===== -->
+  <aside class="sidebar">
+    <a href="<%= content.bookUrl(series, subseries, book) %>" class="sidebar-back">&larr; <%= book.title %></a>
+
+    <ul class="nav-session-list">
+      <% book.sessions.forEach(function(s, i) { %>
+        <li>
+          <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item<%= s.slug === session.slug ? ' active' : '' %>">
+            <span class="session-num"><%= i + 1 %></span>
+            <span class="nav-session-name"><%= s.displayName %></span>
+          </a>
+        </li>
+      <% }); %>
+    </ul>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main">
+    <div class="reading-top">
+      <div class="breadcrumb">
+        <a href="/">Resources</a> <span>&rsaquo;</span>
+        <a href="/#series-<%= series.slug %>"><%= series.title %></a>
+        <% if (subseries) { %>
+          <span>&rsaquo;</span>
+          <a href="/#series-<%= series.slug %>"><%= subseries.title %></a>
+        <% } %>
+        <span>&rsaquo;</span>
+        <a href="<%= content.bookUrl(series, subseries, book) %>"><%= book.title %></a>
+        <span>&rsaquo;</span>
+        <%= session.title || session.displayName %>
+      </div>
+    </div>
+
+    <div class="reading-content">
+      <div class="session-content">
+        <%- sessionHtml %>
+      </div>
+
+      <div class="session-nav">
+        <% if (prevSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, prevSession) %>" class="session-nav-link session-nav-prev">
+            <span class="session-nav-dir">&larr; Previous</span>
+            <span class="session-nav-name"><%= prevSession.displayName %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>
+        <% if (nextSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, nextSession) %>" class="session-nav-link session-nav-next">
+            <span class="session-nav-dir">Next &rarr;</span>
+            <span class="session-nav-name"><%= nextSession.displayName %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

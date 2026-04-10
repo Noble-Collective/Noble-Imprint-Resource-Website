@@ -1,0 +1,11 @@
+# Noble Imprint Resource Website Configuration
+
+# Roles (Phase 2 - authentication)
+roles:
+  suggest-comment: []
+  admin: []
+
+# Override publication status for specific paths (rare exceptions)
+# Use the path relative to series/ in the resources repo
+# status_overrides:
+#   "Spiritual Journals/Sacred Markings": "Hidden"
