@@ -1,0 +1,74 @@
+<%- include('partials/header') %>
+
+  <aside class="sidebar">
+    <a href="/" class="sidebar-back">&larr; Resources</a>
+    <div class="sidebar-book-info">
+      <div class="sidebar-book-cover<% if (!translation.coverPath) { %> cover-green<% } %>"><% if (translation.coverPath) { %><img src="/cover/<%= translation.coverPath %>" alt="<%= translation.title %>" class="sidebar-book-cover-img"><% } %></div>
+      <div class="sidebar-book-title"><%= translation.title %></div>
+      <% if (translation.description) { %>
+        <div class="sidebar-book-subtitle"><%= translation.description %></div>
+      <% } %>
+    </div>
+    <div class="sidebar-sessions-title">Old Testament</div>
+    <ul class="nav-session-list">
+      <% ot.forEach(function(b) { %>
+        <li>
+          <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(b.name) %>" class="nav-session-item">
+            <span class="nav-session-name"><%= b.name %></span>
+          </a>
+        </li>
+      <% }); %>
+    </ul>
+    <div class="sidebar-sessions-title">New Testament</div>
+    <ul class="nav-session-list">
+      <% nt.forEach(function(b) { %>
+        <li>
+          <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(b.name) %>" class="nav-session-item">
+            <span class="nav-session-name"><%= b.name %></span>
+          </a>
+        </li>
+      <% }); %>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <div class="breadcrumb">
+      <a href="/">Resources</a> <span>&rsaquo;</span>
+      <%= translation.title %>
+    </div>
+
+    <h1 class="page-title"><%= translation.title %></h1>
+    <% if (translation.description) { %>
+      <p class="book-detail-subtitle"><%= translation.description %></p>
+    <% } %>
+
+    <div class="book-sessions-area">
+      <div class="sessions-heading-label">Old Testament</div>
+      <ul class="session-list">
+        <% ot.forEach(function(b) { %>
+          <li>
+            <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(b.name) %>">
+              <span class="session-name"><%= b.name %></span>
+              <span class="session-num"><%= b.chapterCount %> ch</span>
+              <span class="session-arrow">&rsaquo;</span>
+            </a>
+          </li>
+        <% }); %>
+      </ul>
+
+      <div class="sessions-heading-label" style="margin-top: 2rem;">New Testament</div>
+      <ul class="session-list">
+        <% nt.forEach(function(b) { %>
+          <li>
+            <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(b.name) %>">
+              <span class="session-name"><%= b.name %></span>
+              <span class="session-num"><%= b.chapterCount %> ch</span>
+              <span class="session-arrow">&rsaquo;</span>
+            </a>
+          </li>
+        <% }); %>
+      </ul>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

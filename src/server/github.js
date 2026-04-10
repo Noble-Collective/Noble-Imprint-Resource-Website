@@ -35,6 +35,16 @@ async function getFileContent(path) {
   return { content, sha: data.sha };
 }
 
+async function getFileBinary(path) {
+  const { data } = await getOctokit().rest.repos.getContent({
+    owner: OWNER,
+    repo: REPO,
+    path,
+  });
+  if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
+  return Buffer.from(data.content, 'base64');
+}
+
 async function getFileRaw(path) {
   const { data } = await getOctokit().request('GET /repos/{owner}/{repo}/contents/{path}', {
     owner: OWNER,
@@ -45,4 +55,4 @@ async function getFileRaw(path) {
   return data;
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileRaw, OWNER, REPO };
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, OWNER, REPO };

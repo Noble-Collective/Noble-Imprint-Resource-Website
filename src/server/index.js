@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const content = require('./content');
+const bible = require('./bible');
 const { renderMarkdown, renderCommonContent } = require('../renderer/parser');
 
 const app = express();
@@ -13,20 +14,22 @@ app.set('views', path.join(__dirname, '../views'));
 // Static files
 app.use('/static', express.static(path.join(__dirname, '../public')));
 
-// Cover image proxy — serves cover SVGs from the resources repo
+// Cover image proxy — serves covers from the resources repo
 app.get('/cover/*', async (req, res) => {
   try {
     const repoPath = req.params[0];
     const github = require('./github');
-    const data = await github.getFileRaw(repoPath);
     const ext = path.extname(repoPath).toLowerCase();
     const mimeTypes = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
     res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
     res.set('Cache-Control', 'public, max-age=3600');
-    if (typeof data === 'string') {
-      res.send(data);
+
+    if (ext === '.svg') {
+      const data = await github.getFileRaw(repoPath);
+      res.send(typeof data === 'string' ? data : Buffer.from(data));
     } else {
-      res.send(Buffer.from(data));
+      const buf = await github.getFileBinary(repoPath);
+      res.send(buf);
     }
   } catch (err) {
     res.status(404).send('Cover not found');
@@ -53,13 +56,61 @@ app.get('/image/*', async (req, res) => {
   }
 });
 
+// Verse lookup API
+app.get('/api/verses', (req, res) => {
+  const ref = req.query.ref;
+  const translation = req.query.translation || 'bsb';
+  if (!ref) return res.status(400).json({ error: 'ref parameter required' });
+
+  const verses = bible.getVerses(translation, ref);
+  if (verses.length === 0) {
+    return res.status(404).json({ error: 'No verses found', ref, translation });
+  }
+  res.json({ ref, translation, verses });
+});
+
+// Bible browsing routes
+app.get('/bible', (req, res) => {
+  const bibles = bible.getAllTranslations();
+  res.render('bible-index', { bibles, title: 'Bibles' });
+});
+
+app.get('/bible/:translationId', (req, res) => {
+  const t = bible.getTranslation(req.params.translationId);
+  if (!t) return res.status(404).render('error', { title: 'Not Found', message: 'Bible translation not found.' });
+  const { ot, nt } = bible.getBookListGrouped(req.params.translationId);
+  res.render('bible-books', { translation: t, ot, nt, title: t.title });
+});
+
+app.get('/bible/:translationId/:bookName', (req, res) => {
+  const t = bible.getTranslation(req.params.translationId);
+  if (!t) return res.status(404).render('error', { title: 'Not Found', message: 'Bible translation not found.' });
+  const bookName = decodeURIComponent(req.params.bookName);
+  const chapter = parseInt(req.query.chapter) || 1;
+  const verses = bible.getChapter(req.params.translationId, bookName, chapter);
+  if (!verses) return res.status(404).render('error', { title: 'Not Found', message: 'Chapter not found.' });
+  const books = bible.getBookList(req.params.translationId);
+  const bookInfo = books.find(b => b.name === bookName);
+  const totalChapters = bookInfo ? bookInfo.chapterCount : 1;
+  res.render('bible-chapter', {
+    translation: t,
+    bookName,
+    chapter,
+    totalChapters,
+    verses,
+    title: `${bookName} ${chapter} — ${t.title}`,
+  });
+});
+
 // Homepage
 app.get('/', async (req, res, next) => {
   try {
     const tree = await content.buildContentTree();
+    const bibles = bible.getAllTranslations();
     res.render('home', {
       tree,
       content,
+      bibles,
       title: 'Resource Library',
     });
   } catch (err) {
@@ -128,6 +179,14 @@ app.use((err, req, res, next) => {
   res.status(500).render('error', { title: 'Error', message: 'Something went wrong. Please try again.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Noble Imprint Resource Website running on port ${PORT}`);
+// Load Bibles then start server
+bible.loadBibles().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Noble Imprint Resource Website running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to load Bibles, starting anyway:', err.message);
+  app.listen(PORT, () => {
+    console.log(`Noble Imprint Resource Website running on port ${PORT} (without Bibles)`);
+  });
 });

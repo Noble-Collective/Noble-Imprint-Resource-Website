@@ -57,6 +57,26 @@
           <% } %>
         </li>
       <% }); %>
+      <% if (bibles && bibles.length > 0) { %>
+        <li class="nav-series-group">
+          <button class="nav-series-link" data-toggle-series aria-expanded="true">
+            <span>Bibles</span>
+            <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <ul class="nav-subseries is-expanded">
+            <% bibles.forEach(function(b) { %>
+              <li>
+                <a href="/bible/<%= b.id %>" class="nav-book-item">
+                  <div class="nav-thumb<% if (!b.coverPath) { %> cover-green<% } %>"><% if (b.coverPath) { %><img src="/cover/<%= b.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
+                  <div>
+                    <div class="nav-book-name"><%= b.title %></div>
+                  </div>
+                </a>
+              </li>
+            <% }); %>
+          </ul>
+        </li>
+      <% } %>
     </ul>
   </aside>
 
@@ -132,6 +152,31 @@
           </div>
         </section>
       <% }); %>
+
+      <!-- Bibles section -->
+      <% if (bibles && bibles.length > 0) { %>
+        <section class="series-section" id="series-bibles">
+          <div class="series-header">
+            <h2 class="series-heading">Bibles</h2>
+          </div>
+          <p class="series-subtitle">Browse available Bible translations.</p>
+          <div class="book-grid">
+            <% bibles.forEach(function(b) { %>
+              <a href="/bible/<%= b.id %>" class="book-card">
+                <div class="book-cover<% if (!b.coverPath) { %> cover-green<% } %>">
+                  <% if (b.coverPath) { %>
+                    <img src="/cover/<%= b.coverPath %>" alt="<%= b.title %>" class="book-cover-img">
+                  <% } else { %>
+                    <%= b.title %>
+                  <% } %>
+                </div>
+                <div class="book-card-title"><%= b.title %></div>
+                <div class="book-card-sub"><%= b.bookCount %> books</div>
+              </a>
+            <% }); %>
+          </div>
+        </section>
+      <% } %>
     </div>
 
     <!-- ===== TEXT/LIST MODE (hidden by default, shown when body.text-mode) ===== -->
@@ -199,6 +244,30 @@
           <% }); %>
         </div>
       <% }); %>
+
+      <!-- Bibles in list view -->
+      <% if (bibles && bibles.length > 0) { %>
+        <div class="text-series-block">
+          <div class="text-series-header">
+            <div>
+              <h2 class="series-heading">Bibles</h2>
+              <p class="series-subtitle">Browse available Bible translations.</p>
+            </div>
+            <span class="text-series-count"><%= bibles.length %> <%= bibles.length === 1 ? 'translation' : 'translations' %></span>
+          </div>
+          <% bibles.forEach(function(b) { %>
+            <a href="/bible/<%= b.id %>" class="text-book-row">
+              <div class="text-book-thumb<% if (!b.coverPath) { %> cover-green<% } %>"><% if (b.coverPath) { %><img src="/cover/<%= b.coverPath %>" alt="" class="text-book-thumb-img"><% } %></div>
+              <div class="text-book-info">
+                <div class="text-book-title"><%= b.title %></div>
+                <div class="text-book-subtitle"><%= b.description %></div>
+                <div class="text-book-meta"><%= b.bookCount %> books</div>
+              </div>
+              <span class="text-book-arrow">&rsaquo;</span>
+            </a>
+          <% }); %>
+        </div>
+      <% } %>
     </div>
   </main>
 

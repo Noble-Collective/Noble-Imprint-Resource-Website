@@ -1,0 +1,37 @@
+<%- include('partials/header') %>
+
+  <aside class="sidebar">
+    <div class="sidebar-title">Bibles</div>
+    <ul class="nav-series">
+      <% bibles.forEach(function(b) { %>
+        <li>
+          <a href="/bible/<%= b.id %>" class="nav-series-link" style="display:block;cursor:pointer;">
+            <span><%= b.title %></span>
+          </a>
+        </li>
+      <% }); %>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <h1 class="page-title">Bibles</h1>
+    <p class="page-subtitle">Browse available Bible translations.</p>
+
+    <div class="book-grid">
+      <% bibles.forEach(function(b) { %>
+        <a href="/bible/<%= b.id %>" class="book-card">
+          <div class="book-cover<% if (!b.coverPath) { %> cover-green<% } %>">
+            <% if (b.coverPath) { %>
+              <img src="/cover/<%= b.coverPath %>" alt="<%= b.title %>" class="book-cover-img">
+            <% } else { %>
+              <%= b.title %>
+            <% } %>
+          </div>
+          <div class="book-card-title"><%= b.title %></div>
+          <div class="book-card-sub"><%= b.bookCount %> books</div>
+        </a>
+      <% }); %>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

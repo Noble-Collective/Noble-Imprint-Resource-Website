@@ -1393,7 +1393,197 @@ body.text-mode .home-text {
 }
 
 /* ============================================================
-   10. FOOTER
+   10. BIBLE
+   ============================================================ */
+.bible-content {
+  font-family: var(--font-reading);
+  font-size: 17px;
+  line-height: 1.8;
+  color: #1a1a1a;
+}
+
+.bible-paragraph {
+  font-family: var(--font-reading);
+  font-size: 17px;
+  line-height: 1.8;
+  color: #1a1a1a;
+  margin-bottom: 1.25rem;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.bible-section-heading {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-green-dark);
+  margin: 2rem 0 0.75rem;
+}
+
+.bible-verse {
+  display: inline;
+}
+
+/* Bible reference links */
+.bible-ref {
+  color: var(--color-green);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--color-green);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.bible-ref:hover {
+  color: var(--color-green-dark);
+}
+
+/* Verse popup */
+.verse-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.verse-popup-overlay.is-visible {
+  display: flex;
+}
+
+.verse-popup {
+  background: var(--color-white);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 520px;
+  width: 90%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.verse-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.verse-popup-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-light);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+
+.verse-popup-close:hover {
+  color: var(--color-text);
+}
+
+.verse-popup-scroll {
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+  flex: 1;
+}
+
+.verse-popup-title {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-charcoal);
+}
+
+.verse-popup-body {
+  font-family: var(--font-reading);
+  font-size: 16px;
+  line-height: 1.75;
+  color: #1a1a1a;
+}
+
+.verse-popup-body .verse-num {
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--color-green);
+  margin-right: 2px;
+  vertical-align: super;
+}
+
+.verse-popup-footer {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.verse-popup-translation {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.verse-popup-link {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--color-green);
+  text-decoration: none;
+}
+
+.verse-popup-link:hover {
+  text-decoration: underline;
+}
+
+.verse-popup-heading {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-green-dark);
+  margin: 1rem 0 0.5rem;
+}
+
+.verse-popup-body p {
+  margin-bottom: 0.75rem;
+}
+
+.verse-gap {
+  border-top: 1px dashed var(--color-border);
+  margin: 1rem 0;
+}
+
+.verse-popup-loading {
+  text-align: center;
+  padding: 2rem;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-text-light);
+}
+
+.verse-num {
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--color-green);
+  margin-right: 2px;
+  vertical-align: super;
+  line-height: 0;
+}
+
+/* ============================================================
+   10b. FOOTER
    ============================================================ */
 .site-footer {
   background: var(--color-charcoal);

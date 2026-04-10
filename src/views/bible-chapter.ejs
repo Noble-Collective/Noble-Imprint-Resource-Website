@@ -1,0 +1,71 @@
+<%- include('partials/header') %>
+
+  <aside class="sidebar">
+    <a href="/bible/<%= translation.id %>" class="sidebar-back">&larr; <%= translation.title %></a>
+    <div class="sidebar-sessions-title">Chapters</div>
+    <ul class="nav-session-list">
+      <% for (var ch = 1; ch <= totalChapters; ch++) { %>
+        <li>
+          <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(bookName) %>?chapter=<%= ch %>" class="nav-session-item<%= ch === chapter ? ' active' : '' %>">
+            <span class="session-num"><%= ch %></span>
+            <span class="nav-session-name">Chapter <%= ch %></span>
+          </a>
+        </li>
+      <% } %>
+    </ul>
+  </aside>
+
+  <main class="main">
+    <div class="reading-top">
+      <div class="breadcrumb">
+        <a href="/">Resources</a> <span>&rsaquo;</span>
+        <a href="/bible">Bibles</a> <span>&rsaquo;</span>
+        <a href="/bible/<%= translation.id %>"><%= translation.title %></a> <span>&rsaquo;</span>
+        <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(bookName) %>"><%= bookName %></a> <span>&rsaquo;</span>
+        Chapter <%= chapter %>
+      </div>
+    </div>
+
+    <div class="reading-content">
+      <div class="session-content bible-content">
+        <h1><%= bookName %> <%= chapter %></h1>
+
+        <%
+          var inParagraph = false;
+          verses.forEach(function(v, i) {
+            if (v.sectionHeading) {
+              if (inParagraph) { %></p><% inParagraph = false; }
+              %><h3 class="bible-section-heading"><%= v.sectionHeading %></h3><%
+            }
+            if (v.paragraphStart || i === 0) {
+              if (inParagraph) { %></p><% }
+              %><p class="bible-paragraph"><% inParagraph = true;
+            }
+            %><span class="bible-verse" id="v<%= v.verse %>"><sup class="verse-num"><%= v.verse %></sup> <%= v.text %> </span><%
+          });
+          if (inParagraph) { %></p><% }
+        %>
+      </div>
+
+      <div class="session-nav">
+        <% if (chapter > 1) { %>
+          <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(bookName) %>?chapter=<%= chapter - 1 %>" class="session-nav-link session-nav-prev">
+            <span class="session-nav-dir">&larr; Previous</span>
+            <span class="session-nav-name">Chapter <%= chapter - 1 %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>
+        <% if (chapter < totalChapters) { %>
+          <a href="/bible/<%= translation.id %>/<%= encodeURIComponent(bookName) %>?chapter=<%= chapter + 1 %>" class="session-nav-link session-nav-next">
+            <span class="session-nav-dir">Next &rarr;</span>
+            <span class="session-nav-name">Chapter <%= chapter + 1 %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

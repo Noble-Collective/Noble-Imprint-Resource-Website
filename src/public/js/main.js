@@ -147,6 +147,91 @@
     });
   }
 
+  /* ----- Bible Verse Popup ----- */
+
+  function initVersePopup() {
+    var overlay = document.querySelector('[data-verse-overlay]');
+    var titleEl = document.querySelector('[data-verse-title]');
+    var bodyEl = document.querySelector('[data-verse-body]');
+    var translationEl = document.querySelector('[data-verse-translation]');
+    var linkEl = document.querySelector('[data-verse-link]');
+    var closeBtn = document.querySelector('[data-verse-close]');
+
+    if (!overlay) return;
+
+    function closePopup() {
+      overlay.classList.remove('is-visible');
+    }
+
+    closeBtn.addEventListener('click', closePopup);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closePopup();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePopup();
+    });
+
+    document.addEventListener('click', function (e) {
+      var ref = e.target.closest('.bible-ref');
+      if (!ref) return;
+      e.preventDefault();
+
+      var refText = ref.getAttribute('data-ref');
+      var translation = 'bsb';
+
+      titleEl.textContent = refText;
+      bodyEl.innerHTML = '<div class="verse-popup-loading">Loading...</div>';
+      translationEl.textContent = '';
+      linkEl.href = '#';
+      overlay.classList.add('is-visible');
+
+      // Normalize en-dash to hyphen for API
+      var apiRef = refText.replace(/\u2013/g, '-');
+
+      fetch('/api/verses?ref=' + encodeURIComponent(apiRef) + '&translation=' + translation)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error || !data.verses || data.verses.length === 0) {
+            bodyEl.innerHTML = '<div class="verse-popup-loading">Verse not found.</div>';
+            return;
+          }
+
+          var html = '';
+          var inParagraph = false;
+          data.verses.forEach(function (v, i) {
+            if (v.gap) {
+              if (inParagraph) { html += '</p>'; inParagraph = false; }
+              html += '<div class="verse-gap"></div>';
+              return;
+            }
+            if (v.sectionHeading) {
+              if (inParagraph) { html += '</p>'; inParagraph = false; }
+              html += '<div class="verse-popup-heading">' + v.sectionHeading + '</div>';
+            }
+            if (v.paragraphStart || !inParagraph) {
+              if (inParagraph) html += '</p>';
+              html += '<p>';
+              inParagraph = true;
+            }
+            html += '<sup class="verse-num">' + v.verse + '</sup> ' + v.text + ' ';
+          });
+          if (inParagraph) html += '</p>';
+          bodyEl.innerHTML = html;
+          translationEl.textContent = 'Berean Standard Bible';
+
+          // Build link to Bible browsing page
+          var firstRef = data.verses[0].ref;
+          var match = firstRef.match(/^(.+?)\s+(\d+):/);
+          if (match) {
+            linkEl.href = '/bible/bsb/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + data.verses[0].verse;
+          }
+        })
+        .catch(function () {
+          bodyEl.innerHTML = '<div class="verse-popup-loading">Failed to load verses.</div>';
+        });
+    });
+  }
+
   /* ----- Init on DOM Ready ----- */
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -154,5 +239,6 @@
     initViewToggle();
     initMenuDrawer();
     initMobileSidebarToggle();
+    initVersePopup();
   });
 })();
