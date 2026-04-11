@@ -1,13 +1,67 @@
 const github = require('./github');
+const fs = require('fs');
+const path = require('path');
 
 const translations = {};
 let loaded = false;
+
+const CACHE_DIR = path.join(__dirname, '../../.bible-cache');
+const CACHE_VERSION = 1;
+
+function getCachePath(id) {
+  return path.join(CACHE_DIR, `${id}-v${CACHE_VERSION}.json`);
+}
+
+function loadFromCache(id) {
+  try {
+    const cachePath = getCachePath(id);
+    if (!fs.existsSync(cachePath)) return null;
+    const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
+    console.log(`Loaded ${id.toUpperCase()} from cache`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveToCache(id, data) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(getCachePath(id), JSON.stringify(data));
+    console.log(`Cached ${id.toUpperCase()} to disk`);
+  } catch (err) {
+    console.warn(`Failed to cache ${id}:`, err.message);
+  }
+}
 
 async function loadBibles() {
   if (loaded) return;
 
   const ids = ['bsb', 'kjv'];
   for (const id of ids) {
+    // Try loading from cache first
+    const cached = loadFromCache(id);
+    if (cached) {
+      // Rebuild Maps from cached data
+      const books = new Map();
+      for (const [bookName, bookData] of Object.entries(cached.books)) {
+        const chapters = new Map();
+        for (const [ch, verses] of Object.entries(bookData.chapters)) {
+          chapters.set(parseInt(ch), verses);
+        }
+        books.set(bookName, { chapters });
+      }
+      translations[id] = {
+        id: cached.id,
+        title: cached.title,
+        description: cached.description,
+        version: cached.version,
+        coverPath: cached.coverPath,
+        verses: cached.verses,
+        books,
+      };
+      continue;
+    }
     try {
       const raw = await github.getFileRaw(`bibles/${id}/references.json`);
       const str = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
@@ -128,6 +182,18 @@ async function loadBibles() {
       };
 
       console.log(`Loaded ${id.toUpperCase()}: ${Object.keys(verses).length} verses, ${books.size} books, ${paragraphStarts.size} paragraph breaks`);
+
+      // Cache to disk for fast restarts
+      const cacheData = {
+        id, title: meta.title, description: meta.description || '',
+        version: meta.version || id.toUpperCase(), coverPath, verses,
+        books: Object.fromEntries(
+          Array.from(books.entries()).map(([name, data]) => [
+            name, { chapters: Object.fromEntries(Array.from(data.chapters.entries())) }
+          ])
+        ),
+      };
+      saveToCache(id, cacheData);
     } catch (err) {
       console.error(`Failed to load Bible ${id}:`, err.message);
     }
