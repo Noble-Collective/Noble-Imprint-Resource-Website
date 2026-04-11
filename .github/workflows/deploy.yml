@@ -24,8 +24,13 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build container image
-        run: gcloud builds submit --tag gcr.io/noble-imprint-website/resource-website --project=noble-imprint-website --suppress-logs
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build and push image
+        run: |
+          docker build -t gcr.io/noble-imprint-website/resource-website .
+          docker push gcr.io/noble-imprint-website/resource-website
 
       - name: Deploy to Cloud Run
         run: |
