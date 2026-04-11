@@ -14,6 +14,21 @@ app.set('views', path.join(__dirname, '../views'));
 // Static files
 app.use('/static', express.static(path.join(__dirname, '../public')));
 
+// Build timestamp — available in all templates
+const buildTimeRaw = process.env.BUILD_TIME;
+let buildTimeFormatted = null;
+if (buildTimeRaw) {
+  try {
+    const d = new Date(buildTimeRaw);
+    buildTimeFormatted = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }) +
+      ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/New_York' }).toLowerCase();
+  } catch { /* ignore */ }
+}
+app.use((req, res, next) => {
+  res.locals.buildTime = buildTimeFormatted;
+  next();
+});
+
 // Cover image proxy — serves covers from the resources repo
 app.get('/cover/*', async (req, res) => {
   try {
@@ -54,6 +69,13 @@ app.get('/image/*', async (req, res) => {
   } catch (err) {
     res.status(404).send('Image not found');
   }
+});
+
+// Cache refresh endpoint — called after deploy to clear stale content
+app.post('/api/refresh', (req, res) => {
+  const cache = require('./cache');
+  cache.invalidateAll();
+  res.json({ ok: true, message: 'Cache cleared' });
 });
 
 // Verse lookup API

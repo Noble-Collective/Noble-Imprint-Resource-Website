@@ -1707,6 +1707,12 @@ body.text-mode .home-text {
   color: #536942;
 }
 
+.footer-build-time {
+  font-size: 0.65rem;
+  color: rgba(83, 105, 66, 0.35);
+  margin-top: 0.75rem;
+}
+
 @media (max-width: 768px) {
   .footer-top {
     padding: 2rem 1.5rem;
