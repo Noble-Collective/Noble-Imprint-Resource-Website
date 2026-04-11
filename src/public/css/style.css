@@ -1620,21 +1620,111 @@ body.text-mode .home-text {
    10b. FOOTER
    ============================================================ */
 .site-footer {
-  background: var(--color-charcoal);
-  color: rgba(255, 255, 255, 0.6);
-  text-align: center;
-  padding: 2rem 3rem;
+  background: #ffffff;
+  color: #536942;
   font-family: var(--font-sans);
-  font-size: 0.8rem;
+  border-top: 1px solid rgba(83, 105, 66, 0.08);
 }
 
-.site-footer a {
-  color: rgba(255, 255, 255, 0.85);
+.footer-top {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 50px 36px;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr;
+  gap: 3rem;
+}
+
+.footer-logo-img {
+  width: 180px;
+  height: auto;
+  opacity: 0.85;
+}
+
+.footer-heading {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #536942;
+  margin-bottom: 1rem;
+}
+
+.footer-link-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-link-list li {
+  margin-bottom: 0.4rem;
+}
+
+.footer-link-list a {
+  font-size: 0.82rem;
+  color: rgba(83, 105, 66, 0.75);
+  text-decoration: none;
   transition: color 0.15s;
 }
 
-.site-footer a:hover {
-  color: var(--color-white);
+.footer-link-list a:hover {
+  color: #536942;
+}
+
+.footer-description {
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: rgba(83, 105, 66, 0.75);
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(83, 105, 66, 0.08);
+  padding: 1.5rem 50px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.footer-bottom-inner {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.footer-bottom small {
+  font-size: 0.72rem;
+  color: rgba(83, 105, 66, 0.5);
+}
+
+.footer-bottom a {
+  color: rgba(83, 105, 66, 0.5);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.footer-bottom a:hover {
+  color: #536942;
+}
+
+@media (max-width: 768px) {
+  .footer-top {
+    padding: 2rem 1.5rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .footer-bottom {
+    padding: 1rem 1.5rem;
+  }
+
+  .footer-bottom-inner {
+    justify-content: center;
+    gap: 1rem;
+  }
 }
 
 /* ============================================================
