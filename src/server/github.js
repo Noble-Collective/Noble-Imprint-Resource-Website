@@ -55,4 +55,15 @@ async function getFileRaw(path) {
   return data;
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, OWNER, REPO };
+async function updateFileContent(filePath, content, sha, message) {
+  await getOctokit().rest.repos.createOrUpdateFileContents({
+    owner: OWNER,
+    repo: REPO,
+    path: filePath,
+    message,
+    content: Buffer.from(content).toString('base64'),
+    sha,
+  });
+}
+
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, OWNER, REPO };

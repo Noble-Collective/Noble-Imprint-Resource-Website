@@ -305,6 +305,25 @@
     }
   }
 
+  /* ----- User Avatar Dropdown ----- */
+
+  function initUserMenu() {
+    var toggle = document.querySelector('[data-user-menu-toggle]');
+    var dropdown = document.querySelector('[data-user-dropdown]');
+    if (!toggle || !dropdown) return;
+
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      dropdown.classList.toggle('is-open');
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('[data-user-menu]')) {
+        dropdown.classList.remove('is-open');
+      }
+    });
+  }
+
   /* ----- Init on DOM Ready ----- */
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -314,5 +333,6 @@
     initMobileSidebarToggle();
     initVersePopup();
     initMobileToc();
+    initUserMenu();
   });
 })();

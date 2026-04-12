@@ -1,18 +1,31 @@
 const express = require('express');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 const content = require('./content');
 const bible = require('./bible');
+const auth = require('./auth');
+const firestore = require('./firestore');
 const { renderMarkdown, renderCommonContent } = require('../renderer/parser');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Trust proxy — needed for secure cookies on Cloud Run
+app.set('trust proxy', true);
+
 // View engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
+// Middleware
+app.use(cookieParser());
+app.use(express.json());
+
 // Static files
 app.use('/static', express.static(path.join(__dirname, '../public')));
+
+// Attach user to every request
+app.use(auth.attachUser);
 
 // Build timestamp — available in all templates
 const buildTimeRaw = process.env.BUILD_TIME;
@@ -26,6 +39,9 @@ if (buildTimeRaw) {
 }
 app.use((req, res, next) => {
   res.locals.buildTime = buildTimeFormatted;
+  res.locals.firebaseConfig = {
+    apiKey: process.env.FIREBASE_API_KEY || '',
+  };
   next();
 });
 
@@ -124,13 +140,53 @@ app.get('/bible/:translationId/:bookName', (req, res) => {
   });
 });
 
+// --- Auth routes ---
+
+app.post('/api/auth/session', async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) return res.status(400).json({ error: 'ID token required' });
+
+  try {
+    const sessionCookie = await auth.createSessionCookie(idToken);
+    const secure = process.env.NODE_ENV === 'production';
+    res.cookie('__session', sessionCookie, {
+      httpOnly: true,
+      secure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: auth.SESSION_EXPIRES_IN,
+    });
+
+    // Create or update user in Firestore
+    const admin = require('firebase-admin');
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    await firestore.createOrUpdateUser(decoded.email, decoded.name, decoded.picture);
+
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Session creation error:', err.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('__session', { path: '/' });
+  res.json({ status: 'ok' });
+});
+
+// --- Admin routes ---
+const adminRoutes = require('./admin-routes');
+app.use('/admin', auth.requireAdmin, adminRoutes.page);
+app.use('/api/admin', auth.requireAdmin, adminRoutes.api);
+
 // Homepage
 app.get('/', async (req, res, next) => {
   try {
     const tree = await content.buildContentTree();
+    const filtered = await content.filterContentTree(tree, req.user);
     const bibles = bible.getAllTranslations();
     res.render('home', {
-      tree,
+      tree: filtered,
       content,
       bibles,
       title: 'Resource Library',
@@ -148,6 +204,13 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
     const resolved = content.resolveRoute(tree, segments);
 
     if (!resolved) return next();
+
+    // Permission check for hidden books
+    const book = resolved.book;
+    if (book && book.status === 'hidden') {
+      const canAccess = await content.canAccessBook(req.user, book.repoPath);
+      if (!canAccess) return next(); // 404 — don't reveal the book exists
+    }
 
     if (resolved.type === 'book') {
       const { series, subseries, book } = resolved;

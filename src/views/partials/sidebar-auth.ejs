@@ -1,0 +1,21 @@
+    <div class="sidebar-auth">
+      <% if (user) { %>
+        <div class="sidebar-auth-user">
+          <% if (user.photoURL) { %>
+            <img src="<%= user.photoURL %>" alt="" class="sidebar-auth-avatar" referrerpolicy="no-referrer">
+          <% } else { %>
+            <span class="sidebar-auth-avatar sidebar-auth-avatar--initials"><%= (user.displayName || user.email)[0].toUpperCase() %></span>
+          <% } %>
+          <div class="sidebar-auth-info">
+            <div class="sidebar-auth-name"><%= user.displayName %></div>
+            <div class="sidebar-auth-email"><%= user.email %></div>
+          </div>
+        </div>
+        <% if (user.isAdmin) { %>
+          <a href="/admin" class="sidebar-auth-link">Admin Console</a>
+        <% } %>
+        <button onclick="logout()" class="sidebar-auth-link sidebar-auth-link--signout">Sign Out</button>
+      <% } else { %>
+        <button onclick="loginWithGoogle()" class="sidebar-auth-link sidebar-auth-link--signin">Sign In</button>
+      <% } %>
+    </div>

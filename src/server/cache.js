@@ -16,8 +16,12 @@ function set(key, value, ttl = DEFAULT_TTL) {
   store.set(key, { value, expires: Date.now() + ttl });
 }
 
+function del(key) {
+  store.delete(key);
+}
+
 function invalidateAll() {
   store.clear();
 }
 
-module.exports = { get, set, invalidateAll };
+module.exports = { get, set, del, invalidateAll };

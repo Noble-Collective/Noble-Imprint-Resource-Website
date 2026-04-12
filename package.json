@@ -8,10 +8,12 @@
     "dev": "node --watch src/server/index.js"
   },
   "dependencies": {
-    "express": "^4.21.0",
+    "cookie-parser": "^1.4.7",
     "ejs": "^3.1.10",
-    "octokit": "^4.1.0",
+    "express": "^4.21.0",
+    "firebase-admin": "^13.8.0",
+    "js-yaml": "^4.1.0",
     "markdown-it": "^14.1.0",
-    "js-yaml": "^4.1.0"
+    "octokit": "^4.1.0"
   }
 }

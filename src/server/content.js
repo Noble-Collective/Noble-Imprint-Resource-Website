@@ -78,7 +78,14 @@ async function loadSessions(bookPath) {
 
 async function loadBook(bookPath, dirName) {
   const meta = await loadMeta(bookPath);
-  if (meta.banner === 'Hidden') return null;
+
+  // Determine status: use explicit status field, fall back to banner for backward compat
+  let status = 'public';
+  if (meta.status) {
+    status = meta.status;
+  } else if (meta.banner === 'Hidden') {
+    status = 'hidden';
+  }
 
   const sessions = await loadSessions(bookPath);
   const commonBook = await loadCommonContent(bookPath, 'commonBook.md');
@@ -99,6 +106,7 @@ async function loadBook(bookPath, dirName) {
     subtitle: meta.subtitle || '',
     order: meta.order || 99,
     banner: meta.banner || null,
+    status,
     color: meta.color || {},
     coverPath,
     commonBook,
@@ -306,6 +314,86 @@ function gatherCommonContent(series, subseries, book) {
   return parts;
 }
 
+// Check if a user can access a specific book (for hidden books)
+async function canAccessBook(user, bookRepoPath) {
+  if (!user) return false;
+  if (user.isAdmin || user.isSuperAdmin) return true;
+
+  const firestore = require('./firestore');
+  const role = await firestore.getUserBookRole(user.email, bookRepoPath);
+  return role !== null;
+}
+
+// Filter content tree based on user permissions — removes hidden books the user can't see
+async function filterContentTree(tree, user) {
+  const firestore = require('./firestore');
+
+  // Get user's book roles for efficient lookup
+  let userBookRoles = {};
+  const isAdmin = user && (user.isAdmin || user.isSuperAdmin);
+  if (user && !isAdmin) {
+    const userData = await firestore.getUser(user.email);
+    if (userData && userData.bookRoles) {
+      userBookRoles = userData.bookRoles;
+    }
+  }
+
+  // Deep clone and filter
+  const filtered = {
+    series: tree.series.map(s => {
+      const children = s.children
+        .map(child => {
+          if (child.type === 'book') {
+            if (child.status === 'hidden' && !isAdmin) {
+              const key = child.repoPath.replace(/\//g, '|');
+              if (!userBookRoles[key]) return null;
+            }
+            return { ...child };
+          } else if (child.type === 'subseries') {
+            const books = child.books.filter(book => {
+              if (book.status === 'hidden' && !isAdmin) {
+                const key = book.repoPath.replace(/\//g, '|');
+                return !!userBookRoles[key];
+              }
+              return true;
+            }).map(b => ({ ...b }));
+            return { ...child, books };
+          }
+          return child;
+        })
+        .filter(Boolean);
+
+      // Recalculate book count
+      let bookCount = 0;
+      for (const child of children) {
+        if (child.type === 'book') bookCount++;
+        else if (child.type === 'subseries') bookCount += child.books.length;
+      }
+
+      return { ...s, children, bookCount };
+    }).filter(s => s.bookCount > 0), // Remove empty series
+  };
+
+  return filtered;
+}
+
+// Get all books from the tree (flat list) — used by admin console
+function getAllBooks(tree) {
+  const books = [];
+  for (const series of tree.series) {
+    for (const child of series.children) {
+      if (child.type === 'book') {
+        books.push({ ...child, seriesTitle: series.title, subseriesTitle: null });
+      } else if (child.type === 'subseries') {
+        for (const book of child.books) {
+          books.push({ ...book, seriesTitle: series.title, subseriesTitle: child.title });
+        }
+      }
+    }
+  }
+  return books;
+}
+
 module.exports = {
   buildContentTree,
   resolveRoute,
@@ -315,5 +403,8 @@ module.exports = {
   loadSessionContent,
   loadSessionTitles,
   gatherCommonContent,
+  filterContentTree,
+  canAccessBook,
+  getAllBooks,
   slugify,
 };

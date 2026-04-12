@@ -1,0 +1,231 @@
+<%- include('partials/header') %>
+
+  <main class="admin-main">
+    <h1 class="admin-page-title">Admin Console</h1>
+
+    <div class="admin-tabs">
+      <button class="admin-tab admin-tab--active" data-admin-tab="users">Users</button>
+      <button class="admin-tab" data-admin-tab="books">Books</button>
+    </div>
+
+    <!-- ===== USERS TAB ===== -->
+    <div class="admin-panel" id="panel-users">
+      <div class="admin-toolbar">
+        <button class="admin-btn admin-btn--primary" id="add-user-btn">+ Add User</button>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="users-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Email</th>
+              <th>Global Role</th>
+              <th>Book Roles</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+              <tr data-user-email="<%= u.email %>">
+                <td class="admin-user-cell">
+                  <% if (u.photoURL) { %>
+                    <img src="<%= u.photoURL %>" alt="" class="admin-avatar" referrerpolicy="no-referrer">
+                  <% } else { %>
+                    <span class="admin-avatar admin-avatar--initials"><%= (u.displayName || u.email)[0].toUpperCase() %></span>
+                  <% } %>
+                  <span><%= u.displayName || u.email %></span>
+                </td>
+                <td><%= u.email %></td>
+                <td>
+                  <% if (u.isSuperAdmin) { %>
+                    <span class="admin-badge admin-badge--super">Super Admin</span>
+                  <% } else if (u.globalRole === 'admin') { %>
+                    <span class="admin-badge admin-badge--admin">Admin</span>
+                  <% } else { %>
+                    <span class="admin-badge admin-badge--none">--</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (u.bookRoleCount > 0) { %>
+                    <button class="admin-link" data-show-book-roles="<%= u.email %>"><%= u.bookRoleCount %> book<%= u.bookRoleCount === 1 ? '' : 's' %></button>
+                  <% } else { %>
+                    <span class="text-muted">None</span>
+                  <% } %>
+                </td>
+                <td class="admin-actions-cell">
+                  <% if (!u.isSuperAdmin) { %>
+                    <button class="admin-btn admin-btn--sm" data-edit-user="<%= u.email %>" data-role="<%= u.globalRole || '' %>">Edit</button>
+                    <button class="admin-btn admin-btn--sm admin-btn--danger" data-delete-user="<%= u.email %>">Remove</button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== BOOKS TAB ===== -->
+    <div class="admin-panel admin-panel--hidden" id="panel-books">
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="books-table">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Series</th>
+              <th>Banner</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% books.forEach(function(book) { %>
+              <tr data-book-path="<%= book.repoPath %>">
+                <td class="admin-book-cell">
+                  <% if (book.coverPath) { %>
+                    <div class="admin-book-thumb"><img src="/cover/<%= book.coverPath %>" alt=""></div>
+                  <% } %>
+                  <span><%= book.title %></span>
+                </td>
+                <td>
+                  <%= book.seriesTitle %>
+                  <% if (book.subseriesTitle) { %><span class="text-muted"> / <%= book.subseriesTitle %></span><% } %>
+                </td>
+                <td>
+                  <% if (book.banner && book.banner !== 'Hidden') { %>
+                    <span class="admin-badge admin-badge--banner"><%= book.banner %></span>
+                  <% } else { %>
+                    <span class="text-muted">--</span>
+                  <% } %>
+                </td>
+                <td>
+                  <label class="admin-toggle" title="Toggle visibility">
+                    <input type="checkbox"
+                      class="admin-toggle-input"
+                      data-toggle-status="<%= book.repoPath %>"
+                      <%= book.status === 'public' ? 'checked' : '' %>>
+                    <span class="admin-toggle-slider"></span>
+                    <span class="admin-toggle-label"><%= book.status === 'public' ? 'Public' : 'Hidden' %></span>
+                  </label>
+                </td>
+                <td>
+                  <button class="admin-btn admin-btn--sm" data-manage-access="<%= book.repoPath %>" data-book-title="<%= book.title %>">Manage Access</button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== MODALS ===== -->
+
+    <!-- Add User Modal -->
+    <div class="admin-modal-overlay" id="modal-add-user" style="display:none">
+      <div class="admin-modal">
+        <div class="admin-modal-header">
+          <h2>Add User</h2>
+          <button class="admin-modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <label class="admin-label">Email Address</label>
+          <input type="email" class="admin-input" id="add-user-email" placeholder="user@example.com">
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-btn" data-close-modal>Cancel</button>
+          <button class="admin-btn admin-btn--primary" id="add-user-submit">Add User</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="admin-modal-overlay" id="modal-edit-user" style="display:none">
+      <div class="admin-modal">
+        <div class="admin-modal-header">
+          <h2>Edit User</h2>
+          <button class="admin-modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <p class="admin-modal-subtitle" id="edit-user-email"></p>
+          <label class="admin-label">Global Role</label>
+          <select class="admin-select" id="edit-user-role">
+            <option value="">No global role</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-btn" data-close-modal>Cancel</button>
+          <button class="admin-btn admin-btn--primary" id="edit-user-submit">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manage Book Access Modal -->
+    <div class="admin-modal-overlay" id="modal-manage-access" style="display:none">
+      <div class="admin-modal admin-modal--wide">
+        <div class="admin-modal-header">
+          <h2>Manage Access: <span id="access-book-title"></span></h2>
+          <button class="admin-modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-access-add">
+            <select class="admin-select" id="access-user-select">
+              <option value="">Select a user...</option>
+              <% users.forEach(function(u) { %>
+                <% if (!u.isSuperAdmin) { %>
+                  <option value="<%= u.email %>"><%= u.displayName || u.email %></option>
+                <% } %>
+              <% }); %>
+            </select>
+            <select class="admin-select" id="access-role-select">
+              <option value="viewer">Viewer</option>
+              <option value="comment-suggest">Comment / Suggest</option>
+              <option value="manuscript-owner">Manuscript Owner</option>
+            </select>
+            <button class="admin-btn admin-btn--primary admin-btn--sm" id="access-add-btn">Add</button>
+          </div>
+          <div id="access-list" class="admin-access-list">
+            <p class="text-muted">Loading...</p>
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-btn" data-close-modal>Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Book Roles for User Modal -->
+    <div class="admin-modal-overlay" id="modal-book-roles" style="display:none">
+      <div class="admin-modal admin-modal--wide">
+        <div class="admin-modal-header">
+          <h2>Book Roles: <span id="book-roles-user-email"></span></h2>
+          <button class="admin-modal-close" data-close-modal>&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <div id="book-roles-list" class="admin-access-list">
+            <p class="text-muted">Loading...</p>
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-btn" data-close-modal>Done</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+  // Pass server data to client JS (safe serialization)
+  window.__ADMIN_DATA = JSON.parse('<%- JSON.stringify({
+    users: users.map(function(u) {
+      return { email: u.email, displayName: u.displayName, isSuperAdmin: u.isSuperAdmin, globalRole: u.globalRole, bookRoles: u.bookRoles || {} };
+    }),
+    books: books.map(function(b) {
+      return { repoPath: b.repoPath, title: b.title, status: b.status };
+    }),
+  }).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
+</script>
+<script src="/static/js/admin.js?v=1"></script>
+
+<%- include('partials/footer') %>
