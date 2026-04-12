@@ -164,8 +164,8 @@ app.post('/api/auth/session', async (req, res) => {
 
     res.json({ status: 'ok' });
   } catch (err) {
-    console.error('Session creation error:', err.message);
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Session creation error:', err.code, err.message);
+    res.status(401).json({ error: 'Invalid token', detail: err.message });
   }
 });
 

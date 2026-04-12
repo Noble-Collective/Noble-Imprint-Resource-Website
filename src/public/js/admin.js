@@ -123,48 +123,99 @@
     });
   });
 
-  // --- Show Book Roles for a User ---
+  // --- Show Book Roles for a User (all books with dropdowns) ---
+  var currentBookRolesEmail = null;
+
   document.querySelectorAll('[data-show-book-roles]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var email = btn.getAttribute('data-show-book-roles');
+      var isAdmin = btn.getAttribute('data-is-admin') === 'true';
+      var isSuper = btn.getAttribute('data-is-super') === 'true';
+      currentBookRolesEmail = email;
       document.getElementById('book-roles-user-email').textContent = email;
-
-      // Find user in data
-      var user = null;
-      for (var i = 0; i < data.users.length; i++) {
-        if (data.users[i].email === email) { user = data.users[i]; break; }
-      }
-
-      var listEl = document.getElementById('book-roles-list');
-      if (!user || !user.bookRoles || Object.keys(user.bookRoles).length === 0) {
-        listEl.innerHTML = '<p class="text-muted">No book roles assigned.</p>';
-      } else {
-        var html = '<table class="admin-table admin-table--compact"><thead><tr><th>Book</th><th>Role</th><th></th></tr></thead><tbody>';
-        Object.keys(user.bookRoles).forEach(function (key) {
-          var repoPath = decodeBookPath(key);
-          html += '<tr><td>' + bookTitleByPath(repoPath) + '</td>';
-          html += '<td>' + roleName(user.bookRoles[key]) + '</td>';
-          html += '<td><button class="admin-btn admin-btn--sm admin-btn--danger" data-remove-book-role data-email="' + email + '" data-path="' + repoPath + '">Remove</button></td>';
-          html += '</tr>';
-        });
-        html += '</tbody></table>';
-        listEl.innerHTML = html;
-
-        // Bind remove buttons
-        listEl.querySelectorAll('[data-remove-book-role]').forEach(function (rb) {
-          rb.addEventListener('click', function () {
-            var e = rb.getAttribute('data-email');
-            var p = rb.getAttribute('data-path');
-            apiCall('DELETE', '/api/admin/users/' + encodeURIComponent(e) + '/books', { bookPath: p })
-              .then(function () { window.location.reload(); })
-              .catch(function (err) { alert('Error: ' + err.message); });
-          });
-        });
-      }
-
+      renderBookRolesForUser(email, isAdmin, isSuper);
       openModal('modal-book-roles');
     });
   });
+
+  function renderBookRolesForUser(email, isAdmin, isSuper) {
+    var user = null;
+    for (var i = 0; i < data.users.length; i++) {
+      if (data.users[i].email === email) { user = data.users[i]; break; }
+    }
+    var userRoles = (user && user.bookRoles) ? user.bookRoles : {};
+
+    var listEl = document.getElementById('book-roles-list');
+    var html = '<table class="admin-table admin-table--compact"><thead><tr><th>Book</th><th>Series</th><th>Role</th></tr></thead><tbody>';
+
+    var adminLabel = isSuper ? 'Super Admin' : 'Admin';
+
+    data.books.forEach(function (book) {
+      var encodedKey = book.repoPath.replace(/\//g, '|');
+      var currentRole = userRoles[encodedKey] || '';
+
+      html += '<tr>';
+      html += '<td>' + book.title + '</td>';
+      html += '<td class="text-muted">' + (book.seriesTitle || '') + '</td>';
+
+      if (isAdmin || isSuper) {
+        html += '<td><span class="admin-badge admin-badge--disabled">' + adminLabel + '</span></td>';
+      } else {
+        html += '<td><select class="admin-select admin-select--inline" data-book-role-select data-path="' + book.repoPath + '" data-email="' + email + '">';
+        html += '<option value=""' + (currentRole === '' ? ' selected' : '') + '>None</option>';
+        html += '<option value="viewer"' + (currentRole === 'viewer' ? ' selected' : '') + '>Viewer</option>';
+        html += '<option value="comment-suggest"' + (currentRole === 'comment-suggest' ? ' selected' : '') + '>Comment / Suggest</option>';
+        html += '<option value="manuscript-owner"' + (currentRole === 'manuscript-owner' ? ' selected' : '') + '>Manuscript Owner</option>';
+        html += '</select></td>';
+      }
+
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+
+    // Bind change events on dropdowns
+    listEl.querySelectorAll('[data-book-role-select]').forEach(function (select) {
+      select.addEventListener('change', function () {
+        var bookPath = select.getAttribute('data-path');
+        var email = select.getAttribute('data-email');
+        var role = select.value;
+        var encodedKey = bookPath.replace(/\//g, '|');
+
+        select.disabled = true;
+
+        if (role === '') {
+          // Remove role
+          apiCall('DELETE', '/api/admin/users/' + encodeURIComponent(email) + '/books', { bookPath: bookPath })
+            .then(function () {
+              // Update local data
+              data.users.forEach(function (u) {
+                if (u.email === email && u.bookRoles) delete u.bookRoles[encodedKey];
+              });
+              select.disabled = false;
+              updateBookRoleCountInTable(email);
+            })
+            .catch(function (err) { select.disabled = false; alert('Error: ' + err.message); });
+        } else {
+          // Set role
+          apiCall('PUT', '/api/admin/users/' + encodeURIComponent(email) + '/books', { bookPath: bookPath, role: role })
+            .then(function () {
+              // Update local data
+              data.users.forEach(function (u) {
+                if (u.email === email) {
+                  if (!u.bookRoles) u.bookRoles = {};
+                  u.bookRoles[encodedKey] = role;
+                }
+              });
+              select.disabled = false;
+              updateBookRoleCountInTable(email);
+            })
+            .catch(function (err) { select.disabled = false; alert('Error: ' + err.message); });
+        }
+      });
+    });
+  }
 
   // --- Toggle Book Status ---
   document.querySelectorAll('[data-toggle-status]').forEach(function (checkbox) {
@@ -258,13 +309,36 @@
     var user = null;
     data.users.forEach(function (u) { if (u.email === email) user = u; });
     if (!user) return;
-    var count = user.bookRoles ? Object.keys(user.bookRoles).length : 0;
+
+    // Build summary counts
+    var roles = user.bookRoles || {};
+    var counts = {};
+    var labels = { 'viewer': 'Viewer', 'comment-suggest': 'Commenter', 'manuscript-owner': 'Manuscript Owner' };
+    Object.values(roles).forEach(function (role) {
+      var label = labels[role] || role;
+      counts[label] = (counts[label] || 0) + 1;
+    });
+
     var cell = row.querySelector('td:nth-child(4)');
-    if (count > 0) {
-      cell.innerHTML = '<button class="admin-link" data-show-book-roles="' + email + '">' + count + ' book' + (count === 1 ? '' : 's') + '</button>';
+    var summaryHtml = '';
+    var keys = Object.keys(counts);
+    if (keys.length > 0) {
+      keys.forEach(function (label) {
+        summaryHtml += '<span class="admin-role-summary">' + label + ' for ' + counts[label] + ' book' + (counts[label] === 1 ? '' : 's') + '</span>';
+      });
     } else {
-      cell.innerHTML = '<span class="text-muted">None</span>';
+      summaryHtml = '<span class="text-muted">None</span>';
     }
+    summaryHtml += ' <button class="admin-btn-inline" data-show-book-roles="' + email + '" data-is-admin="false" data-is-super="false">Edit</button>';
+    cell.innerHTML = summaryHtml;
+
+    // Re-bind the new Edit button
+    cell.querySelector('[data-show-book-roles]').addEventListener('click', function () {
+      currentBookRolesEmail = email;
+      document.getElementById('book-roles-user-email').textContent = email;
+      renderBookRolesForUser(email, false, false);
+      openModal('modal-book-roles');
+    });
   }
 
   document.getElementById('access-add-btn').addEventListener('click', function () {

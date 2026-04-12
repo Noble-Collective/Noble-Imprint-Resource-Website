@@ -58,7 +58,9 @@
 <script>
   firebase.initializeApp({
     apiKey: "<%= typeof firebaseConfig !== 'undefined' && firebaseConfig ? firebaseConfig.apiKey : '' %>",
-    authDomain: "resources.noblecollective.org",
+    authDomain: window.location.hostname === 'localhost'
+      ? "noble-imprint-website.firebaseapp.com"
+      : "resources.noblecollective.org",
     projectId: "noble-imprint-website"
   });
 </script>
