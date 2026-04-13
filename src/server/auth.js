@@ -48,6 +48,33 @@ function attachUser(req, res, next) {
     }).catch(() => { req.user = user; res.locals.user = user; next(); });
   }
 
+  // API key auth: for bot/automation access (e.g., Claude AI)
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey && process.env.CLAUDE_API_KEY && apiKey === process.env.CLAUDE_API_KEY) {
+    const botEmail = process.env.CLAUDE_BOT_EMAIL || 'claude@noblecollective.org';
+    const firestoreMod = require('./firestore');
+    return firestoreMod.getUser(botEmail).then(async (botUser) => {
+      const user = {
+        uid: 'bot_' + botEmail.replace(/[^a-zA-Z0-9]/g, '_'),
+        email: botEmail,
+        displayName: (botUser && botUser.displayName) || 'Claude AI',
+        photoURL: (botUser && botUser.photoURL) || null,
+        isSuperAdmin: false,
+        isAdmin: false,
+        isBot: true,
+      };
+      const isAdm = await firestoreMod.isAdmin(botEmail);
+      user.isAdmin = isAdm;
+      req.user = user;
+      res.locals.user = user;
+      next();
+    }).catch(() => {
+      req.user = null;
+      res.locals.user = null;
+      next();
+    });
+  }
+
   const sessionCookie = req.cookies && req.cookies.__session;
   if (!sessionCookie) {
     req.user = null;

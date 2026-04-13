@@ -12,6 +12,33 @@ router.use((req, res, next) => {
   next();
 });
 
+// --- Content read endpoint (for bots/automation) ---
+router.get('/content', async (req, res) => {
+  try {
+    const { filePath } = req.query;
+    if (!filePath) return res.status(400).json({ error: 'filePath query param required' });
+
+    // Derive bookPath from filePath (everything before /sessions/)
+    const sessionsIdx = filePath.indexOf('/sessions/');
+    const bookPath = sessionsIdx >= 0 ? filePath.substring(0, sessionsIdx) : filePath;
+
+    // Check permission
+    const role = await firestore.getUserBookRole(req.user.email, bookPath);
+    if (!role) return res.status(403).json({ error: 'No access to this book' });
+
+    const { content, sha } = await github.getFileContent(filePath);
+
+    // Also return any pending suggestions and comments for this file
+    const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
+    const pendingComments = await suggestions.getCommentsForFile(filePath);
+
+    res.json({ content, sha, filePath, bookPath, pendingSuggestions, pendingComments });
+  } catch (err) {
+    console.error('Content read error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 async function canEdit(email, bookPath) {
   const role = await firestore.getUserBookRole(email, bookPath);
   return role === 'admin' || role === 'manuscript-owner' || role === 'comment-suggest';
