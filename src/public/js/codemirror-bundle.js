@@ -30295,6 +30295,14 @@ var Diff = class {
   }
 };
 
+// node_modules/diff/libesm/diff/character.js
+var CharacterDiff = class extends Diff {
+};
+var characterDiff = new CharacterDiff();
+function diffChars(oldStr, newStr, options) {
+  return characterDiff.diff(oldStr, newStr, options);
+}
+
 // node_modules/diff/libesm/util/string.js
 function longestCommonPrefix(str1, str2) {
   let i;
@@ -30574,6 +30582,7 @@ export {
   ViewPlugin,
   WidgetType,
   basicSetup,
+  diffChars,
   diffWords,
   keymap,
   markdown

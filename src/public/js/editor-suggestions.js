@@ -3,7 +3,7 @@
 // and manages suggestion state for the margin panel.
 import {
   Decoration, ViewPlugin, WidgetType, StateField, StateEffect,
-  EditorView, diffWords,
+  EditorView, diffChars,
 } from '/static/js/codemirror-bundle.js';
 
 // --- State: original document content (set once on init) ---
@@ -37,73 +37,106 @@ class DeletedTextWidget extends WidgetType {
 }
 
 // --- Compute diff hunks between original and current ---
+// Uses diffChars for character-level precision, then merges nearby changes into
+// coherent hunks (so "Christianity" → "Faith" is one replacement, not 5 tiny ones).
 export function computeHunks(original, current) {
-  const diffs = diffWords(original, current);
-  const hunks = [];
+  const diffs = diffChars(original, current);
+
+  // First pass: collect raw change segments with their positions
+  const segments = [];
   let origOffset = 0;
   let currOffset = 0;
-  let hunkId = 0;
 
   for (const part of diffs) {
     if (!part.added && !part.removed) {
-      // Unchanged
+      segments.push({ type: 'same', value: part.value, origFrom: origOffset, currFrom: currOffset });
       origOffset += part.value.length;
       currOffset += part.value.length;
-    } else if (part.removed && !part.added) {
-      // Deletion: text in original but not in current
+    } else if (part.removed) {
+      segments.push({ type: 'del', value: part.value, origFrom: origOffset, currFrom: currOffset });
+      origOffset += part.value.length;
+    } else if (part.added) {
+      segments.push({ type: 'ins', value: part.value, origFrom: origOffset, currFrom: currOffset });
+      currOffset += part.value.length;
+    }
+  }
+
+  // Second pass: merge adjacent/nearby changes into coherent hunks.
+  // If unchanged text between two changes is less than 4 chars, merge them.
+  const MERGE_THRESHOLD = 4;
+  const groups = []; // Each group: { origText, newText, origFrom, origTo, currFrom, currTo }
+  let currentGroup = null;
+
+  for (const seg of segments) {
+    if (seg.type === 'same') {
+      if (currentGroup && seg.value.length < MERGE_THRESHOLD) {
+        // Small gap — absorb into the current group
+        currentGroup.origText += seg.value;
+        currentGroup.newText += seg.value;
+        currentGroup.origTo += seg.value.length;
+        currentGroup.currTo += seg.value.length;
+      } else {
+        // Large gap — finalize current group
+        if (currentGroup) groups.push(currentGroup);
+        currentGroup = null;
+      }
+    } else if (seg.type === 'del') {
+      if (!currentGroup) {
+        currentGroup = { origText: '', newText: '', origFrom: seg.origFrom, origTo: seg.origFrom, currFrom: seg.currFrom, currTo: seg.currFrom };
+      }
+      currentGroup.origText += seg.value;
+      currentGroup.origTo += seg.value.length;
+    } else if (seg.type === 'ins') {
+      if (!currentGroup) {
+        currentGroup = { origText: '', newText: '', origFrom: seg.origFrom, origTo: seg.origFrom, currFrom: seg.currFrom, currTo: seg.currFrom };
+      }
+      currentGroup.newText += seg.value;
+      currentGroup.currTo += seg.value.length;
+    }
+  }
+  if (currentGroup) groups.push(currentGroup);
+
+  // Convert groups to hunks
+  const hunks = [];
+  let hunkId = 0;
+  for (const g of groups) {
+    if (g.origText && g.newText) {
+      hunks.push({
+        id: 'hunk-' + (hunkId++),
+        type: 'replacement',
+        originalFrom: g.origFrom,
+        originalTo: g.origTo,
+        originalText: g.origText,
+        newText: g.newText,
+        currentFrom: g.currFrom,
+        currentTo: g.currTo,
+        currentPos: g.currFrom,
+      });
+    } else if (g.origText) {
       hunks.push({
         id: 'hunk-' + (hunkId++),
         type: 'deletion',
-        originalFrom: origOffset,
-        originalTo: origOffset + part.value.length,
-        originalText: part.value,
+        originalFrom: g.origFrom,
+        originalTo: g.origTo,
+        originalText: g.origText,
         newText: '',
-        currentPos: currOffset, // Where the widget goes in the current doc
+        currentPos: g.currFrom,
       });
-      origOffset += part.value.length;
-    } else if (part.added && !part.removed) {
-      // Insertion: text in current but not in original
+    } else if (g.newText) {
       hunks.push({
         id: 'hunk-' + (hunkId++),
         type: 'insertion',
-        originalFrom: origOffset,
-        originalTo: origOffset,
+        originalFrom: g.origFrom,
+        originalTo: g.origFrom,
         originalText: '',
-        newText: part.value,
-        currentFrom: currOffset,
-        currentTo: currOffset + part.value.length,
+        newText: g.newText,
+        currentFrom: g.currFrom,
+        currentTo: g.currTo,
       });
-      currOffset += part.value.length;
     }
   }
 
-  // Merge adjacent deletion+insertion into replacements
-  const merged = [];
-  let i = 0;
-  while (i < hunks.length) {
-    if (i + 1 < hunks.length &&
-        hunks[i].type === 'deletion' &&
-        hunks[i + 1].type === 'insertion' &&
-        hunks[i].currentPos === hunks[i + 1].currentFrom) {
-      merged.push({
-        id: hunks[i].id,
-        type: 'replacement',
-        originalFrom: hunks[i].originalFrom,
-        originalTo: hunks[i].originalTo,
-        originalText: hunks[i].originalText,
-        newText: hunks[i + 1].newText,
-        currentFrom: hunks[i + 1].currentFrom,
-        currentTo: hunks[i + 1].currentTo,
-        currentPos: hunks[i].currentPos,
-      });
-      i += 2;
-    } else {
-      merged.push(hunks[i]);
-      i++;
-    }
-  }
-
-  return merged;
+  return hunks;
 }
 
 // --- Build suggestion decorations from hunks ---

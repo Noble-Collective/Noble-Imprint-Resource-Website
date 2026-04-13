@@ -10,4 +10,4 @@ export { Decoration, ViewPlugin, WidgetType, keymap } from '@codemirror/view';
 export { markdown } from '@codemirror/lang-markdown';
 
 // Diff library
-export { diffWords } from 'diff';
+export { diffWords, diffChars } from 'diff';

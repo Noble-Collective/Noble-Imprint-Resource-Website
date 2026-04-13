@@ -1,8 +1,8 @@
 // Noble Imprint — Comment System
-// Highlight text, add comments, show in margin alongside suggestions.
+// Select text → floating popup appears → enter comment → saves to margin.
 import { Decoration, ViewPlugin, EditorView } from '/static/js/codemirror-bundle.js';
 
-let comments = []; // Array of { id, from, to, selectedText, commentText, authorEmail, authorName, createdAt }
+let comments = [];
 let editorViewRef = null;
 let onCommentsChanged = null;
 
@@ -13,7 +13,6 @@ const commentPlugin = ViewPlugin.fromClass(
       this.decorations = buildCommentDecorations(view);
     }
     update(update) {
-      // Rebuild when comments change (triggered externally by setting a flag)
       if (update.docChanged || this._dirty) {
         this.decorations = buildCommentDecorations(update.view);
         this._dirty = false;
@@ -25,12 +24,10 @@ const commentPlugin = ViewPlugin.fromClass(
 
 function buildCommentDecorations(view) {
   if (comments.length === 0) return Decoration.none;
-
   const doc = view.state.doc.toString();
   const decorations = [];
 
   for (const c of comments) {
-    // Find the commented text in the current document
     const pos = doc.indexOf(c.selectedText);
     if (pos >= 0) {
       decorations.push(
@@ -50,22 +47,158 @@ const commentTheme = EditorView.theme({
   '.cm-comment-highlight': {
     background: 'rgba(251, 188, 4, 0.25)',
     borderBottom: '2px solid #fbbc04',
-    cursor: 'pointer',
   },
 });
+
+// --- Selection listener: show "Add Comment" tooltip on text selection ---
+const selectionListener = EditorView.updateListener.of((update) => {
+  if (!update.selectionSet && !update.focusChanged) return;
+  const sel = update.view.state.selection.main;
+  if (sel.empty) {
+    hideCommentTooltip();
+    return;
+  }
+  // Show tooltip near the selection
+  const coords = update.view.coordsAtPos(sel.head);
+  if (coords) {
+    showCommentTooltip(coords.left, coords.top);
+  }
+});
+
+let tooltipEl = null;
+
+function showCommentTooltip(x, y) {
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('button');
+    tooltipEl.className = 'comment-tooltip';
+    tooltipEl.textContent = '+ Comment';
+    tooltipEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideCommentTooltip();
+      showCommentPopup();
+    });
+    document.body.appendChild(tooltipEl);
+  }
+  tooltipEl.style.display = 'block';
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top = (y - 36) + 'px';
+}
+
+function hideCommentTooltip() {
+  if (tooltipEl) tooltipEl.style.display = 'none';
+}
+
+function showCommentPopup() {
+  const popup = document.getElementById('comment-popup');
+  const input = document.getElementById('comment-popup-input');
+  if (!popup || !editorViewRef) return;
+
+  const sel = editorViewRef.state.selection.main;
+  if (sel.empty) return;
+
+  // Position popup near the editor
+  const coords = editorViewRef.coordsAtPos(sel.head);
+  if (coords) {
+    const editorRect = editorViewRef.dom.closest('.editor-body').getBoundingClientRect();
+    popup.style.top = (coords.top - editorRect.top + 24) + 'px';
+    popup.style.right = '0';
+  }
+
+  popup.style.display = 'block';
+  input.value = '';
+  input.focus();
+}
 
 // --- Public API ---
 
 export function commentExtension() {
-  return [commentPlugin, commentTheme];
+  return [commentPlugin, commentTheme, selectionListener];
 }
 
 export function initComments(view, existingComments, callback) {
   editorViewRef = view;
   comments = existingComments || [];
   onCommentsChanged = callback;
-  // Force rebuild decorations
+
+  // Bind popup buttons
+  document.getElementById('comment-popup-cancel')?.addEventListener('click', () => {
+    document.getElementById('comment-popup').style.display = 'none';
+  });
+
+  document.getElementById('comment-popup-submit')?.addEventListener('click', () => {
+    submitComment();
+  });
+
+  // Enter key in textarea submits (Shift+Enter for newline)
+  document.getElementById('comment-popup-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submitComment();
+    }
+  });
+
   refreshDecorations();
+}
+
+async function submitComment() {
+  if (!editorViewRef) return;
+  const popup = document.getElementById('comment-popup');
+  const input = document.getElementById('comment-popup-input');
+  const commentText = input.value.trim();
+  if (!commentText) return;
+
+  const sel = editorViewRef.state.selection.main;
+  const selectedText = editorViewRef.state.sliceDoc(sel.from, sel.to);
+  if (!selectedText.trim()) return;
+
+  const editorData = window.__EDITOR_DATA;
+  if (!editorData) return;
+
+  const submitBtn = document.getElementById('comment-popup-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving...';
+
+  try {
+    const res = await fetch('/api/suggestions/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: editorData.sessionFilePath,
+        bookPath: editorData.bookRepoPath,
+        baseCommitSha: editorData.contentSha,
+        from: sel.from,
+        to: sel.to,
+        selectedText,
+        commentText,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Error: ' + (err.error || 'Failed to save comment'));
+      return;
+    }
+
+    const result = await res.json();
+    addComment({
+      id: result.id,
+      from: sel.from,
+      to: sel.to,
+      selectedText,
+      commentText,
+      authorEmail: editorData.user ? editorData.user.email : '',
+      authorName: editorData.user ? editorData.user.displayName : '',
+      createdAt: new Date(),
+    });
+
+    popup.style.display = 'none';
+  } catch (err) {
+    alert('Error: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Comment';
+  }
 }
 
 export function addComment(commentData) {
@@ -89,63 +222,7 @@ function refreshDecorations() {
     const plugin = editorViewRef.plugin(commentPlugin);
     if (plugin) {
       plugin._dirty = true;
-      // Trigger a trivial update to rebuild decorations
       editorViewRef.dispatch({});
     }
-  }
-}
-
-// --- Add comment flow ---
-
-export async function promptAddComment(view, editorData) {
-  const sel = view.state.selection.main;
-  if (sel.empty) {
-    alert('Select some text first, then click Comment.');
-    return;
-  }
-
-  const selectedText = view.state.sliceDoc(sel.from, sel.to);
-  if (selectedText.trim().length === 0) {
-    alert('Select some text first.');
-    return;
-  }
-
-  const commentText = prompt('Add your comment:');
-  if (!commentText || commentText.trim().length === 0) return;
-
-  try {
-    const res = await fetch('/api/suggestions/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filePath: editorData.sessionFilePath,
-        bookPath: editorData.bookRepoPath,
-        baseCommitSha: editorData.contentSha,
-        from: sel.from,
-        to: sel.to,
-        selectedText: selectedText,
-        commentText: commentText.trim(),
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Error: ' + (err.error || 'Failed to save comment'));
-      return;
-    }
-
-    const result = await res.json();
-    addComment({
-      id: result.id,
-      from: sel.from,
-      to: sel.to,
-      selectedText,
-      commentText: commentText.trim(),
-      authorEmail: editorData.user ? editorData.user.email : '',
-      authorName: editorData.user ? editorData.user.displayName : '',
-      createdAt: new Date(),
-    });
-  } catch (err) {
-    alert('Error: ' + err.message);
   }
 }

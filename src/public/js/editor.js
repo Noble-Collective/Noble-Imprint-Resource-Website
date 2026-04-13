@@ -5,7 +5,7 @@ import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, repositionCards } from '/static/js/editor-margin.js';
-import { commentExtension, initComments, promptAddComment, getComments } from '/static/js/editor-comments.js';
+import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
 
 const data = window.__EDITOR_DATA;
 if (data) {
@@ -125,6 +125,18 @@ if (data) {
     return null;
   }
 
+  // --- Toast notification ---
+  function showToast(message, type) {
+    const toast = document.getElementById('editor-toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.className = 'editor-toast editor-toast--' + (type || 'info');
+    toast.style.display = 'block';
+    if (type === 'success') {
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+  }
+
   // --- Accept a hunk via API ---
   let acceptingInProgress = false;
   async function acceptHunk(hunkId) {
@@ -142,6 +154,8 @@ if (data) {
     const btn = document.querySelector('[data-action="accept"][data-hunk-id="' + hunkId + '"]');
     if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
 
+    showToast('Committing to GitHub...', 'info');
+
     try {
       const res = await fetch('/api/suggestions/hunk/' + firestoreId + '/accept', {
         method: 'PUT',
@@ -149,14 +163,26 @@ if (data) {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert('Error: ' + (err.message || err.error));
+        showToast('Error: ' + (err.message || err.error), 'error');
         acceptingInProgress = false;
         if (btn) { btn.disabled = false; btn.style.opacity = ''; }
         return;
       }
-      window.location.reload();
+
+      showToast('GitHub updated successfully', 'success');
+      acceptingInProgress = false;
+
+      // Remove the accepted suggestion's card from the margin
+      const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+      if (card) card.remove();
+
+      // Remove from pendingSuggestions data so it doesn't reappear
+      if (data.pendingSuggestions) {
+        data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
+      }
+
     } catch (err) {
-      alert('Error accepting suggestion: ' + err.message);
+      showToast('Error: ' + err.message, 'error');
       acceptingInProgress = false;
       if (btn) { btn.disabled = false; btn.style.opacity = ''; }
     }
@@ -417,9 +443,6 @@ if (data) {
   document.getElementById('btn-suggest-edit')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
-  document.getElementById('btn-add-comment')?.addEventListener('click', () => {
-    if (editorView) promptAddComment(editorView, data);
-  });
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;

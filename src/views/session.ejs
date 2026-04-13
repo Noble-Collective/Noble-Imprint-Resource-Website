@@ -121,7 +121,6 @@
           <span class="editor-save-status" id="editor-save-status"></span>
         </div>
         <div class="editor-toolbar-right">
-          <button class="edit-btn" id="btn-add-comment" title="Add comment on selected text">Comment</button>
           <button class="edit-btn edit-btn--primary" id="btn-editor-done">Done</button>
         </div>
       </div>
@@ -131,6 +130,16 @@
           <div class="margin-empty">No changes yet</div>
         </div>
       </div>
+      <!-- Floating comment popup (appears near selected text) -->
+      <div class="comment-popup" id="comment-popup" style="display:none">
+        <textarea class="comment-popup-input" id="comment-popup-input" placeholder="Add a comment..." rows="3"></textarea>
+        <div class="comment-popup-actions">
+          <button class="edit-btn" id="comment-popup-cancel">Cancel</button>
+          <button class="edit-btn edit-btn--primary" id="comment-popup-submit">Comment</button>
+        </div>
+      </div>
+      <!-- Toast notifications -->
+      <div class="editor-toast" id="editor-toast" style="display:none"></div>
     </div>
     <% } %>
 

@@ -748,28 +748,22 @@ test.describe('Editor - Comments', () => {
     await clearAllComments();
   });
 
-  test('Comment button exists in toolbar', async ({ page }) => {
-    const btn = page.locator('#btn-add-comment');
-    await expect(btn).toBeVisible();
-  });
-
-  test('clicking Comment with no selection shows alert', async ({ page }) => {
-    page.on('dialog', dialog => dialog.accept());
-    await page.click('#btn-add-comment');
-    // Alert should have fired (we accepted it)
+  test('selecting text shows comment tooltip', async ({ page }) => {
+    await selectText(page, 'belief system');
+    await page.waitForTimeout(500);
+    const tooltip = page.locator('.comment-tooltip');
+    await expect(tooltip).toBeVisible({ timeout: 3000 });
   });
 
   test('adding a comment on selected text saves to Firestore', async ({ page }) => {
     await selectText(page, 'belief system');
-    // Handle the prompt dialog
-    page.on('dialog', async dialog => {
-      if (dialog.type() === 'prompt') {
-        await dialog.accept('This needs clarification');
-      } else {
-        await dialog.accept();
-      }
-    });
-    await page.click('#btn-add-comment');
+    await page.waitForTimeout(500);
+    // Click the floating tooltip
+    await page.click('.comment-tooltip');
+    await page.waitForTimeout(300);
+    // Type in the popup
+    await page.fill('#comment-popup-input', 'This needs clarification');
+    await page.click('#comment-popup-submit');
     await page.waitForTimeout(2000);
 
     const count = await getPendingCommentCount();
@@ -778,14 +772,11 @@ test.describe('Editor - Comments', () => {
 
   test('comment shows yellow highlight in editor', async ({ page }) => {
     await selectText(page, 'belief system');
-    page.on('dialog', async dialog => {
-      if (dialog.type() === 'prompt') {
-        await dialog.accept('Test comment');
-      } else {
-        await dialog.accept();
-      }
-    });
-    await page.click('#btn-add-comment');
+    await page.waitForTimeout(500);
+    await page.click('.comment-tooltip');
+    await page.waitForTimeout(300);
+    await page.fill('#comment-popup-input', 'Test comment');
+    await page.click('#comment-popup-submit');
     await page.waitForTimeout(1000);
 
     const highlight = page.locator('.cm-comment-highlight');
@@ -794,14 +785,11 @@ test.describe('Editor - Comments', () => {
 
   test('comment shows in margin panel', async ({ page }) => {
     await selectText(page, 'belief system');
-    page.on('dialog', async dialog => {
-      if (dialog.type() === 'prompt') {
-        await dialog.accept('Needs rewording');
-      } else {
-        await dialog.accept();
-      }
-    });
-    await page.click('#btn-add-comment');
+    await page.waitForTimeout(500);
+    await page.click('.comment-tooltip');
+    await page.waitForTimeout(300);
+    await page.fill('#comment-popup-input', 'Needs rewording');
+    await page.click('#comment-popup-submit');
     await page.waitForTimeout(1000);
 
     const commentCard = page.locator('.margin-card--comment');
