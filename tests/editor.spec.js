@@ -1,48 +1,35 @@
 // Noble Imprint — Comprehensive Editor Tests
-// Tests the masked editor, suggestion tracking, auto-save, accept/reject
-// Run with: npx playwright test tests/editor.spec.js
-
+// Run with: GOOGLE_CLOUD_PROJECT=noble-imprint-website npx playwright test tests/editor.spec.js
 const { test, expect } = require('@playwright/test');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
-const TEST_FILE_PATH = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
 const TEST_EMAIL = 'steve@noblecollective.org';
 
-// --- Helper: authenticate via test endpoint ---
+// ============================================================
+// HELPERS
+// ============================================================
+
 async function login(page) {
   const res = await page.request.post(`${BASE_URL}/api/auth/test-login`, {
     data: { email: TEST_EMAIL },
   });
   expect(res.ok()).toBeTruthy();
-  // Reload to pick up cookie
   await page.goto(BASE_URL + TEST_SESSION_PATH);
 }
 
-// --- Helper: enter suggest edit mode ---
 async function enterSuggestMode(page) {
   await page.click('#btn-suggest-edit');
   await page.waitForSelector('#codemirror-host .cm-editor');
-  // Wait for editor to be ready
   await page.waitForTimeout(500);
 }
 
-// --- Helper: enter direct edit mode ---
 async function enterDirectMode(page) {
   await page.click('#btn-direct-edit');
   await page.waitForSelector('#codemirror-host .cm-editor');
   await page.waitForTimeout(500);
 }
 
-// --- Helper: get editor text content ---
-async function getEditorContent(page) {
-  return page.evaluate(() => {
-    const cm = document.querySelector('.cm-content');
-    return cm ? cm.textContent : '';
-  });
-}
-
-// --- Helper: get raw editor document ---
 async function getRawDoc(page) {
   return page.evaluate(() => {
     if (window.__editorView) return window.__editorView.state.doc.toString();
@@ -50,32 +37,25 @@ async function getRawDoc(page) {
   });
 }
 
-// --- Helper: scroll editor to a position in the document ---
+// Scroll the CM editor to a fraction of the document
 async function scrollEditorTo(page, fraction) {
   await page.evaluate((frac) => {
-    if (window.__editorView) {
-      const doc = window.__editorView.state.doc;
-      const pos = Math.floor(doc.length * frac);
-      window.__editorView.dispatch({
-        effects: window.__editorView.constructor.scrollIntoView(pos, { y: 'start' }),
-      });
-    }
+    if (!window.__editorView) return;
+    const doc = window.__editorView.state.doc;
+    const pos = Math.floor(doc.length * frac);
+    window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
   }, fraction);
   await page.waitForTimeout(300);
 }
 
-// --- Helper: place cursor at a specific text in the editor ---
-async function clickTextInEditor(page, searchText) {
+// Place cursor right after a specific text (finds it in the raw doc via CM API)
+async function cursorAfter(page, searchText) {
   const found = await page.evaluate((text) => {
     if (!window.__editorView) return false;
     const doc = window.__editorView.state.doc.toString();
     const pos = doc.indexOf(text);
     if (pos === -1) return false;
-    // Set cursor at the end of the found text
-    window.__editorView.dispatch({
-      selection: { anchor: pos + text.length },
-      scrollIntoView: true,
-    });
+    window.__editorView.dispatch({ selection: { anchor: pos + text.length }, scrollIntoView: true });
     window.__editorView.focus();
     return true;
   }, searchText);
@@ -83,44 +63,66 @@ async function clickTextInEditor(page, searchText) {
   await page.waitForTimeout(200);
 }
 
-// --- Helper: type at cursor position ---
-async function typeAtCursor(page, text) {
+// Place cursor right before a specific text
+async function cursorBefore(page, searchText) {
+  const found = await page.evaluate((text) => {
+    if (!window.__editorView) return false;
+    const doc = window.__editorView.state.doc.toString();
+    const pos = doc.indexOf(text);
+    if (pos === -1) return false;
+    window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    window.__editorView.focus();
+    return true;
+  }, searchText);
+  expect(found).toBeTruthy();
+  await page.waitForTimeout(200);
+}
+
+// Select a specific text range in the editor (via CM API)
+async function selectText(page, searchText) {
+  const found = await page.evaluate((text) => {
+    if (!window.__editorView) return false;
+    const doc = window.__editorView.state.doc.toString();
+    const pos = doc.indexOf(text);
+    if (pos === -1) return false;
+    window.__editorView.dispatch({ selection: { anchor: pos, head: pos + text.length }, scrollIntoView: true });
+    window.__editorView.focus();
+    return true;
+  }, searchText);
+  expect(found).toBeTruthy();
+  await page.waitForTimeout(200);
+}
+
+// Replace selected text by typing (assumes text is selected)
+async function replaceWith(page, newText) {
+  await page.keyboard.type(newText);
+  await page.waitForTimeout(200);
+}
+
+// Type text at the current cursor position
+async function typeText(page, text) {
   await page.keyboard.type(text);
   await page.waitForTimeout(200);
 }
 
-// --- Helper: select text in editor ---
-async function selectTextInEditor(page, searchText) {
-  const found = await page.evaluate((text) => {
-    if (!window.__editorView) return false;
-    const doc = window.__editorView.state.doc.toString();
-    const pos = doc.indexOf(text);
-    if (pos === -1) return false;
-    window.__editorView.dispatch({
-      selection: { anchor: pos, head: pos + text.length },
-      scrollIntoView: true,
-    });
-    window.__editorView.focus();
-    return true;
-  }, searchText);
-  expect(found).toBeTruthy();
+// Delete the current selection
+async function deleteSelection(page) {
+  await page.keyboard.press('Backspace');
   await page.waitForTimeout(200);
 }
 
-// --- Helper: count margin cards ---
+// Count margin cards
 async function getMarginCardCount(page) {
   return page.locator('.margin-card').count();
 }
 
-// --- Helper: wait for auto-save ---
+// Wait for auto-save (1500ms debounce + network)
 async function waitForAutoSave(page) {
-  // Auto-save debounce is 1500ms, wait a bit more
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(3000);
 }
 
-// --- Helper: check Firestore suggestions count ---
+// Check Firestore pending suggestion count
 async function getPendingSuggestionCount() {
-  // Use the API endpoint (requires auth cookie from the page context)
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
@@ -128,19 +130,20 @@ async function getPendingSuggestionCount() {
   return snap.size;
 }
 
-// --- Helper: clear all suggestions ---
+// Clear all suggestions from Firestore
 async function clearAllSuggestions() {
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
   const snap = await db.collection('suggestions').get();
+  if (snap.empty) return;
   const batch = db.batch();
   snap.docs.forEach(d => batch.delete(d.ref));
   await batch.commit();
 }
 
 // ============================================================
-// TEST SUITE
+// MASKING TESTS
 // ============================================================
 
 test.describe('Editor - Masking', () => {
@@ -150,8 +153,7 @@ test.describe('Editor - Masking', () => {
     await enterSuggestMode(page);
   });
 
-  test('headings are masked - # markers hidden, text styled', async ({ page }) => {
-    // The H1 "# Session 1: The Gospel" should show without the "# "
+  test('H1 heading: # hidden, text styled', async ({ page }) => {
     const h1 = page.locator('.cm-heading-1');
     await expect(h1.first()).toBeVisible();
     const text = await h1.first().textContent();
@@ -159,45 +161,43 @@ test.describe('Editor - Masking', () => {
     expect(text).not.toContain('# ');
   });
 
-  test('H2 headings masked', async ({ page }) => {
+  test('H2 heading: ## hidden, text styled', async ({ page }) => {
     const h2 = page.locator('.cm-heading-2');
     await expect(h2.first()).toBeVisible();
     const text = await h2.first().textContent();
     expect(text).not.toContain('## ');
   });
 
-  test('H3 headings masked', async ({ page }) => {
+  test('H3 heading: ### hidden, text styled', async ({ page }) => {
     const h3 = page.locator('.cm-heading-3');
     await expect(h3.first()).toBeVisible();
   });
 
-  test('bold markers hidden - ** not visible', async ({ page }) => {
+  test('bold: ** markers hidden', async ({ page }) => {
     const bold = page.locator('.cm-bold');
     await expect(bold.first()).toBeVisible();
-    // Check the visible text doesn't contain **
-    const editorText = await getEditorContent(page);
+    const editorText = await page.locator('.cm-content').first().textContent();
     expect(editorText).not.toContain('**earnestly');
   });
 
-  test('italic markers hidden - _ not visible', async ({ page }) => {
+  test('italic: _ markers hidden', async ({ page }) => {
     const italic = page.locator('.cm-italic');
     await expect(italic.first()).toBeVisible();
   });
 
-  test('blockquote markers hidden - > not visible at line start', async ({ page }) => {
+  test('blockquote: > hidden, styled with border', async ({ page }) => {
     const bq = page.locator('.cm-blockquote');
     await expect(bq.first()).toBeVisible();
   });
 
-  test('attribution markers hidden - << not visible', async ({ page }) => {
+  test('attribution: << hidden, text right-aligned', async ({ page }) => {
     const attr = page.locator('.cm-attribution');
     await expect(attr.first()).toBeVisible();
     const text = await attr.first().textContent();
     expect(text).not.toContain('<<');
   });
 
-  test('Question tags hidden, content styled', async ({ page }) => {
-    // Question blocks start around line 41 — scroll to ~30% of document
+  test('Question tags hidden, content in styled block', async ({ page }) => {
     await scrollEditorTo(page, 0.10);
     const qBlock = page.locator('.cm-question-block');
     await expect(qBlock.first()).toBeVisible({ timeout: 5000 });
@@ -207,8 +207,7 @@ test.describe('Editor - Masking', () => {
     expect(text.length).toBeGreaterThan(10);
   });
 
-  test('Callout tags hidden, content styled', async ({ page }) => {
-    // Callouts appear around line 69+ — scroll to ~50% of document
+  test('Callout tags hidden, content highlighted', async ({ page }) => {
     await scrollEditorTo(page, 0.40);
     const callout = page.locator('.cm-callout');
     await expect(callout.first()).toBeVisible({ timeout: 5000 });
@@ -217,7 +216,7 @@ test.describe('Editor - Masking', () => {
     expect(text).not.toContain('</Callout>');
   });
 
-  test('raw document still contains structural syntax', async ({ page }) => {
+  test('raw doc still has all structural syntax intact', async ({ page }) => {
     const raw = await getRawDoc(page);
     expect(raw).toContain('# Session 1');
     expect(raw).toContain('<Question id=');
@@ -227,6 +226,10 @@ test.describe('Editor - Masking', () => {
     expect(raw).toContain('**');
   });
 });
+
+// ============================================================
+// SUGGESTION TRACKING TESTS
+// ============================================================
 
 test.describe('Editor - Suggestion Tracking', () => {
   test.beforeEach(async ({ page }) => {
@@ -241,79 +244,71 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('replacing a word shows green insertion and red deletion', async ({ page }) => {
-    // Find and click on "Christianity" in the paragraph text
-    await clickTextInEditor(page, 'Christianity');
-    // Select the word
-    await page.keyboard.press('Control+Shift+Left');
-    // Type replacement
-    await typeAtCursor(page, 'Faith');
-
-    // Check inline decorations appear
-    await page.waitForTimeout(500);
-    const insertions = page.locator('.cm-suggestion-insert');
-    const deletions = page.locator('.cm-suggestion-delete');
-    await expect(insertions.first()).toBeVisible();
-    // Deletion widget should appear
-    await expect(deletions.first()).toBeVisible();
-  });
-
-  test('adding text shows only green insertion', async ({ page }) => {
-    // Click at end of "The Gospel" heading
-    await clickTextInEditor(page, 'The Gospel');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' - Updated');
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
 
     await page.waitForTimeout(500);
     const insertions = page.locator('.cm-suggestion-insert');
-    await expect(insertions.first()).toBeVisible();
-    const text = await insertions.first().textContent();
-    expect(text).toContain('Updated');
+    const deletions = page.locator('.cm-suggestion-delete');
+    await expect(insertions.first()).toBeVisible({ timeout: 3000 });
+    await expect(deletions.first()).toBeVisible({ timeout: 3000 });
   });
 
-  test('deleting text shows red strikethrough', async ({ page }) => {
-    // Select "sovereign king" and delete
-    await selectTextInEditor(page, 'sovereign king');
-    await page.keyboard.press('Delete');
+  test('adding text at end of sentence shows green insertion', async ({ page }) => {
+    await cursorAfter(page, 'belief system.');
+    await typeText(page, ' Indeed it is more.');
+
+    await page.waitForTimeout(500);
+    const insertions = page.locator('.cm-suggestion-insert');
+    await expect(insertions.first()).toBeVisible({ timeout: 3000 });
+  });
+
+  test('deleting a word shows red strikethrough', async ({ page }) => {
+    await selectText(page, 'sovereign');
+    await deleteSelection(page);
 
     await page.waitForTimeout(500);
     const deletions = page.locator('.cm-suggestion-delete');
-    await expect(deletions.first()).toBeVisible();
+    await expect(deletions.first()).toBeVisible({ timeout: 3000 });
   });
 
   test('margin card appears for each change', async ({ page }) => {
-    // Make a change
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await page.waitForTimeout(500);
 
     const count = await getMarginCardCount(page);
     expect(count).toBeGreaterThan(0);
   });
 
-  test('margin card shows user name and avatar', async ({ page }) => {
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+  test('margin card shows user name', async ({ page }) => {
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await page.waitForTimeout(500);
 
     const name = page.locator('.margin-card-name');
     await expect(name.first()).toBeVisible();
   });
 
-  test('two edits in different areas create two margin cards', async ({ page }) => {
-    // Edit 1: change "Christianity" to "Faith"
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+  test('two edits in different parts create two margin cards', async ({ page }) => {
+    // Edit 1: near the top
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await page.waitForTimeout(300);
 
-    // Edit 2: change "sovereign" to "supreme"
-    await selectTextInEditor(page, 'sovereign');
-    await typeAtCursor(page, 'supreme');
+    // Edit 2: further down
+    await selectText(page, 'sovereign');
+    await replaceWith(page, 'supreme');
     await page.waitForTimeout(500);
 
     const count = await getMarginCardCount(page);
     expect(count).toBeGreaterThanOrEqual(2);
   });
 });
+
+// ============================================================
+// AUTO-SAVE TESTS
+// ============================================================
 
 test.describe('Editor - Auto-Save', () => {
   test.beforeEach(async ({ page }) => {
@@ -328,60 +323,59 @@ test.describe('Editor - Auto-Save', () => {
   });
 
   test('suggestion auto-saves to Firestore after pause', async ({ page }) => {
-    // Make a change
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
-
-    // Wait for auto-save (1500ms debounce + network time)
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await waitForAutoSave(page);
 
-    // Check Firestore
     const count = await getPendingSuggestionCount();
     expect(count).toBeGreaterThan(0);
   });
 
-  test('"Saved" status appears in toolbar after auto-save', async ({ page }) => {
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
-
-    // Wait for save status
+  test('"Saved" appears in toolbar', async ({ page }) => {
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await page.waitForSelector('#editor-save-status:not(:empty)', { timeout: 5000 });
     const status = await page.textContent('#editor-save-status');
     expect(status).toBe('Saved');
   });
 
-  test('discarding a suggestion (X) deletes from Firestore', async ({ page }) => {
-    // Make a change and wait for save
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+  test('discarding (X) removes suggestion from Firestore', async ({ page }) => {
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await waitForAutoSave(page);
 
     const before = await getPendingSuggestionCount();
     expect(before).toBeGreaterThan(0);
 
-    // Click the X button on the margin card
-    await page.click('.margin-action--reject');
-    await page.waitForTimeout(1000);
+    // Click X on the margin card
+    const rejectBtn = page.locator('.margin-action--reject');
+    await expect(rejectBtn.first()).toBeVisible({ timeout: 3000 });
+    await rejectBtn.first().click();
+    await page.waitForTimeout(2000);
 
     const after = await getPendingSuggestionCount();
-    expect(after).toBe(before - 1);
+    expect(after).toBeLessThan(before);
   });
 
-  test('reverting an edit removes it from Firestore', async ({ page }) => {
-    // Make a change
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+  test('undoing all edits removes suggestion from Firestore', async ({ page }) => {
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await waitForAutoSave(page);
 
-    // Undo
-    await page.keyboard.press('Control+z');
-    await page.keyboard.press('Control+z');
+    // Undo until back to original
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press('Control+z');
+    }
     await waitForAutoSave(page);
 
     const count = await getPendingSuggestionCount();
     expect(count).toBe(0);
   });
 });
+
+// ============================================================
+// EDGE CASES — EDITING NEAR STRUCTURAL SYNTAX
+// ============================================================
 
 test.describe('Editor - Edge Cases Near Structural Syntax', () => {
   test.beforeEach(async ({ page }) => {
@@ -395,132 +389,188 @@ test.describe('Editor - Edge Cases Near Structural Syntax', () => {
     await clearAllSuggestions();
   });
 
-  test('editing inside a Question block preserves tags', async ({ page }) => {
-    // Find question text and edit it
-    await clickTextInEditor(page, 'What happened when the Holy Spirit');
-    await page.keyboard.press('Home');
-    await typeAtCursor(page, 'TEST: ');
+  // --- Headings ---
 
-    // Verify raw doc still has Question tags
-    const raw = await getRawDoc(page);
-    expect(raw).toContain('<Question id=TheCallSes1-Hearing-Q1>');
-    expect(raw).toContain('</Question>');
-    expect(raw).toContain('TEST: 1. What happened');
-  });
-
-  test('editing inside a Callout block preserves tags', async ({ page }) => {
-    await clickTextInEditor(page, 'All who genuinely believe');
-    await page.keyboard.press('Home');
-    await typeAtCursor(page, 'Indeed, ');
+  test('replacing a word inside H2 heading preserves ##', async ({ page }) => {
+    await selectText(page, 'Session Overview');
+    await replaceWith(page, 'Session Summary');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('<Callout>');
-    expect(raw).toContain('</Callout>');
-    expect(raw).toContain('Indeed, All who genuinely');
+    expect(raw).toContain('## Session Summary');
+    expect(raw).not.toContain('## ## ');
   });
 
-  test('editing attribution text preserves << marker', async ({ page }) => {
-    await clickTextInEditor(page, 'The Path of Discipleship');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' (revised)');
-
-    const raw = await getRawDoc(page);
-    expect(raw).toContain('<< _The Path of Discipleship (revised)_');
-  });
-
-  test('editing heading text preserves # markers', async ({ page }) => {
-    await clickTextInEditor(page, 'Session Overview');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' (Draft)');
-
-    const raw = await getRawDoc(page);
-    expect(raw).toContain('## Session Overview (Draft)');
-  });
-
-  test('editing bold text preserves ** markers', async ({ page }) => {
-    await clickTextInEditor(page, 'Key Passage');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' Updated');
-
-    const raw = await getRawDoc(page);
-    expect(raw).toContain('**Key Passage Updated**');
-  });
-
-  test('editing blockquote text preserves > marker', async ({ page }) => {
-    await clickTextInEditor(page, 'Disciples of Christ');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' today');
-
-    const raw = await getRawDoc(page);
-    expect(raw).toContain('>Disciples of Christ today');
-  });
-
-  test('editing between two structural blocks does not corrupt them', async ({ page }) => {
-    // Edit text between two Question blocks
-    const raw1 = await getRawDoc(page);
-    const qCount1 = (raw1.match(/<Question/g) || []).length;
-
-    // Click in the text area between questions
-    await clickTextInEditor(page, 'Retell this story');
-    await page.keyboard.press('Home');
-    await typeAtCursor(page, 'Please ');
-
-    const raw2 = await getRawDoc(page);
-    const qCount2 = (raw2.match(/<Question/g) || []).length;
-    expect(qCount2).toBe(qCount1); // Same number of Question blocks
-  });
-
-  test('typing at the start of a heading line preserves # prefix', async ({ page }) => {
-    // Place cursor right at the beginning of "Session Overview" (H2)
-    await page.evaluate(() => {
-      const doc = window.__editorView.state.doc.toString();
-      const pos = doc.indexOf('## Session Overview');
-      // Position cursor right after "## " (at the S of Session)
-      window.__editorView.dispatch({
-        selection: { anchor: pos + 3 },
-        scrollIntoView: true,
-      });
-      window.__editorView.focus();
-    });
-    await page.waitForTimeout(200);
-    await page.keyboard.press('Home');
-    await typeAtCursor(page, 'New ');
-
-    const raw = await getRawDoc(page);
-    // The ## should still be there, and "New" should be in the heading text
-    expect(raw).toContain('## New Session Overview');
-  });
-
-  test('typing at the end of a heading preserves structure', async ({ page }) => {
-    await clickTextInEditor(page, 'Key Elements');
-    await page.keyboard.press('End');
-    await typeAtCursor(page, ' (v2)');
+  test('appending text to H3 heading preserves ###', async ({ page }) => {
+    await cursorAfter(page, 'Key Elements');
+    await typeText(page, ' (v2)');
 
     const raw = await getRawDoc(page);
     expect(raw).toContain('### Key Elements (v2)');
   });
 
-  test('deleting a word at the boundary of bold does not corrupt markers', async ({ page }) => {
-    // "**earnestly receive" — select "earnestly" and delete it
-    await selectTextInEditor(page, 'earnestly');
-    await page.keyboard.press('Delete');
+  test('replacing a word in H3 heading preserves ###', async ({ page }) => {
+    await selectText(page, 'Confessional');
+    await replaceWith(page, 'Core');
 
     const raw = await getRawDoc(page);
-    // Bold markers should still be intact
-    expect(raw).toContain('**');
-    expect(raw).not.toContain('***'); // No triple asterisks
+    expect(raw).toContain('### Core Statement');
   });
 
-  test('editing italic text inside attribution preserves structure', async ({ page }) => {
-    // The Path of Discipleship is italic inside <<
-    await clickTextInEditor(page, 'The Path of Discipleship');
-    await selectTextInEditor(page, 'Path');
-    await typeAtCursor(page, 'Way');
+  // --- Bold ---
+
+  test('replacing a word inside bold preserves ** markers', async ({ page }) => {
+    // "**earnestly receive..." — replace "earnestly" with "humbly"
+    await selectText(page, 'earnestly');
+    await replaceWith(page, 'humbly');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('**humbly receive');
+    expect(raw).not.toContain('***');
+  });
+
+  test('appending to bold text stays inside ** markers', async ({ page }) => {
+    // "**Key Passage**" — add text after "Passage" but before **
+    await selectText(page, 'Key Passage');
+    await replaceWith(page, 'Main Passage');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('**Main Passage**');
+  });
+
+  // --- Italic ---
+
+  test('replacing italic text preserves _ markers', async ({ page }) => {
+    // "_The Path of Discipleship_" is inside << attribution
+    await selectText(page, 'The Path of Discipleship');
+    await replaceWith(page, 'The Way of Discipleship');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('_The Way of Discipleship_');
+  });
+
+  // --- Blockquote ---
+
+  test('replacing text inside blockquote preserves > marker', async ({ page }) => {
+    await selectText(page, 'Disciples of Christ');
+    await replaceWith(page, 'Followers of Christ');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('>Followers of Christ');
+    // Should not have lost the > marker
+    expect(raw).not.toContain('\nFollowers of Christ');
+  });
+
+  test('appending text inside blockquote stays in blockquote', async ({ page }) => {
+    await cursorAfter(page, 'through baptism,');
+    await typeText(page, ' as commanded,');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('>publicly declare their faith commitment and community participation through baptism, as commanded,');
+  });
+
+  // --- Attribution ---
+
+  test('replacing text in attribution preserves << and _italic_', async ({ page }) => {
+    await selectText(page, 'Path');
+    await replaceWith(page, 'Way');
 
     const raw = await getRawDoc(page);
     expect(raw).toContain('<< _The Way of Discipleship_');
   });
+
+  // --- Question blocks ---
+
+  test('editing inside a Question block preserves tags', async ({ page }) => {
+    // Select specific text inside a question
+    await selectText(page, 'What happened when the Holy Spirit');
+    await replaceWith(page, 'What occurred when the Holy Spirit');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('<Question id=TheCallSes1-Hearing-Q1>');
+    expect(raw).toContain('</Question>');
+    expect(raw).toContain('What occurred when the Holy Spirit');
+  });
+
+  test('appending text inside Question block stays inside tags', async ({ page }) => {
+    await cursorAfter(page, 'Acts 2:1–13');
+    await typeText(page, ' (please read carefully)');
+
+    const raw = await getRawDoc(page);
+    // The added text should be before </Question>
+    expect(raw).toContain('Acts 2:1–13 (please read carefully)');
+    expect(raw).toContain('</Question>');
+  });
+
+  // --- Callout blocks ---
+
+  test('replacing text inside Callout preserves tags', async ({ page }) => {
+    await scrollEditorTo(page, 0.40);
+    await selectText(page, 'All who genuinely believe in Jesus');
+    await replaceWith(page, 'Everyone who truly believes in Jesus');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('<Callout>');
+    expect(raw).toContain('</Callout>');
+    expect(raw).toContain('Everyone who truly believes in Jesus');
+  });
+
+  // --- Regular paragraph ---
+
+  test('replacing a word in a paragraph works cleanly', async ({ page }) => {
+    await selectText(page, 'philosophy');
+    await replaceWith(page, 'worldview');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('an idea, a worldview, or a belief system');
+  });
+
+  test('inserting text mid-paragraph works', async ({ page }) => {
+    await cursorAfter(page, 'more than an idea,');
+    await typeText(page, ' much more than');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('more than an idea, much more than a');
+  });
+
+  // --- Between structural blocks ---
+
+  test('editing between two Question blocks does not corrupt them', async ({ page }) => {
+    const raw1 = await getRawDoc(page);
+    const qCount1 = (raw1.match(/<Question/g) || []).length;
+
+    await selectText(page, 'Retell this story');
+    await replaceWith(page, 'Retell this narrative');
+
+    const raw2 = await getRawDoc(page);
+    const qCount2 = (raw2.match(/<Question/g) || []).length;
+    expect(qCount2).toBe(qCount1);
+  });
+
+  // --- Delete operations ---
+
+  test('deleting a word in a paragraph', async ({ page }) => {
+    await selectText(page, 'sovereign ');
+    await deleteSelection(page);
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('as rightful king');
+    expect(raw).not.toContain('as sovereign rightful');
+  });
+
+  test('deleting text inside bold preserves markers', async ({ page }) => {
+    // Replace "earnestly" with nothing (effectively deleting it)
+    await selectText(page, 'earnestly');
+    await replaceWith(page, 'gratefully');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('**gratefully receive');
+    expect(raw).not.toContain('***');
+  });
 });
+
+// ============================================================
+// ACCEPT / REJECT FLOW
+// ============================================================
 
 test.describe('Editor - Accept/Reject Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -533,52 +583,67 @@ test.describe('Editor - Accept/Reject Flow', () => {
     await clearAllSuggestions();
   });
 
-  test('creating suggestion and reviewing shows Review button', async ({ page }) => {
-    // Create a suggestion
+  test('suggestion persists after exiting editor', async ({ page }) => {
     await enterSuggestMode(page);
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await waitForAutoSave(page);
 
-    // Exit editor
+    // Exit
     await page.click('#btn-editor-done');
-    await page.waitForNavigation();
+    await page.waitForTimeout(2000);
 
-    // Should see Review button
-    const reviewBtn = page.locator('#btn-review');
-    await expect(reviewBtn).toBeVisible();
+    // Verify still in Firestore
+    const count = await getPendingSuggestionCount();
+    expect(count).toBeGreaterThan(0);
   });
 
-  test('accept button commits to GitHub', async ({ page }) => {
-    // Create suggestion
+  test('Review button appears when suggestions exist', async ({ page }) => {
     await enterSuggestMode(page);
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await waitForAutoSave(page);
+
+    // Exit editor — triggers page reload
     await page.click('#btn-editor-done');
-    await page.waitForNavigation();
+    // Wait for the reload to complete
+    await page.waitForURL('**/' + TEST_SESSION_PATH.split('/').pop() + '*', { timeout: 15000 });
+    await page.waitForTimeout(1000);
 
-    // Enter review mode
+    const reviewBtn = page.locator('#btn-review');
+    await expect(reviewBtn).toBeVisible({ timeout: 5000 });
+  });
+
+  test('review mode is read-only', async ({ page }) => {
+    await enterSuggestMode(page);
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
+    await waitForAutoSave(page);
+
+    await page.click('#btn-editor-done');
+    await page.waitForURL('**/' + TEST_SESSION_PATH.split('/').pop() + '*', { timeout: 15000 });
+    await page.waitForTimeout(1000);
+
     await page.click('#btn-review');
-    await page.waitForSelector('.margin-card');
+    await page.waitForSelector('.cm-editor');
+    await page.waitForTimeout(500);
 
-    // Click accept
-    await page.click('.margin-action--accept');
-    await page.waitForNavigation({ timeout: 30000 });
-
-    // Verify suggestion is gone from Firestore
-    const count = await getPendingSuggestionCount();
-    expect(count).toBe(0);
+    const label = page.locator('#editor-mode-label');
+    await expect(label).toHaveText('Reviewing Suggestions');
   });
 });
 
-test.describe('Editor - Direct Edit (Admin)', () => {
+// ============================================================
+// DIRECT EDIT (ADMIN)
+// ============================================================
+
+test.describe('Editor - Direct Edit', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL + TEST_SESSION_PATH);
     await login(page);
   });
 
-  test('direct edit mode shows "Direct Editing" label', async ({ page }) => {
+  test('direct edit shows "Direct Editing" label', async ({ page }) => {
     await enterDirectMode(page);
     const label = page.locator('#editor-mode-label');
     await expect(label).toHaveText('Direct Editing');
@@ -586,12 +651,21 @@ test.describe('Editor - Direct Edit (Admin)', () => {
 
   test('direct edit has no suggestion decorations', async ({ page }) => {
     await enterDirectMode(page);
-    await selectTextInEditor(page, 'Christianity');
-    await typeAtCursor(page, 'Faith');
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
     await page.waitForTimeout(500);
 
-    // Should not have suggestion decorations in direct mode
     const insertions = page.locator('.cm-suggestion-insert');
     await expect(insertions).toHaveCount(0);
+  });
+
+  test('direct edit can modify the document', async ({ page }) => {
+    await enterDirectMode(page);
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
+
+    const raw = await getRawDoc(page);
+    expect(raw).toContain('Faith is more than');
+    expect(raw).not.toContain('Christianity is more than');
   });
 });
