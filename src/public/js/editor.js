@@ -4,7 +4,8 @@ import { maskingExtension } from '/static/js/editor-masking.js';
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, repositionCards } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, repositionCards } from '/static/js/editor-margin.js';
+import { commentExtension, initComments, promptAddComment, getComments } from '/static/js/editor-comments.js';
 
 const data = window.__EDITOR_DATA;
 if (data) {
@@ -205,20 +206,35 @@ if (data) {
   }
 
   // --- Build working document from original + existing suggestions ---
+  // Uses text-based find-and-replace, not position-based (matches server accept logic)
   function buildWorkingDoc(original, existingSuggestions) {
     if (!existingSuggestions || existingSuggestions.length === 0) return original;
 
-    // Sort by originalFrom descending so we can apply from end to start without shifting
+    // Sort by originalFrom descending so we apply from end to start (avoids position shifts)
     const sorted = [...existingSuggestions].sort((a, b) => b.originalFrom - a.originalFrom);
     let doc = original;
 
     for (const s of sorted) {
       if (s.type === 'insertion') {
-        doc = doc.slice(0, s.originalFrom) + s.newText + doc.slice(s.originalFrom);
+        // Find insertion point using context
+        if (s.contextBefore || s.contextAfter) {
+          const ctx = (s.contextBefore || '') + (s.contextAfter || '');
+          const ctxPos = doc.indexOf(ctx);
+          if (ctxPos >= 0) {
+            const insertAt = ctxPos + (s.contextBefore || '').length;
+            doc = doc.slice(0, insertAt) + s.newText + doc.slice(insertAt);
+          }
+        }
       } else if (s.type === 'deletion') {
-        doc = doc.slice(0, s.originalFrom) + doc.slice(s.originalTo);
+        const pos = doc.indexOf(s.originalText);
+        if (pos >= 0) {
+          doc = doc.slice(0, pos) + doc.slice(pos + s.originalText.length);
+        }
       } else if (s.type === 'replacement') {
-        doc = doc.slice(0, s.originalFrom) + s.newText + doc.slice(s.originalTo);
+        const pos = doc.indexOf(s.originalText);
+        if (pos >= 0) {
+          doc = doc.slice(0, pos) + s.newText + doc.slice(pos + s.originalText.length);
+        }
       }
     }
     return doc;
@@ -268,17 +284,20 @@ if (data) {
     const host = document.getElementById('codemirror-host');
     host.innerHTML = '';
 
+    // For suggest/review mode, pre-set the original content in the initial state
+    const extensions = [
+      basicSetup,
+      markdown(),
+      EditorView.lineWrapping,
+      maskingExtension(),
+      ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
+      ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
+    ];
+
     editorView = new EditorView({
       state: EditorState.create({
         doc: workingDoc,
-        extensions: [
-          basicSetup,
-          markdown(),
-          EditorView.lineWrapping,
-          maskingExtension(),
-          ...(isSuggestOrReview ? [suggestionExtension()] : []),
-          ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
-        ],
+        extensions,
       }),
       parent: host,
     });
@@ -288,13 +307,23 @@ if (data) {
       editorView.dispatch({ effects: setOriginal.of(originalContent) });
     }
 
-    // Init margin panel
+    // Init margin panel + comments
     if (isSuggestOrReview && marginEl) {
       const userInfo = data.user ? { ...data.user, editRole: data.editRole } : null;
       initMarginPanel(marginEl, editorView, userInfo, {
         onAccept: acceptHunk,
         onReject: rejectOrDeleteHunk,
+        onResolveComment: resolveComment,
       });
+
+      // Load existing comments
+      const existingComments = data.pendingComments || [];
+      initComments(editorView, existingComments, (comments) => {
+        updateCommentCards(comments);
+      });
+      if (existingComments.length > 0) {
+        updateCommentCards(existingComments);
+      }
     }
 
     // Reposition margin on scroll
@@ -364,10 +393,33 @@ if (data) {
     }
   }
 
+  // --- Resolve a comment ---
+  async function resolveComment(commentId) {
+    try {
+      const res = await fetch('/api/suggestions/comments/' + commentId + '/resolve', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert('Error: ' + (err.error || 'Failed to resolve'));
+        return;
+      }
+      // Remove from local state
+      const { removeComment } = await import('/static/js/editor-comments.js');
+      removeComment(commentId);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+
   // --- Bind buttons ---
   document.getElementById('btn-suggest-edit')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
+  document.getElementById('btn-add-comment')?.addEventListener('click', () => {
+    if (editorView) promptAddComment(editorView, data);
+  });
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;

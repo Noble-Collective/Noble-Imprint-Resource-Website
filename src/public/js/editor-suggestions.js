@@ -159,10 +159,13 @@ const suggestionPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this.decorations = Decoration.none;
-      this.update({ view, docChanged: true });
+      this._lastOriginal = '';
     }
     update(update) {
-      if (update.docChanged || update.startState !== update.state) {
+      const original = update.view.state.field(originalDocField);
+      const originalChanged = original !== this._lastOriginal;
+      if (originalChanged) this._lastOriginal = original;
+      if (update.docChanged || originalChanged) {
         const original = update.view.state.field(originalDocField);
         if (!original) {
           this.decorations = Decoration.none;

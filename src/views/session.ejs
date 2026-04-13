@@ -121,6 +121,7 @@
           <span class="editor-save-status" id="editor-save-status"></span>
         </div>
         <div class="editor-toolbar-right">
+          <button class="edit-btn" id="btn-add-comment" title="Add comment on selected text">Comment</button>
           <button class="edit-btn edit-btn--primary" id="btn-editor-done">Done</button>
         </div>
       </div>
@@ -144,6 +145,7 @@
         sessionFilePath: sessionFilePath,
         bookRepoPath: bookRepoPath,
         pendingSuggestions: pendingSuggestions || [],
+        pendingComments: pendingComments || [],
         canReview: canReview || false,
         user: user ? { email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null,
       }).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
