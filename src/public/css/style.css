@@ -2937,6 +2937,374 @@ body.drawer-open {
   overflow-y: auto;
 }
 
+/* Tab badge */
+.admin-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #c0392b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  margin-left: 4px;
+}
+
+/* Review meta */
+.review-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #555;
+}
+.review-meta-item strong {
+  color: #333;
+}
+
+/* Diff view */
+.diff-view {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 14px;
+  line-height: 1.7;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #fafafa;
+}
+.diff-ins {
+  background: #d4edda;
+  text-decoration: none;
+}
+.diff-del {
+  background: #f8d7da;
+  text-decoration: line-through;
+}
+
+/* ============================================================
+   Editor — Edit Toolbar + CodeMirror Container
+   ============================================================ */
+
+.edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.edit-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.edit-btn:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+.edit-btn--primary {
+  background: #1a1a1a;
+  color: #fff;
+  border-color: #1a1a1a;
+}
+.edit-btn--primary:hover {
+  background: #333;
+}
+.edit-btn--review {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+}
+.edit-btn--review:hover {
+  background: #ffecb5;
+}
+.edit-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.edit-banner {
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  flex: 1;
+}
+.edit-banner--pending {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+}
+.edit-banner-link {
+  color: #856404;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.editor-container {
+  width: 100%;
+}
+.editor-nav {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 8px 0 12px;
+  color: #888;
+}
+.editor-nav-link {
+  color: #666;
+  text-decoration: none;
+}
+.editor-nav-link:hover {
+  color: #d7b44a;
+}
+.editor-nav-sep {
+  margin: 0 6px;
+  color: #ccc;
+}
+.editor-nav-current {
+  color: #333;
+}
+/* When editor is active, expand main to use full width */
+.main.is-editing {
+  padding: 1rem;
+  max-width: none;
+}
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f8f8f8;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px 6px 0 0;
+  flex-wrap: wrap;
+}
+.editor-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.editor-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.editor-mode-label {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+.editor-save-status {
+  font-size: 12px;
+  color: #27ae60;
+  font-family: 'DM Sans', sans-serif;
+  margin-left: 8px;
+}
+.editor-comment-input {
+  width: 260px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+}
+.editor-comment-input:focus {
+  outline: none;
+  border-color: #d7b44a;
+}
+
+#codemirror-host {
+  border: 1px solid #e5e5e5;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+  min-height: 400px;
+}
+#codemirror-host .cm-editor {
+  min-height: 400px;
+}
+
+/* Editor body: editor + margin panel side by side */
+.editor-body {
+  display: flex;
+  position: relative;
+  border: 1px solid #e5e5e5;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+  min-height: 400px;
+}
+.editor-body #codemirror-host {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Suggestion margin panel */
+.suggestion-margin {
+  width: 260px;
+  flex-shrink: 0;
+  border-left: 1px solid #e5e5e5;
+  background: #fafbf9;
+  overflow-y: auto;
+  position: relative;
+  padding: 12px 0;
+}
+.margin-empty {
+  padding: 16px;
+  color: #999;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  text-align: center;
+}
+
+/* Margin cards */
+.margin-card {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  transition: border-color .15s;
+}
+.margin-card:hover {
+  border-color: #d7b44a;
+}
+.margin-card-body {
+  line-height: 1.5;
+  word-break: break-word;
+}
+.margin-card-del {
+  background: rgba(234, 67, 53, 0.12);
+  color: #c62828;
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.margin-card-ins {
+  background: rgba(52, 168, 83, 0.15);
+  color: #1e7e34;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.margin-card-arrow {
+  color: #999;
+  font-size: 11px;
+}
+
+/* Card header: avatar + name + actions */
+.margin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.margin-card-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.margin-card-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.margin-card-avatar--initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #d7b44a;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 10px;
+}
+.margin-card-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.margin-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.margin-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  padding: 0;
+}
+.margin-action:hover {
+  background: #f5f5f5;
+}
+.margin-action--accept {
+  color: #27ae60;
+}
+.margin-action--accept:hover {
+  background: #e8f5e9;
+  border-color: #27ae60;
+}
+.margin-action--reject {
+  color: #c0392b;
+}
+.margin-action--reject:hover {
+  background: #fdf0ef;
+  border-color: #c0392b;
+}
+.margin-card-time {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* Inline suggestion decorations (in CodeMirror) */
+.cm-suggestion-insert {
+  background: rgba(52, 168, 83, 0.18);
+  color: #1e7e34;
+  text-decoration: underline;
+  text-decoration-color: rgba(52, 168, 83, 0.4);
+}
+.cm-suggestion-delete {
+  background: rgba(234, 67, 53, 0.12);
+  color: #c62828;
+  text-decoration: line-through;
+  cursor: default;
+  user-select: none;
+}
+
 /* ============================================================
    Admin Console — Responsive
    ============================================================ */
@@ -2964,5 +3332,36 @@ body.drawer-open {
   }
   .admin-modal {
     margin: 16px;
+  }
+  .editor-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .editor-toolbar-right {
+    flex-wrap: wrap;
+  }
+  .editor-comment-input {
+    width: 100%;
+  }
+  .edit-toolbar {
+    flex-wrap: wrap;
+  }
+  .editor-body {
+    flex-direction: column;
+  }
+  .suggestion-margin {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e5e5e5;
+    position: static;
+    max-height: 200px;
+  }
+  .margin-card {
+    position: static;
+    margin-bottom: 6px;
+    left: auto;
+    right: auto;
+    margin-left: 8px;
+    margin-right: 8px;
   }
 }

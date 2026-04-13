@@ -68,7 +68,21 @@
       </div>
     </div>
 
-    <div class="reading-content">
+    <% if (typeof editRole !== 'undefined' && editRole) { %>
+      <div class="edit-toolbar" id="edit-toolbar">
+        <button class="edit-btn" id="btn-suggest-edit">Suggest Edits</button>
+        <% if (editRole === 'admin') { %>
+          <button class="edit-btn edit-btn--primary" id="btn-direct-edit">Direct Edit</button>
+        <% } %>
+        <% if (pendingSuggestions && pendingSuggestions.length > 0) { %>
+          <button class="edit-btn edit-btn--review" id="btn-review">
+            Review <%= pendingSuggestions.length %> suggestion<%= pendingSuggestions.length === 1 ? '' : 's' %>
+          </button>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="reading-content" id="reading-content">
       <div class="session-content">
         <%- sessionHtml %>
       </div>
@@ -92,6 +106,49 @@
         <% } %>
       </div>
     </div>
+
+    <% if (typeof editRole !== 'undefined' && editRole) { %>
+    <!-- Editor container (hidden until edit mode) -->
+    <div class="editor-container" id="editor-container" style="display:none">
+      <div class="editor-nav">
+        <a href="<%= content.bookUrl(series, subseries, book) %>" class="editor-nav-link">&larr; <%= book.title %></a>
+        <span class="editor-nav-sep">/</span>
+        <span class="editor-nav-current"><%= session.title || session.displayName %></span>
+      </div>
+      <div class="editor-toolbar" id="editor-toolbar-bar">
+        <div class="editor-toolbar-left">
+          <span class="editor-mode-label" id="editor-mode-label">Suggesting Edits</span>
+          <span class="editor-save-status" id="editor-save-status"></span>
+        </div>
+        <div class="editor-toolbar-right">
+          <button class="edit-btn edit-btn--primary" id="btn-editor-done">Done</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <div id="codemirror-host"></div>
+        <div class="suggestion-margin" id="suggestion-margin">
+          <div class="margin-empty">No changes yet</div>
+        </div>
+      </div>
+    </div>
+    <% } %>
+
   </main>
+
+<% if (typeof editRole !== 'undefined' && editRole) { %>
+    <script>
+      window.__EDITOR_DATA = JSON.parse('<%- JSON.stringify({
+        rawContent: rawContent,
+        contentSha: contentSha,
+        editRole: editRole,
+        sessionFilePath: sessionFilePath,
+        bookRepoPath: bookRepoPath,
+        pendingSuggestions: pendingSuggestions || [],
+        canReview: canReview || false,
+        user: user ? { email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null,
+      }).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
+    </script>
+    <script type="module" src="/static/js/editor.js?v=3"></script>
+<% } %>
 
 <%- include('partials/footer') %>

@@ -9,3 +9,6 @@ mockups/
 
 # Firebase
 .firebase/
+
+# Test
+test-results/

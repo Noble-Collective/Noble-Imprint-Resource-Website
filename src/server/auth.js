@@ -28,6 +28,26 @@ async function verifySessionCookie(cookie) {
 
 // Middleware: attach user info to every request
 function attachUser(req, res, next) {
+  // Dev-only: bypass auth with __dev_auth cookie
+  if (process.env.NODE_ENV !== 'production' && req.cookies && req.cookies.__dev_auth) {
+    const email = req.cookies.__dev_auth;
+    const user = {
+      uid: email.replace(/[^a-zA-Z0-9]/g, '_'),
+      email,
+      displayName: email.split('@')[0],
+      photoURL: null,
+      isSuperAdmin: isSuperAdmin(email),
+      isAdmin: false,
+    };
+    const firestoreMod = require('./firestore');
+    return firestoreMod.isAdmin(email).then(isAdm => {
+      user.isAdmin = isAdm || user.isSuperAdmin;
+      req.user = user;
+      res.locals.user = user;
+      next();
+    }).catch(() => { req.user = user; res.locals.user = user; next(); });
+  }
+
   const sessionCookie = req.cookies && req.cookies.__session;
   if (!sessionCookie) {
     req.user = null;

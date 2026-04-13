@@ -174,10 +174,33 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// --- Test auth helper (development only) ---
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/auth/test-login', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: 'email required' });
+      // Set a dev-only cookie that attachUser recognizes
+      res.cookie('__dev_auth', email, {
+        httpOnly: true, secure: false, sameSite: 'lax', path: '/', maxAge: 24 * 60 * 60 * 1000,
+      });
+      await firestore.createOrUpdateUser(email, email.split('@')[0], null);
+      res.json({ status: 'ok' });
+    } catch (err) {
+      console.error('Test login error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 // --- Admin routes ---
 const adminRoutes = require('./admin-routes');
 app.use('/admin', auth.requireAdmin, adminRoutes.page);
 app.use('/api/admin', auth.requireAdmin, adminRoutes.api);
+
+// --- Suggestion routes ---
+const suggestionRoutes = require('./suggestion-routes');
+app.use('/api/suggestions', suggestionRoutes);
 
 // Homepage
 app.get('/', async (req, res, next) => {
@@ -245,6 +268,19 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const prevSession = idx > 0 ? book.sessions[idx - 1] : null;
       const nextSession = idx < book.sessions.length - 1 ? book.sessions[idx + 1] : null;
 
+      // Editor data — for users with edit/review permissions
+      const suggestions = require('./suggestions');
+      let editRole = null;
+      let allPendingSuggestions = [];
+      if (req.user) {
+        editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
+      }
+      const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
+      const canReview = editRole === 'admin' || editRole === 'manuscript-owner';
+      if (canEdit || canReview) {
+        allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
+      }
+
       res.render('session', {
         series,
         subseries: subseries || null,
@@ -257,6 +293,13 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         nextSession,
         content,
         title: `${sessionData.title} — ${book.title}`,
+        editRole: canEdit ? editRole : null,
+        canReview: canReview || false,
+        rawContent: canEdit ? sessionData.content : null,
+        contentSha: canEdit ? sessionData.sha : null,
+        pendingSuggestions: allPendingSuggestions,
+        sessionFilePath: canEdit ? session.path : null,
+        bookRepoPath: canEdit ? book.repoPath : null,
       });
     }
   } catch (err) {

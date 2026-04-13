@@ -362,4 +362,77 @@
       .catch(function (err) { alert('Error: ' + err.message); });
   });
 
+  // --- Reviews Tab ---
+
+  var reviewsLoaded = false;
+
+  document.querySelectorAll('[data-admin-tab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.getAttribute('data-admin-tab') === 'reviews' && !reviewsLoaded) {
+        loadReviewsList();
+        reviewsLoaded = true;
+      }
+    });
+  });
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function fileNameFromPath(path) {
+    var parts = path.split('/');
+    return parts[parts.length - 1];
+  }
+
+  function loadReviewsList() {
+    var listEl = document.getElementById('reviews-list');
+    listEl.innerHTML = '<p class="text-muted">Loading...</p>';
+
+    apiCall('GET', '/api/suggestions?status=pending')
+      .then(function (items) {
+        if (items.length === 0) {
+          listEl.innerHTML = '<p class="text-muted">No pending suggestions.</p>';
+          return;
+        }
+
+        // Group by filePath
+        var byFile = {};
+        items.forEach(function (item) {
+          if (!byFile[item.filePath]) byFile[item.filePath] = { book: item.bookPath, items: [] };
+          byFile[item.filePath].items.push(item);
+        });
+
+        var html = '<table class="admin-table"><thead><tr>';
+        html += '<th>Session</th><th>Book</th><th>Suggestions</th><th>Authors</th><th></th>';
+        html += '</tr></thead><tbody>';
+
+        Object.keys(byFile).forEach(function (filePath) {
+          var group = byFile[filePath];
+          var authors = [];
+          group.items.forEach(function (item) {
+            if (authors.indexOf(item.authorName || item.authorEmail) === -1) {
+              authors.push(item.authorName || item.authorEmail);
+            }
+          });
+
+          // Build a URL to the session page
+          // filePath looks like: series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1.md
+          // We need to construct the website URL from this
+          html += '<tr>';
+          html += '<td>' + escapeHtml(fileNameFromPath(filePath)) + '</td>';
+          html += '<td class="text-muted">' + escapeHtml(group.book.split('/').pop()) + '</td>';
+          html += '<td>' + group.items.length + '</td>';
+          html += '<td>' + escapeHtml(authors.join(', ')) + '</td>';
+          html += '<td><a href="/?reviewFile=' + encodeURIComponent(filePath) + '" class="admin-btn admin-btn--sm">Open Session</a></td>';
+          html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+      })
+      .catch(function (err) {
+        listEl.innerHTML = '<p class="text-muted">Error: ' + err.message + '</p>';
+      });
+  }
+
 })();

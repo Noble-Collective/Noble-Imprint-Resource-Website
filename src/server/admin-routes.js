@@ -4,6 +4,7 @@ const content = require('./content');
 const github = require('./github');
 const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
+const suggestions = require('./suggestions');
 
 // --- Page routes ---
 const page = express.Router();
@@ -35,10 +36,13 @@ page.get('/', async (req, res, next) => {
       bookRoleCount: u.bookRoles ? Object.keys(u.bookRoles).length : 0,
     }));
 
+    const pendingSuggestions = await suggestions.listSuggestions({ status: 'pending' });
+
     res.render('admin', {
       title: 'Admin Console',
       users: usersWithFlags,
       books,
+      pendingSuggestionCount: pendingSuggestions.length,
       firestore: { decodeBookPath: firestore.decodeBookPath },
     });
   } catch (err) {

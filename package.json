@@ -5,15 +5,24 @@
   "main": "src/server/index.js",
   "scripts": {
     "start": "node src/server/index.js",
-    "dev": "node --watch src/server/index.js"
+    "dev": "node --watch src/server/index.js",
+    "build:editor": "esbuild src/editor-entry.js --bundle --format=esm --outfile=src/public/js/codemirror-bundle.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
+    "diff": "^8.0.4",
     "ejs": "^3.1.10",
     "express": "^4.21.0",
     "firebase-admin": "^13.8.0",
     "js-yaml": "^4.1.0",
     "markdown-it": "^14.1.0",
     "octokit": "^4.1.0"
+  },
+  "devDependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/state": "^6.6.0",
+    "@playwright/test": "^1.59.1",
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.28.0"
   }
 }
