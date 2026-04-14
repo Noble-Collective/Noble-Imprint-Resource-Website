@@ -192,38 +192,31 @@ function findZone(zones, pos) {
   return null;
 }
 
-// --- Selection constraint: clamp selection to zone boundaries ---
-// Uses transactionFilter to modify the selection before it's applied,
-// avoiding conflicts with atomic ranges.
+// --- Selection constraint: clamp DRAG selections to zone boundaries ---
+// Single clicks (cursor positioning) are always allowed.
+// Only range selections (anchor !== head) are clamped.
 const selectionConstraint = EditorState.transactionFilter.of((tr) => {
-  // Only filter selection changes, not doc changes
   if (tr.docChanged) return tr;
   if (!tr.selection) return tr;
+
+  const sel = tr.selection.main;
+  // Single click / cursor move — always allow
+  if (sel.anchor === sel.head) return tr;
 
   const zones = tr.startState.field(editableZonesField);
   if (zones.length === 0) return tr;
 
-  const sel = tr.selection.main;
   const anchorZone = findZone(zones, sel.anchor);
-
-  // If anchor isn't in any zone, let it through (atomic ranges will handle positioning)
-  if (!anchorZone) return tr;
+  if (!anchorZone) return tr; // Anchor outside any zone — don't interfere
 
   const headZone = findZone(zones, sel.head);
-
-  // If both in same zone, allow
+  // Both in same zone — allow
   if (headZone && anchorZone.from === headZone.from && anchorZone.to === headZone.to) return tr;
 
   // Clamp head to the anchor's zone
   const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
-  if (clampedHead !== sel.head) {
-    return [{
-      selection: { anchor: sel.anchor, head: clampedHead },
-      annotations: tr.annotations,
-    }];
-  }
-
-  return tr;
+  if (clampedHead === sel.anchor) return tr; // Would collapse to cursor — just allow
+  return [{ selection: { anchor: sel.anchor, head: clampedHead } }];
 });
 
 // --- Transaction filter: reject edits that span zone boundaries ---
