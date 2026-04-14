@@ -21,20 +21,25 @@ export function setRevealFocusedLine(enabled) {
 }
 
 // --- Build decorations by scanning document text ---
-// If skipLineNumber is set, decorations on that line are omitted (shows raw markdown)
+// Returns { all: DecorationSet, atomic: DecorationSet }
+// `all` includes both hidden ranges and styled marks (for visual rendering)
+// `atomic` includes only hidden ranges (for cursor skipping — marks should NOT be atomic)
 function buildMaskingDecorations(view, skipLineNumber) {
   const doc = view.state.doc;
   const text = doc.toString();
-  const decorations = [];
+  const decorations = [];     // All decorations (visual)
+  const atomicDecos = [];     // Only replace decorations (for atomic ranges)
 
   // Helper: add a collapsed (hidden) range
   function hide(from, to) {
     if (from < to) {
-      decorations.push(Decoration.replace({ inclusive: false }).range(from, to));
+      const deco = Decoration.replace({ inclusive: false }).range(from, to);
+      decorations.push(deco);
+      atomicDecos.push(deco);
     }
   }
 
-  // Helper: add a styled range
+  // Helper: add a styled range (NOT atomic)
   function mark(from, to, cls) {
     if (from < to) {
       decorations.push(Decoration.mark({ class: cls }).range(from, to));
@@ -155,21 +160,25 @@ function buildMaskingDecorations(view, skipLineNumber) {
   }
 
   // Filter out decorations on the skipped line (if any)
-  let filtered = decorations;
+  let filteredAll = decorations;
+  let filteredAtomic = atomicDecos;
   if (skipLineNumber !== undefined && skipLineNumber >= 1 && skipLineNumber <= doc.lines) {
     const skipLine = doc.line(skipLineNumber);
     const skipFrom = skipLine.from;
     const skipTo = skipLine.to;
-    filtered = decorations.filter(d => {
-      // Remove decorations that are entirely within the skipped line
-      return !(d.from >= skipFrom && d.to <= skipTo);
-    });
+    const lineFilter = d => !(d.from >= skipFrom && d.to <= skipTo);
+    filteredAll = decorations.filter(lineFilter);
+    filteredAtomic = atomicDecos.filter(lineFilter);
   }
 
   // Sort by position (required by CodeMirror)
-  filtered.sort((a, b) => a.from - b.from || a.to - b.to);
+  filteredAll.sort((a, b) => a.from - b.from || a.to - b.to);
+  filteredAtomic.sort((a, b) => a.from - b.from || a.to - b.to);
 
-  return Decoration.set(filtered, true);
+  return {
+    all: Decoration.set(filteredAll, true),
+    atomic: Decoration.set(filteredAtomic, true),
+  };
 }
 
 // --- ViewPlugin that recomputes decorations on each document/selection change ---
@@ -177,7 +186,9 @@ const maskingPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this._lastCursorLine = 0;
-      this.decorations = buildMaskingDecorations(view, this._getSkipLine(view));
+      const result = buildMaskingDecorations(view, this._getSkipLine(view));
+      this.decorations = result.all;
+      this.atomicDecorations = result.atomic;
     }
     _getSkipLine(view) {
       if (!revealFocusedLine) return undefined;
@@ -189,7 +200,9 @@ const maskingPlugin = ViewPlugin.fromClass(
       const lineChanged = cursorLine !== this._lastCursorLine;
       if (update.docChanged || update.viewportChanged || lineChanged) {
         this._lastCursorLine = cursorLine;
-        this.decorations = buildMaskingDecorations(update.view, cursorLine);
+        const result = buildMaskingDecorations(update.view, cursorLine);
+        this.decorations = result.all;
+        this.atomicDecorations = result.atomic;
       }
     }
   },
@@ -198,10 +211,10 @@ const maskingPlugin = ViewPlugin.fromClass(
   }
 );
 
-// --- Atomic ranges: cursor skips over hidden decorations ---
+// --- Atomic ranges: ONLY hidden (replace) decorations, NOT styled (mark) decorations ---
 const atomicRanges = EditorView.atomicRanges.of((view) => {
   const plugin = view.plugin(maskingPlugin);
-  return plugin ? plugin.decorations : Decoration.none;
+  return plugin ? plugin.atomicDecorations : Decoration.none;
 });
 
 // --- Theme: visual styles matching the reading view ---

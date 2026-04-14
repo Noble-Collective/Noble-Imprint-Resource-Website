@@ -192,32 +192,41 @@ function findZone(zones, pos) {
   return null;
 }
 
-// --- Selection constraint: clamp DRAG selections to zone boundaries ---
-// Single clicks (cursor positioning) are always allowed.
-// Only range selections (anchor !== head) are clamped.
-const selectionConstraint = EditorState.transactionFilter.of((tr) => {
-  if (tr.docChanged) return tr;
-  if (!tr.selection) return tr;
+// --- Selection constraint: clamp selection on mouseup, not during drag ---
+// This avoids fighting with CM6's mouse handling during drags.
+// The drag happens naturally, then we snap the selection to zone boundaries when released.
+let selectionConstraintCleanup = null;
 
-  const sel = tr.selection.main;
-  // Single click / cursor move — always allow
-  if (sel.anchor === sel.head) return tr;
+function installSelectionConstraint(view) {
+  const handler = () => {
+    // Small delay to let CM6 finalize the selection
+    setTimeout(() => {
+      const zones = view.state.field(editableZonesField);
+      if (zones.length === 0) return;
 
-  const zones = tr.startState.field(editableZonesField);
-  if (zones.length === 0) return tr;
+      const sel = view.state.selection.main;
+      if (sel.anchor === sel.head) return; // Cursor, not selection
 
-  const anchorZone = findZone(zones, sel.anchor);
-  if (!anchorZone) return tr; // Anchor outside any zone — don't interfere
+      const anchorZone = findZone(zones, sel.anchor);
+      if (!anchorZone) return;
 
-  const headZone = findZone(zones, sel.head);
-  // Both in same zone — allow
-  if (headZone && anchorZone.from === headZone.from && anchorZone.to === headZone.to) return tr;
+      const headZone = findZone(zones, sel.head);
+      if (headZone && anchorZone.from === headZone.from && anchorZone.to === headZone.to) return;
 
-  // Clamp head to the anchor's zone
-  const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
-  if (clampedHead === sel.anchor) return tr; // Would collapse to cursor — just allow
-  return [{ selection: { anchor: sel.anchor, head: clampedHead } }];
-});
+      // Clamp head to anchor's zone
+      const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
+      if (clampedHead !== sel.head && clampedHead !== sel.anchor) {
+        view.dispatch({ selection: { anchor: sel.anchor, head: clampedHead } });
+      }
+    }, 10);
+  };
+
+  view.dom.addEventListener('mouseup', handler);
+  selectionConstraintCleanup = () => view.dom.removeEventListener('mouseup', handler);
+}
+
+// No-op extension — the actual constraint is installed imperatively via installSelectionConstraint
+const selectionConstraint = [];
 
 // --- Transaction filter: reject edits that span zone boundaries ---
 const editFilter = EditorState.transactionFilter.of((tr) => {
@@ -252,4 +261,4 @@ export function constraintExtension() {
   return [editableZonesField, selectionConstraint, editFilter];
 }
 
-export { setZones, computeEditableZones as recomputeZones };
+export { setZones, computeEditableZones as recomputeZones, installSelectionConstraint };
