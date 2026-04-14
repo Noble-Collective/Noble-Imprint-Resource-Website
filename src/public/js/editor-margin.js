@@ -187,7 +187,7 @@ function renderAllCards() {
 
     // Thread replies — keyed by Firestore ID of the parent suggestion
     var firestoreId = loaded ? loaded.id : null;
-    var threadHtml = firestoreId ? buildThreadHtml(firestoreId, 'suggestion') : '';
+    var threadHtml = buildThreadHtml(firestoreId || hunk.id, 'suggestion');
 
     html += '<div class="margin-card margin-card--suggestion" data-hunk-id="' + hunk.id + '" style="top:' + top + 'px">'
       + '<div class="margin-card-header">'
@@ -230,7 +230,7 @@ function renderAllCards() {
         + '</button>';
     }
 
-    var cThreadHtml = c.id ? buildThreadHtml(c.id, 'comment') : '';
+    var cThreadHtml = buildThreadHtml(c.id || ('comment-' + Math.random()), 'comment');
 
     html += '<div class="margin-card margin-card--comment" data-comment-id="' + c.id + '" style="top:' + top + 'px">'
       + '<div class="margin-card-header">'
