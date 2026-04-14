@@ -3077,6 +3077,69 @@ body.drawer-open {
 .editor-nav-current {
   color: #333;
 }
+/* Editor modal (commit message, confirmations) */
+.editor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.editor-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  width: 420px;
+  max-width: 90vw;
+  font-family: 'DM Sans', sans-serif;
+}
+.editor-modal-header {
+  padding: 16px 20px 0;
+}
+.editor-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.editor-modal-body {
+  padding: 12px 20px;
+}
+.editor-modal-label {
+  display: block;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+}
+.editor-modal-textarea {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 60px;
+}
+.editor-modal-textarea:focus {
+  outline: none;
+  border-color: #d7b44a;
+}
+.editor-modal-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Direct edit mode accent */
+.editor-container.direct-editing .editor-toolbar {
+  border-top: 3px solid #d7b44a;
+}
+.editor-container.direct-editing .editor-mode-label {
+  color: #b8941f;
+}
 /* Edit mode: Google Docs-like layout */
 .main.main--editing {
   padding: 0.5rem 1rem;
@@ -3239,6 +3302,14 @@ body.drawer-open {
 .margin-card--focused {
   animation: card-pulse 0.6s ease;
   border-color: #d7b44a;
+}
+.margin-card--removing {
+  animation: card-remove 0.4s ease forwards;
+  pointer-events: none;
+}
+@keyframes card-remove {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(20px); }
 }
 @keyframes card-pulse {
   0% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,.06); }

@@ -145,6 +145,22 @@
       </div>
       <!-- Toast notifications -->
       <div class="editor-toast" id="editor-toast" style="display:none"></div>
+      <!-- Commit message modal -->
+      <div class="editor-modal-overlay" id="commit-modal" style="display:none">
+        <div class="editor-modal">
+          <div class="editor-modal-header">
+            <h3>Commit Changes</h3>
+          </div>
+          <div class="editor-modal-body">
+            <label for="commit-message" class="editor-modal-label">Describe your changes (optional)</label>
+            <textarea id="commit-message" class="editor-modal-textarea" rows="3" placeholder="e.g. Fixed grammar in introduction paragraph"></textarea>
+          </div>
+          <div class="editor-modal-footer">
+            <button class="edit-btn" id="commit-cancel">Cancel</button>
+            <button class="edit-btn edit-btn--primary" id="commit-confirm">Commit</button>
+          </div>
+        </div>
+      </div>
     </div>
     <% } %>
 

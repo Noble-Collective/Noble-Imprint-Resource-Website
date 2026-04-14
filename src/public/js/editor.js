@@ -176,7 +176,7 @@ if (data) {
 
     const firestoreId = findFirestoreId(hunkId);
     if (!firestoreId) {
-      alert('Could not find this suggestion. It may not be saved yet.');
+      showToast('Could not find this suggestion. It may not be saved yet.', 'error');
       acceptingInProgress = false;
       return;
     }
@@ -206,9 +206,12 @@ if (data) {
       // Remove replies for the accepted suggestion
       removeRepliesForParent(firestoreId);
 
-      // Remove the accepted suggestion's card from the margin
+      // Animate and remove the accepted suggestion's card
       const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
-      if (card) card.remove();
+      if (card) {
+        card.classList.add('margin-card--removing');
+        setTimeout(() => card.remove(), 400);
+      }
 
       // Remove from pendingSuggestions data so it doesn't reappear
       if (data.pendingSuggestions) {
@@ -260,9 +263,19 @@ if (data) {
       savedHunks.delete(key);
     }
 
-    // In review mode, reload to reflect the change
+    // Animate card removal
+    const selector = hunk ? '.margin-card[data-hunk-id="' + hunkId + '"]' : null;
+    const card = selector ? document.querySelector(selector) : null;
+    if (card) {
+      card.classList.add('margin-card--removing');
+      setTimeout(() => card.remove(), 400);
+    }
+
+    showToast(editMode === 'review' ? 'Suggestion rejected' : 'Suggestion discarded', 'info');
+
+    // In review mode, reload after toast
     if (editMode === 'review') {
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1200);
     }
   }
 
@@ -307,6 +320,9 @@ if (data) {
     modeLabel.textContent = mode === 'direct' ? 'Direct Editing'
       : mode === 'review' ? 'Reviewing Suggestions'
       : 'Suggesting Edits';
+
+    // Visual mode distinction
+    editorContainer.classList.toggle('direct-editing', mode === 'direct');
 
     // Swap views
     readingContent.style.display = 'none';
@@ -445,6 +461,7 @@ if (data) {
 
   function exitEditor() {
     setRevealFocusedLine(false);
+    editorContainer.classList.remove('direct-editing');
     if (editorView) {
       editorView.destroy();
       editorView = null;
@@ -475,18 +492,30 @@ if (data) {
   }
 
   // --- Direct edit save ---
-  async function directSave() {
+  function showCommitModal() {
+    const modal = document.getElementById('commit-modal');
+    const input = document.getElementById('commit-message');
+    if (!modal) return;
+    input.value = '';
+    modal.style.display = '';
+    input.focus();
+  }
+
+  function hideCommitModal() {
+    const modal = document.getElementById('commit-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function directSave(comment) {
     if (!editorView) return;
     const currentContent = editorView.state.doc.toString();
-    if (currentContent === originalContent) {
-      alert('No changes were made.');
-      return;
-    }
-    if (!confirm('Commit these changes directly to the repository?')) return;
+
+    hideCommitModal();
 
     const doneBtn = document.getElementById('btn-editor-done');
     doneBtn.disabled = true;
     doneBtn.textContent = 'Saving...';
+    showToast('Committing to GitHub...', 'info');
 
     try {
       const res = await fetch('/api/suggestions/direct-edit', {
@@ -495,19 +524,31 @@ if (data) {
         body: JSON.stringify({
           filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
           content: currentContent, sha: data.contentSha,
+          comment: comment || '',
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to save');
       }
-      window.location.reload();
+      showToast('Changes committed successfully', 'success');
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
-      alert('Error: ' + err.message);
+      showToast('Error: ' + err.message, 'error');
       doneBtn.disabled = false;
       doneBtn.textContent = 'Done';
     }
   }
+
+  // Commit modal event bindings
+  document.getElementById('commit-cancel')?.addEventListener('click', hideCommitModal);
+  document.getElementById('commit-confirm')?.addEventListener('click', () => {
+    const msg = document.getElementById('commit-message')?.value?.trim() || '';
+    directSave(msg);
+  });
+  document.getElementById('commit-modal')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('editor-modal-overlay')) hideCommitModal();
+  });
 
   // --- Resolve a comment ---
   async function resolveComment(commentId) {
@@ -518,7 +559,7 @@ if (data) {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert('Error: ' + (err.error || 'Failed to resolve'));
+        showToast('Error: ' + (err.error || 'Failed to resolve'), 'error');
         return;
       }
       // Remove from local state
@@ -526,7 +567,7 @@ if (data) {
       removeComment(commentId);
       removeRepliesForParent(commentId);
     } catch (err) {
-      alert('Error: ' + err.message);
+      showToast('Error: ' + err.message, 'error');
     }
   }
 
@@ -571,7 +612,7 @@ if (data) {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;
       if (currentContent !== originalContent) {
-        directSave();
+        showCommitModal();
       } else {
         exitEditor();
       }
