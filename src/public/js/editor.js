@@ -25,13 +25,10 @@ if (data) {
   let saveTimer = null;
 
   function hunkKey(hunk) {
-    // Key by content — stable across diff recomputations
-    // For insertions (no originalText), use the context position
-    if (hunk.type === 'insertion') {
-      return 'ins:' + hunk.originalFrom + ':' + (hunk.newText || '').substring(0, 50);
-    }
-    // For deletions/replacements, the original text is the stable anchor
-    return hunk.type + ':' + (hunk.originalText || '');
+    // Key by position in the ORIGINAL document — stable as the user types,
+    // because the original never changes. The position identifies WHERE in the
+    // original document this change applies, regardless of what the new text is.
+    return hunk.originalFrom + ':' + hunk.originalTo;
   }
 
   function extractContext(original, from, to) {
@@ -40,14 +37,32 @@ if (data) {
     return { contextBefore: before, contextAfter: after };
   }
 
+  // Find a saved hunk that overlaps with this hunk's original position range
+  function findOverlappingSavedHunk(hunk) {
+    const hFrom = hunk.originalFrom;
+    const hTo = hunk.originalTo;
+    for (const [key, docId] of savedHunks) {
+      const [kFrom, kTo] = key.split(':').map(Number);
+      // Overlapping or adjacent ranges in the original document
+      if (hFrom <= kTo + 1 && hTo >= kFrom - 1) {
+        return { key, docId };
+      }
+    }
+    return null;
+  }
+
   async function autoSave(hunks) {
     if (!data.sessionFilePath || !data.bookRepoPath || editMode !== 'suggest') return;
 
+    // Build set of current hunk position ranges
     const currentKeys = new Set(hunks.map(hunkKey));
 
-    // Delete hunks that no longer exist
+    // Delete saved hunks that no longer exist (user reverted)
     for (const [key, docId] of savedHunks) {
-      if (!currentKeys.has(key)) {
+      // Check if any current hunk overlaps with this saved hunk
+      const [kFrom, kTo] = key.split(':').map(Number);
+      const stillExists = hunks.some(h => h.originalFrom <= kTo + 1 && h.originalTo >= kFrom - 1);
+      if (!stillExists) {
         try {
           await fetch('/api/suggestions/hunk/' + docId, { method: 'DELETE' });
           savedHunks.delete(key);
@@ -59,28 +74,39 @@ if (data) {
     for (const hunk of hunks) {
       const key = hunkKey(hunk);
       const ctx = extractContext(originalContent, hunk.originalFrom, hunk.originalTo);
+      const hunkData = {
+        type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
+        originalText: hunk.originalText, newText: hunk.newText, ...ctx,
+      };
 
-      if (savedHunks.has(key)) {
+      // Check exact key match first, then overlapping match
+      const existing = savedHunks.has(key)
+        ? { key, docId: savedHunks.get(key) }
+        : findOverlappingSavedHunk(hunk);
+
+      if (existing) {
+        // Update existing Firestore record
         try {
-          await fetch('/api/suggestions/hunk/' + savedHunks.get(key), {
+          await fetch('/api/suggestions/hunk/' + existing.docId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
-              originalText: hunk.originalText, newText: hunk.newText, ...ctx,
-            }),
+            body: JSON.stringify(hunkData),
           });
+          // Update the key if it changed (merge threshold shifted the range)
+          if (existing.key !== key) {
+            savedHunks.delete(existing.key);
+            savedHunks.set(key, existing.docId);
+          }
         } catch { /* ignore */ }
       } else {
+        // Create new Firestore record
         try {
           const res = await fetch('/api/suggestions/hunk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
-              baseCommitSha: data.contentSha, type: hunk.type,
-              originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
-              originalText: hunk.originalText, newText: hunk.newText, ...ctx,
+              baseCommitSha: data.contentSha, ...hunkData,
             }),
           });
           if (res.ok) {
