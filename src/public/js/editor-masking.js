@@ -260,11 +260,11 @@ const maskingTheme = EditorView.theme({
   '.cm-selectionLayer': {
     display: 'none !important',
   },
-  '.cm-content ::selection': {
-    background: 'rgba(215, 180, 74, 0.3)',
+  '& .cm-content .cm-line ::selection': {
+    backgroundColor: 'rgba(215, 180, 74, 0.3) !important',
   },
-  '.cm-content ::-moz-selection': {
-    background: 'rgba(215, 180, 74, 0.3)',
+  '& .cm-content .cm-line::selection': {
+    backgroundColor: 'rgba(215, 180, 74, 0.3) !important',
   },
 
   // Revealed syntax on focused line — visible but muted
