@@ -706,6 +706,93 @@ test.describe('Editor - Accept/Reject Flow', () => {
 });
 
 // ============================================================
+// ACCEPT + REFRESH TESTS — verify decorations clear and editor matches GitHub
+// ============================================================
+
+test.describe('Accept Refresh', () => {
+  let savedContent = null;
+  const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+
+  test.beforeEach(async ({ page }) => {
+    await clearAllSuggestions();
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+  });
+
+  test.afterEach(async () => {
+    await clearAllSuggestions();
+    // Restore original file if the test modified it
+    if (savedContent) {
+      const http = require('http');
+      await new Promise((resolve) => {
+        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
+          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
+          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
+            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
+              const sha = JSON.parse(d).sha;
+              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after accept refresh test' });
+              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
+              }); er.write(body); er.end();
+            });
+          });
+        });
+        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
+      });
+      await new Promise(r => http.request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
+    }
+  });
+
+  test('accepting a suggestion clears inline decorations and refreshes from GitHub', async ({ page, request }) => {
+    // Save original content for restoration
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE },
+      headers: { 'x-api-key': apiKey },
+    });
+    const { content } = await contentRes.json();
+    savedContent = content;
+
+    // Find a unique word to edit (dynamically — not hardcoded)
+    const targetWord = 'sovereign';
+    const hasTarget = content.includes(targetWord);
+    expect(hasTarget).toBeTruthy();
+
+    await enterSuggestMode(page);
+
+    // Make an edit
+    await selectText(page, targetWord);
+    await replaceWith(page, 'supreme');
+    await page.waitForTimeout(500);
+
+    // Verify green insertion decoration exists
+    const insertions = page.locator('.cm-suggestion-insert');
+    await expect(insertions.first()).toBeVisible({ timeout: 3000 });
+
+    // Wait for auto-save
+    await waitForAutoSave(page);
+
+    // Accept the suggestion via the margin card
+    const acceptBtn = page.locator('.margin-action--accept').first();
+    await expect(acceptBtn).toBeVisible({ timeout: 3000 });
+    await acceptBtn.click();
+
+    // Wait for the full accept + refresh cycle (commit + GitHub fetch)
+    await page.waitForTimeout(8000);
+
+    // CRITICAL: inline decorations should be GONE after refresh
+    const insertionsAfter = await page.locator('.cm-suggestion-insert').count();
+    const deletionsAfter = await page.locator('.cm-suggestion-delete').count();
+    expect(insertionsAfter).toBe(0);
+    expect(deletionsAfter).toBe(0);
+
+    // The editor text should contain the accepted change
+    const doc = await page.evaluate(() => window.__editorView?.state.doc.toString() || '');
+    expect(doc).toContain('supreme');
+  });
+});
+
+// ============================================================
 // ACCEPT PRECISION TESTS — context-based location
 // ============================================================
 
