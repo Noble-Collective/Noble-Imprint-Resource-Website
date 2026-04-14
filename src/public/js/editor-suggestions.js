@@ -3,7 +3,7 @@
 // and manages suggestion state for the margin panel.
 import {
   Decoration, ViewPlugin, WidgetType, StateField, StateEffect,
-  EditorView, diffChars,
+  EditorView, Annotation, diffChars,
 } from '/static/js/codemirror-bundle.js';
 
 // --- State: original document content (set once on init) ---
@@ -17,6 +17,56 @@ export const originalDocField = StateField.define({
     return value;
   },
 });
+
+// --- Annotation Registry: independent, immutable suggestion/comment tracking ---
+// Each annotation has stable positions that map through document changes via mapPos.
+const addAnnotation = StateEffect.define();
+const removeAnnotation = StateEffect.define(); // by id
+const setAnnotations = StateEffect.define();   // bulk load
+const updateAnnotation = StateEffect.define(); // partial update { id, ...fields }
+const isRevert = Annotation.define();          // tags revert transactions
+
+export const annotationRegistry = StateField.define({
+  create() { return new Map(); },
+  update(registry, tr) {
+    let updated = new Map(registry);
+
+    // Process effects first (before position mapping)
+    for (const e of tr.effects) {
+      if (e.is(setAnnotations)) {
+        updated = new Map();
+        for (const a of e.value) updated.set(a.id, a);
+        return updated;
+      }
+      if (e.is(addAnnotation)) updated.set(e.value.id, e.value);
+      if (e.is(removeAnnotation)) updated.delete(e.value);
+      if (e.is(updateAnnotation)) {
+        const existing = updated.get(e.value.id);
+        if (existing) updated.set(e.value.id, { ...existing, ...e.value });
+      }
+    }
+
+    // Map positions through document changes
+    if (tr.docChanged) {
+      for (const [id, a] of updated) {
+        if (a.currentFrom == null || a.currentTo == null) continue;
+        const newFrom = tr.changes.mapPos(a.currentFrom, 1);
+        const newTo = a.kind === 'suggestion' && a.type === 'deletion'
+          ? newFrom
+          : tr.changes.mapPos(a.currentTo, -1);
+        if (newTo < newFrom) {
+          updated.delete(id); // range collapsed — annotation overwritten
+        } else {
+          updated.set(id, { ...a, currentFrom: newFrom, currentTo: newTo });
+        }
+      }
+    }
+
+    return updated;
+  },
+});
+
+export { addAnnotation, removeAnnotation, setAnnotations, updateAnnotation, isRevert };
 
 // --- Widget for showing deleted text inline ---
 class DeletedTextWidget extends WidgetType {
@@ -250,7 +300,7 @@ const suggestionTheme = EditorView.theme({
 
 // --- Export ---
 export function suggestionExtension() {
-  return [originalDocField, suggestionPlugin, suggestionTheme];
+  return [originalDocField, annotationRegistry, suggestionPlugin, suggestionTheme];
 }
 
 export function getCurrentHunks() {

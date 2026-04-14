@@ -3,6 +3,7 @@ import { basicSetup, EditorView, EditorState, Compartment, markdown } from '/sta
 import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-masking.js';
 import {
   suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
+  annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
@@ -312,17 +313,34 @@ if (data) {
   async function rejectOrDeleteHunk(hunkId) {
     const firestoreId = findFirestoreId(hunkId);
 
-    // Revert the change in the editor
-    const hunks = getCurrentHunks();
-    const hunk = hunks.find(h => h.id === hunkId);
-    if (hunk && editorView && editMode === 'suggest') {
-      if (hunk.type === 'insertion') {
-        editorView.dispatch({ changes: { from: hunk.currentFrom, to: hunk.currentTo, insert: '' } });
-      } else if (hunk.type === 'deletion') {
-        editorView.dispatch({ changes: { from: hunk.currentPos, insert: hunk.originalText } });
-      } else if (hunk.type === 'replacement') {
-        editorView.dispatch({ changes: { from: hunk.currentFrom, to: hunk.currentTo, insert: hunk.originalText } });
+    // Remove from the annotation registry
+    if (firestoreId) {
+      editorView.dispatch({ effects: removeAnnotation.of(firestoreId) });
+    }
+
+    // Rebuild the document from scratch: original + remaining registry suggestions
+    // This is safe — other suggestions' positions are preserved because we rebuild
+    // from the registry rather than reverting text and hoping the diff recomputes correctly.
+    if (editorView && editMode === 'suggest') {
+      const registry = editorView.state.field(annotationRegistry);
+      const remainingSuggestions = [];
+      for (const [, a] of registry) {
+        if (a.kind === 'suggestion') {
+          remainingSuggestions.push(a);
+        }
       }
+      const newWorkingDoc = buildWorkingDoc(originalContent, remainingSuggestions.length > 0
+        ? data.pendingSuggestions.filter(s => s.id !== firestoreId && !s.resolvedStale)
+        : []);
+
+      // Clear zones, replace document, restore zones
+      editorView.dispatch({ effects: setZones.of([]) });
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+        annotations: isRevert.of(true),
+      });
+      const zones = recomputeZones(editorView.state.doc);
+      editorView.dispatch({ effects: setZones.of(zones) });
     }
 
     // Delete or reject from Firestore immediately
@@ -339,14 +357,18 @@ if (data) {
       } catch { /* ignore */ }
     }
 
-    // Clean up replies — both local state AND Firestore
+    // Clean up replies
     if (firestoreId) removeRepliesForParent(firestoreId);
     removeRepliesForParent(hunkId);
-    // Delete from Firestore by both IDs (replies may be keyed by either)
     try {
       if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
       fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
     } catch { /* ignore */ }
+    if (firestoreId && data.pendingSuggestions) {
+      data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
+    }
+    const hunks = getCurrentHunks();
+    const hunk = hunks.find(h => h.id === hunkId);
     if (hunk) {
       const key = hunkKey(hunk);
       savedHunks.delete(key);
@@ -357,7 +379,6 @@ if (data) {
 
     showToast(editMode === 'review' ? 'Suggestion rejected' : 'Suggestion discarded', 'info');
 
-    // In review mode, reload after toast
     if (editMode === 'review') {
       setTimeout(() => window.location.reload(), 1200);
     }
@@ -507,6 +528,34 @@ if (data) {
     // Set original for diff tracking
     if (isSuggestOrReview) {
       editorView.dispatch({ effects: setOriginal.of(originalContent) });
+
+      // Populate annotation registry with loaded suggestions
+      const registryEntries = [];
+      for (const s of existingSuggestions) {
+        if (s.resolvedStale) continue;
+        // Find position of this suggestion's newText in the working doc
+        const pos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+        const textLen = s.type === 'insertion' ? (s.newText || '').length
+          : s.type === 'deletion' ? 0
+          : (s.newText || '').length;
+        registryEntries.push({
+          id: s.id,
+          kind: 'suggestion',
+          type: s.type,
+          originalText: s.originalText || '',
+          newText: s.newText || '',
+          originalFrom: s.originalFrom,
+          originalTo: s.originalTo,
+          currentFrom: pos,
+          currentTo: pos + textLen,
+          authorEmail: s.authorEmail,
+          authorName: s.authorName,
+          firestoreId: s.id,
+        });
+      }
+      if (registryEntries.length > 0) {
+        editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
+      }
     }
 
     // Initialize editable zones for constrained mode
