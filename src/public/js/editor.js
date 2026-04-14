@@ -339,8 +339,9 @@ if (data) {
       } catch { /* ignore */ }
     }
 
-    // Clean up local tracking
+    // Clean up local tracking — remove replies by both Firestore ID and hunk ID
     if (firestoreId) removeRepliesForParent(firestoreId);
+    removeRepliesForParent(hunkId);
     if (hunk) {
       const key = hunkKey(hunk);
       savedHunks.delete(key);
