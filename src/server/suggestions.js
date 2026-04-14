@@ -116,7 +116,15 @@ async function acceptHunk(id, resolverEmail) {
 
   if (hunk.type === 'insertion') {
     // For insertions, find the insertion point using context
-    const ctx = hunk.contextBefore + hunk.contextAfter;
+    const ctx = (hunk.contextBefore || '') + (hunk.contextAfter || '');
+    if (!ctx) {
+      await suggestionsCollection().doc(id).update({
+        status: 'stale',
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        resolvedBy: resolverEmail,
+      });
+      return { stale: true };
+    }
     const pos = currentContent.indexOf(ctx);
     if (pos === -1) {
       await suggestionsCollection().doc(id).update({
@@ -126,13 +134,58 @@ async function acceptHunk(id, resolverEmail) {
       });
       return { stale: true };
     }
-    const insertAt = pos + hunk.contextBefore.length;
+    const insertAt = pos + (hunk.contextBefore || '').length;
     newContent = currentContent.slice(0, insertAt) + hunk.newText + currentContent.slice(insertAt);
   } else {
-    // For deletions and replacements, find the original text
-    const pos = currentContent.indexOf(hunk.originalText);
+    // For deletions and replacements, use context to find the EXACT location.
+    // A bare indexOf(originalText) is catastrophic for short/common strings
+    // like "." or "the" — it finds the first occurrence, not the right one.
+    let pos = -1;
+
+    // Strategy 1: Find using full context (contextBefore + originalText + contextAfter)
+    if (hunk.contextBefore || hunk.contextAfter) {
+      const fullCtx = (hunk.contextBefore || '') + hunk.originalText + (hunk.contextAfter || '');
+      const ctxPos = currentContent.indexOf(fullCtx);
+      if (ctxPos >= 0) {
+        pos = ctxPos + (hunk.contextBefore || '').length;
+      }
+    }
+
+    // Strategy 2: Try contextBefore + originalText (contextAfter may have changed)
+    if (pos === -1 && hunk.contextBefore) {
+      const partialCtx = hunk.contextBefore + hunk.originalText;
+      const ctxPos = currentContent.indexOf(partialCtx);
+      if (ctxPos >= 0) {
+        pos = ctxPos + hunk.contextBefore.length;
+      }
+    }
+
+    // Strategy 3: Try originalText + contextAfter (contextBefore may have changed)
+    if (pos === -1 && hunk.contextAfter) {
+      const partialCtx = hunk.originalText + hunk.contextAfter;
+      const ctxPos = currentContent.indexOf(partialCtx);
+      if (ctxPos >= 0) {
+        pos = ctxPos;
+      }
+    }
+
+    // Strategy 4: Last resort — bare indexOf (only safe for long/unique text)
+    if (pos === -1) {
+      pos = currentContent.indexOf(hunk.originalText);
+    }
+
     if (pos === -1) {
       // Text no longer exists — mark stale
+      await suggestionsCollection().doc(id).update({
+        status: 'stale',
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        resolvedBy: resolverEmail,
+      });
+      return { stale: true };
+    }
+
+    // Verify the text at the found position actually matches
+    if (currentContent.substring(pos, pos + hunk.originalText.length) !== hunk.originalText) {
       await suggestionsCollection().doc(id).update({
         status: 'stale',
         resolvedAt: admin.firestore.FieldValue.serverTimestamp(),

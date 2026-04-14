@@ -706,6 +706,108 @@ test.describe('Editor - Accept/Reject Flow', () => {
 });
 
 // ============================================================
+// ACCEPT PRECISION TESTS — context-based location
+// ============================================================
+
+test.describe('Accept Precision', () => {
+  const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  const TEST_BOOK = 'series/Narrative Journey Series/Foundations/Test Book';
+  let savedContent = null;
+
+  // Restore original file after each test (the test modifies GitHub)
+  test.afterEach(async () => {
+    await clearAllSuggestions();
+    if (savedContent) {
+      const http = require('http');
+      await new Promise((resolve) => {
+        // Login
+        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
+          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
+          // Get current SHA (file was modified by the test)
+          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
+            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
+              const sha = JSON.parse(d).sha;
+              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after precision test' });
+              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
+              }); er.write(body); er.end();
+            });
+          });
+        });
+        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
+      });
+      await new Promise(r => http.request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
+    }
+  });
+
+  test('context-based accept targets the correct occurrence, not the first', async ({ request }) => {
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+
+    // Read the current file (whatever state it's in)
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE },
+      headers: { 'x-api-key': apiKey },
+    });
+    const { content, sha } = await contentRes.json();
+    savedContent = content;
+
+    // Find ALL periods in the file
+    const periods = [];
+    for (let i = 0; i < content.length; i++) {
+      if (content[i] === '.') periods.push(i);
+    }
+    expect(periods.length).toBeGreaterThan(10); // File must have many periods
+
+    // Pick a period in the latter half — NOT the first occurrence
+    const targetIdx = Math.floor(periods.length * 0.75);
+    const targetPos = periods[targetIdx];
+    const firstPeriod = periods[0];
+    expect(targetPos).toBeGreaterThan(firstPeriod); // Sanity check
+
+    // Snapshot everything before the target
+    const contentBeforeTarget = content.substring(0, targetPos);
+
+    // Build context from surrounding text
+    const ctxBefore = content.substring(Math.max(0, targetPos - 50), targetPos);
+    const ctxAfter = content.substring(targetPos + 1, Math.min(content.length, targetPos + 51));
+
+    // Create a suggestion to remove this specific period
+    const createRes = await request.post(BASE_URL + '/api/suggestions/hunk', {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE, bookPath: TEST_BOOK, baseCommitSha: sha,
+        type: 'replacement', originalFrom: targetPos, originalTo: targetPos + 1,
+        originalText: '.', newText: '',
+        contextBefore: ctxBefore, contextAfter: ctxAfter,
+      },
+    });
+    const sugg = await createRes.json();
+    expect(sugg.id).toBeTruthy();
+
+    // Accept it
+    await request.post(BASE_URL + '/api/auth/test-login', { data: { email: 'steve@noblecollective.org' } });
+    const acceptRes = await request.put(BASE_URL + '/api/suggestions/hunk/' + sugg.id + '/accept', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(acceptRes.ok()).toBeTruthy();
+
+    // Read the file after accept
+    const afterRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE },
+      headers: { 'x-api-key': apiKey },
+    });
+    const after = await afterRes.json();
+
+    // CRITICAL: everything before the target position must be IDENTICAL
+    // If the old indexOf bug existed, an earlier period would be removed
+    expect(after.content.substring(0, targetPos)).toBe(contentBeforeTarget);
+
+    // The period at the target position should be gone (file is 1 char shorter there)
+    expect(after.content.length).toBe(content.length - 1);
+  });
+});
+
+// ============================================================
 // DIRECT EDIT (ADMIN)
 // ============================================================
 
