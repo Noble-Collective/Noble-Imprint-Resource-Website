@@ -261,7 +261,16 @@ test.describe('Editor - Masking', () => {
   });
 
   test('Question tags hidden, content in styled block', async ({ page }) => {
-    await scrollEditorTo(page, 0.10);
+    // Scroll to first Question block via CodeMirror API
+    await page.evaluate(() => {
+      if (!window.__editorView) return;
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf('<Question');
+      if (pos >= 0) {
+        window.__editorView.dispatch({ selection: { anchor: pos + 20 }, scrollIntoView: true });
+      }
+    });
+    await page.waitForTimeout(500);
     const qBlock = page.locator('.cm-question-block');
     await expect(qBlock.first()).toBeVisible({ timeout: 5000 });
     const text = await qBlock.first().textContent();
