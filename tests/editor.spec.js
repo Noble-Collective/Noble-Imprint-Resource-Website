@@ -376,6 +376,37 @@ test.describe('Editor - Suggestion Tracking', () => {
     const count = await getMarginCardCount(page);
     expect(count).toBeGreaterThanOrEqual(2);
   });
+
+  test('multiple suggestions persist in margin after auto-save', async ({ page }) => {
+    // Make 3 suggestions spread across the document
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
+    await page.waitForTimeout(300);
+
+    await selectText(page, 'sovereign');
+    await replaceWith(page, 'supreme');
+    await page.waitForTimeout(300);
+
+    await selectText(page, 'philosophy');
+    await replaceWith(page, 'worldview');
+    await page.waitForTimeout(300);
+
+    // Verify 3 cards before auto-save
+    let count = await getMarginCardCount(page);
+    expect(count).toBeGreaterThanOrEqual(3);
+
+    // Wait for auto-save to fire (1.5s debounce + network)
+    await waitForAutoSave(page);
+
+    // CRITICAL: all 3 cards must still be present after auto-save
+    count = await getMarginCardCount(page);
+    expect(count).toBeGreaterThanOrEqual(3);
+
+    // Wait again to catch any delayed auto-save deletions
+    await page.waitForTimeout(3000);
+    count = await getMarginCardCount(page);
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
 });
 
 // ============================================================
