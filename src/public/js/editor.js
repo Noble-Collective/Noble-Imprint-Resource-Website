@@ -364,32 +364,54 @@ if (data) {
   }
 
   // --- Build working document from original + existing suggestions ---
-  // Uses text-based find-and-replace, not position-based (matches server accept logic)
+  // Uses server-resolved positions when available, falls back to text-based find-and-replace
   function buildWorkingDoc(original, existingSuggestions) {
     if (!existingSuggestions || existingSuggestions.length === 0) return original;
 
-    // Sort by originalFrom descending so we apply from end to start (avoids position shifts)
-    const sorted = [...existingSuggestions].sort((a, b) => b.originalFrom - a.originalFrom);
+    // Filter out stale suggestions
+    const valid = existingSuggestions.filter(s => !s.resolvedStale);
+
+    // Sort by position descending so we apply from end to start (avoids position shifts)
+    const sorted = [...valid].sort((a, b) => {
+      const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
+      const posB = b.resolvedFrom != null ? b.resolvedFrom : b.originalFrom;
+      return posB - posA;
+    });
     let doc = original;
 
     for (const s of sorted) {
+      // Use server-resolved position if available
+      const hasResolved = s.resolvedFrom != null && s.resolvedTo != null;
+
       if (s.type === 'insertion') {
-        // Find insertion point using context
-        if (s.contextBefore || s.contextAfter) {
+        let insertAt = -1;
+        if (hasResolved) {
+          insertAt = s.resolvedFrom;
+        } else if (s.contextBefore || s.contextAfter) {
           const ctx = (s.contextBefore || '') + (s.contextAfter || '');
           const ctxPos = doc.indexOf(ctx);
-          if (ctxPos >= 0) {
-            const insertAt = ctxPos + (s.contextBefore || '').length;
-            doc = doc.slice(0, insertAt) + s.newText + doc.slice(insertAt);
-          }
+          if (ctxPos >= 0) insertAt = ctxPos + (s.contextBefore || '').length;
+        }
+        if (insertAt >= 0) {
+          doc = doc.slice(0, insertAt) + s.newText + doc.slice(insertAt);
         }
       } else if (s.type === 'deletion') {
-        const pos = doc.indexOf(s.originalText);
+        let pos = -1;
+        if (hasResolved) {
+          pos = s.resolvedFrom;
+        } else {
+          pos = doc.indexOf(s.originalText);
+        }
         if (pos >= 0) {
           doc = doc.slice(0, pos) + doc.slice(pos + s.originalText.length);
         }
       } else if (s.type === 'replacement') {
-        const pos = doc.indexOf(s.originalText);
+        let pos = -1;
+        if (hasResolved) {
+          pos = s.resolvedFrom;
+        } else {
+          pos = doc.indexOf(s.originalText);
+        }
         if (pos >= 0) {
           doc = doc.slice(0, pos) + s.newText + doc.slice(pos + s.originalText.length);
         }

@@ -207,8 +207,16 @@ function renderAllCards() {
   for (const c of currentComments) {
     var top = 0;
     try {
+      // Use server-resolved positions if available, fall back to indexOf
       var doc = editorView.state.doc.toString();
-      var cPos = doc.indexOf(c.selectedText);
+      var cPos = -1;
+      if (c.resolvedFrom != null && !c.resolvedStale) {
+        cPos = c.resolvedFrom;
+      } else if (c.currentFrom != null) {
+        cPos = c.currentFrom;
+      } else {
+        cPos = doc.indexOf(c.selectedText);
+      }
       if (cPos >= 0) {
         var coords = editorView.coordsAtPos(cPos);
         if (coords) {

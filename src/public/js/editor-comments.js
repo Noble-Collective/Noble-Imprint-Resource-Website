@@ -28,13 +28,26 @@ function buildCommentDecorations(view) {
   const decorations = [];
 
   for (const c of comments) {
-    const pos = doc.indexOf(c.selectedText);
-    if (pos >= 0) {
+    // Use server-resolved positions if available, fall back to indexOf
+    let pos = -1;
+    let end = -1;
+    if (c.resolvedFrom != null && c.resolvedTo != null && !c.resolvedStale) {
+      pos = c.resolvedFrom;
+      end = c.resolvedTo;
+    } else if (c.currentFrom != null && c.currentTo != null) {
+      pos = c.currentFrom;
+      end = c.currentTo;
+    } else {
+      pos = doc.indexOf(c.selectedText);
+      end = pos >= 0 ? pos + c.selectedText.length : -1;
+    }
+
+    if (pos >= 0 && end > pos && end <= doc.length) {
       decorations.push(
         Decoration.mark({
           class: 'cm-comment-highlight',
           attributes: { 'data-comment-id': c.id },
-        }).range(pos, pos + c.selectedText.length)
+        }).range(pos, end)
       );
     }
   }
