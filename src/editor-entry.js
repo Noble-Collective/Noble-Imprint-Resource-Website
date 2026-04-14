@@ -1,7 +1,7 @@
 // CodeMirror 6 entry point — bundled into a single file by esbuild
 // Core
 export { basicSetup, EditorView } from 'codemirror';
-export { EditorState, StateField, StateEffect, Compartment } from '@codemirror/state';
+export { EditorState, StateField, StateEffect, Compartment, EditorSelection } from '@codemirror/state';
 
 // View primitives for decorations and plugins
 export { Decoration, ViewPlugin, WidgetType, keymap } from '@codemirror/view';

@@ -6,7 +6,7 @@ import {
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
-import { constraintExtension, setZones, recomputeZones, installSelectionConstraint } from '/static/js/editor-constraints.js';
+import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
 const data = window.__EDITOR_DATA;
 if (data) {
@@ -392,7 +392,6 @@ if (data) {
     if (isConstrained) {
       const zones = recomputeZones(editorView.state.doc);
       editorView.dispatch({ effects: setZones.of(zones) });
-      installSelectionConstraint(editorView);
     }
 
     // Init margin panel + comments

@@ -1,5 +1,13 @@
-// Noble Imprint — CodeMirror 6 Masking Extension
-// Hides structural markdown/custom syntax, shows formatted text
+// Noble Imprint — CodeMirror 6 Masking Extension (v2)
+// Hides structural markdown/custom syntax, shows formatted text.
+//
+// Inline syntax (##, **, _, <<, >) is hidden using mark decorations with
+// CSS zero-width styling. The text stays in the DOM so the cursor passes
+// through smoothly — no jumping, no atomic range issues.
+//
+// Block-level tags (<Question>, </Question>, <Callout>, etc.) use replace
+// decorations so the cursor skips them in one step. These are long strings
+// that users should never interact with.
 import { Decoration, ViewPlugin, WidgetType, EditorView } from '/static/js/codemirror-bundle.js';
 
 // --- Widget for <br> spacer ---
@@ -21,25 +29,26 @@ export function setRevealFocusedLine(enabled) {
 }
 
 // --- Build decorations by scanning document text ---
-// Returns { all: DecorationSet, atomic: DecorationSet }
-// `all` includes both hidden ranges and styled marks (for visual rendering)
-// `atomic` includes only hidden ranges (for cursor skipping — marks should NOT be atomic)
 function buildMaskingDecorations(view, skipLineNumber) {
   const doc = view.state.doc;
   const text = doc.toString();
-  const decorations = [];     // All decorations (visual)
-  const atomicDecos = [];     // Only replace decorations (for atomic ranges)
+  const decorations = [];
 
-  // Helper: add a collapsed (hidden) range
-  function hide(from, to) {
+  // Helper: hide inline syntax with zero-width CSS mark (cursor passes through)
+  function hideInline(from, to) {
     if (from < to) {
-      const deco = Decoration.replace({ inclusive: false }).range(from, to);
-      decorations.push(deco);
-      atomicDecos.push(deco);
+      decorations.push(Decoration.mark({ class: 'cm-hidden-syntax' }).range(from, to));
     }
   }
 
-  // Helper: add a styled range (NOT atomic)
+  // Helper: hide block-level tag by replacing (cursor skips over)
+  function hideBlock(from, to) {
+    if (from < to) {
+      decorations.push(Decoration.replace({ inclusive: false }).range(from, to));
+    }
+  }
+
+  // Helper: add a styled range (NOT hidden — just visual formatting)
   function mark(from, to, cls) {
     if (from < to) {
       decorations.push(Decoration.mark({ class: cls }).range(from, to));
@@ -55,9 +64,9 @@ function buildMaskingDecorations(view, skipLineNumber) {
     const openTagEnd = fullStart + m[0].indexOf('>') + 1;
     const closeTagStart = fullEnd - '</Question>'.length;
 
-    hide(fullStart, openTagEnd);          // Hide <Question id=...>
-    hide(closeTagStart, fullEnd);          // Hide </Question>
-    mark(openTagEnd, closeTagStart, 'cm-question-block'); // Style content
+    hideBlock(fullStart, openTagEnd);          // Hide <Question id=...>
+    hideBlock(closeTagStart, fullEnd);          // Hide </Question>
+    mark(openTagEnd, closeTagStart, 'cm-question-block');
   }
 
   // --- Callout blocks: <Callout>content</Callout> ---
@@ -68,8 +77,8 @@ function buildMaskingDecorations(view, skipLineNumber) {
     const openTagEnd = fullStart + '<Callout>'.length;
     const closeTagStart = fullEnd - '</Callout>'.length;
 
-    hide(fullStart, openTagEnd);
-    hide(closeTagStart, fullEnd);
+    hideBlock(fullStart, openTagEnd);
+    hideBlock(closeTagStart, fullEnd);
     mark(openTagEnd, closeTagStart, 'cm-callout');
   }
 
@@ -83,8 +92,8 @@ function buildMaskingDecorations(view, skipLineNumber) {
       const openTagEnd = fullStart + `<${tag}>`.length;
       const closeTagStart = fullEnd - `</${tag}>`.length;
 
-      hide(fullStart, openTagEnd);
-      hide(closeTagStart, fullEnd);
+      hideBlock(fullStart, openTagEnd);
+      hideBlock(closeTagStart, fullEnd);
       mark(openTagEnd, closeTagStart, 'cm-section-block');
     }
   }
@@ -100,7 +109,7 @@ function buildMaskingDecorations(view, skipLineNumber) {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const prefixLen = headingMatch[0].length;
-      hide(lineFrom, lineFrom + prefixLen);
+      hideInline(lineFrom, lineFrom + prefixLen);
       mark(lineFrom + prefixLen, line.to, 'cm-heading-' + level);
       continue;
     }
@@ -109,7 +118,7 @@ function buildMaskingDecorations(view, skipLineNumber) {
     const attrMatch = lineText.match(/^<<\s+/);
     if (attrMatch) {
       const prefixLen = attrMatch[0].length;
-      hide(lineFrom, lineFrom + prefixLen);
+      hideInline(lineFrom, lineFrom + prefixLen);
       mark(lineFrom + prefixLen, line.to, 'cm-attribution');
       continue;
     }
@@ -118,7 +127,7 @@ function buildMaskingDecorations(view, skipLineNumber) {
     const bqMatch = lineText.match(/^>\s*/);
     if (bqMatch && lineText.trim() !== '>') {
       const prefixLen = bqMatch[0].length;
-      hide(lineFrom, lineFrom + prefixLen);
+      hideInline(lineFrom, lineFrom + prefixLen);
       mark(lineFrom, line.to, 'cm-blockquote');
       continue;
     }
@@ -144,9 +153,9 @@ function buildMaskingDecorations(view, skipLineNumber) {
   while ((m = boldRe.exec(text)) !== null) {
     const fullStart = m.index;
     const fullEnd = fullStart + m[0].length;
-    hide(fullStart, fullStart + 2);              // Hide opening **
-    hide(fullEnd - 2, fullEnd);                  // Hide closing **
-    mark(fullStart + 2, fullEnd - 2, 'cm-bold'); // Style content
+    hideInline(fullStart, fullStart + 2);              // Hide opening **
+    hideInline(fullEnd - 2, fullEnd);                  // Hide closing **
+    mark(fullStart + 2, fullEnd - 2, 'cm-bold');       // Style content
   }
 
   // --- Inline: _italic_ (single underscore, not inside words) ---
@@ -154,31 +163,25 @@ function buildMaskingDecorations(view, skipLineNumber) {
   while ((m = italicRe.exec(text)) !== null) {
     const fullStart = m.index;
     const fullEnd = fullStart + m[0].length;
-    hide(fullStart, fullStart + 1);                // Hide opening _
-    hide(fullEnd - 1, fullEnd);                    // Hide closing _
-    mark(fullStart + 1, fullEnd - 1, 'cm-italic'); // Style content
+    hideInline(fullStart, fullStart + 1);              // Hide opening _
+    hideInline(fullEnd - 1, fullEnd);                  // Hide closing _
+    mark(fullStart + 1, fullEnd - 1, 'cm-italic');     // Style content
   }
 
-  // Filter out decorations on the skipped line (if any)
-  let filteredAll = decorations;
-  let filteredAtomic = atomicDecos;
+  // Filter out decorations on the skipped line (direct edit reveal)
+  let filtered = decorations;
   if (skipLineNumber !== undefined && skipLineNumber >= 1 && skipLineNumber <= doc.lines) {
     const skipLine = doc.line(skipLineNumber);
     const skipFrom = skipLine.from;
     const skipTo = skipLine.to;
     const lineFilter = d => !(d.from >= skipFrom && d.to <= skipTo);
-    filteredAll = decorations.filter(lineFilter);
-    filteredAtomic = atomicDecos.filter(lineFilter);
+    filtered = decorations.filter(lineFilter);
   }
 
   // Sort by position (required by CodeMirror)
-  filteredAll.sort((a, b) => a.from - b.from || a.to - b.to);
-  filteredAtomic.sort((a, b) => a.from - b.from || a.to - b.to);
+  filtered.sort((a, b) => a.from - b.from || a.to - b.to);
 
-  return {
-    all: Decoration.set(filteredAll, true),
-    atomic: Decoration.set(filteredAtomic, true),
-  };
+  return Decoration.set(filtered, true);
 }
 
 // --- ViewPlugin that recomputes decorations on each document/selection change ---
@@ -186,9 +189,7 @@ const maskingPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this._lastCursorLine = 0;
-      const result = buildMaskingDecorations(view, this._getSkipLine(view));
-      this.decorations = result.all;
-      this.atomicDecorations = result.atomic;
+      this.decorations = buildMaskingDecorations(view, this._getSkipLine(view));
     }
     _getSkipLine(view) {
       if (!revealFocusedLine) return undefined;
@@ -200,9 +201,7 @@ const maskingPlugin = ViewPlugin.fromClass(
       const lineChanged = cursorLine !== this._lastCursorLine;
       if (update.docChanged || update.viewportChanged || lineChanged) {
         this._lastCursorLine = cursorLine;
-        const result = buildMaskingDecorations(update.view, cursorLine);
-        this.decorations = result.all;
-        this.atomicDecorations = result.atomic;
+        this.decorations = buildMaskingDecorations(update.view, cursorLine);
       }
     }
   },
@@ -210,12 +209,6 @@ const maskingPlugin = ViewPlugin.fromClass(
     decorations: (v) => v.decorations,
   }
 );
-
-// --- Atomic ranges: ONLY hidden (replace) decorations, NOT styled (mark) decorations ---
-const atomicRanges = EditorView.atomicRanges.of((view) => {
-  const plugin = view.plugin(maskingPlugin);
-  return plugin ? plugin.atomicDecorations : Decoration.none;
-});
 
 // --- Theme: visual styles matching the reading view ---
 const maskingTheme = EditorView.theme({
@@ -241,6 +234,19 @@ const maskingTheme = EditorView.theme({
   },
   '&.cm-focused': {
     outline: 'none',
+  },
+
+  // Zero-width hidden syntax — text stays in DOM but takes no space
+  '.cm-hidden-syntax': {
+    fontSize: '0',
+    lineHeight: '0',
+    overflow: 'hidden',
+    display: 'inline',
+    width: '0',
+    padding: '0',
+    margin: '0',
+    border: 'none',
+    color: 'transparent',
   },
 
   // Headings
@@ -355,6 +361,8 @@ const maskingTheme = EditorView.theme({
 });
 
 // --- Export the complete masking extension ---
+// No atomicRanges: inline syntax uses zero-width marks (smooth cursor),
+// block tags use replace decorations (inherently atomic).
 export function maskingExtension() {
-  return [maskingPlugin, atomicRanges, maskingTheme];
+  return [maskingPlugin, maskingTheme];
 }

@@ -236,8 +236,11 @@ test.describe('Editor - Masking', () => {
   test('bold: ** markers hidden', async ({ page }) => {
     const bold = page.locator('.cm-bold');
     await expect(bold.first()).toBeVisible();
-    const editorText = await page.locator('.cm-content').first().textContent();
-    expect(editorText).not.toContain('**earnestly');
+    // With zero-width CSS hiding, ** is in DOM but invisible (font-size: 0)
+    const hidden = page.locator('.cm-hidden-syntax').first();
+    await expect(hidden).toBeAttached();
+    const box = await hidden.boundingBox();
+    expect(box === null || box.width === 0).toBeTruthy();
   });
 
   test('italic: _ markers hidden', async ({ page }) => {

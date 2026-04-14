@@ -30576,6 +30576,7 @@ function diffWordsWithSpace(oldStr, newStr, options) {
 export {
   Compartment,
   Decoration,
+  EditorSelection,
   EditorState,
   EditorView,
   StateEffect,
