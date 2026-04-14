@@ -102,6 +102,18 @@ if (data) {
             savedHunks.delete(existing.key);
             savedHunks.set(key, existing.docId);
           }
+          // Keep registry in sync
+          if (editorView) {
+            editorView.dispatch({ effects: updateAnnotation.of({
+              id: existing.docId,
+              originalText: hunk.originalText || '',
+              newText: hunk.newText || '',
+              originalFrom: hunk.originalFrom,
+              originalTo: hunk.originalTo,
+              currentFrom: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentFrom,
+              currentTo: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentTo,
+            }) });
+          }
         } catch { /* ignore */ }
       } else {
         // Create new Firestore record
@@ -117,6 +129,37 @@ if (data) {
           if (res.ok) {
             const result = await res.json();
             savedHunks.set(key, result.id);
+
+            // Promote to annotation registry — now this suggestion has a stable ID
+            // and will survive document rebuilds during discard operations
+            if (editorView) {
+              editorView.dispatch({ effects: addAnnotation.of({
+                id: result.id,
+                kind: 'suggestion',
+                type: hunk.type,
+                originalText: hunk.originalText || '',
+                newText: hunk.newText || '',
+                originalFrom: hunk.originalFrom,
+                originalTo: hunk.originalTo,
+                currentFrom: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentFrom,
+                currentTo: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentTo,
+                authorEmail: data.user ? data.user.email : '',
+                authorName: data.user ? data.user.displayName : '',
+                firestoreId: result.id,
+              }) });
+
+              // Add to pendingSuggestions for buildWorkingDoc
+              if (!data.pendingSuggestions) data.pendingSuggestions = [];
+              data.pendingSuggestions.push({
+                id: result.id,
+                type: hunk.type,
+                originalText: hunk.originalText || '',
+                newText: hunk.newText || '',
+                originalFrom: hunk.originalFrom,
+                originalTo: hunk.originalTo,
+                ...ctx,
+              });
+            }
           }
         } catch { /* ignore */ }
       }
