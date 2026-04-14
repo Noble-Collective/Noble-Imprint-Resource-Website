@@ -1,67 +1,12 @@
-// Noble Imprint — Comment System
-// Select text → floating popup appears → enter comment → saves to margin.
-import { Decoration, ViewPlugin, EditorView } from '/static/js/codemirror-bundle.js';
+// Noble Imprint — Comment System (v3 — Registry-based)
+//
+// Comments are tracked in the annotationRegistry StateField (in editor-suggestions.js).
+// This file only handles: tooltip UI, popup UI, and submitting to the API.
+// Decorations are built by the registry decoration plugin, not here.
+import { EditorView } from '/static/js/codemirror-bundle.js';
 
-let comments = [];
 let editorViewRef = null;
-let onCommentsChanged = null;
-
-// --- Decoration plugin: highlight commented ranges ---
-const commentPlugin = ViewPlugin.fromClass(
-  class {
-    constructor(view) {
-      this.decorations = buildCommentDecorations(view);
-    }
-    update(update) {
-      if (update.docChanged || this._dirty) {
-        this.decorations = buildCommentDecorations(update.view);
-        this._dirty = false;
-      }
-    }
-  },
-  { decorations: (v) => v.decorations }
-);
-
-function buildCommentDecorations(view) {
-  if (comments.length === 0) return Decoration.none;
-  const doc = view.state.doc.toString();
-  const decorations = [];
-
-  for (const c of comments) {
-    // Use server-resolved positions if available, fall back to indexOf
-    let pos = -1;
-    let end = -1;
-    if (c.resolvedFrom != null && c.resolvedTo != null && !c.resolvedStale) {
-      pos = c.resolvedFrom;
-      end = c.resolvedTo;
-    } else if (c.currentFrom != null && c.currentTo != null) {
-      pos = c.currentFrom;
-      end = c.currentTo;
-    } else {
-      pos = doc.indexOf(c.selectedText);
-      end = pos >= 0 ? pos + c.selectedText.length : -1;
-    }
-
-    if (pos >= 0 && end > pos && end <= doc.length) {
-      decorations.push(
-        Decoration.mark({
-          class: 'cm-comment-highlight',
-          attributes: { 'data-comment-id': c.id },
-        }).range(pos, end)
-      );
-    }
-  }
-
-  decorations.sort((a, b) => a.from - b.from);
-  return Decoration.set(decorations, true);
-}
-
-const commentTheme = EditorView.theme({
-  '.cm-comment-highlight': {
-    background: 'rgba(251, 188, 4, 0.25)',
-    borderBottom: '2px solid #fbbc04',
-  },
-});
+let onCommentAdded = null; // callback after new comment saved
 
 // --- Selection listener: show "Add Comment" tooltip on text selection ---
 const selectionListener = EditorView.updateListener.of((update) => {
@@ -71,7 +16,6 @@ const selectionListener = EditorView.updateListener.of((update) => {
     hideCommentTooltip();
     return;
   }
-  // Show tooltip near the selection
   const coords = update.view.coordsAtPos(sel.head);
   if (coords) {
     showCommentTooltip(coords.left, coords.top);
@@ -110,7 +54,6 @@ function showCommentPopup() {
   const sel = editorViewRef.state.selection.main;
   if (sel.empty) return;
 
-  // Position popup near the editor
   const coords = editorViewRef.coordsAtPos(sel.head);
   if (coords) {
     const editorRect = editorViewRef.dom.closest('.editor-body').getBoundingClientRect();
@@ -126,13 +69,12 @@ function showCommentPopup() {
 // --- Public API ---
 
 export function commentExtension() {
-  return [commentPlugin, commentTheme, selectionListener];
+  return [selectionListener];
 }
 
-export function initComments(view, existingComments, callback) {
+export function initComments(view, callback) {
   editorViewRef = view;
-  comments = existingComments || [];
-  onCommentsChanged = callback;
+  onCommentAdded = callback;
 
   // Bind popup buttons
   document.getElementById('comment-popup-cancel')?.addEventListener('click', () => {
@@ -143,15 +85,12 @@ export function initComments(view, existingComments, callback) {
     submitComment();
   });
 
-  // Enter key in textarea submits (Shift+Enter for newline)
   document.getElementById('comment-popup-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submitComment();
     }
   });
-
-  refreshDecorations();
 }
 
 async function submitComment() {
@@ -194,16 +133,21 @@ async function submitComment() {
     }
 
     const result = await res.json();
-    addComment({
-      id: result.id,
-      from: sel.from,
-      to: sel.to,
-      selectedText,
-      commentText,
-      authorEmail: editorData.user ? editorData.user.email : '',
-      authorName: editorData.user ? editorData.user.displayName : '',
-      createdAt: new Date(),
-    });
+
+    // Notify editor.js to add to registry
+    if (onCommentAdded) {
+      onCommentAdded({
+        id: result.id,
+        kind: 'comment',
+        selectedText,
+        commentText,
+        currentFrom: sel.from,
+        currentTo: sel.to,
+        authorEmail: editorData.user ? editorData.user.email : '',
+        authorName: editorData.user ? editorData.user.displayName : '',
+        createdAt: new Date(),
+      });
+    }
 
     popup.style.display = 'none';
   } catch (err) {
@@ -211,31 +155,5 @@ async function submitComment() {
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Comment';
-  }
-}
-
-export function addComment(commentData) {
-  comments.push(commentData);
-  refreshDecorations();
-  if (onCommentsChanged) onCommentsChanged(comments);
-}
-
-export function removeComment(commentId) {
-  comments = comments.filter(c => c.id !== commentId);
-  refreshDecorations();
-  if (onCommentsChanged) onCommentsChanged(comments);
-}
-
-export function getComments() {
-  return comments;
-}
-
-function refreshDecorations() {
-  if (editorViewRef) {
-    const plugin = editorViewRef.plugin(commentPlugin);
-    if (plugin) {
-      plugin._dirty = true;
-      editorViewRef.dispatch({});
-    }
   }
 }

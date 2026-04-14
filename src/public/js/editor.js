@@ -6,7 +6,8 @@ import {
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions } from '/static/js/editor-margin.js';
-import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
+import { commentExtension, initComments } from '/static/js/editor-comments.js';
+import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
 const data = window.__EDITOR_DATA;
@@ -62,13 +63,13 @@ if (data) {
     // Build set of current hunk position ranges
     const currentKeys = new Set(hunks.map(hunkKey));
 
-    // Delete saved hunks that no longer exist (user reverted)
-    // BUT: never auto-delete suggestions that are in the annotation registry —
-    // those should only be removed by explicit user action (discard)
+    // Delete saved hunks that no longer exist in the diff (user reverted/undid)
+    // Protect suggestions that were LOADED from Firestore on init (not created this session)
     const registry = editorView ? editorView.state.field(annotationRegistry) : new Map();
     for (const [key, docId] of savedHunks) {
-      // Skip if this suggestion is in the registry (it's a saved, tracked suggestion)
-      if (registry.has(docId)) continue;
+      // Only protect entries loaded from Firestore on init (they have loadedFromServer flag)
+      const regEntry = registry.get(docId);
+      if (regEntry && regEntry.loadedFromServer) continue;
 
       const [kFrom, kTo] = key.split(':').map(Number);
       const stillExists = hunks.some(h => h.originalFrom <= kTo + 1 && h.originalTo >= kFrom - 1);
@@ -76,6 +77,10 @@ if (data) {
         try {
           await fetch('/api/suggestions/hunk/' + docId, { method: 'DELETE' });
           savedHunks.delete(key);
+          // Also remove from registry if it was there
+          if (editorView && registry.has(docId)) {
+            editorView.dispatch({ effects: removeAnnotation.of(docId) });
+          }
         } catch { /* ignore */ }
       }
     }
@@ -520,10 +525,32 @@ if (data) {
       ? buildWorkingDoc(originalContent, existingSuggestions)
       : originalContent;
 
+    // Helper: read registry and update margin cards with BOTH registry + diff data
+    function updateRegistryCards() {
+      if (!editorView) return;
+      const registry = editorView.state.field(annotationRegistry);
+      const regComments = [];
+      for (const [, a] of registry) {
+        if (a.kind === 'comment') regComments.push(a);
+      }
+      updateCommentCards(regComments);
+      // Suggestion cards still come from diff hunks (which include both saved and unsaved)
+      updateMarginCards(getCurrentHunks());
+    }
+
     // Wire up margin panel callback
     if (isSuggestOrReview) {
       setHunksChangedCallback((hunks) => {
-        if (editorView) updateMarginCards(hunks);
+        if (editorView) {
+          updateMarginCards(hunks);
+          // Also update comment cards from registry (positions may have shifted)
+          const registry = editorView.state.field(annotationRegistry);
+          const regComments = [];
+          for (const [, a] of registry) {
+            if (a.kind === 'comment') regComments.push(a);
+          }
+          updateCommentCards(regComments);
+        }
         if (mode === 'suggest') {
           clearTimeout(saveTimer);
           saveTimer = setTimeout(() => autoSave(hunks), 1500);
@@ -577,11 +604,12 @@ if (data) {
     if (isSuggestOrReview) {
       editorView.dispatch({ effects: setOriginal.of(originalContent) });
 
-      // Populate annotation registry with loaded suggestions
+      // Populate annotation registry with BOTH suggestions AND comments
       const registryEntries = [];
+
+      // Suggestions
       for (const s of existingSuggestions) {
         if (s.resolvedStale) continue;
-        // Find position of this suggestion's newText in the working doc
         const pos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
         const textLen = s.type === 'insertion' ? (s.newText || '').length
           : s.type === 'deletion' ? 0
@@ -599,8 +627,30 @@ if (data) {
           authorEmail: s.authorEmail,
           authorName: s.authorName,
           firestoreId: s.id,
+          loadedFromServer: true,
         });
       }
+
+      // Comments
+      const existingComments = data.pendingComments || [];
+      for (const c of existingComments) {
+        if (c.resolvedStale) continue;
+        const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
+        const to = c.resolvedTo != null ? c.resolvedTo : c.to;
+        registryEntries.push({
+          id: c.id,
+          kind: 'comment',
+          selectedText: c.selectedText || '',
+          commentText: c.commentText || '',
+          currentFrom: from,
+          currentTo: to,
+          authorEmail: c.authorEmail,
+          authorName: c.authorName,
+          firestoreId: c.id,
+          loadedFromServer: true,
+        });
+      }
+
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       }
@@ -623,11 +673,16 @@ if (data) {
         onDismissStale: dismissStaleSuggestion,
       });
 
-      // Load existing comments
-      const existingComments = data.pendingComments || [];
-      initComments(editorView, existingComments, (comments) => {
-        updateCommentCards(comments);
+      // Init comment popup UI (no module array — comments are in the registry)
+      initComments(editorView, (commentData) => {
+        // Add new comment to registry
+        editorView.dispatch({ effects: addAnnotation.of(commentData) });
+        // Notify margin panel
+        updateRegistryCards();
       });
+
+      // Load existing comments into margin panel from registry
+      const existingComments = data.pendingComments || [];
       if (existingComments.length > 0) {
         updateCommentCards(existingComments);
       }
@@ -772,9 +827,10 @@ if (data) {
         showToast('Error: ' + (err.error || 'Failed to resolve'), 'error');
         return;
       }
-      // Remove from local state
-      const { removeComment } = await import('/static/js/editor-comments.js');
-      removeComment(commentId);
+      // Remove from registry (decorations will disappear automatically)
+      if (editorView) {
+        editorView.dispatch({ effects: removeAnnotation.of(commentId) });
+      }
       removeRepliesForParent(commentId);
     } catch (err) {
       showToast('Error: ' + err.message, 'error');
