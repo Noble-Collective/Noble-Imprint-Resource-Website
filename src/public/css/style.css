@@ -3299,6 +3299,42 @@ body.drawer-open {
 .margin-card:hover {
   border-color: #d7b44a;
 }
+/* Card status indicators (accept in progress) */
+.margin-card-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  padding: 4px 0;
+}
+.margin-card-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ddd;
+  border-top-color: #666;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.margin-card-status--loading { color: #666; }
+.margin-card-status--success { color: #27ae60; font-weight: 600; }
+.margin-card-status--stale { color: #b8941f; }
+.margin-card-status--error { color: #c0392b; }
+.margin-card--success {
+  border-color: #27ae60;
+  background: #f0faf4;
+}
+.margin-card--stale {
+  border-color: #d7b44a;
+  background: #fdf8e8;
+}
+.margin-action:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
 .margin-card--focused {
   animation: card-pulse 0.6s ease;
   border-color: #d7b44a;

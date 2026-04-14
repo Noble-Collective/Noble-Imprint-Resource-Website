@@ -319,6 +319,56 @@ function resolveOverlaps() {
   });
 }
 
+// Set a card's status (loading, success, stale, error)
+export function setCardStatus(hunkId, status, message) {
+  if (!marginEl) return;
+  var card = marginEl.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+  if (!card) return;
+
+  var body = card.querySelector('.margin-card-body');
+  var thread = card.querySelector('.margin-card-thread');
+  var time = card.querySelector('.margin-card-time');
+  var actions = card.querySelector('.margin-card-actions');
+
+  if (actions) actions.style.display = 'none';
+  if (thread) thread.style.display = 'none';
+  if (time) time.style.display = 'none';
+
+  if (status === 'loading') {
+    body.innerHTML = '<div class="margin-card-status margin-card-status--loading">'
+      + '<span class="margin-card-spinner"></span>' + escapeHtml(message) + '</div>';
+  } else if (status === 'success') {
+    body.innerHTML = '<div class="margin-card-status margin-card-status--success">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+      + escapeHtml(message) + '</div>';
+    card.classList.add('margin-card--success');
+  } else if (status === 'stale') {
+    body.innerHTML = '<div class="margin-card-status margin-card-status--stale">'
+      + escapeHtml(message) + '</div>';
+    card.classList.add('margin-card--stale');
+  } else if (status === 'error') {
+    body.innerHTML = '<div class="margin-card-status margin-card-status--error">'
+      + escapeHtml(message) + '</div>';
+    if (actions) actions.style.display = '';
+  }
+}
+
+// Disable all accept/reject buttons across all cards
+export function disableAllCardActions() {
+  if (!marginEl) return;
+  marginEl.querySelectorAll('.margin-action--accept, .margin-action--reject').forEach(function(btn) {
+    btn.disabled = true;
+  });
+}
+
+// Re-enable all accept/reject buttons
+export function enableAllCardActions() {
+  if (!marginEl) return;
+  marginEl.querySelectorAll('.margin-action--accept, .margin-action--reject').forEach(function(btn) {
+    btn.disabled = false;
+  });
+}
+
 // Animate a card removal — slides out, then removes from DOM
 export function animateCardRemoval(selector) {
   if (!marginEl) return;

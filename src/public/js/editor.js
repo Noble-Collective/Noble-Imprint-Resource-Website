@@ -4,7 +4,7 @@ import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-maskin
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
@@ -190,43 +190,46 @@ if (data) {
       return;
     }
 
-    // Disable the button visually
-    const btn = document.querySelector('[data-action="accept"][data-hunk-id="' + hunkId + '"]');
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
-
-    showToast('Committing to GitHub...', 'info');
+    // Transform card to loading state, disable all other cards
+    setCardStatus(hunkId, 'loading', 'Committing to GitHub...');
+    disableAllCardActions();
 
     try {
       const res = await fetch('/api/suggestions/hunk/' + firestoreId + '/accept', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
       });
+
       if (!res.ok) {
         const err = await res.json();
-        showToast('Error: ' + (err.message || err.error), 'error');
+        if (res.status === 409) {
+          setCardStatus(hunkId, 'stale', err.message || 'File has changed — suggestion is stale');
+        } else {
+          setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
+        }
         acceptingInProgress = false;
-        if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+        enableAllCardActions();
         return;
       }
 
-      showToast('GitHub updated successfully', 'success');
-      acceptingInProgress = false;
-
-      // Remove replies for the accepted suggestion
+      // Success — card turns green
+      setCardStatus(hunkId, 'success', 'Committed to GitHub');
       removeRepliesForParent(firestoreId);
 
-      // Animate and remove the accepted suggestion's card
-      animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
-
-      // Remove from pendingSuggestions data so it doesn't reappear
       if (data.pendingSuggestions) {
         data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
       }
 
-    } catch (err) {
-      showToast('Error: ' + err.message, 'error');
       acceptingInProgress = false;
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      enableAllCardActions();
+
+      // Slide out after 1.5s
+      setTimeout(() => animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]'), 1500);
+
+    } catch (err) {
+      setCardStatus(hunkId, 'error', err.message || 'Network error');
+      acceptingInProgress = false;
+      enableAllCardActions();
     }
   }
 
