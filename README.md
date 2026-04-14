@@ -101,7 +101,7 @@ Suggestions are tracked per-hunk (each contiguous change is a separate Firestore
 4. Auto-saved to Firestore after 1.5s pause, keyed by original document position
 5. Displayed inline (green for insertions, red strikethrough for deletions) and as margin cards
 
-**Accept flow:** Server fetches the current file from GitHub, does text-based find-and-replace (`originalText` -> `newText`), commits. If the text can't be found (file changed), the suggestion is marked stale.
+**Accept flow:** Click accept → card shows spinner "Committing to GitHub..." (non-blocking, user can scroll). Server fetches the current file from GitHub, does text-based find-and-replace (`originalText` -> `newText`), commits. Card turns green "Committed to GitHub" then slides out. If the text can't be found (file changed), card turns amber "stale". All other cards' buttons are disabled during the operation to prevent concurrent commits.
 
 ### Comments and Replies
 
