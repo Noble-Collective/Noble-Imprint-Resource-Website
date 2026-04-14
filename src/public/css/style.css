@@ -3330,6 +3330,33 @@ body.drawer-open {
   border-color: #d7b44a;
   background: #fdf8e8;
 }
+/* Refresh overlay (covers editor during GitHub fetch) */
+.editor-refresh-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: #666;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(2px);
+}
+/* Stale card details */
+.margin-card-stale-label {
+  display: block;
+  font-size: 10px;
+  color: #999;
+  margin: 6px 0 3px;
+}
+.margin-card-stale-actions {
+  margin-top: 6px;
+  display: flex;
+  justify-content: flex-end;
+}
 .margin-action:disabled {
   opacity: 0.3;
   cursor: default;

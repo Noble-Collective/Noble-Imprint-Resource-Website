@@ -11,6 +11,7 @@ let onAcceptHunk = null;
 let onRejectHunk = null;
 let onResolveComment = null;
 let onPostReply = null;
+let onDismissStale = null;
 const removingCards = new Set(); // Card IDs mid-removal animation
 
 function escapeHtml(str) {
@@ -42,6 +43,7 @@ export function initMarginPanel(el, view, user, callbacks) {
   onRejectHunk = callbacks && callbacks.onReject;
   onResolveComment = callbacks && callbacks.onResolveComment;
   onPostReply = callbacks && callbacks.onPostReply;
+  onDismissStale = callbacks && callbacks.onDismissStale;
 }
 
 export function updateReplies(replies) {
@@ -343,9 +345,32 @@ export function setCardStatus(hunkId, status, message) {
       + escapeHtml(message) + '</div>';
     card.classList.add('margin-card--success');
   } else if (status === 'stale') {
+    // Show what the suggestion was using saved data attributes
+    var origText = card.dataset.origText || '';
+    var newText = card.dataset.newText || '';
+    var hunkType = card.dataset.hunkType || '';
+    var suggHtml = '';
+    if (hunkType === 'deletion') {
+      suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(origText, 60)) + '</span>';
+    } else if (hunkType === 'insertion') {
+      suggHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(newText, 60)) + '</span>';
+    } else if (origText || newText) {
+      suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(origText, 40)) + '</span>'
+        + ' <span class="margin-card-arrow">&rarr;</span> '
+        + '<span class="margin-card-ins">' + escapeHtml(truncate(newText, 40)) + '</span>';
+    }
     body.innerHTML = '<div class="margin-card-status margin-card-status--stale">'
-      + escapeHtml(message) + '</div>';
+      + '\u26A0 The text you suggested an edit to has changed.</div>'
+      + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
+      + '<div class="margin-card-stale-actions">'
+      + '<button class="edit-btn" data-action="dismiss-stale" data-hunk-id="' + hunkId + '">Dismiss</button>'
+      + '</div>';
     card.classList.add('margin-card--stale');
+    // Bind dismiss button
+    var dismissBtn = card.querySelector('[data-action="dismiss-stale"]');
+    if (dismissBtn && onDismissStale) {
+      dismissBtn.addEventListener('click', function(e) { e.stopPropagation(); onDismissStale(hunkId); });
+    }
   } else if (status === 'error') {
     body.innerHTML = '<div class="margin-card-status margin-card-status--error">'
       + escapeHtml(message) + '</div>';

@@ -177,6 +177,51 @@ if (data) {
     this.style.display = 'none';
   });
 
+  // --- Refresh overlay ---
+  function showRefreshOverlay() {
+    const el = document.getElementById('editor-refresh-overlay');
+    if (el) el.style.display = '';
+  }
+  function hideRefreshOverlay() {
+    const el = document.getElementById('editor-refresh-overlay');
+    if (el) el.style.display = 'none';
+  }
+
+  // --- Smart refresh: re-fetch from GitHub and rebuild editor state ---
+  async function refreshFromGitHub() {
+    showRefreshOverlay();
+    try {
+      const freshRes = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (!freshRes.ok) { hideRefreshOverlay(); return; }
+      const fresh = await freshRes.json();
+
+      const newOriginal = fresh.content;
+      const remainingSuggestions = fresh.pendingSuggestions || [];
+      const newWorkingDoc = buildWorkingDoc(newOriginal, remainingSuggestions);
+
+      // Update the editor document and original in one dispatch
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+        effects: setOriginal.of(newOriginal),
+      });
+
+      // Update local data
+      data.pendingSuggestions = remainingSuggestions;
+      data.pendingComments = fresh.pendingComments || [];
+      data.pendingReplies = fresh.pendingReplies || [];
+
+      // Refresh comment and reply cards
+      const existingComments = fresh.pendingComments || [];
+      const { initComments } = await import('/static/js/editor-comments.js');
+      initComments(editorView, existingComments, (comments) => {
+        updateCommentCards(comments);
+      });
+      if (existingComments.length > 0) updateCommentCards(existingComments);
+      updateReplies(fresh.pendingReplies || []);
+    } catch { /* ignore refresh errors */ }
+    hideRefreshOverlay();
+  }
+
   // --- Accept a hunk via API ---
   let acceptingInProgress = false;
   async function acceptHunk(hunkId) {
@@ -188,6 +233,18 @@ if (data) {
       showToast('Could not find this suggestion. It may not be saved yet.', 'error');
       acceptingInProgress = false;
       return;
+    }
+
+    // Save hunk details on the card before replacing its content
+    const hunks = getCurrentHunks();
+    const hunk = hunks.find(h => h.id === hunkId);
+    if (hunk) {
+      const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+      if (card) {
+        card.dataset.origText = hunk.originalText || '';
+        card.dataset.newText = hunk.newText || '';
+        card.dataset.hunkType = hunk.type || '';
+      }
     }
 
     // Transform card to loading state, disable all other cards
@@ -203,7 +260,7 @@ if (data) {
       if (!res.ok) {
         const err = await res.json();
         if (res.status === 409) {
-          setCardStatus(hunkId, 'stale', err.message || 'File has changed — suggestion is stale');
+          setCardStatus(hunkId, 'stale', err.message || 'Stale');
         } else {
           setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
         }
@@ -216,20 +273,8 @@ if (data) {
       setCardStatus(hunkId, 'success', 'Committed to GitHub');
       removeRepliesForParent(firestoreId);
 
-      // Update the original doc so the diff recalculates and inline decorations clear
-      const hunks = getCurrentHunks();
-      const acceptedHunk = hunks.find(h => h.id === hunkId);
-      if (acceptedHunk && editorView) {
-        const original = editorView.state.field(originalDocField);
-        const newOriginal = original.slice(0, acceptedHunk.originalFrom)
-          + (acceptedHunk.newText || '')
-          + original.slice(acceptedHunk.originalTo);
-        editorView.dispatch({ effects: setOriginal.of(newOriginal) });
-      }
-
-      if (data.pendingSuggestions) {
-        data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
-      }
+      // Smart refresh: fetch latest from GitHub and rebuild editor
+      await refreshFromGitHub();
 
       acceptingInProgress = false;
       enableAllCardActions();
@@ -242,6 +287,15 @@ if (data) {
       acceptingInProgress = false;
       enableAllCardActions();
     }
+  }
+
+  // --- Dismiss a stale suggestion ---
+  async function dismissStaleSuggestion(hunkId) {
+    const firestoreId = findFirestoreId(hunkId);
+    if (firestoreId) {
+      try { await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' }); } catch { /* ignore */ }
+    }
+    animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
   }
 
   // --- Reject/delete a hunk ---
@@ -431,6 +485,7 @@ if (data) {
         onReject: rejectOrDeleteHunk,
         onResolveComment: resolveComment,
         onPostReply: postReply,
+        onDismissStale: dismissStaleSuggestion,
       });
 
       // Load existing comments
