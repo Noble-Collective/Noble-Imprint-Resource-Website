@@ -2,7 +2,7 @@
 import { basicSetup, EditorView, EditorState, Compartment, markdown } from '/static/js/codemirror-bundle.js';
 import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-masking.js';
 import {
-  suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
+  suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
@@ -215,6 +215,17 @@ if (data) {
       // Success — card turns green
       setCardStatus(hunkId, 'success', 'Committed to GitHub');
       removeRepliesForParent(firestoreId);
+
+      // Update the original doc so the diff recalculates and inline decorations clear
+      const hunks = getCurrentHunks();
+      const acceptedHunk = hunks.find(h => h.id === hunkId);
+      if (acceptedHunk && editorView) {
+        const original = editorView.state.field(originalDocField);
+        const newOriginal = original.slice(0, acceptedHunk.originalFrom)
+          + (acceptedHunk.newText || '')
+          + original.slice(acceptedHunk.originalTo);
+        editorView.dispatch({ effects: setOriginal.of(newOriginal) });
+      }
 
       if (data.pendingSuggestions) {
         data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
