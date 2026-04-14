@@ -326,14 +326,16 @@ const maskingTheme = EditorView.theme({
     color: '#888',
   },
 
-  // Question blocks
-  '.cm-question-block': {
-    display: 'block',
+  // Question blocks — border on line to prevent duplication from split spans
+  '.cm-line:has(.cm-question-block)': {
     borderLeft: '3px solid #dfb53b',
     background: '#fdfbf4',
-    padding: '0.75rem 1.25rem',
+    padding: '0.75rem 1.25rem !important',
     margin: '0.5rem 0',
     borderRadius: '0 6px 6px 0',
+  },
+  '.cm-question-block': {
+    display: 'inline',
   },
 
   // Callouts
@@ -353,22 +355,27 @@ const maskingTheme = EditorView.theme({
     padding: '4px 0',
   },
 
-  // Blockquotes
-  '.cm-blockquote': {
+  // Blockquotes — border + background on the LINE to prevent duplication
+  // when suggestion/comment marks split the blockquote into multiple spans
+  '.cm-line:has(.cm-blockquote)': {
     borderLeft: '3px solid #536942',
     background: '#f6f8f5',
-    paddingLeft: '1.5rem',
+    paddingLeft: '1.5rem !important',
+  },
+  '.cm-blockquote': {
     fontStyle: 'italic',
   },
 
-  // Section blocks
-  '.cm-section-block': {
-    display: 'block',
+  // Section blocks — border on line to prevent duplication
+  '.cm-line:has(.cm-section-block)': {
     background: '#f6f8f5',
     border: '1px solid #e2e6df',
     borderRadius: '6px',
-    padding: '1rem 1.5rem',
+    padding: '1rem 1.5rem !important',
     margin: '0.5rem 0',
+  },
+  '.cm-section-block': {
+    display: 'inline',
   },
 
   // Bold / Italic
