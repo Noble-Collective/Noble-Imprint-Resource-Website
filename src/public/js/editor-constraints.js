@@ -179,37 +179,51 @@ function parseLineZones(lineText, lineFrom) {
   return filtered;
 }
 
-// --- Find the zone containing a position ---
+// --- Find the zone containing a position (with 2-char tolerance for atomic range boundaries) ---
 function findZone(zones, pos) {
+  // Exact match first
   for (const z of zones) {
     if (pos >= z.from && pos <= z.to) return z;
+  }
+  // Nearby match (cursor may land just outside a zone due to atomic ranges)
+  for (const z of zones) {
+    if (pos >= z.from - 2 && pos <= z.to + 2) return z;
   }
   return null;
 }
 
 // --- Selection constraint: clamp selection to zone boundaries ---
-const selectionConstraint = EditorView.updateListener.of((update) => {
-  if (!update.selectionSet) return;
+// Uses transactionFilter to modify the selection before it's applied,
+// avoiding conflicts with atomic ranges.
+const selectionConstraint = EditorState.transactionFilter.of((tr) => {
+  // Only filter selection changes, not doc changes
+  if (tr.docChanged) return tr;
+  if (!tr.selection) return tr;
 
-  const zones = update.view.state.field(editableZonesField);
-  if (zones.length === 0) return;
+  const zones = tr.startState.field(editableZonesField);
+  if (zones.length === 0) return tr;
 
-  const sel = update.view.state.selection.main;
+  const sel = tr.selection.main;
   const anchorZone = findZone(zones, sel.anchor);
+
+  // If anchor isn't in any zone, let it through (atomic ranges will handle positioning)
+  if (!anchorZone) return tr;
+
   const headZone = findZone(zones, sel.head);
 
-  // If both anchor and head are in the same zone, allow it
-  if (anchorZone && headZone && anchorZone === headZone) return;
+  // If both in same zone, allow
+  if (headZone && anchorZone.from === headZone.from && anchorZone.to === headZone.to) return tr;
 
-  // If anchor is in a zone but head extends beyond, clamp head
-  if (anchorZone) {
-    const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
-    if (clampedHead !== sel.head) {
-      update.view.dispatch({
-        selection: { anchor: sel.anchor, head: clampedHead },
-      });
-    }
+  // Clamp head to the anchor's zone
+  const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
+  if (clampedHead !== sel.head) {
+    return [{
+      selection: { anchor: sel.anchor, head: clampedHead },
+      annotations: tr.annotations,
+    }];
   }
+
+  return tr;
 });
 
 // --- Transaction filter: reject edits that span zone boundaries ---
