@@ -345,14 +345,15 @@ const maskingTheme = EditorView.theme({
     padding: '1px 4px',
   },
 
-  // Attributions (right-aligned)
-  '.cm-attribution': {
-    display: 'block',
+  // Attributions — right-align on line to prevent split-span issues
+  '.cm-line:has(.cm-attribution)': {
     textAlign: 'right',
+    padding: '4px 24px !important',
+  },
+  '.cm-attribution': {
     fontSize: '0.85rem',
     color: '#6b6b6b',
     fontWeight: '600',
-    padding: '4px 0',
   },
 
   // Blockquotes — border + background on the LINE to prevent duplication
