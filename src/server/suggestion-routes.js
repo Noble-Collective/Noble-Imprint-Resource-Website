@@ -28,11 +28,32 @@ router.get('/content', async (req, res) => {
 
     const { content, sha } = await github.getFileContent(filePath);
 
-    // Also return any pending suggestions and comments for this file
+    // Get pending suggestions and comments, resolve their positions against current content
     const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
     const pendingComments = await suggestions.getCommentsForFile(filePath);
-
     const pendingReplies = await suggestions.getRepliesForFile(filePath);
+
+    // Resolve positions for each annotation against the current file content
+    for (const s of pendingSuggestions) {
+      const resolved = suggestions.resolveAnchor(s, content);
+      if (!resolved.stale) {
+        s.resolvedFrom = resolved.from;
+        s.resolvedTo = resolved.to;
+        s.resolvedConfidence = resolved.confidence;
+      } else {
+        s.resolvedStale = true;
+      }
+    }
+    for (const c of pendingComments) {
+      const resolved = suggestions.resolveAnchor(c, content);
+      if (!resolved.stale) {
+        c.resolvedFrom = resolved.from;
+        c.resolvedTo = resolved.to;
+        c.resolvedConfidence = resolved.confidence;
+      } else {
+        c.resolvedStale = true;
+      }
+    }
 
     res.json({ content, sha, filePath, bookPath, pendingSuggestions, pendingComments, pendingReplies });
   } catch (err) {
@@ -193,11 +214,16 @@ router.post('/comments', async (req, res) => {
       return res.status(403).json({ error: 'No edit permission' });
     }
 
+    // Get file content for building rich anchor data
+    let fileContent = null;
+    try { fileContent = (await github.getFileContent(filePath)).content; } catch { /* fallback */ }
+
     const id = await suggestions.createComment({
       filePath, bookPath, baseCommitSha,
       from, to, selectedText, commentText,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
+      fileContent,
     });
     res.json({ id, status: 'ok' });
   } catch (err) {

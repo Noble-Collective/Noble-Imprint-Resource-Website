@@ -1,6 +1,166 @@
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 const github = require('./github');
 const cache = require('./cache');
+
+// --- Content hash for fast-path position validation ---
+function contentHash(content) {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+// --- Multi-selector anchor: resolve an annotation's position in current content ---
+// Returns { from, to, confidence, stale } or { stale: true } if unfindable
+function resolveAnchor(annotation, currentContent) {
+  // FAST PATH: content hash matches — positions are still valid
+  if (annotation.position && annotation.position.contentHash &&
+      annotation.position.contentHash === contentHash(currentContent)) {
+    return { from: annotation.position.from, to: annotation.position.to, confidence: 1.0 };
+  }
+
+  // Determine the exact text to search for
+  const exact = annotation.anchor ? annotation.anchor.exact
+    : (annotation.originalText || annotation.selectedText || '');
+  const prefix = annotation.anchor ? (annotation.anchor.prefix || '')
+    : (annotation.contextBefore || '');
+  const suffix = annotation.anchor ? (annotation.anchor.suffix || '')
+    : (annotation.contextAfter || '');
+
+  if (!exact && !prefix && !suffix) {
+    return { stale: true, confidence: 0 };
+  }
+
+  // Step 1: Try prefix + exact + suffix (highest confidence)
+  if (prefix && suffix) {
+    const fullCtx = prefix + exact + suffix;
+    const pos = currentContent.indexOf(fullCtx);
+    if (pos >= 0) {
+      const from = pos + prefix.length;
+      return { from, to: from + exact.length, confidence: 1.0 };
+    }
+  }
+
+  // Step 2: Try prefix + exact only
+  if (prefix) {
+    const partial = prefix + exact;
+    const pos = currentContent.indexOf(partial);
+    if (pos >= 0) {
+      const from = pos + prefix.length;
+      return { from, to: from + exact.length, confidence: 0.95 };
+    }
+  }
+
+  // Step 3: Try exact + suffix only
+  if (suffix) {
+    const partial = exact + suffix;
+    const pos = currentContent.indexOf(partial);
+    if (pos >= 0) {
+      return { from: pos, to: pos + exact.length, confidence: 0.95 };
+    }
+  }
+
+  // Step 4: Bare exact text search (only safe for long strings)
+  if (exact.length >= 20) {
+    const pos = currentContent.indexOf(exact);
+    if (pos >= 0) {
+      return { from: pos, to: pos + exact.length, confidence: 0.8 };
+    }
+  }
+
+  // Step 5: Short exact text — find all occurrences, pick closest to structural hint
+  if (exact.length > 0 && exact.length < 20) {
+    const candidates = [];
+    let searchFrom = 0;
+    while (true) {
+      const pos = currentContent.indexOf(exact, searchFrom);
+      if (pos === -1) break;
+      candidates.push(pos);
+      searchFrom = pos + 1;
+    }
+
+    if (candidates.length === 1) {
+      return { from: candidates[0], to: candidates[0] + exact.length, confidence: 0.8 };
+    }
+
+    if (candidates.length > 1 && annotation.structure && annotation.structure.percentOffset != null) {
+      const expectedPos = Math.round(annotation.structure.percentOffset * currentContent.length);
+      let best = candidates[0];
+      let bestDist = Math.abs(best - expectedPos);
+      for (const c of candidates) {
+        const dist = Math.abs(c - expectedPos);
+        if (dist < bestDist) { best = c; bestDist = dist; }
+      }
+      return { from: best, to: best + exact.length, confidence: 0.6 };
+    }
+  }
+
+  // FAILED — mark stale
+  return { stale: true, confidence: 0 };
+}
+
+// --- Build multi-selector anchor data for a new annotation ---
+function buildAnchorData(content, from, to, exactText) {
+  const prefix = content.substring(Math.max(0, from - 80), from);
+  const suffix = content.substring(to, Math.min(content.length, to + 80));
+  const line = content.substring(0, from).split('\n').length;
+
+  return {
+    anchor: { exact: exactText, prefix, suffix },
+    position: { from, to, contentHash: contentHash(content) },
+    structure: { lineNumber: line, percentOffset: from / content.length },
+  };
+}
+
+// --- Re-anchor all remaining annotations for a file after it changes ---
+async function reanchorAnnotations(filePath, newContent) {
+  const newHash = contentHash(newContent);
+
+  const [suggestions, comments] = await Promise.all([
+    getSuggestionsForFile(filePath),
+    getCommentsForFile(filePath),
+  ]);
+
+  const batch = getDb().batch();
+  let batchCount = 0;
+
+  for (const s of suggestions) {
+    const resolved = resolveAnchor(s, newContent);
+    if (resolved.stale) {
+      batch.update(suggestionsCollection().doc(s.id), {
+        status: 'stale',
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      batch.update(suggestionsCollection().doc(s.id), {
+        'position.from': resolved.from,
+        'position.to': resolved.to,
+        'position.contentHash': newHash,
+      });
+    }
+    batchCount++;
+  }
+
+  for (const c of comments) {
+    const resolved = resolveAnchor(c, newContent);
+    if (resolved.stale) {
+      batch.update(commentsCollection().doc(c.id), {
+        status: 'resolved',
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        resolvedBy: 'system:stale',
+      });
+    } else {
+      batch.update(commentsCollection().doc(c.id), {
+        from: resolved.from,
+        to: resolved.to,
+        'position.from': resolved.from,
+        'position.to': resolved.to,
+        'position.contentHash': newHash,
+      });
+    }
+    batchCount++;
+  }
+
+  if (batchCount > 0) await batch.commit();
+}
 
 function getDb() {
   return admin.firestore();
@@ -20,7 +180,16 @@ function repliesCollection() {
 
 // --- Suggestion Hunk CRUD ---
 
-async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName }) {
+async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, fileContent }) {
+  // Build enhanced anchor data if file content is available
+  const anchorData = fileContent
+    ? buildAnchorData(fileContent, originalFrom, originalTo, originalText || '')
+    : {
+        anchor: { exact: originalText || '', prefix: contextBefore || '', suffix: contextAfter || '' },
+        position: { from: originalFrom, to: originalTo, contentHash: '' },
+        structure: { lineNumber: 0, percentOffset: originalFrom / 1 },
+      };
+
   const ref = await suggestionsCollection().add({
     filePath,
     bookPath,
@@ -32,6 +201,9 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     newText: newText || '',
     contextBefore: contextBefore || '',
     contextAfter: contextAfter || '',
+    anchor: anchorData.anchor,
+    position: anchorData.position,
+    structure: anchorData.structure,
     authorEmail,
     authorName: authorName || authorEmail,
     status: 'pending',
@@ -213,10 +385,11 @@ async function acceptHunk(id, resolverEmail) {
     resolvedBy: resolverEmail,
   });
 
-  // Other pending suggestions stay pending — they'll still work as long as
-  // their originalText can be found in the file. No blanket stale.
-
   await deleteRepliesForParent(id);
+
+  // Re-anchor all remaining annotations against the new file content
+  await reanchorAnnotations(hunk.filePath, newContent);
+
   cache.invalidateAll();
   return { stale: false };
 }
@@ -233,7 +406,16 @@ async function rejectHunk(id, resolverEmail, reason) {
 
 // --- Comment CRUD ---
 
-async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, authorEmail, authorName }) {
+async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, authorEmail, authorName, fileContent }) {
+  // Build enhanced anchor data if file content is available
+  const anchorData = fileContent
+    ? buildAnchorData(fileContent, from, to, selectedText || '')
+    : {
+        anchor: { exact: selectedText || '', prefix: '', suffix: '' },
+        position: { from, to, contentHash: '' },
+        structure: { lineNumber: 0, percentOffset: 0 },
+      };
+
   const ref = await commentsCollection().add({
     filePath,
     bookPath,
@@ -242,6 +424,9 @@ async function createComment({ filePath, bookPath, baseCommitSha, from, to, sele
     to,
     selectedText,
     commentText,
+    anchor: anchorData.anchor,
+    position: anchorData.position,
+    structure: anchorData.structure,
     authorEmail,
     authorName: authorName || authorEmail,
     status: 'open',
@@ -322,4 +507,8 @@ module.exports = {
   createReply,
   getRepliesForFile,
   deleteRepliesForParent,
+  resolveAnchor,
+  reanchorAnnotations,
+  contentHash,
+  buildAnchorData,
 };
