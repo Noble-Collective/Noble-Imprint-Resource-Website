@@ -187,7 +187,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     : {
         anchor: { exact: originalText || '', prefix: contextBefore || '', suffix: contextAfter || '' },
         position: { from: originalFrom, to: originalTo, contentHash: '' },
-        structure: { lineNumber: 0, percentOffset: originalFrom / 1 },
+        structure: { lineNumber: 0, percentOffset: 0 },
       };
 
   const ref = await suggestionsCollection().add({

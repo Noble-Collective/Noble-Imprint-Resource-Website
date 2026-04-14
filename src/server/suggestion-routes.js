@@ -301,6 +301,7 @@ router.post('/direct-edit', async (req, res) => {
       ? `${comment} (direct edit by ${req.user.email})`
       : `Direct edit by ${req.user.email}`;
     await github.updateFileContent(filePath, content, sha, message);
+    await suggestions.reanchorAnnotations(filePath, content);
     cache.invalidateAll();
     res.json({ status: 'ok' });
   } catch (err) {

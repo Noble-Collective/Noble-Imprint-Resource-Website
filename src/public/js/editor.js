@@ -156,9 +156,11 @@ if (data) {
                 authorEmail: data.user ? data.user.email : '',
                 authorName: data.user ? data.user.displayName : '',
                 firestoreId: result.id,
+                loadedFromServer: false,
               }) });
 
-              // Add to pendingSuggestions for buildWorkingDoc
+              // Legacy: keep pendingSuggestions in sync for findFirestoreId fallback
+              // TODO: remove once findFirestoreId is fully registry-based
               if (!data.pendingSuggestions) data.pendingSuggestions = [];
               data.pendingSuggestions.push({
                 id: result.id,
@@ -187,24 +189,26 @@ if (data) {
     const hunks = getCurrentHunks();
     const hunk = hunks.find(h => h.id === hunkId);
 
-    // Check savedHunks Map using the hunkKey (type:from:to), not the hunk ID
+    // Check savedHunks Map first (direct mapping from auto-save)
     if (hunk) {
       const key = hunkKey(hunk);
       if (savedHunks.has(key)) return savedHunks.get(key);
     }
 
-    // Match against loaded suggestions by content
-    if (hunk && data.pendingSuggestions) {
-      for (const s of data.pendingSuggestions) {
-        if (s.originalText === hunk.originalText && s.newText === hunk.newText) return s.id;
-        if (s.type === hunk.type && s.originalText === hunk.originalText) return s.id;
+    // Check annotation registry by content match
+    if (hunk && editorView) {
+      const registry = editorView.state.field(annotationRegistry);
+      for (const [id, a] of registry) {
+        if (a.kind !== 'suggestion') continue;
+        if (a.originalText === hunk.originalText && a.newText === hunk.newText) return id;
+        if (a.type === hunk.type && a.originalText === hunk.originalText) return id;
       }
     }
 
-    // Direct match by ID
-    if (data.pendingSuggestions) {
-      const direct = data.pendingSuggestions.find(s => s.id === hunkId);
-      if (direct) return direct.id;
+    // Direct ID match in registry
+    if (editorView) {
+      const registry = editorView.state.field(annotationRegistry);
+      if (registry.has(hunkId)) return hunkId;
     }
 
     return null;
@@ -378,13 +382,9 @@ if (data) {
       const registry = editorView.state.field(annotationRegistry);
       const remainingSuggestions = [];
       for (const [, a] of registry) {
-        if (a.kind === 'suggestion') {
-          remainingSuggestions.push(a);
-        }
+        if (a.kind === 'suggestion') remainingSuggestions.push(a);
       }
-      const newWorkingDoc = buildWorkingDoc(originalContent, remainingSuggestions.length > 0
-        ? data.pendingSuggestions.filter(s => s.id !== firestoreId && !s.resolvedStale)
-        : []);
+      const newWorkingDoc = buildWorkingDoc(originalContent, remainingSuggestions);
 
       // Clear zones, replace document, restore zones
       editorView.dispatch({ effects: setZones.of([]) });
@@ -417,9 +417,7 @@ if (data) {
       if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
       fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
     } catch { /* ignore */ }
-    if (firestoreId && data.pendingSuggestions) {
-      data.pendingSuggestions = data.pendingSuggestions.filter(s => s.id !== firestoreId);
-    }
+    // Registry already updated via removeAnnotation above
     const hunks = getCurrentHunks();
     const hunk = hunks.find(h => h.id === hunkId);
     if (hunk) {
