@@ -13,8 +13,16 @@ class BrSpacerWidget extends WidgetType {
   ignoreEvent() { return true; }
 }
 
+// Mode flag: when true, the cursor's line shows raw markdown
+let revealFocusedLine = false;
+
+export function setRevealFocusedLine(enabled) {
+  revealFocusedLine = enabled;
+}
+
 // --- Build decorations by scanning document text ---
-function buildMaskingDecorations(view) {
+// If skipLineNumber is set, decorations on that line are omitted (shows raw markdown)
+function buildMaskingDecorations(view, skipLineNumber) {
   const doc = view.state.doc;
   const text = doc.toString();
   const decorations = [];
@@ -146,21 +154,42 @@ function buildMaskingDecorations(view) {
     mark(fullStart + 1, fullEnd - 1, 'cm-italic'); // Style content
   }
 
-  // Sort by position (required by CodeMirror)
-  decorations.sort((a, b) => a.from - b.from || a.to - b.to);
+  // Filter out decorations on the skipped line (if any)
+  let filtered = decorations;
+  if (skipLineNumber !== undefined && skipLineNumber >= 1 && skipLineNumber <= doc.lines) {
+    const skipLine = doc.line(skipLineNumber);
+    const skipFrom = skipLine.from;
+    const skipTo = skipLine.to;
+    filtered = decorations.filter(d => {
+      // Remove decorations that are entirely within the skipped line
+      return !(d.from >= skipFrom && d.to <= skipTo);
+    });
+  }
 
-  return Decoration.set(decorations, true);
+  // Sort by position (required by CodeMirror)
+  filtered.sort((a, b) => a.from - b.from || a.to - b.to);
+
+  return Decoration.set(filtered, true);
 }
 
-// --- ViewPlugin that recomputes decorations on each document change ---
+// --- ViewPlugin that recomputes decorations on each document/selection change ---
 const maskingPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
-      this.decorations = buildMaskingDecorations(view);
+      this._lastCursorLine = 0;
+      this.decorations = buildMaskingDecorations(view, this._getSkipLine(view));
+    }
+    _getSkipLine(view) {
+      if (!revealFocusedLine) return undefined;
+      const pos = view.state.selection.main.head;
+      return view.state.doc.lineAt(pos).number;
     }
     update(update) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildMaskingDecorations(update.view);
+      const cursorLine = this._getSkipLine(update.view);
+      const lineChanged = cursorLine !== this._lastCursorLine;
+      if (update.docChanged || update.viewportChanged || lineChanged) {
+        this._lastCursorLine = cursorLine;
+        this.decorations = buildMaskingDecorations(update.view, cursorLine);
       }
     }
   },

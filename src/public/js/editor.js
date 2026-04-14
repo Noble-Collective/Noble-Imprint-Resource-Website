@@ -1,6 +1,6 @@
 // Noble Imprint — CodeMirror 6 Editor (ES Module)
 import { basicSetup, EditorView, EditorState, markdown } from '/static/js/codemirror-bundle.js';
-import { maskingExtension } from '/static/js/editor-masking.js';
+import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-masking.js';
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
@@ -338,8 +338,11 @@ if (data) {
     host.innerHTML = '';
 
     // For suggest/review mode, pre-set the original content in the initial state
-    // Suggest-comment users get edit constraints (single line, within tag boundaries)
-    const isConstrained = mode === 'suggest' && data.editRole === 'comment-suggest';
+    // All users in suggest mode get edit constraints (single line, within tag boundaries)
+    const isConstrained = mode === 'suggest';
+
+    // Direct edit: reveal raw markdown on the focused line
+    setRevealFocusedLine(mode === 'direct');
 
     // Zone recomputation listener — keeps zones fresh as doc changes
     // Uses a flag to prevent infinite dispatch loop (setZones triggers update which triggers setZones...)
@@ -414,6 +417,7 @@ if (data) {
   }
 
   function exitEditor() {
+    setRevealFocusedLine(false);
     if (editorView) {
       editorView.destroy();
       editorView = null;

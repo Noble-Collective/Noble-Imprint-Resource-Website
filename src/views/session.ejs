@@ -71,7 +71,7 @@
     <% if (typeof editRole !== 'undefined' && editRole) { %>
       <div class="edit-toolbar" id="edit-toolbar">
         <button class="edit-btn" id="btn-suggest-edit">Suggest Edits</button>
-        <% if (editRole === 'admin') { %>
+        <% if (editRole === 'admin' || editRole === 'manuscript-owner') { %>
           <button class="edit-btn edit-btn--primary" id="btn-direct-edit">Direct Edit</button>
         <% } %>
         <% if (pendingSuggestions && pendingSuggestions.length > 0) { %>
