@@ -63,8 +63,13 @@ if (data) {
     const currentKeys = new Set(hunks.map(hunkKey));
 
     // Delete saved hunks that no longer exist (user reverted)
+    // BUT: never auto-delete suggestions that are in the annotation registry —
+    // those should only be removed by explicit user action (discard)
+    const registry = editorView ? editorView.state.field(annotationRegistry) : new Map();
     for (const [key, docId] of savedHunks) {
-      // Check if any current hunk overlaps with this saved hunk
+      // Skip if this suggestion is in the registry (it's a saved, tracked suggestion)
+      if (registry.has(docId)) continue;
+
       const [kFrom, kTo] = key.split(':').map(Number);
       const stillExists = hunks.some(h => h.originalFrom <= kTo + 1 && h.originalTo >= kFrom - 1);
       if (!stillExists) {
