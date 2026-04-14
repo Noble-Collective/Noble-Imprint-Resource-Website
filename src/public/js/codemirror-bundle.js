@@ -30574,6 +30574,7 @@ function diffWordsWithSpace(oldStr, newStr, options) {
   return wordsWithSpaceDiff.diff(oldStr, newStr, options);
 }
 export {
+  Compartment,
   Decoration,
   EditorState,
   EditorView,

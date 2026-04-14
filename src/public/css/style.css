@@ -3103,6 +3103,26 @@ body.drawer-open {
   align-items: center;
   gap: 8px;
 }
+.edit-btn--source {
+  font-family: 'DM Mono', 'Consolas', monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.edit-btn--source:hover {
+  background: #e8e8e8;
+  border-color: #aaa;
+}
+.edit-btn--source.active {
+  background: #333;
+  color: #fff;
+  border-color: #333;
+}
 .editor-mode-label {
   font-family: 'DM Sans', sans-serif;
   font-weight: 600;

@@ -1,5 +1,5 @@
 // Noble Imprint — CodeMirror 6 Editor (ES Module)
-import { basicSetup, EditorView, EditorState, markdown } from '/static/js/codemirror-bundle.js';
+import { basicSetup, EditorView, EditorState, Compartment, markdown } from '/static/js/codemirror-bundle.js';
 import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-masking.js';
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
@@ -13,6 +13,10 @@ if (data) {
   let editorView = null;
   let editMode = null; // 'suggest' | 'direct' | 'review'
   const originalContent = data.rawContent;
+
+  // --- View Source toggle (compartment for masking) ---
+  const maskingCompartment = new Compartment();
+  let viewSourceActive = false;
 
   const readingContent = document.getElementById('reading-content');
   const editorContainer = document.getElementById('editor-container');
@@ -356,11 +360,12 @@ if (data) {
       }
     }) : [];
 
+    viewSourceActive = false;
     const extensions = [
       basicSetup,
       markdown(),
       EditorView.lineWrapping,
-      maskingExtension(),
+      maskingCompartment.of(maskingExtension()),
       ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
       ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
@@ -438,6 +443,17 @@ if (data) {
     window.location.reload();
   }
 
+  // --- View Source toggle ---
+  function toggleViewSource() {
+    if (!editorView) return;
+    viewSourceActive = !viewSourceActive;
+    editorView.dispatch({
+      effects: maskingCompartment.reconfigure(viewSourceActive ? [] : maskingExtension()),
+    });
+    const btn = document.getElementById('btn-view-source');
+    if (btn) btn.classList.toggle('active', viewSourceActive);
+  }
+
   // --- Direct edit save ---
   async function directSave() {
     if (!editorView) return;
@@ -497,6 +513,7 @@ if (data) {
   document.getElementById('btn-suggest-edit')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
+  document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;
