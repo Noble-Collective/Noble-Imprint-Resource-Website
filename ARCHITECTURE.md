@@ -207,10 +207,10 @@ An admin reviews the suggestion, seeing the changes rendered visually (deletions
 
 ### Safety guarantees
 
-- **Structural syntax is untouchable** in the normal editor. The `<Question>`, `<Callout>`, `<<`, and other custom tags are hidden and cursor-inaccessible.
-- **A "View source" toggle** is available for power users who need to make structural changes (adding a new Question block, changing heading levels). This requires understanding the markdown format.
-- **One suggestion per file at a time.** While a suggestion is pending on a file, no one else can submit a different suggestion for that same file. This prevents conflicting edits.
-- **Advisory locking.** When someone opens a file for editing, other users see "Jane is currently editing this file." This is informational — the real safety net is the SHA check at acceptance time.
+- **Structural syntax is untouchable** in suggest mode. The `<Question>`, `<Callout>`, `<<`, and other custom tags are hidden and protected by edit zone constraints. Users can only edit text content within tag boundaries.
+- **A "View Source" toggle** is available in the toolbar, showing the full raw markdown for power users. Direct edit mode (admins/manuscript owners only) allows structural changes with Obsidian-style reveal.
+- **Multiple suggestions per file are supported.** Each hunk is independent. The text-based find-and-replace acceptance ensures hunks don't interfere with each other.
+- **SHA-based conflict detection.** When accepting a suggestion, the server checks whether the original text still exists in the current file. If the file has changed and the text can't be found, the suggestion is marked "stale."
 - **Every accepted change is a Git commit** with a clear message and author. The full history is always available.
 
 ---
@@ -219,13 +219,16 @@ An admin reviews the suggestion, seeing the changes rendered visually (deletions
 
 The website uses Google sign-in for authentication. Access levels are defined in a simple configuration file:
 
-| Role | Browse and read content | Suggest edits and leave comments | Accept / reject suggestions |
-|---|---|---|---|
-| **Anyone** (no login) | Yes | — | — |
-| **Suggest-Comment** | Yes | Yes | — |
-| **Admin** | Yes | Yes | Yes |
+| Role | Browse public | See hidden books | Suggest edits & comment | Accept / reject | Manage users |
+|---|---|---|---|---|---|
+| **Anyone** (no login) | Yes | — | — | — | — |
+| **Viewer** (per-book) | Yes | That book only | — | — | — |
+| **Comment-Suggest** (per-book) | Yes | That book only | Yes | — | — |
+| **Manuscript Owner** (per-book) | Yes | That book only | Yes | Yes + direct edit | — |
+| **Admin** | Yes | All | Yes | Yes + direct edit | Yes |
+| **Super Admin** (steve@) | Yes | All | Yes | Yes + direct edit | Yes (cannot be removed) |
 
-Roles are assigned by email address in the website's configuration file. Adding or removing someone's access is a one-line change.
+Roles are managed in the admin console (`/admin`) and stored in Firestore. Per-book roles are assigned individually; Admin is a global role.
 
 ---
 
@@ -280,35 +283,51 @@ The rendering engine is the most critical component. It parses the markdown file
 
 The editing experience uses CodeMirror 6 — a code editor framework — with a "decoration" layer that hides structural syntax while keeping it physically present in the document buffer.
 
-CodeMirror's "replace decorations" render a range of characters as zero-width (invisible) while applying visual styling to the content between them. "Atomic ranges" make the cursor skip over hidden characters. The result is that users see beautifully formatted text, but every keystroke operates on the real markdown characters.
+Two hiding strategies are used depending on the syntax length:
+
+- **Inline markers** (`##`, `**`, `_`, `<<`, `>`) use `Decoration.mark()` with CSS `font-size: 0` (zero-width). The text stays in the DOM so the cursor passes through smoothly — no jumping, no selection glitches. This is the same approach used by Obsidian's live preview.
+- **Block-level tags** (`<Question id=...>`, `</Question>`, `<Callout>`, `</Callout>`, section tags) use `Decoration.replace()` so the cursor skips them in one step. These are long structural strings users should never interact with.
+
+Visual mark decorations (headings styled large, bold styled bold, etc.) are applied on top of the hiding and remain active at all times — including on the focused line in direct edit mode.
 
 Key technical details:
 
-- **Decorations are computed from the same parser** that powers the public reading view. One parser, two outputs: HTML for reading and CodeMirror decorations for editing.
-- **Atomic ranges protect structural syntax.** The cursor treats each hidden tag as a single indivisible unit. Backspace at a boundary stops before entering the hidden range.
-- **Boundary behaviors are defined per element type.** Typing at the end of a Question block keeps new text inside the block. Pressing Enter after a heading inserts a new line below.
+- **No atomicRanges.** An earlier version used `Decoration.replace()` + `atomicRanges` for all syntax hiding, which caused cursor jumping, selection fighting, and whole-region highlighting. The v2 architecture eliminated atomicRanges entirely.
+- **Selection constraints use synchronous `transactionFilter`** — selections are clamped to zone boundaries (single line, within innermost tag) before the view updates. No mouseup hacks, no setTimeout delays, no visible flicker.
+- **Edit protection uses `transactionFilter`** — edits that fall outside computed editable zones are blocked. Zones are recomputed on every document change.
+- **Obsidian-style reveal in direct edit mode.** When the cursor is on a line, the syntax markers for that line appear in muted gray while the visual styling (heading size, bold weight, etc.) remains. Moving the cursor away re-hides the markers.
 - **Pasted text is inserted literally** — no re-parsing of pasted content. What you paste is what goes into the buffer.
+- **Google Docs-style layout.** Editor content is constrained to 680px (matching reading view), with line numbers on the left, suggestion/comment margin on the right, and a sticky toolbar that follows as you scroll.
 
 ### Suggestion storage and diff model
 
-Suggestions are stored in Cloud Firestore (or a simple database). Each suggestion records:
+Suggestions are stored per-hunk in Cloud Firestore. Each hunk is a single contiguous change (insertion, deletion, or replacement), auto-saved as the user types:
 
 ```
-id:                Unique identifier
-file_path:         Path to the file in the resources repo
-base_commit_sha:   The Git commit SHA when the suggestion was created
-original_content:  Full file content at time of suggestion
-modified_content:  Full file content after the user's edits
-diff:              Computed diff between original and modified
-author_email:      Who made the suggestion
-comment:           Optional description of the changes
-status:            pending | accepted | rejected | stale
-created_at:        Timestamp
-resolved_at:       Timestamp (when accepted/rejected)
-resolved_by:       Email of the admin
+Collection: suggestions
+  id, filePath, bookPath, baseCommitSha,
+  type (insertion | deletion | replacement),
+  originalFrom, originalTo,          — positions in the original document
+  originalText, newText,             — what changed
+  contextBefore, contextAfter,       — 50 chars of surrounding text
+  authorEmail, authorName,
+  status (pending | accepted | rejected | stale),
+  createdAt, resolvedAt, resolvedBy
+
+Collection: comments
+  id, filePath, bookPath, from, to,
+  selectedText, commentText,
+  authorEmail, authorName,
+  status (open | resolved), createdAt
+
+Collection: replies
+  id, parentId, parentType (suggestion | comment),
+  filePath, text, authorEmail, authorName, createdAt
 ```
 
-Storing both the full original and modified content (along with the diff) provides flexibility for rendering the review view and handles edge cases gracefully.
+The per-hunk model means multiple users can have suggestions on different parts of the same file simultaneously. Each hunk is keyed by its position in the original document, with overlap detection to prevent duplicates during rapid editing.
+
+When a suggestion is accepted, the server fetches the current file from GitHub, does a text-based find-and-replace for `originalText` → `newText`, and commits. If the text can't be found (file changed), the suggestion is marked stale. Replies are batch-deleted when a suggestion is accepted/rejected or a comment is resolved.
 
 ### Authentication
 
@@ -321,44 +340,45 @@ The website repo uses a GitHub App (installed on both repos) for scoped API acce
 - **Read access** to `Noble-Imprint-Resources` for fetching content.
 - **Write access** to `Noble-Imprint-Resources` for committing accepted suggestions.
 
-### Website configuration file
+### User and role management
 
-```yaml
-# website-config.yaml (lives in the website repo)
+Users and roles are managed via the admin console at `/admin`, stored in Firestore (`users` collection). Per-book roles are stored as a map on each user document. No config files needed.
 
-roles:
-  suggest-comment:
-    - "author@noblecollective.org"
-  admin:
-    - "lead@noblecollective.org"
-    - "editor@noblecollective.org"
-
-# Only needed for rare exceptions
-status_overrides:
-  # "series/Spiritual Journals/Sacred Markings": "Hidden"
-```
+Book visibility is controlled by `status` in each book's `meta.json` (`public` or `hidden`), toggled via the admin console Books tab.
 
 ### Website repo structure
 
 ```
 Noble-Imprint-Resource-Website/
-├── .github/workflows/deploy.yaml      # CI/CD pipeline
+├── .github/workflows/deploy.yml       # CI/CD: Docker build + Cloud Run deploy
+├── firebase.json                       # Firebase Hosting → Cloud Run rewrite
+├── tests/editor.spec.js               # 52 Playwright editor tests
+├── docs/claude-editor-prompt.md        # Claude AI bot setup guide
 ├── src/
-│   ├── server/                         # Node.js server
-│   │   ├── index.js                    # Routes
-│   │   ├── auth.js                     # Firebase Auth
-│   │   ├── github.js                   # GitHub API client
-│   │   └── suggestions.js              # Suggestion logic
-│   ├── renderer/                       # Markdown rendering engine
-│   │   ├── parser.js                   # Custom syntax parser
-│   │   ├── html-renderer.js            # Render to HTML
-│   │   └── codemirror-decorations.js   # Editor decorations
-│   ├── editor/                         # CodeMirror masked editor
-│   │   ├── editor.js                   # Initialization
-│   │   └── diff.js                     # Diff computation
-│   ├── public/                         # CSS, client JS, images
-│   └── views/                          # HTML templates
-├── website-config.yaml
+│   ├── editor-entry.js                 # CodeMirror bundle entry (esbuild)
+│   ├── public/
+│   │   ├── css/style.css               # All styles (responsive)
+│   │   └── js/
+│   │       ├── codemirror-bundle.js    # CM6 + diff bundle (1.1MB)
+│   │       ├── editor.js              # Editor orchestration
+│   │       ├── editor-masking.js       # v2 masking (zero-width + replace)
+│   │       ├── editor-suggestions.js   # diffChars tracking + decorations
+│   │       ├── editor-margin.js        # Margin panel + replies + focus
+│   │       ├── editor-comments.js      # Comment system
+│   │       └── editor-constraints.js   # v2 constraints (transactionFilter)
+│   ├── renderer/parser.js             # Markdown → HTML + Bible refs
+│   ├── server/
+│   │   ├── index.js                    # Express server + routes
+│   │   ├── auth.js                     # Firebase Admin SDK + sessions
+│   │   ├── firestore.js                # User CRUD + permissions
+│   │   ├── suggestions.js             # Suggestions + comments + replies
+│   │   ├── suggestion-routes.js        # Editing API routes
+│   │   ├── admin-routes.js             # Admin console routes
+│   │   ├── github.js                   # GitHub API (read + write)
+│   │   ├── content.js                  # Content tree builder
+│   │   ├── bible.js                    # Bible loader + verse lookup
+│   │   └── cache.js                    # In-memory cache
+│   └── views/                          # EJS templates
 ├── Dockerfile
 ├── package.json
 └── ARCHITECTURE.md
@@ -379,16 +399,12 @@ Noble-Imprint-Resource-Website/
 
 ---
 
-## Open decisions
+## Remaining decisions
 
-These items need to be resolved during implementation but don't affect the architecture:
-
-1. **Visual design and layout** — browsing experience, reading typography, color scheme.
-2. **Caching strategy** — in-memory with TTL, Redis, or fully static pre-built pages.
-3. **Mobile responsiveness** — requirements for reading and editing on smaller screens.
-4. **Common content rendering** — how `commonSeries.md`, `commonSubseries.md`, and `commonBook.md` files are handled (injected into sessions, shown separately, or skipped).
-5. **Notifications** — whether suggestion submissions and reviews trigger email or in-app alerts.
-6. **Multiple suggestions per file** — currently limited to one at a time for simplicity; may expand later.
+1. **Courtesy locking** — "Jane is editing this file" advisory banner (not yet implemented).
+2. **Notifications** — whether suggestion submissions and reviews trigger email or in-app alerts.
+3. **SEO / Open Graph** — meta tags for social sharing of public content.
+4. **Content search** — search across all sessions.
 
 ---
 
