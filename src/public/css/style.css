@@ -3309,6 +3309,85 @@ body.drawer-open {
   color: #aaa;
   margin-top: 4px;
 }
+/* Reply thread within margin cards */
+.margin-card-thread {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #f0f0f0;
+}
+.margin-card-reply {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: flex-start;
+}
+.margin-card-avatar--small {
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.margin-card-reply-content {
+  min-width: 0;
+  line-height: 1.4;
+}
+.margin-card-reply-author {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  margin-right: 4px;
+}
+.margin-card-reply-text {
+  font-size: 11px;
+  color: #333;
+  word-break: break-word;
+  margin-top: 1px;
+}
+.margin-card-reply-time {
+  font-size: 9px;
+  color: #bbb;
+}
+.margin-card-reply-input {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.margin-reply-field {
+  flex: 1;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  min-width: 0;
+}
+.margin-reply-field:focus {
+  border-color: #d7b44a;
+}
+.margin-reply-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  cursor: pointer;
+  color: #d7b44a;
+  padding: 0;
+  flex-shrink: 0;
+}
+.margin-reply-send:hover {
+  background: #fdf8e8;
+  border-color: #d7b44a;
+}
+.margin-reply-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* Comment cards */
 .margin-card--comment {

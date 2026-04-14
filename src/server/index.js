@@ -278,9 +278,11 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
       const canReview = editRole === 'admin' || editRole === 'manuscript-owner';
       let allPendingComments = [];
+      let allReplies = [];
       if (canEdit || canReview) {
         allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
         allPendingComments = await suggestions.getCommentsForFile(session.path);
+        allReplies = await suggestions.getRepliesForFile(session.path);
       }
 
       res.render('session', {
@@ -301,6 +303,7 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         contentSha: canEdit ? sessionData.sha : null,
         pendingSuggestions: allPendingSuggestions,
         pendingComments: allPendingComments,
+        pendingReplies: allReplies,
         sessionFilePath: canEdit ? session.path : null,
         bookRepoPath: canEdit ? book.repoPath : null,
       });

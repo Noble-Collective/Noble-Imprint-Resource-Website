@@ -32,7 +32,9 @@ router.get('/content', async (req, res) => {
     const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
     const pendingComments = await suggestions.getCommentsForFile(filePath);
 
-    res.json({ content, sha, filePath, bookPath, pendingSuggestions, pendingComments });
+    const pendingReplies = await suggestions.getRepliesForFile(filePath);
+
+    res.json({ content, sha, filePath, bookPath, pendingSuggestions, pendingComments, pendingReplies });
   } catch (err) {
     console.error('Content read error:', err.message);
     res.status(500).json({ error: err.message });
@@ -119,7 +121,8 @@ router.get('/file', async (req, res) => {
 
     const sug = await suggestions.getSuggestionsForFile(filePath);
     const comments = await suggestions.getCommentsForFile(filePath);
-    res.json({ suggestions: sug, comments });
+    const replies = await suggestions.getRepliesForFile(filePath);
+    res.json({ suggestions: sug, comments, replies });
   } catch (err) {
     console.error('Get file suggestions error:', err.message);
     res.status(500).json({ error: err.message });
@@ -209,6 +212,33 @@ router.put('/comments/:id/resolve', async (req, res) => {
     res.json({ status: 'resolved' });
   } catch (err) {
     console.error('Resolve comment error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Replies ---
+
+router.post('/replies', async (req, res) => {
+  try {
+    const { parentId, parentType, filePath, bookPath, text } = req.body;
+    if (!parentId || !parentType || !filePath || !text) {
+      return res.status(400).json({ error: 'parentId, parentType, filePath, and text required' });
+    }
+    if (parentType !== 'suggestion' && parentType !== 'comment') {
+      return res.status(400).json({ error: 'parentType must be "suggestion" or "comment"' });
+    }
+    if (!(await canEdit(req.user.email, bookPath))) {
+      return res.status(403).json({ error: 'No edit permission' });
+    }
+
+    const id = await suggestions.createReply({
+      parentId, parentType, filePath, text,
+      authorEmail: req.user.email,
+      authorName: req.user.displayName,
+    });
+    res.json({ id, status: 'ok' });
+  } catch (err) {
+    console.error('Create reply error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

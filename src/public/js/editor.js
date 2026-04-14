@@ -4,7 +4,7 @@ import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-maskin
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, repositionCards } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
 import { constraintExtension, setZones, recomputeZones, installSelectionConstraint } from '/static/js/editor-constraints.js';
 
@@ -203,6 +203,9 @@ if (data) {
       showToast('GitHub updated successfully', 'success');
       acceptingInProgress = false;
 
+      // Remove replies for the accepted suggestion
+      removeRepliesForParent(firestoreId);
+
       // Remove the accepted suggestion's card from the margin
       const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
       if (card) card.remove();
@@ -251,6 +254,7 @@ if (data) {
     }
 
     // Clean up local tracking
+    if (firestoreId) removeRepliesForParent(firestoreId);
     if (hunk) {
       const key = hunkKey(hunk);
       savedHunks.delete(key);
@@ -398,6 +402,7 @@ if (data) {
         onAccept: acceptHunk,
         onReject: rejectOrDeleteHunk,
         onResolveComment: resolveComment,
+        onPostReply: postReply,
       });
 
       // Load existing comments
@@ -407,6 +412,12 @@ if (data) {
       });
       if (existingComments.length > 0) {
         updateCommentCards(existingComments);
+      }
+
+      // Load existing replies
+      const existingReplies = data.pendingReplies || [];
+      if (existingReplies.length > 0) {
+        updateReplies(existingReplies);
       }
     }
 
@@ -504,9 +515,37 @@ if (data) {
       // Remove from local state
       const { removeComment } = await import('/static/js/editor-comments.js');
       removeComment(commentId);
+      removeRepliesForParent(commentId);
     } catch (err) {
       alert('Error: ' + err.message);
     }
+  }
+
+  // --- Post a reply to a suggestion or comment ---
+  async function postReply(parentId, parentType, text) {
+    const res = await fetch('/api/suggestions/replies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        parentId, parentType, text,
+        filePath: data.sessionFilePath,
+        bookPath: data.bookRepoPath,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to post reply');
+    }
+    const result = await res.json();
+    return {
+      id: result.id,
+      parentId,
+      parentType,
+      text,
+      authorEmail: data.user ? data.user.email : '',
+      authorName: data.user ? data.user.displayName : '',
+      createdAt: new Date(),
+    };
   }
 
   // --- Bind buttons ---

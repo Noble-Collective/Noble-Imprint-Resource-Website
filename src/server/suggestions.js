@@ -14,6 +14,10 @@ function commentsCollection() {
   return getDb().collection('comments');
 }
 
+function repliesCollection() {
+  return getDb().collection('replies');
+}
+
 // --- Suggestion Hunk CRUD ---
 
 async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName }) {
@@ -52,6 +56,7 @@ async function updateHunk(id, { originalFrom, originalTo, originalText, newText,
 }
 
 async function deleteHunk(id) {
+  await deleteRepliesForParent(id);
   await suggestionsCollection().doc(id).delete();
 }
 
@@ -158,6 +163,7 @@ async function acceptHunk(id, resolverEmail) {
   // Other pending suggestions stay pending — they'll still work as long as
   // their originalText can be found in the file. No blanket stale.
 
+  await deleteRepliesForParent(id);
   cache.invalidateAll();
   return { stale: false };
 }
@@ -169,6 +175,7 @@ async function rejectHunk(id, resolverEmail, reason) {
     resolvedBy: resolverEmail,
     rejectionReason: reason || null,
   });
+  await deleteRepliesForParent(id);
 }
 
 // --- Comment CRUD ---
@@ -208,6 +215,43 @@ async function resolveComment(id, resolverEmail) {
     resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedBy: resolverEmail,
   });
+  await deleteRepliesForParent(id);
+}
+
+// --- Reply CRUD ---
+
+async function createReply({ parentId, parentType, filePath, text, authorEmail, authorName }) {
+  const ref = await repliesCollection().add({
+    parentId,
+    parentType,
+    filePath,
+    text,
+    authorEmail,
+    authorName: authorName || authorEmail,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return ref.id;
+}
+
+async function getRepliesForFile(filePath) {
+  const snapshot = await repliesCollection()
+    .where('filePath', '==', filePath)
+    .orderBy('createdAt', 'asc')
+    .get();
+
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function deleteRepliesForParent(parentId) {
+  const snapshot = await repliesCollection()
+    .where('parentId', '==', parentId)
+    .get();
+
+  if (snapshot.empty) return;
+
+  const batch = getDb().batch();
+  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
 }
 
 module.exports = {
@@ -222,4 +266,7 @@ module.exports = {
   createComment,
   getCommentsForFile,
   resolveComment,
+  createReply,
+  getRepliesForFile,
+  deleteRepliesForParent,
 };

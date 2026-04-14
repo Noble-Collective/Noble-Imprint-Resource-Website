@@ -5,10 +5,12 @@ let marginEl = null;
 let editorView = null;
 let currentHunks = [];
 let currentComments = [];
+let currentReplies = [];
 let userData = null; // { email, displayName, photoURL, editRole }
 let onAcceptHunk = null;
 let onRejectHunk = null;
 let onResolveComment = null;
+let onPostReply = null;
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -38,6 +40,16 @@ export function initMarginPanel(el, view, user, callbacks) {
   onAcceptHunk = callbacks && callbacks.onAccept;
   onRejectHunk = callbacks && callbacks.onReject;
   onResolveComment = callbacks && callbacks.onResolveComment;
+  onPostReply = callbacks && callbacks.onPostReply;
+}
+
+export function updateReplies(replies) {
+  currentReplies = replies || [];
+  renderAllCards();
+}
+
+export function removeRepliesForParent(parentId) {
+  currentReplies = currentReplies.filter(r => r.parentId !== parentId);
 }
 
 export function updateCommentCards(comments) {
@@ -49,6 +61,42 @@ export function updateMarginCards(hunks) {
   if (!marginEl || !editorView) return;
   currentHunks = hunks;
   renderAllCards();
+}
+
+function buildThreadHtml(parentId, parentType) {
+  var replies = currentReplies.filter(function(r) { return r.parentId === parentId; });
+  var hasEditAccess = userData && (userData.editRole === 'admin' || userData.editRole === 'manuscript-owner' || userData.editRole === 'comment-suggest');
+
+  if (replies.length === 0 && !hasEditAccess) return '';
+
+  var html = '<div class="margin-card-thread">';
+
+  for (var i = 0; i < replies.length; i++) {
+    var r = replies[i];
+    var rName = r.authorName || r.authorEmail || 'Unknown';
+    var rInitial = rName[0].toUpperCase();
+    var rTime = r.createdAt ? (r.createdAt._seconds ? new Date(r.createdAt._seconds * 1000) : new Date(r.createdAt)) : new Date();
+    html += '<div class="margin-card-reply">'
+      + '<span class="margin-card-avatar margin-card-avatar--initials margin-card-avatar--small">' + escapeHtml(rInitial) + '</span>'
+      + '<div class="margin-card-reply-content">'
+      + '<span class="margin-card-reply-author">' + escapeHtml(rName) + '</span>'
+      + '<span class="margin-card-reply-time">' + timeAgo(rTime) + '</span>'
+      + '<div class="margin-card-reply-text">' + escapeHtml(r.text) + '</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  if (hasEditAccess) {
+    html += '<div class="margin-card-reply-input">'
+      + '<input type="text" class="margin-reply-field" data-parent-id="' + parentId + '" data-parent-type="' + parentType + '" placeholder="Reply...">'
+      + '<button class="margin-reply-send" data-parent-id="' + parentId + '" data-parent-type="' + parentType + '" title="Send">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>'
+      + '</button>'
+      + '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function renderAllCards() {
@@ -126,6 +174,10 @@ function renderAllCards() {
         + '</button>';
     }
 
+    // Thread replies — keyed by Firestore ID of the parent suggestion
+    var firestoreId = loaded ? loaded.id : null;
+    var threadHtml = firestoreId ? buildThreadHtml(firestoreId, 'suggestion') : '';
+
     html += '<div class="margin-card margin-card--suggestion" data-hunk-id="' + hunk.id + '" style="top:' + top + 'px">'
       + '<div class="margin-card-header">'
       + '<div class="margin-card-user">'
@@ -135,6 +187,7 @@ function renderAllCards() {
       + '<div class="margin-card-actions">' + actionsHtml + '</div>'
       + '</div>'
       + '<div class="margin-card-body">' + bodyHtml + '</div>'
+      + threadHtml
       + '<div class="margin-card-time">' + timeAgo(hunkTime) + '</div>'
       + '</div>';
   }
@@ -166,6 +219,8 @@ function renderAllCards() {
         + '</button>';
     }
 
+    var cThreadHtml = c.id ? buildThreadHtml(c.id, 'comment') : '';
+
     html += '<div class="margin-card margin-card--comment" data-comment-id="' + c.id + '" style="top:' + top + 'px">'
       + '<div class="margin-card-header">'
       + '<div class="margin-card-user">'
@@ -178,6 +233,7 @@ function renderAllCards() {
       + '<span class="margin-card-quote">"' + escapeHtml(truncate(c.selectedText, 60)) + '"</span>'
       + '<p class="margin-card-comment-text">' + escapeHtml(c.commentText) + '</p>'
       + '</div>'
+      + cThreadHtml
       + '<div class="margin-card-time">' + timeAgo(cTime) + '</div>'
       + '</div>';
   }
@@ -198,6 +254,36 @@ function renderAllCards() {
       } else if (action === 'resolve-comment') {
         var commentId = btn.getAttribute('data-comment-id');
         if (onResolveComment) onResolveComment(commentId);
+      }
+    });
+  });
+
+  // Bind reply send buttons
+  marginEl.querySelectorAll('.margin-reply-send').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var parentId = btn.getAttribute('data-parent-id');
+      var parentType = btn.getAttribute('data-parent-type');
+      var input = btn.previousElementSibling;
+      var text = input ? input.value.trim() : '';
+      if (!text || !onPostReply) return;
+      btn.disabled = true;
+      onPostReply(parentId, parentType, text).then(function(reply) {
+        currentReplies.push(reply);
+        renderAllCards();
+      }).catch(function() {
+        btn.disabled = false;
+      });
+    });
+  });
+
+  // Bind reply input Enter key
+  marginEl.querySelectorAll('.margin-reply-field').forEach(function(input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var sendBtn = input.nextElementSibling;
+        if (sendBtn) sendBtn.click();
       }
     });
   });

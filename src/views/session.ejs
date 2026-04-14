@@ -156,6 +156,7 @@
         bookRepoPath: bookRepoPath,
         pendingSuggestions: pendingSuggestions || [],
         pendingComments: pendingComments || [],
+        pendingReplies: pendingReplies || [],
         canReview: canReview || false,
         user: user ? { email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null,
       }).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
