@@ -199,11 +199,21 @@ if (data) {
       const remainingSuggestions = fresh.pendingSuggestions || [];
       const newWorkingDoc = buildWorkingDoc(newOriginal, remainingSuggestions);
 
-      // Update the editor document and original in one dispatch
+      // Clear constraint zones first — the edit protection transactionFilter
+      // would block a full-document replacement since position 0 is outside any zone
+      editorView.dispatch({ effects: setZones.of([]) });
+
+      // Replace the editor document and original
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
         effects: setOriginal.of(newOriginal),
       });
+
+      // Restore constraint zones from the new document
+      if (editMode === 'suggest') {
+        const zones = recomputeZones(editorView.state.doc);
+        editorView.dispatch({ effects: setZones.of(zones) });
+      }
 
       // Update local data
       data.pendingSuggestions = remainingSuggestions;
