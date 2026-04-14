@@ -3,17 +3,6 @@
 import { Decoration, ViewPlugin, EditorView } from '/static/js/codemirror-bundle.js';
 
 let comments = [];
-
-function showEditorToast(message, type) {
-  const toast = document.getElementById('editor-toast');
-  if (!toast) return;
-  toast.textContent = message;
-  toast.className = 'editor-toast editor-toast--' + (type || 'info');
-  toast.style.display = 'block';
-  if (type === 'success' || type === 'info') {
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
-  }
-}
 let editorViewRef = null;
 let onCommentsChanged = null;
 
@@ -187,7 +176,7 @@ async function submitComment() {
 
     if (!res.ok) {
       const err = await res.json();
-      showEditorToast('Error: ' + (err.error || 'Failed to save comment'), 'error');
+      window.showToast('Error: ' + (err.error || 'Failed to save comment'), 'error');
       return;
     }
 
@@ -205,7 +194,7 @@ async function submitComment() {
 
     popup.style.display = 'none';
   } catch (err) {
-    showEditorToast('Error: ' + err.message, 'error');
+    window.showToast('Error: ' + err.message, 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Comment';

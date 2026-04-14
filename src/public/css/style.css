@@ -3591,6 +3591,7 @@ body.drawer-open {
   font-size: 14px;
   font-weight: 500;
   box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  cursor: pointer;
 }
 .editor-toast--info {
   background: #1a1a1a;

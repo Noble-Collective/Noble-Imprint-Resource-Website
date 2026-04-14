@@ -4,7 +4,7 @@ import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-maskin
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
@@ -163,10 +163,19 @@ if (data) {
     toast.textContent = message;
     toast.className = 'editor-toast editor-toast--' + (type || 'info');
     toast.style.display = 'block';
-    if (type === 'success') {
+    if (type === 'success' || type === 'info') {
       setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    } else if (type === 'error') {
+      setTimeout(() => { toast.style.display = 'none'; }, 5000);
     }
   }
+  // Expose for other modules (editor-comments.js)
+  window.showToast = showToast;
+
+  // Click to dismiss toast
+  document.getElementById('editor-toast')?.addEventListener('click', function() {
+    this.style.display = 'none';
+  });
 
   // --- Accept a hunk via API ---
   let acceptingInProgress = false;
@@ -207,11 +216,7 @@ if (data) {
       removeRepliesForParent(firestoreId);
 
       // Animate and remove the accepted suggestion's card
-      const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
-      if (card) {
-        card.classList.add('margin-card--removing');
-        setTimeout(() => card.remove(), 400);
-      }
+      animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
 
       // Remove from pendingSuggestions data so it doesn't reappear
       if (data.pendingSuggestions) {
@@ -264,12 +269,7 @@ if (data) {
     }
 
     // Animate card removal
-    const selector = hunk ? '.margin-card[data-hunk-id="' + hunkId + '"]' : null;
-    const card = selector ? document.querySelector(selector) : null;
-    if (card) {
-      card.classList.add('margin-card--removing');
-      setTimeout(() => card.remove(), 400);
-    }
+    animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
 
     showToast(editMode === 'review' ? 'Suggestion rejected' : 'Suggestion discarded', 'info');
 
@@ -548,6 +548,12 @@ if (data) {
   });
   document.getElementById('commit-modal')?.addEventListener('click', (e) => {
     if (e.target.classList.contains('editor-modal-overlay')) hideCommitModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('commit-modal');
+      if (modal && modal.style.display !== 'none') hideCommitModal();
+    }
   });
 
   // --- Resolve a comment ---

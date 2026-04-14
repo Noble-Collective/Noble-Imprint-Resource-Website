@@ -11,6 +11,7 @@ let onAcceptHunk = null;
 let onRejectHunk = null;
 let onResolveComment = null;
 let onPostReply = null;
+const removingCards = new Set(); // Card IDs mid-removal animation
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -102,7 +103,15 @@ function buildThreadHtml(parentId, parentType) {
 function renderAllCards() {
   if (!marginEl || !editorView) return;
 
-  if (currentHunks.length === 0 && currentComments.length === 0) {
+  // Preserve cards that are mid-removal animation
+  const preservedCards = [];
+  if (removingCards.size > 0) {
+    marginEl.querySelectorAll('.margin-card--removing').forEach(function(card) {
+      preservedCards.push(card);
+    });
+  }
+
+  if (currentHunks.length === 0 && currentComments.length === 0 && preservedCards.length === 0) {
     marginEl.innerHTML = '<div class="margin-empty">No changes yet</div>';
     return;
   }
@@ -240,6 +249,9 @@ function renderAllCards() {
 
   marginEl.innerHTML = html;
 
+  // Re-append cards that are mid-removal animation
+  preservedCards.forEach(function(card) { marginEl.appendChild(card); });
+
   // Bind action buttons (suggestions)
   marginEl.querySelectorAll('[data-action]').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
@@ -305,6 +317,20 @@ function resolveOverlaps() {
     }
     lastBottom = top + card.offsetHeight;
   });
+}
+
+// Animate a card removal — slides out, then removes from DOM
+export function animateCardRemoval(selector) {
+  if (!marginEl) return;
+  var card = marginEl.querySelector(selector);
+  if (!card) return;
+  var cardId = selector;
+  removingCards.add(cardId);
+  card.classList.add('margin-card--removing');
+  setTimeout(function() {
+    removingCards.delete(cardId);
+    if (card.parentNode) card.remove();
+  }, 400);
 }
 
 // Focus a margin card — scroll into view + pulse animation
