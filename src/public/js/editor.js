@@ -339,9 +339,14 @@ if (data) {
       } catch { /* ignore */ }
     }
 
-    // Clean up local tracking — remove replies by both Firestore ID and hunk ID
+    // Clean up replies — both local state AND Firestore
     if (firestoreId) removeRepliesForParent(firestoreId);
     removeRepliesForParent(hunkId);
+    // Delete from Firestore by both IDs (replies may be keyed by either)
+    try {
+      if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
+      fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
+    } catch { /* ignore */ }
     if (hunk) {
       const key = hunkKey(hunk);
       savedHunks.delete(key);

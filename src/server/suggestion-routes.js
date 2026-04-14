@@ -243,6 +243,17 @@ router.post('/replies', async (req, res) => {
   }
 });
 
+// Delete replies by parentId (cleanup when discarding suggestions)
+router.delete('/replies/by-parent/:parentId', async (req, res) => {
+  try {
+    await suggestions.deleteRepliesForParent(req.params.parentId);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Delete replies error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Direct edit (admin only) ---
 
 router.post('/direct-edit', async (req, res) => {
