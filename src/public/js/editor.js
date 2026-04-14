@@ -6,6 +6,7 @@ import {
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, repositionCards } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
+import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
 const data = window.__EDITOR_DATA;
 if (data) {
@@ -311,12 +312,28 @@ if (data) {
     host.innerHTML = '';
 
     // For suggest/review mode, pre-set the original content in the initial state
+    // Suggest-comment users get edit constraints (single line, within tag boundaries)
+    const isConstrained = mode === 'suggest' && data.editRole === 'comment-suggest';
+
+    // Zone recomputation listener — keeps zones fresh as doc changes
+    // Uses a flag to prevent infinite dispatch loop (setZones triggers update which triggers setZones...)
+    let zonesUpdating = false;
+    const zoneUpdater = isConstrained ? EditorView.updateListener.of((update) => {
+      if (update.docChanged && !zonesUpdating) {
+        zonesUpdating = true;
+        const zones = recomputeZones(update.view.state.doc);
+        update.view.dispatch({ effects: setZones.of(zones) });
+        zonesUpdating = false;
+      }
+    }) : [];
+
     const extensions = [
       basicSetup,
       markdown(),
       EditorView.lineWrapping,
       maskingExtension(),
       ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
+      ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
     ];
 
@@ -331,6 +348,12 @@ if (data) {
     // Set original for diff tracking
     if (isSuggestOrReview) {
       editorView.dispatch({ effects: setOriginal.of(originalContent) });
+    }
+
+    // Initialize editable zones for constrained mode
+    if (isConstrained) {
+      const zones = recomputeZones(editorView.state.doc);
+      editorView.dispatch({ effects: setZones.of(zones) });
     }
 
     // Init margin panel + comments
