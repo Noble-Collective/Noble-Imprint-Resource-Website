@@ -34,21 +34,41 @@ function buildMaskingDecorations(view, skipLineNumber) {
   const text = doc.toString();
   const decorations = [];
 
-  // Helper: hide inline syntax with zero-width CSS mark (cursor passes through)
+  // Determine the focused line range (for direct edit reveal)
+  let skipFrom = -1, skipTo = -1;
+  if (skipLineNumber !== undefined && skipLineNumber >= 1 && skipLineNumber <= doc.lines) {
+    const skipLine = doc.line(skipLineNumber);
+    skipFrom = skipLine.from;
+    skipTo = skipLine.to;
+  }
+
+  function isOnFocusedLine(from, to) {
+    return skipFrom >= 0 && from >= skipFrom && to <= skipTo;
+  }
+
+  // Helper: hide inline syntax — on focused line, reveal with muted styling instead
   function hideInline(from, to) {
     if (from < to) {
-      decorations.push(Decoration.mark({ class: 'cm-hidden-syntax' }).range(from, to));
+      if (isOnFocusedLine(from, to)) {
+        decorations.push(Decoration.mark({ class: 'cm-revealed-syntax' }).range(from, to));
+      } else {
+        decorations.push(Decoration.mark({ class: 'cm-hidden-syntax' }).range(from, to));
+      }
     }
   }
 
-  // Helper: hide block-level tag by replacing (cursor skips over)
+  // Helper: hide block-level tag — on focused line, reveal with muted styling instead
   function hideBlock(from, to) {
     if (from < to) {
-      decorations.push(Decoration.replace({ inclusive: false }).range(from, to));
+      if (isOnFocusedLine(from, to)) {
+        decorations.push(Decoration.mark({ class: 'cm-revealed-syntax' }).range(from, to));
+      } else {
+        decorations.push(Decoration.replace({ inclusive: false }).range(from, to));
+      }
     }
   }
 
-  // Helper: add a styled range (NOT hidden — just visual formatting)
+  // Helper: add a styled range — ALWAYS applies (styling stays on focused line)
   function mark(from, to, cls) {
     if (from < to) {
       decorations.push(Decoration.mark({ class: cls }).range(from, to));
@@ -168,20 +188,10 @@ function buildMaskingDecorations(view, skipLineNumber) {
     mark(fullStart + 1, fullEnd - 1, 'cm-italic');     // Style content
   }
 
-  // Filter out decorations on the skipped line (direct edit reveal)
-  let filtered = decorations;
-  if (skipLineNumber !== undefined && skipLineNumber >= 1 && skipLineNumber <= doc.lines) {
-    const skipLine = doc.line(skipLineNumber);
-    const skipFrom = skipLine.from;
-    const skipTo = skipLine.to;
-    const lineFilter = d => !(d.from >= skipFrom && d.to <= skipTo);
-    filtered = decorations.filter(lineFilter);
-  }
-
   // Sort by position (required by CodeMirror)
-  filtered.sort((a, b) => a.from - b.from || a.to - b.to);
+  decorations.sort((a, b) => a.from - b.from || a.to - b.to);
 
-  return Decoration.set(filtered, true);
+  return Decoration.set(decorations, true);
 }
 
 // --- ViewPlugin that recomputes decorations on each document/selection change ---
@@ -234,6 +244,12 @@ const maskingTheme = EditorView.theme({
   },
   '&.cm-focused': {
     outline: 'none',
+  },
+
+  // Revealed syntax on focused line — visible but muted
+  '.cm-revealed-syntax': {
+    color: '#bbb',
+    fontSize: '0.75em',
   },
 
   // Zero-width hidden syntax — text stays in DOM but takes no space
