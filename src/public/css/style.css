@@ -3077,10 +3077,11 @@ body.drawer-open {
 .editor-nav-current {
   color: #333;
 }
-/* When editor is active, expand main to use full width */
-.main.is-editing {
-  padding: 1rem;
+/* Edit mode: Google Docs-like layout */
+.main.main--editing {
+  padding: 0.5rem 1rem;
   max-width: none;
+  background: #f0f0f0;
 }
 .editor-toolbar {
   display: flex;
@@ -3088,10 +3089,14 @@ body.drawer-open {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  background: #f8f8f8;
-  border: 1px solid #e5e5e5;
+  background: #fff;
+  border: 1px solid #e0e0e0;
   border-radius: 6px 6px 0 0;
   flex-wrap: wrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .editor-toolbar-left {
   display: flex;
@@ -3122,6 +3127,24 @@ body.drawer-open {
   background: #333;
   color: #fff;
   border-color: #333;
+}
+/* Line numbers toggle */
+.cm-hide-gutters .cm-gutters {
+  display: none;
+}
+.editor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  user-select: none;
+}
+.editor-toggle input[type="checkbox"] {
+  accent-color: #d7b44a;
+  margin: 0;
 }
 .editor-mode-label {
   font-family: 'DM Sans', sans-serif;
@@ -3163,11 +3186,13 @@ body.drawer-open {
 .editor-body {
   display: flex;
   position: relative;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #e0e0e0;
   border-top: none;
   border-radius: 0 0 6px 6px;
   overflow: hidden;
   min-height: 400px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 .editor-body #codemirror-host {
   flex: 1;
@@ -3210,6 +3235,15 @@ body.drawer-open {
 }
 .margin-card:hover {
   border-color: #d7b44a;
+}
+.margin-card--focused {
+  animation: card-pulse 0.6s ease;
+  border-color: #d7b44a;
+}
+@keyframes card-pulse {
+  0% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  30% { transform: scale(1.03); box-shadow: 0 2px 12px rgba(215,180,74,0.35); }
+  100% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 }
 .margin-card-body {
   line-height: 1.5;
@@ -3558,6 +3592,9 @@ body.drawer-open {
   }
   .editor-body {
     flex-direction: column;
+  }
+  .cm-gutters {
+    display: none !important;
   }
   .suggestion-margin {
     width: 100%;

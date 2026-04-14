@@ -4,7 +4,7 @@ import { maskingExtension, setRevealFocusedLine } from '/static/js/editor-maskin
 import {
   suggestionExtension, setOriginal, setHunksChangedCallback, getCurrentHunks,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getComments } from '/static/js/editor-comments.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
@@ -318,8 +318,7 @@ if (data) {
     if (sidebar) sidebar.style.display = 'none';
     if (readingTop) readingTop.style.display = 'none';
     if (mobileToc) mobileToc.style.display = 'none';
-    document.querySelector('.main').style.padding = '0.5rem 1.5rem';
-    document.querySelector('.main').style.maxWidth = 'none';
+    document.querySelector('.main').classList.add('main--editing');
 
     const marginEl = document.getElementById('suggestion-margin');
     const isSuggestOrReview = mode === 'suggest' || mode === 'review';
@@ -426,6 +425,18 @@ if (data) {
       scroller.addEventListener('scroll', repositionCards);
     }
 
+    // Click inline decoration → focus margin card
+    if (isSuggestOrReview) {
+      host.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-hunk-id], [data-comment-id]');
+        if (!target) return;
+        const hunkId = target.getAttribute('data-hunk-id');
+        const commentId = target.getAttribute('data-comment-id');
+        if (hunkId) focusMarginCard('hunk', hunkId);
+        else if (commentId) focusMarginCard('comment', commentId);
+      });
+    }
+
     // Expose for testing
     window.__editorView = editorView;
 
@@ -447,8 +458,7 @@ if (data) {
     if (sidebar) sidebar.style.display = '';
     if (readingTop) readingTop.style.display = '';
     if (mobileToc) mobileToc.style.display = '';
-    document.querySelector('.main').style.padding = '';
-    document.querySelector('.main').style.maxWidth = '';
+    document.querySelector('.main').classList.remove('main--editing');
     editMode = null;
     window.location.reload();
   }
@@ -552,6 +562,11 @@ if (data) {
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
+  document.getElementById('chk-line-numbers')?.addEventListener('change', (e) => {
+    if (editorView) {
+      editorView.dom.classList.toggle('cm-hide-gutters', !e.target.checked);
+    }
+  });
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;

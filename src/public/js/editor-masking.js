@@ -230,13 +230,22 @@ const maskingTheme = EditorView.theme({
     fontFamily: "'Lora', Georgia, serif",
     lineHeight: '1.8',
     padding: '24px 0',
-    maxWidth: '100%',
+    maxWidth: '680px',
   },
   '.cm-line': {
     padding: '0 24px',
   },
   '.cm-gutters': {
-    display: 'none',
+    background: 'transparent',
+    borderRight: '1px solid #eee',
+    color: '#ccc',
+    fontSize: '11px',
+    fontFamily: "'DM Sans', sans-serif",
+    minWidth: '36px',
+  },
+  '.cm-gutter.cm-lineNumbers .cm-gutterElement': {
+    paddingRight: '8px',
+    paddingLeft: '8px',
   },
   '.cm-scroller': {
     minHeight: '400px',

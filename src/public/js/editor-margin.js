@@ -307,6 +307,26 @@ function resolveOverlaps() {
   });
 }
 
+// Focus a margin card — scroll into view + pulse animation
+export function focusMarginCard(type, id) {
+  if (!marginEl) return;
+  var selector = type === 'comment'
+    ? '.margin-card[data-comment-id="' + id + '"]'
+    : '.margin-card[data-hunk-id="' + id + '"]';
+  var card = marginEl.querySelector(selector);
+  if (!card) return;
+
+  // Scroll into view within the margin panel
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Pulse animation
+  card.classList.remove('margin-card--focused');
+  // Force reflow so re-adding triggers the animation
+  void card.offsetWidth;
+  card.classList.add('margin-card--focused');
+  setTimeout(function() { card.classList.remove('margin-card--focused'); }, 700);
+}
+
 // Reposition cards on scroll or resize
 export function repositionCards() {
   if (!editorView || !marginEl || currentHunks.length === 0) return;
