@@ -94,6 +94,34 @@ app.post('/api/refresh', (req, res) => {
   res.json({ ok: true, message: 'Cache cleared' });
 });
 
+// Clean up test book suggestions/comments/replies after deploy
+app.post('/api/cleanup-test-data', async (req, res) => {
+  try {
+    const admin = require('firebase-admin');
+    const db = admin.firestore();
+    const testBookPath = 'series/Narrative Journey Series/Foundations/Test Book';
+    let deleted = 0;
+
+    for (const col of ['suggestions', 'comments', 'replies']) {
+      const snap = await db.collection(col)
+        .where('filePath', '>=', testBookPath)
+        .where('filePath', '<=', testBookPath + '\uf8ff')
+        .get();
+      if (!snap.empty) {
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        deleted += snap.size;
+      }
+    }
+
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    console.error('Cleanup test data error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Verse lookup API
 app.get('/api/verses', (req, res) => {
   const ref = req.query.ref;

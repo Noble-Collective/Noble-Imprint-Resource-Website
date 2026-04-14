@@ -45,3 +45,7 @@ jobs:
         run: |
           sleep 10
           curl -s -X POST https://resources.noblecollective.org/api/refresh || true
+
+      - name: Clean up test book data
+        run: |
+          curl -s -X POST https://resources.noblecollective.org/api/cleanup-test-data || true
