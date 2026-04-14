@@ -945,3 +945,223 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     expect(cardText).toContain('Other User');
   });
 });
+
+// ============================================================
+// API KEY AUTH TESTS (Claude AI bot)
+// ============================================================
+
+const TEST_FILE_PATH = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+const TEST_BOOK_PATH = 'series/Narrative Journey Series/Foundations/Test Book';
+
+function getApiKey() {
+  return process.env.CLAUDE_API_KEY || '';
+}
+
+// Clean up bot-created suggestions/comments/replies after tests
+async function cleanupBotData() {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) admin.initializeApp();
+  const db = admin.firestore();
+  const botEmail = 'claude@noblecollective.org';
+
+  for (const col of ['suggestions', 'comments', 'replies']) {
+    const snap = await db.collection(col).where('authorEmail', '==', botEmail).get();
+    if (!snap.empty) {
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+}
+
+test.describe('API Key Auth (Claude AI bot)', () => {
+  test.afterAll(async () => {
+    await cleanupBotData();
+  });
+
+  test('content read via API key returns file content and metadata', async ({ request }) => {
+    const res = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': getApiKey() },
+    });
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    expect(data.content).toBeTruthy();
+    expect(data.content.length).toBeGreaterThan(1000);
+    expect(data.sha).toBeTruthy();
+    expect(data.filePath).toBe(TEST_FILE_PATH);
+    expect(data.bookPath).toBe(TEST_BOOK_PATH);
+    expect(Array.isArray(data.pendingSuggestions)).toBeTruthy();
+    expect(Array.isArray(data.pendingComments)).toBeTruthy();
+    expect(Array.isArray(data.pendingReplies)).toBeTruthy();
+  });
+
+  test('invalid API key is rejected', async ({ request }) => {
+    const res = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': 'wrong-key-12345' },
+    });
+    expect(res.status()).toBe(401);
+  });
+
+  test('creating a suggestion via API key works and shows correct author', async ({ request }) => {
+    // Read content first to get SHA
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': getApiKey() },
+    });
+    const { content, sha } = await contentRes.json();
+    const pos = content.indexOf('Christianity');
+    expect(pos).toBeGreaterThan(-1);
+
+    // Create suggestion
+    const res = await request.post(BASE_URL + '/api/suggestions/hunk', {
+      headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE_PATH,
+        bookPath: TEST_BOOK_PATH,
+        baseCommitSha: sha,
+        type: 'replacement',
+        originalFrom: pos,
+        originalTo: pos + 'Christianity'.length,
+        originalText: 'Christianity',
+        newText: 'The Christian faith',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + 'Christianity'.length, pos + 'Christianity'.length + 50),
+      },
+    });
+    expect(res.ok()).toBeTruthy();
+    const result = await res.json();
+    expect(result.id).toBeTruthy();
+    expect(result.status).toBe('ok');
+
+    // Verify author in Firestore
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) admin.initializeApp();
+    const doc = await admin.firestore().collection('suggestions').doc(result.id).get();
+    expect(doc.exists).toBeTruthy();
+    expect(doc.data().authorEmail).toBe('claude@noblecollective.org');
+    expect(doc.data().authorName).toBe('Claude AI');
+  });
+
+  test('creating a comment via API key works', async ({ request }) => {
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': getApiKey() },
+    });
+    const { content, sha } = await contentRes.json();
+    const text = 'sovereign king';
+    const pos = content.indexOf(text);
+    expect(pos).toBeGreaterThan(-1);
+
+    const res = await request.post(BASE_URL + '/api/suggestions/comments', {
+      headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE_PATH,
+        bookPath: TEST_BOOK_PATH,
+        baseCommitSha: sha,
+        from: pos,
+        to: pos + text.length,
+        selectedText: text,
+        commentText: 'Consider emphasizing the lordship aspect more clearly.',
+      },
+    });
+    expect(res.ok()).toBeTruthy();
+    const result = await res.json();
+    expect(result.id).toBeTruthy();
+  });
+
+  test('creating a reply via API key works', async ({ request }) => {
+    // Create a suggestion first
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': getApiKey() },
+    });
+    const { content, sha } = await contentRes.json();
+    const pos = content.indexOf('philosophy');
+
+    const suggRes = await request.post(BASE_URL + '/api/suggestions/hunk', {
+      headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE_PATH,
+        bookPath: TEST_BOOK_PATH,
+        baseCommitSha: sha,
+        type: 'replacement',
+        originalFrom: pos,
+        originalTo: pos + 'philosophy'.length,
+        originalText: 'philosophy',
+        newText: 'worldview',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + 'philosophy'.length, pos + 'philosophy'.length + 50),
+      },
+    });
+    const sugg = await suggRes.json();
+
+    // Reply to the suggestion
+    const res = await request.post(BASE_URL + '/api/suggestions/replies', {
+      headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
+      data: {
+        parentId: sugg.id,
+        parentType: 'suggestion',
+        filePath: TEST_FILE_PATH,
+        bookPath: TEST_BOOK_PATH,
+        text: 'This better reflects the intended meaning in context.',
+      },
+    });
+    expect(res.ok()).toBeTruthy();
+    const result = await res.json();
+    expect(result.id).toBeTruthy();
+  });
+
+  test('bot suggestion appears as inline decoration in editor', async ({ page, request }) => {
+    await cleanupBotData();
+    await clearAllSuggestions();
+
+    // Create a suggestion via API key
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath: TEST_FILE_PATH },
+      headers: { 'x-api-key': getApiKey() },
+    });
+    const { content, sha } = await contentRes.json();
+    const pos = content.indexOf('Christianity');
+
+    await request.post(BASE_URL + '/api/suggestions/hunk', {
+      headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE_PATH,
+        bookPath: TEST_BOOK_PATH,
+        baseCommitSha: sha,
+        type: 'replacement',
+        originalFrom: pos,
+        originalTo: pos + 'Christianity'.length,
+        originalText: 'Christianity',
+        newText: 'The Christian faith',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + 'Christianity'.length, pos + 'Christianity'.length + 50),
+      },
+    });
+
+    // Open editor as human user — bot suggestion should load and render
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+    await page.waitForTimeout(1500);
+
+    // Scroll to the suggestion text
+    await page.evaluate(() => {
+      if (!window.__editorView) return;
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf('The Christian faith');
+      if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    });
+    await page.waitForTimeout(500);
+
+    // The green insertion decoration should be visible
+    const insertion = page.locator('.cm-suggestion-insert');
+    await expect(insertion.first()).toBeVisible({ timeout: 5000 });
+
+    // The working doc should contain the suggested replacement
+    const doc = await page.evaluate(() => window.__editorView?.state.doc.toString() || '');
+    expect(doc).toContain('The Christian faith');
+  });
+});

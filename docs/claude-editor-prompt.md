@@ -42,12 +42,13 @@ x-api-key: YOUR_API_KEY_HERE
 GET /api/suggestions/content?filePath={filePath}
 Header: x-api-key: {key}
 ```
-Returns: `{ content, sha, filePath, bookPath, pendingSuggestions, pendingComments }`
+Returns: `{ content, sha, filePath, bookPath, pendingSuggestions, pendingComments, pendingReplies }`
 
 - `content` — the raw markdown text of the session
 - `sha` — the Git SHA (needed for conflict detection)
 - `pendingSuggestions` — any existing pending suggestions on this file
 - `pendingComments` — any existing pending comments on this file
+- `pendingReplies` — any existing replies on suggestions/comments for this file
 
 #### Submit a suggestion (edit)
 ```
@@ -85,6 +86,23 @@ Body: {
 }
 ```
 Returns: `{ id, status: "ok" }`
+
+#### Reply to a suggestion or comment
+```
+POST /api/suggestions/replies
+Header: x-api-key: {key}
+Content-Type: application/json
+Body: {
+  "parentId": "{id of the suggestion or comment}",
+  "parentType": "suggestion" | "comment",
+  "filePath": "series/..../sessions/filename.md",
+  "bookPath": "series/..../BookName",
+  "text": "Your reply here"
+}
+```
+Returns: `{ id, status: "ok" }`
+
+Use replies to add context to your own suggestions (e.g., explain why you recommended a change) or to respond to other users' suggestions/comments.
 
 ### Content Structure
 
