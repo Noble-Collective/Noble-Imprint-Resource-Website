@@ -254,6 +254,18 @@ const maskingTheme = EditorView.theme({
   '&.cm-focused': {
     outline: 'none',
   },
+  // Use native browser selection instead of drawSelection overlay.
+  // drawSelection fails to render backgrounds within mark decoration spans
+  // (italic, bold, blockquote) due to coordsAtPos measurement issues.
+  '.cm-selectionLayer': {
+    display: 'none !important',
+  },
+  '.cm-content ::selection': {
+    background: 'rgba(215, 180, 74, 0.3)',
+  },
+  '.cm-content ::-moz-selection': {
+    background: 'rgba(215, 180, 74, 0.3)',
+  },
 
   // Revealed syntax on focused line — visible but muted
   '.cm-revealed-syntax': {
