@@ -64,14 +64,21 @@ if (data) {
     const currentKeys = new Set(hunks.map(hunkKey));
 
     // Delete saved hunks that no longer exist in the diff.
-    // NEVER auto-delete a suggestion that's in the annotation registry.
-    // Registry entries are only removed by explicit user action (discard, accept, reject).
-    // Auto-delete only applies to hunks that were saved but never made it to the registry
-    // (e.g., very short-lived edits that were saved then immediately undone).
+    // Registry entries that were loaded from server are always protected.
+    // Session-created registry entries are protected UNLESS the document matches
+    // the original (user undid all edits) — in that case, clean them up.
     const registry = editorView ? editorView.state.field(annotationRegistry) : new Map();
+    const docMatchesOriginal = hunks.length === 0 && editorView &&
+      editorView.state.doc.toString() === editorView.state.field(originalDocField);
 
     for (const [key, docId] of savedHunks) {
-      if (registry.has(docId)) continue; // Protected by registry — never auto-delete
+      const regEntry = registry.get(docId);
+      if (regEntry) {
+        // Server-loaded entries: always protected
+        if (regEntry.loadedFromServer) continue;
+        // Session-created entries: protected unless doc matches original (full undo)
+        if (!docMatchesOriginal) continue;
+      }
 
       const [kFrom, kTo] = key.split(':').map(Number);
       const stillExists = hunks.some(h => h.originalFrom <= kTo + 1 && h.originalTo >= kFrom - 1);
@@ -79,6 +86,9 @@ if (data) {
         try {
           await fetch('/api/suggestions/hunk/' + docId, { method: 'DELETE' });
           savedHunks.delete(key);
+          if (editorView && registry.has(docId)) {
+            editorView.dispatch({ effects: removeAnnotation.of(docId) });
+          }
         } catch { /* ignore */ }
       }
     }
