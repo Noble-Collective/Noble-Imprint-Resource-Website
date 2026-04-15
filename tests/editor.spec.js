@@ -15,6 +15,15 @@ async function login(page) {
     data: { email: TEST_EMAIL },
   });
   expect(res.ok()).toBeTruthy();
+  // Retry page load — the server may be rebuilding its content tree from a cache refresh
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 15000 });
+      return;
+    } catch {
+      if (attempt < 2) await page.waitForTimeout(3000);
+    }
+  }
   await page.goto(BASE_URL + TEST_SESSION_PATH);
 }
 
@@ -1733,5 +1742,268 @@ test.describe('API Key Auth (Claude AI bot)', () => {
     // The working doc should contain the suggested replacement
     const doc = await page.evaluate(() => window.__editorView?.state.doc.toString() || '');
     expect(doc).toContain('The Christian faith');
+  });
+});
+
+// ============================================================
+// INTEGRATION TESTS — Sequential Multi-Operation Sessions
+// These test real user workflows that cross state boundaries.
+// Each bug found on 2026-04-15 only appeared during sequential
+// operations (edit → auto-save → edit → accept → accept → comment).
+// Isolated unit tests cannot catch these.
+// ============================================================
+
+test.describe('Integration - Full Editing Session', () => {
+  const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  let savedContent = null;
+
+  test.beforeEach(async ({ page }) => {
+    await clearAllSuggestions();
+    await clearAllComments();
+    // Wait for server to settle (previous test's accepts trigger cache refreshes)
+    await page.waitForTimeout(2000);
+    await login(page);
+  });
+
+  test.afterEach(async () => {
+    await clearAllSuggestions();
+    await clearAllComments();
+    // Restore original file if the test modified it
+    if (savedContent) {
+      const http = require('http');
+      await new Promise((resolve) => {
+        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
+          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
+          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
+            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
+              const sha = JSON.parse(d).sha;
+              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after integration test' });
+              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
+              }); er.write(body); er.end();
+            });
+          });
+        });
+        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
+      });
+      await new Promise(r => require('http').request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
+    }
+  });
+
+  // Helper: fetch suggestions/comments via page context (uses session cookie)
+  async function getFileData(page) {
+    return page.evaluate(async () => {
+      const fp = window.__EDITOR_DATA.sessionFilePath;
+      const res = await fetch('/api/suggestions/file?filePath=' + encodeURIComponent(fp));
+      return res.json();
+    });
+  }
+
+  // Helper: fetch file content via API key
+  async function getFileContent(page) {
+    return page.evaluate(async (fp) => {
+      const res = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(fp));
+      return res.json();
+    }, TEST_FILE);
+  }
+
+  test('edit → auto-save → edit → accept both → comment: full session', async ({ page }) => {
+    test.setTimeout(180000); // 3 minutes — sequential accepts are slow
+
+    // Save original content for restoration
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+    const initialContent = await (await fetch(BASE_URL + '/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), {
+      headers: { 'x-api-key': apiKey },
+    })).json();
+    savedContent = initialContent.content;
+
+    await enterSuggestMode(page);
+
+    // --- PHASE 1: First edit + auto-save ---
+    const word1 = await findUniqueWord(page, 'plain');
+    expect(word1).toBeTruthy();
+
+    await selectText(page, word1);
+    await replaceWith(page, 'INTEGFIRST');
+    await page.waitForTimeout(500);
+    expect(await getMarginCardCount(page)).toBe(1);
+
+    // Wait for auto-save to Firestore
+    await waitForAutoSave(page);
+
+    // Verify suggestion saved
+    const data1 = await getFileData(page);
+    expect(data1.suggestions.length).toBe(1);
+    expect(data1.suggestions[0].newText).toContain('INTEGFIRST');
+
+    // --- PHASE 2: Second edit AFTER auto-save (regression: escapeHtml crash) ---
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) {
+        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    }, word1);
+    expect(word2).toBeTruthy();
+
+    await selectText(page, word2);
+    await replaceWith(page, 'INTEGSECOND');
+    await page.waitForTimeout(500);
+
+    // REGRESSION: both cards must be visible after second edit
+    expect(await getMarginCardCount(page)).toBeGreaterThanOrEqual(2);
+
+    await waitForAutoSave(page);
+
+    // Both suggestions in Firestore
+    const data2 = await getFileData(page);
+    expect(data2.suggestions.length).toBe(2);
+
+    // --- PHASE 3: Accept first suggestion (regression: card vanishing) ---
+    const acceptBtn1 = page.locator('.margin-action--accept').first();
+    await acceptBtn1.click();
+
+    // Wait for accept + refreshFromGitHub cycle
+    await page.waitForTimeout(10000);
+
+    // REGRESSION: second card must still be visible
+    const cardsAfterAccept1 = await getMarginCardCount(page);
+    expect(cardsAfterAccept1).toBeGreaterThanOrEqual(1);
+
+    // Firestore: 1 pending remains
+    const data3 = await getFileData(page);
+    const pending3 = data3.suggestions.filter(s => s.status === 'pending');
+    expect(pending3.length).toBe(1);
+
+    // --- PHASE 4: Accept second suggestion (regression: stale context) ---
+    const acceptBtn2 = page.locator('.margin-action--accept').first();
+    await acceptBtn2.click();
+
+    // Wait for accept + refresh
+    await page.waitForTimeout(10000);
+
+    // No pending suggestions remain
+    const data4 = await getFileData(page);
+    const pending4 = data4.suggestions.filter(s => s.status === 'pending');
+    expect(pending4.length).toBe(0);
+
+    // REGRESSION: both changes reflected in GitHub (stale context caused wrong placement)
+    const verified = await getFileContent(page);
+    expect(verified.content).toContain('INTEGFIRST');
+    expect(verified.content).toContain('INTEGSECOND');
+    expect(verified.content).not.toContain(word1);
+    expect(verified.content).not.toContain(word2);
+
+    // No suggestion decorations remain in editor
+    const insertDecos = await page.locator('.cm-suggestion-insert').count();
+    const deleteDecos = await page.locator('.cm-suggestion-delete').count();
+    expect(insertDecos).toBe(0);
+    expect(deleteDecos).toBe(0);
+
+    // --- PHASE 5: Leave a comment after accepts (regression: initComments wrong args) ---
+    const commentWord = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+      for (const w of words) {
+        if (doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    });
+    expect(commentWord).toBeTruthy();
+
+    // Scroll to the word, select it, and programmatically trigger the comment popup
+    // (after multiple refreshFromGitHub cycles, the tooltip can end up outside the viewport)
+    await page.evaluate((w) => {
+      const view = window.__editorView;
+      const doc = view.state.doc.toString();
+      const idx = doc.indexOf(w);
+      if (idx >= 0) {
+        view.dispatch({ selection: { anchor: idx, head: idx + w.length }, scrollIntoView: true });
+      }
+    }, commentWord);
+    await page.waitForTimeout(500);
+
+    // Click comment tooltip (use page.click which auto-scrolls)
+    await page.click('.comment-tooltip');
+    await page.waitForTimeout(300);
+
+    // Type and submit comment
+    await page.fill('#comment-popup-input', 'Integration test comment');
+    await page.click('#comment-popup-submit');
+    await page.waitForTimeout(2000);
+
+    // REGRESSION: comment must save (not "onCommentAdded is not a function")
+    const highlight = page.locator('.cm-comment-highlight');
+    await expect(highlight.first()).toBeVisible({ timeout: 5000 });
+
+    const commentCard = page.locator('.margin-card--comment');
+    await expect(commentCard.first()).toBeVisible({ timeout: 5000 });
+
+    // Only ONE comment card (no duplicates from re-init)
+    const commentCount = await commentCard.count();
+    expect(commentCount).toBe(1);
+
+    // Comment in Firestore
+    const data5 = await getFileData(page);
+    expect(data5.comments.length).toBe(1);
+  });
+
+  test('edit → auto-save → edit → discard first → no re-creation', async ({ page }) => {
+    test.setTimeout(120000);
+
+    await enterSuggestMode(page);
+
+    // --- Two edits with auto-save between ---
+    const word1 = await findUniqueWord(page, 'plain');
+    expect(word1).toBeTruthy();
+
+    await selectText(page, word1);
+    await replaceWith(page, 'DISCARD1');
+    await waitForAutoSave(page);
+
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) {
+        if (w !== skip && w !== 'DISCARD1' && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    }, word1);
+    expect(word2).toBeTruthy();
+
+    await selectText(page, word2);
+    await replaceWith(page, 'DISCARD2');
+    await waitForAutoSave(page);
+
+    // Both saved
+    expect(await getMarginCardCount(page)).toBeGreaterThanOrEqual(2);
+    const dataBefore = await getFileData(page);
+    expect(dataBefore.suggestions.length).toBe(2);
+
+    // --- Discard first suggestion via X button ---
+    const rejectBtn = page.locator('.margin-action--reject').first();
+    await rejectBtn.click();
+    await page.waitForTimeout(5000);
+
+    // REGRESSION: discarded suggestion must NOT be re-created by auto-save
+    const dataAfter = await getFileData(page);
+    const pending = dataAfter.suggestions.filter(s => s.status === 'pending');
+    expect(pending.length).toBe(1);
+
+    // One suggestion remains (don't assume which card was "first" in position order)
+    const remainingText = pending[0].newText;
+    const discardedText = remainingText.includes('DISCARD1') ? 'DISCARD2' : 'DISCARD1';
+    const restoredWord = remainingText.includes('DISCARD1') ? word2 : word1;
+
+    // Editor: discarded word restored, other edit preserved
+    const doc = await getRawDoc(page);
+    expect(doc).toContain(restoredWord); // Original word restored for discarded edit
+    expect(doc).toContain(remainingText); // Remaining edit preserved
+
+    // Wait extra to catch delayed re-creation
+    await page.waitForTimeout(5000);
+    const dataAfterWait = await getFileData(page);
+    expect(dataAfterWait.suggestions.filter(s => s.status === 'pending').length).toBe(1);
   });
 });
