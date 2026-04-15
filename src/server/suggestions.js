@@ -130,10 +130,18 @@ async function reanchorAnnotations(filePath, newContent) {
         resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
+      // Update positions AND context strings — stale context causes accepts to fail
+      const freshCtxBefore = newContent.substring(Math.max(0, resolved.from - 80), resolved.from);
+      const ctxEnd = s.type === 'insertion' ? resolved.from : resolved.from + (s.originalText || '').length;
+      const freshCtxAfter = newContent.substring(ctxEnd, Math.min(newContent.length, ctxEnd + 80));
       batch.update(suggestionsCollection().doc(s.id), {
         'position.from': resolved.from,
         'position.to': resolved.to,
         'position.contentHash': newHash,
+        contextBefore: freshCtxBefore,
+        contextAfter: freshCtxAfter,
+        'anchor.prefix': freshCtxBefore,
+        'anchor.suffix': freshCtxAfter,
       });
     }
     batchCount++;
@@ -148,12 +156,17 @@ async function reanchorAnnotations(filePath, newContent) {
         resolvedBy: 'system:stale',
       });
     } else {
+      // Update positions AND context
+      const freshCtxBefore = newContent.substring(Math.max(0, resolved.from - 80), resolved.from);
+      const freshCtxAfter = newContent.substring(resolved.to, Math.min(newContent.length, resolved.to + 80));
       batch.update(commentsCollection().doc(c.id), {
         from: resolved.from,
         to: resolved.to,
         'position.from': resolved.from,
         'position.to': resolved.to,
         'position.contentHash': newHash,
+        contextBefore: freshCtxBefore,
+        contextAfter: freshCtxAfter,
       });
     }
     batchCount++;
