@@ -246,7 +246,10 @@ const draftPlugin = ViewPlugin.fromClass(
       const original = update.view.state.field(originalDocField);
       const originalChanged = original !== this._lastOriginal;
       if (originalChanged) this._lastOriginal = original;
-      if (update.docChanged || originalChanged) {
+      const registryChanged = update.transactions.some(tr =>
+        tr.effects.some(e => e.is(addAnnotation) || e.is(removeAnnotation) || e.is(setAnnotations) || e.is(updateAnnotation))
+      );
+      if (update.docChanged || originalChanged || registryChanged) {
         if (!original) {
           currentHunks = [];
           this.decorations = Decoration.none;
@@ -261,8 +264,20 @@ const draftPlugin = ViewPlugin.fromClass(
           return;
         }
 
-        const hunks = computeHunks(original, current);
-        console.log('[DRAFT] computeHunks returned', hunks.length, 'hunks:', hunks.map(h => h.type + ' "' + (h.originalText||'').slice(0,20) + '"→"' + (h.newText||'').slice(0,20) + '"'));
+        const allHunks = computeHunks(original, current);
+
+        // Filter out hunks already in the registry (they have their own decorations
+        // from registryDecoPlugin). Match by originalText+newText content.
+        const registry = update.view.state.field(annotationRegistry);
+        const hunks = allHunks.filter(h => {
+          for (const [, a] of registry) {
+            if (a.kind !== 'suggestion') continue;
+            if (a.originalText === h.originalText && a.newText === h.newText && a.type === h.type) return false;
+          }
+          return true;
+        });
+
+        console.log('[DRAFT] computeHunks returned', allHunks.length, 'total,', hunks.length, 'draft (filtered', allHunks.length - hunks.length, 'registry dupes):', hunks.map(h => h.type + ' "' + (h.originalText||'').slice(0,20) + '"→"' + (h.newText||'').slice(0,20) + '"'));
         currentHunks = hunks;
         this.decorations = buildDraftDecorations(hunks);
 

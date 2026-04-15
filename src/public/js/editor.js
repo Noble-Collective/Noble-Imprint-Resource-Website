@@ -600,16 +600,41 @@ if (data) {
         if (a.kind === 'comment') regComments.push(a);
       }
       updateCommentCards(regComments);
-      // Suggestion cards still come from diff hunks (which include both saved and unsaved)
-      updateMarginCards(getCurrentHunks());
+      updateMarginCards(buildMarginHunks(getCurrentHunks()));
+    }
+
+    // Build margin hunks from BOTH registry suggestions and draft hunks
+    function buildMarginHunks(draftHunks) {
+      if (!editorView) return draftHunks;
+      const registry = editorView.state.field(annotationRegistry);
+      const registryHunks = [];
+      for (const [, a] of registry) {
+        if (a.kind !== 'suggestion') continue;
+        // Convert registry annotation to hunk-like object for the margin panel
+        registryHunks.push({
+          id: a.id,
+          type: a.type,
+          originalText: a.originalText,
+          newText: a.newText,
+          currentFrom: a.currentFrom,
+          currentTo: a.currentTo,
+          currentPos: a.currentFrom, // for deletions
+        });
+      }
+      // Merge: registry hunks first (sorted by position), then draft hunks
+      const all = [...registryHunks, ...draftHunks];
+      all.sort((a, b) => (a.currentFrom || a.currentPos || 0) - (b.currentFrom || b.currentPos || 0));
+      return all;
     }
 
     // Wire up margin panel callback
     if (isSuggestOrReview) {
       setHunksChangedCallback((hunks) => {
-        console.log('[CALLBACK] onHunksChanged received', hunks.length, 'hunks');
+        console.log('[CALLBACK] onHunksChanged received', hunks.length, 'draft hunks');
         if (editorView) {
-          updateMarginCards(hunks);
+          const allHunks = buildMarginHunks(hunks);
+          console.log('[CALLBACK] margin will show', allHunks.length, 'total cards (draft + registry)');
+          updateMarginCards(allHunks);
           // Also update comment cards from registry (positions may have shifted)
           const registry = editorView.state.field(annotationRegistry);
           const regComments = [];
