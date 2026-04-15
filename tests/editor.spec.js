@@ -1605,6 +1605,15 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await enterSuggestMode(page);
     await page.waitForTimeout(1000);
 
+    // Scroll to the first suggestion so CM6 renders inline decorations for those lines
+    await page.evaluate((r1) => {
+      if (!window.__editorView) return;
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf(r1);
+      if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    }, replacement1);
+    await page.waitForTimeout(500);
+
     // Both suggestions should show as inline decorations
     const insertions = await page.locator('.cm-suggestion-insert').count();
     expect(insertions).toBeGreaterThanOrEqual(2);
@@ -1680,6 +1689,15 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await login(page);
     await enterSuggestMode(page);
     await page.waitForTimeout(1000);
+
+    // Scroll to the comment word so CM6 renders inline decorations for those lines
+    await page.evaluate((word) => {
+      if (!window.__editorView) return;
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf(word);
+      if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    }, lateWord);
+    await page.waitForTimeout(500);
 
     // The comment highlight should cover the later word in the working doc
     const highlightText = await page.evaluate(() => {

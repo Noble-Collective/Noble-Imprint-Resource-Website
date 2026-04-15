@@ -495,7 +495,6 @@ if (data) {
 
     // Filter out stale suggestions
     const valid = existingSuggestions.filter(s => !s.resolvedStale);
-
     // Sort by position descending so we apply from end to start (avoids position shifts)
     const sorted = [...valid].sort((a, b) => {
       const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
