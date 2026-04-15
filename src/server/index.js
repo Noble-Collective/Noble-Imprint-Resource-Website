@@ -355,14 +355,12 @@ app.use((err, req, res, next) => {
   res.status(500).render('error', { title: 'Error', message: 'Something went wrong. Please try again.' });
 });
 
-// Load Bibles then start server
-bible.loadBibles().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Noble Imprint Resource Website running on port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('Failed to load Bibles, starting anyway:', err.message);
-  app.listen(PORT, () => {
-    console.log(`Noble Imprint Resource Website running on port ${PORT} (without Bibles)`);
+// Start server immediately so Cloud Run health check passes, then load bibles
+app.listen(PORT, () => {
+  console.log(`Noble Imprint Resource Website running on port ${PORT}`);
+  bible.loadBibles().then(() => {
+    console.log('Bibles loaded successfully');
+  }).catch(err => {
+    console.error('Failed to load Bibles:', err.message);
   });
 });
