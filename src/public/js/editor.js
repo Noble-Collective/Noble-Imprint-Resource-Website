@@ -290,78 +290,15 @@ if (data) {
       // fresh server-resolved positions, and reset savedHunks so auto-save starts clean.
       savedHunks.clear();
 
-      // Repopulate registry with remaining suggestions + comments.
-      // Positions must be relative to the WORKING doc (not the original), because
-      // buildWorkingDoc applies suggestions end-to-start, shifting positions.
-      // Compute working-doc positions by tracking cumulative shifts from each suggestion.
-      const validSuggestions = remainingSuggestions.filter(s => !s.resolvedStale);
-      const sortedByPos = [...validSuggestions].sort((a, b) => {
-        const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
-        const posB = b.resolvedFrom != null ? b.resolvedFrom : b.originalFrom;
-        return posA - posB; // ascending by position
-      });
-
-      // Compute cumulative shift for each suggestion
-      let cumulativeShift = 0;
-      const registryEntries = [];
-      for (const s of sortedByPos) {
-        const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
-        const workingPos = origPos + cumulativeShift;
-        const origLen = (s.originalText || '').length;
-        const newLen = (s.newText || '').length;
-
-        let currentFrom, currentTo;
-        if (s.type === 'insertion') {
-          currentFrom = workingPos;
-          currentTo = workingPos + newLen;
-          cumulativeShift += newLen;
-        } else if (s.type === 'deletion') {
-          currentFrom = workingPos;
-          currentTo = workingPos;
-          cumulativeShift -= origLen;
-        } else {
-          // replacement
-          currentFrom = workingPos;
-          currentTo = workingPos + newLen;
-          cumulativeShift += newLen - origLen;
-        }
-
-        registryEntries.push({
-          id: s.id,
-          kind: 'suggestion',
-          type: s.type,
-          originalText: s.originalText || '',
-          newText: s.newText || '',
-          originalFrom: s.originalFrom,
-          originalTo: s.originalTo,
-          currentFrom,
-          currentTo,
-          authorEmail: s.authorEmail,
-          authorName: s.authorName,
-          firestoreId: s.id,
-          loadedFromServer: true,
-        });
-        // Rebuild savedHunks mapping for auto-save
-        const key = s.originalFrom + ':' + s.originalTo;
-        savedHunks.set(key, s.id);
-      }
+      // Repopulate registry with shifted positions + rebuild savedHunks
       const existingComments = fresh.pendingComments || [];
-      for (const c of existingComments) {
-        if (c.resolvedStale) continue;
-        const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
-        const to = c.resolvedTo != null ? c.resolvedTo : c.to;
-        registryEntries.push({
-          id: c.id,
-          kind: 'comment',
-          selectedText: c.selectedText || '',
-          commentText: c.commentText || '',
-          currentFrom: from,
-          currentTo: to,
-          authorEmail: c.authorEmail,
-          authorName: c.authorName,
-          firestoreId: c.id,
-          loadedFromServer: true,
-        });
+      const registryEntries = buildShiftedRegistryEntries(remainingSuggestions, existingComments);
+      // Rebuild savedHunks from the suggestion entries
+      for (const e of registryEntries) {
+        if (e.kind === 'suggestion') {
+          const key = e.originalFrom + ':' + e.originalTo;
+          savedHunks.set(key, e.id);
+        }
       }
       editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       console.log('[REFRESH] rebuilt registry with', registryEntries.length, 'entries, savedHunks:', savedHunks.size);
@@ -608,6 +545,82 @@ if (data) {
     return doc;
   }
 
+  // --- Build registry entries with correct working-doc positions ---
+  // buildWorkingDoc applies suggestions end-to-start, which shifts positions.
+  // This function computes the correct positions for BOTH suggestions and comments
+  // in the working doc by tracking cumulative shifts from suggestion applications.
+  function buildShiftedRegistryEntries(suggestions, comments) {
+    const entries = [];
+    const validSuggs = (suggestions || []).filter(s => !s.resolvedStale);
+
+    // Build shift table from suggestions sorted by ascending position
+    const sorted = [...validSuggs].sort((a, b) => {
+      const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
+      const posB = b.resolvedFrom != null ? b.resolvedFrom : b.originalFrom;
+      return posA - posB;
+    });
+
+    // shifts[i] = { pos: original-file position, delta: chars added/removed }
+    const shifts = [];
+    for (const s of sorted) {
+      const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+      const origLen = (s.originalText || '').length;
+      const newLen = (s.newText || '').length;
+      let delta = 0;
+      if (s.type === 'insertion') delta = newLen;
+      else if (s.type === 'deletion') delta = -origLen;
+      else delta = newLen - origLen;
+      shifts.push({ pos: origPos, delta });
+    }
+
+    // Helper: compute working-doc position from an original-file position
+    function toWorkingPos(origFilePos) {
+      let shift = 0;
+      for (const s of shifts) {
+        if (s.pos <= origFilePos) shift += s.delta;
+        else break;
+      }
+      return origFilePos + shift;
+    }
+
+    // Suggestions
+    for (const s of sorted) {
+      const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+      const wp = toWorkingPos(origPos);
+      const newLen = (s.newText || '').length;
+
+      let curFrom, curTo;
+      if (s.type === 'insertion') { curFrom = wp; curTo = wp + newLen; }
+      else if (s.type === 'deletion') { curFrom = wp; curTo = wp; }
+      else { curFrom = wp; curTo = wp + newLen; }
+
+      entries.push({
+        id: s.id, kind: 'suggestion', type: s.type,
+        originalText: s.originalText || '', newText: s.newText || '',
+        originalFrom: s.originalFrom, originalTo: s.originalTo,
+        currentFrom: curFrom, currentTo: curTo,
+        authorEmail: s.authorEmail, authorName: s.authorName,
+        firestoreId: s.id, loadedFromServer: true,
+      });
+    }
+
+    // Comments — also shifted by suggestion applications
+    for (const c of (comments || [])) {
+      if (c.resolvedStale) continue;
+      const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
+      const to = c.resolvedTo != null ? c.resolvedTo : c.to;
+      entries.push({
+        id: c.id, kind: 'comment',
+        selectedText: c.selectedText || '', commentText: c.commentText || '',
+        currentFrom: toWorkingPos(from), currentTo: toWorkingPos(to),
+        authorEmail: c.authorEmail, authorName: c.authorName,
+        firestoreId: c.id, loadedFromServer: true,
+      });
+    }
+
+    return entries;
+  }
+
   // --- Editor init ---
   function initEditor(mode) {
     editMode = mode;
@@ -744,72 +757,10 @@ if (data) {
     if (isSuggestOrReview) {
       editorView.dispatch({ effects: setOriginal.of(originalContent) });
 
-      // Populate annotation registry with BOTH suggestions AND comments.
-      // Positions must be relative to the working doc, not the original —
-      // buildWorkingDoc applies suggestions end-to-start, shifting positions.
-      const validSuggs = existingSuggestions.filter(s => !s.resolvedStale);
-      const sortedSuggs = [...validSuggs].sort((a, b) => {
-        const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
-        const posB = b.resolvedFrom != null ? b.resolvedFrom : b.originalFrom;
-        return posA - posB;
-      });
-
-      const registryEntries = [];
-      let initShift = 0;
-      for (const s of sortedSuggs) {
-        const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
-        const wp = origPos + initShift;
-        const origLen = (s.originalText || '').length;
-        const newLen = (s.newText || '').length;
-
-        let curFrom, curTo;
-        if (s.type === 'insertion') {
-          curFrom = wp; curTo = wp + newLen;
-          initShift += newLen;
-        } else if (s.type === 'deletion') {
-          curFrom = wp; curTo = wp;
-          initShift -= origLen;
-        } else {
-          curFrom = wp; curTo = wp + newLen;
-          initShift += newLen - origLen;
-        }
-
-        registryEntries.push({
-          id: s.id,
-          kind: 'suggestion',
-          type: s.type,
-          originalText: s.originalText || '',
-          newText: s.newText || '',
-          originalFrom: s.originalFrom,
-          originalTo: s.originalTo,
-          currentFrom: curFrom,
-          currentTo: curTo,
-          authorEmail: s.authorEmail,
-          authorName: s.authorName,
-          firestoreId: s.id,
-          loadedFromServer: true,
-        });
-      }
-
-      // Comments
+      // Populate annotation registry with suggestions + comments.
+      // Positions shifted to working-doc coordinates (buildWorkingDoc shifts content).
       const existingComments = data.pendingComments || [];
-      for (const c of existingComments) {
-        if (c.resolvedStale) continue;
-        const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
-        const to = c.resolvedTo != null ? c.resolvedTo : c.to;
-        registryEntries.push({
-          id: c.id,
-          kind: 'comment',
-          selectedText: c.selectedText || '',
-          commentText: c.commentText || '',
-          currentFrom: from,
-          currentTo: to,
-          authorEmail: c.authorEmail,
-          authorName: c.authorName,
-          firestoreId: c.id,
-          loadedFromServer: true,
-        });
-      }
+      const registryEntries = buildShiftedRegistryEntries(existingSuggestions, existingComments);
 
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
