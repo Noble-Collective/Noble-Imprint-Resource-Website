@@ -553,41 +553,21 @@ if (data) {
     const entries = [];
     const validSuggs = (suggestions || []).filter(s => !s.resolvedStale);
 
-    // Build shift table from suggestions sorted by ascending position
+    // Sort suggestions by ascending original-file position
     const sorted = [...validSuggs].sort((a, b) => {
       const posA = a.resolvedFrom != null ? a.resolvedFrom : a.originalFrom;
       const posB = b.resolvedFrom != null ? b.resolvedFrom : b.originalFrom;
       return posA - posB;
     });
 
-    // shifts[i] = { pos: original-file position, delta: chars added/removed }
-    const shifts = [];
+    // Build suggestions with cumulative shift — each suggestion's working-doc
+    // position is shifted only by PRIOR suggestions, not its own delta.
+    let cumulativeShift = 0;
     for (const s of sorted) {
       const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
       const origLen = (s.originalText || '').length;
       const newLen = (s.newText || '').length;
-      let delta = 0;
-      if (s.type === 'insertion') delta = newLen;
-      else if (s.type === 'deletion') delta = -origLen;
-      else delta = newLen - origLen;
-      shifts.push({ pos: origPos, delta });
-    }
-
-    // Helper: compute working-doc position from an original-file position
-    function toWorkingPos(origFilePos) {
-      let shift = 0;
-      for (const s of shifts) {
-        if (s.pos <= origFilePos) shift += s.delta;
-        else break;
-      }
-      return origFilePos + shift;
-    }
-
-    // Suggestions
-    for (const s of sorted) {
-      const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
-      const wp = toWorkingPos(origPos);
-      const newLen = (s.newText || '').length;
+      const wp = origPos + cumulativeShift;
 
       let curFrom, curTo;
       if (s.type === 'insertion') { curFrom = wp; curTo = wp + newLen; }
@@ -602,9 +582,37 @@ if (data) {
         authorEmail: s.authorEmail, authorName: s.authorName,
         firestoreId: s.id, loadedFromServer: true,
       });
+
+      // Update cumulative shift for subsequent suggestions
+      let delta = 0;
+      if (s.type === 'insertion') delta = newLen;
+      else if (s.type === 'deletion') delta = -origLen;
+      else delta = newLen - origLen;
+      cumulativeShift += delta;
     }
 
-    // Comments — also shifted by suggestion applications
+    // Comments — shifted by ALL suggestions (full cumulative shift)
+    // Rebuild shift table for comment position computation
+    const shifts = [];
+    for (const s of sorted) {
+      const origPos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+      const origLen = (s.originalText || '').length;
+      const newLen = (s.newText || '').length;
+      let delta = 0;
+      if (s.type === 'insertion') delta = newLen;
+      else if (s.type === 'deletion') delta = -origLen;
+      else delta = newLen - origLen;
+      shifts.push({ pos: origPos, delta });
+    }
+    function toWorkingPos(origFilePos) {
+      let shift = 0;
+      for (const s of shifts) {
+        if (s.pos < origFilePos) shift += s.delta;
+        else break;
+      }
+      return origFilePos + shift;
+    }
+
     for (const c of (comments || [])) {
       if (c.resolvedStale) continue;
       const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
