@@ -248,6 +248,27 @@ async function createTestSuggestion({ type, originalText, newText, authorEmail, 
   });
 }
 
+// Find unique words directly from the GitHub file (server-side, for createTestSuggestion)
+async function findUniqueWordsInFile(count = 2) {
+  const github = require('../src/server/github');
+  const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  const { content } = await github.getFileContent(filePath);
+  const lines = content.split('\n');
+  const words = [];
+  for (const line of lines) {
+    if (!line.startsWith('#') && !line.startsWith('>') && !line.startsWith('<') && !line.startsWith('-') && line.length > 30) {
+      const lineWords = line.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+      for (const w of lineWords) {
+        if (content.indexOf(w) === content.lastIndexOf(w) && !words.includes(w)) {
+          words.push(w);
+          if (words.length >= count) return words;
+        }
+      }
+    }
+  }
+  return words;
+}
+
 // Clear all suggestions from Firestore
 async function clearAllSuggestions() {
   const admin = require('firebase-admin');
@@ -373,6 +394,7 @@ test.describe('Editor - Masking', () => {
 test.describe('Editor - Suggestion Tracking', () => {
   test.beforeEach(async ({ page }) => {
     await clearAllSuggestions();
+    await clearAllComments();
     await page.goto(BASE_URL + TEST_SESSION_PATH);
     await login(page);
     await enterSuggestMode(page);
@@ -575,13 +597,25 @@ test.describe('Registry Robustness', () => {
   });
 
   test('discarding one suggestion does not remove others', async ({ page }) => {
-    // Make 2 suggestions
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    // Make 2 suggestions on dynamically found words
+    const word1 = await findUniqueWord(page, 'plain');
+    expect(word1).toBeTruthy();
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) {
+        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    }, word1);
+    expect(word2).toBeTruthy();
+
+    await selectText(page, word1);
+    await replaceWith(page, 'KEEP1');
     await page.waitForTimeout(300);
 
-    await selectText(page, 'sovereign');
-    await replaceWith(page, 'supreme');
+    await selectText(page, word2);
+    await replaceWith(page, 'KEEP2');
     await page.waitForTimeout(300);
 
     // Wait for auto-save
@@ -1141,16 +1175,15 @@ test.describe('Accept Refresh', () => {
     const { content } = await contentRes.json();
     savedContent = content;
 
-    // Find a unique word to edit (dynamically — not hardcoded)
-    const targetWord = 'sovereign';
-    const hasTarget = content.includes(targetWord);
-    expect(hasTarget).toBeTruthy();
-
     await enterSuggestMode(page);
+
+    // Find a unique word to edit dynamically
+    const targetWord = await findUniqueWord(page, 'plain');
+    expect(targetWord).toBeTruthy();
 
     // Make an edit
     await selectText(page, targetWord);
-    await replaceWith(page, 'supreme');
+    await replaceWith(page, 'ACCEPTTEST');
     await page.waitForTimeout(500);
 
     // Verify green insertion decoration exists
@@ -1395,9 +1428,13 @@ test.describe('Editor - Comments', () => {
 // ============================================================
 
 test.describe('Editor - Loading Existing Suggestions', () => {
+  // Dynamic words found from the actual file — no hardcoded text dependencies
+  let testWords = [];
+
   test.beforeEach(async ({ page }) => {
     await clearAllSuggestions();
     await clearAllComments();
+    testWords = await findUniqueWordsInFile(2);
   });
 
   test.afterEach(async () => {
@@ -1408,8 +1445,8 @@ test.describe('Editor - Loading Existing Suggestions', () => {
   test('existing suggestion shows inline when entering suggest mode', async ({ page }) => {
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'Christianity',
-      newText: 'Faith',
+      originalText: testWords[0],
+      newText: 'TESTREPLACEMENT',
     });
 
     await page.goto(BASE_URL + TEST_SESSION_PATH);
@@ -1417,11 +1454,11 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await enterSuggestMode(page);
     await page.waitForTimeout(1000);
 
-    // Scroll to where "Faith" is (it replaced "Christianity" mid-document)
+    // Scroll to the suggestion replacement text
     await page.evaluate(() => {
       if (!window.__editorView) return;
       const doc = window.__editorView.state.doc.toString();
-      const pos = doc.indexOf('Faith');
+      const pos = doc.indexOf('TESTREPLACEMENT');
       if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
     });
     await page.waitForTimeout(500);
@@ -1433,8 +1470,8 @@ test.describe('Editor - Loading Existing Suggestions', () => {
   test('existing suggestion shows in margin with author info', async ({ page }) => {
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'Christianity',
-      newText: 'Faith',
+      originalText: testWords[0],
+      newText: 'TESTREPLACEMENT',
     });
 
     await page.goto(BASE_URL + TEST_SESSION_PATH);
@@ -1449,8 +1486,8 @@ test.describe('Editor - Loading Existing Suggestions', () => {
   test('existing suggestion positioned at correct location (not top)', async ({ page }) => {
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'Christianity',
-      newText: 'Faith',
+      originalText: testWords[0],
+      newText: 'TESTREPLACEMENT',
     });
 
     await page.goto(BASE_URL + TEST_SESSION_PATH);
@@ -1462,7 +1499,7 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await page.evaluate(() => {
       if (!window.__editorView) return;
       const doc = window.__editorView.state.doc.toString();
-      const pos = doc.indexOf('Faith');
+      const pos = doc.indexOf('TESTREPLACEMENT');
       if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
     });
     await page.waitForTimeout(500);
@@ -1477,13 +1514,13 @@ test.describe('Editor - Loading Existing Suggestions', () => {
   test('Review button shows count of existing suggestions', async ({ page }) => {
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'Christianity',
-      newText: 'Faith',
+      originalText: testWords[0],
+      newText: 'TESTREPLACEMENT1',
     });
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'sovereign',
-      newText: 'supreme',
+      originalText: testWords[1],
+      newText: 'TESTREPLACEMENT2',
     });
 
     await page.goto(BASE_URL + TEST_SESSION_PATH);
@@ -1498,8 +1535,8 @@ test.describe('Editor - Loading Existing Suggestions', () => {
   test('suggestions from other users are visible', async ({ page }) => {
     await createTestSuggestion({
       type: 'replacement',
-      originalText: 'Christianity',
-      newText: 'Faith',
+      originalText: testWords[0],
+      newText: 'TESTREPLACEMENT',
       authorEmail: 'otheruser@example.com',
       authorName: 'Other User',
     });
@@ -1513,7 +1550,7 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await page.evaluate(() => {
       if (!window.__editorView) return;
       const doc = window.__editorView.state.doc.toString();
-      const pos = doc.indexOf('Faith');
+      const pos = doc.indexOf('TESTREPLACEMENT');
       if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
     });
     await page.waitForTimeout(500);
@@ -1522,6 +1559,118 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     await expect(card.first()).toBeVisible({ timeout: 5000 });
     const cardText = await card.first().textContent();
     expect(cardText).toContain('Other User');
+  });
+
+  test('multiple suggestions positioned correctly (shift computation)', async ({ page }) => {
+    // Create two suggestions — the first changes document length, so the second
+    // must be shifted in the working doc. This tests buildShiftedRegistryEntries.
+    const replacement1 = testWords[0] + 'EXTRA';  // longer than original = positive shift
+    const replacement2 = 'SHIFTED' + testWords[1]; // different replacement for second word
+    await createTestSuggestion({
+      type: 'replacement',
+      originalText: testWords[0],
+      newText: replacement1,
+    });
+    await createTestSuggestion({
+      type: 'replacement',
+      originalText: testWords[1],
+      newText: replacement2,
+    });
+
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+    await page.waitForTimeout(1000);
+
+    // Both suggestions should show as inline decorations
+    const insertions = await page.locator('.cm-suggestion-insert').count();
+    expect(insertions).toBeGreaterThanOrEqual(2);
+
+    // Both margin cards should exist
+    const cards = await getMarginCardCount(page);
+    expect(cards).toBeGreaterThanOrEqual(2);
+
+    // Verify the highlights cover the CORRECT replacement text, not shifted text
+    const highlights = await page.evaluate(() => {
+      const result = [];
+      document.querySelectorAll('.cm-suggestion-insert').forEach(el => {
+        result.push(el.textContent);
+      });
+      return result;
+    });
+    expect(highlights.some(h => h.includes(replacement1))).toBeTruthy();
+    expect(highlights.some(h => h.includes(replacement2))).toBeTruthy();
+  });
+
+  test('comment positioned correctly when suggestion before it changes length', async ({ page }) => {
+    // A suggestion that changes length shifts everything after it — including comments.
+    // The comment's highlight must be on the correct text, not shifted off.
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) admin.initializeApp();
+    const db = admin.firestore();
+    const github = require('../src/server/github');
+    const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+
+    const { content } = await github.getFileContent(filePath);
+
+    // Use testWords: word[0] for suggestion (earlier in doc), word[1] for comment (later)
+    const suggWord = testWords[0];
+    const commentWord = testWords[1];
+    const suggPos = content.indexOf(suggWord);
+    const commentPos = content.indexOf(commentWord);
+
+    // Ensure word[0] appears before word[1] — if not, swap
+    const [earlyWord, lateWord, earlyPos, latePos] = suggPos < commentPos
+      ? [suggWord, commentWord, suggPos, commentPos]
+      : [commentWord, suggWord, commentPos, suggPos];
+
+    const replacementText = earlyWord + 'EXTRA';  // longer = positive shift
+
+    // Create a suggestion on the earlier word
+    await createTestSuggestion({
+      type: 'replacement',
+      originalText: earlyWord,
+      newText: replacementText,
+    });
+
+    // Create a comment on the later word (AFTER the suggestion)
+    const ctxBefore = content.substring(Math.max(0, latePos - 50), latePos);
+    const ctxAfter = content.substring(latePos + lateWord.length, Math.min(content.length, latePos + lateWord.length + 50));
+    await db.collection('comments').add({
+      filePath,
+      bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+      from: latePos,
+      to: latePos + lateWord.length,
+      selectedText: lateWord,
+      commentText: 'Test comment on dynamic word',
+      authorEmail: TEST_EMAIL,
+      authorName: 'Steve',
+      status: 'open',
+      contextBefore: ctxBefore,
+      contextAfter: ctxAfter,
+      anchor: { exact: lateWord, prefix: ctxBefore, suffix: ctxAfter },
+      position: { from: latePos, to: latePos + lateWord.length },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+    await page.waitForTimeout(1000);
+
+    // The comment highlight should cover the later word in the working doc
+    const highlightText = await page.evaluate(() => {
+      const els = document.querySelectorAll('.cm-comment-highlight');
+      return els.length > 0 ? els[0].textContent : null;
+    });
+    expect(highlightText).toBe(lateWord);
+
+    // The suggestion highlight should cover the replacement text
+    const suggestionHighlights = await page.evaluate(() => {
+      const els = document.querySelectorAll('.cm-suggestion-insert');
+      return Array.from(els).map(el => el.textContent);
+    });
+    expect(suggestionHighlights.some(h => h.includes(replacementText))).toBeTruthy();
   });
 });
 
@@ -1590,8 +1739,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
       headers: { 'x-api-key': getApiKey() },
     });
     const { content, sha } = await contentRes.json();
-    const pos = content.indexOf('Christianity');
-    expect(pos).toBeGreaterThan(-1);
+    // Find a unique word dynamically — no hardcoded text dependencies
+    const words = content.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+    const targetWord = words.find(w => content.indexOf(w) === content.lastIndexOf(w));
+    expect(targetWord).toBeTruthy();
+    const pos = content.indexOf(targetWord);
 
     // Create suggestion
     const res = await request.post(BASE_URL + '/api/suggestions/hunk', {
@@ -1602,11 +1754,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         baseCommitSha: sha,
         type: 'replacement',
         originalFrom: pos,
-        originalTo: pos + 'Christianity'.length,
-        originalText: 'Christianity',
-        newText: 'The Christian faith',
+        originalTo: pos + targetWord.length,
+        originalText: targetWord,
+        newText: 'BOTTESTREPLACEMENT',
         contextBefore: content.substring(Math.max(0, pos - 50), pos),
-        contextAfter: content.substring(pos + 'Christianity'.length, pos + 'Christianity'.length + 50),
+        contextAfter: content.substring(pos + targetWord.length, pos + targetWord.length + 50),
       },
     });
     expect(res.ok()).toBeTruthy();
@@ -1629,9 +1781,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
       headers: { 'x-api-key': getApiKey() },
     });
     const { content, sha } = await contentRes.json();
-    const text = 'sovereign king';
+    // Find a unique word dynamically for the comment target
+    const words = content.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+    const text = words.find(w => content.indexOf(w) === content.lastIndexOf(w));
+    expect(text).toBeTruthy();
     const pos = content.indexOf(text);
-    expect(pos).toBeGreaterThan(-1);
 
     const res = await request.post(BASE_URL + '/api/suggestions/comments', {
       headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
@@ -1642,7 +1796,7 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         from: pos,
         to: pos + text.length,
         selectedText: text,
-        commentText: 'Consider emphasizing the lordship aspect more clearly.',
+        commentText: 'Bot test comment on dynamic text.',
       },
     });
     expect(res.ok()).toBeTruthy();
@@ -1657,7 +1811,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
       headers: { 'x-api-key': getApiKey() },
     });
     const { content, sha } = await contentRes.json();
-    const pos = content.indexOf('philosophy');
+    // Find a unique word dynamically
+    const allWords = content.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+    const replyWord = allWords.find(w => content.indexOf(w) === content.lastIndexOf(w));
+    expect(replyWord).toBeTruthy();
+    const pos = content.indexOf(replyWord);
 
     const suggRes = await request.post(BASE_URL + '/api/suggestions/hunk', {
       headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
@@ -1667,11 +1825,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         baseCommitSha: sha,
         type: 'replacement',
         originalFrom: pos,
-        originalTo: pos + 'philosophy'.length,
-        originalText: 'philosophy',
-        newText: 'worldview',
+        originalTo: pos + replyWord.length,
+        originalText: replyWord,
+        newText: 'REPLYTEST',
         contextBefore: content.substring(Math.max(0, pos - 50), pos),
-        contextAfter: content.substring(pos + 'philosophy'.length, pos + 'philosophy'.length + 50),
+        contextAfter: content.substring(pos + replyWord.length, pos + replyWord.length + 50),
       },
     });
     const sugg = await suggRes.json();
@@ -1702,7 +1860,12 @@ test.describe('API Key Auth (Claude AI bot)', () => {
       headers: { 'x-api-key': getApiKey() },
     });
     const { content, sha } = await contentRes.json();
-    const pos = content.indexOf('Christianity');
+    // Find a unique word dynamically
+    const words = content.match(/\b[a-zA-Z]{6,14}\b/g) || [];
+    const botWord = words.find(w => content.indexOf(w) === content.lastIndexOf(w));
+    expect(botWord).toBeTruthy();
+    const pos = content.indexOf(botWord);
+    const botReplacement = 'BOTVISIBLE';
 
     await request.post(BASE_URL + '/api/suggestions/hunk', {
       headers: { 'x-api-key': getApiKey(), 'Content-Type': 'application/json' },
@@ -1712,11 +1875,11 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         baseCommitSha: sha,
         type: 'replacement',
         originalFrom: pos,
-        originalTo: pos + 'Christianity'.length,
-        originalText: 'Christianity',
-        newText: 'The Christian faith',
+        originalTo: pos + botWord.length,
+        originalText: botWord,
+        newText: botReplacement,
         contextBefore: content.substring(Math.max(0, pos - 50), pos),
-        contextAfter: content.substring(pos + 'Christianity'.length, pos + 'Christianity'.length + 50),
+        contextAfter: content.substring(pos + botWord.length, pos + botWord.length + 50),
       },
     });
 
@@ -1727,12 +1890,12 @@ test.describe('API Key Auth (Claude AI bot)', () => {
     await page.waitForTimeout(1500);
 
     // Scroll to the suggestion text
-    await page.evaluate(() => {
+    await page.evaluate((replacement) => {
       if (!window.__editorView) return;
       const doc = window.__editorView.state.doc.toString();
-      const pos = doc.indexOf('The Christian faith');
+      const pos = doc.indexOf(replacement);
       if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-    });
+    }, botReplacement);
     await page.waitForTimeout(500);
 
     // The green insertion decoration should be visible
@@ -1741,7 +1904,7 @@ test.describe('API Key Auth (Claude AI bot)', () => {
 
     // The working doc should contain the suggested replacement
     const doc = await page.evaluate(() => window.__editorView?.state.doc.toString() || '');
-    expect(doc).toContain('The Christian faith');
+    expect(doc).toContain(botReplacement);
   });
 });
 
@@ -1912,20 +2075,33 @@ test.describe('Integration - Full Editing Session', () => {
     });
     expect(commentWord).toBeTruthy();
 
-    // Scroll to the word, select it, and programmatically trigger the comment popup
-    // (after multiple refreshFromGitHub cycles, the tooltip can end up outside the viewport)
+    // Scroll to the word, select it, and trigger the comment popup
+    // After multiple refreshFromGitHub cycles, the editor may have re-rendered.
+    // Use scrollIntoView + explicit viewport scroll to ensure tooltip is clickable.
     await page.evaluate((w) => {
       const view = window.__editorView;
       const doc = view.state.doc.toString();
       const idx = doc.indexOf(w);
       if (idx >= 0) {
         view.dispatch({ selection: { anchor: idx, head: idx + w.length }, scrollIntoView: true });
+        // Also ensure the CM scroller has the selection in view
+        const coords = view.coordsAtPos(idx);
+        if (coords) {
+          const scroller = view.scrollDOM;
+          const rect = scroller.getBoundingClientRect();
+          if (coords.top < rect.top || coords.top > rect.bottom) {
+            scroller.scrollTop += coords.top - rect.top - rect.height / 2;
+          }
+        }
       }
     }, commentWord);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
-    // Click comment tooltip (use page.click which auto-scrolls)
-    await page.click('.comment-tooltip');
+    // Click comment tooltip — use force:true to bypass viewport check since
+    // Playwright's auto-scroll doesn't understand CM's nested scroll container
+    const tooltip = page.locator('.comment-tooltip');
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
+    await tooltip.click({ force: true });
     await page.waitForTimeout(300);
 
     // Type and submit comment
