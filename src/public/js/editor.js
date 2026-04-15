@@ -349,11 +349,8 @@ if (data) {
       data.pendingComments = existingComments;
       data.pendingReplies = fresh.pendingReplies || [];
 
-      // Refresh comment and reply cards
-      const { initComments } = await import('/static/js/editor-comments.js');
-      initComments(editorView, existingComments, (comments) => {
-        updateCommentCards(comments);
-      });
+      // Refresh comment and reply cards (don't re-init — that overwrites the
+      // callback with wrong args and adds duplicate event listeners)
       if (existingComments.length > 0) updateCommentCards(existingComments);
       updateReplies(fresh.pendingReplies || []);
     } catch (err) {
