@@ -9,7 +9,14 @@ function getOctokit() {
   if (!octokit) {
     const token = process.env.GITHUB_TOKEN;
     if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
-    octokit = new Octokit({ auth: token });
+    octokit = new Octokit({
+      auth: token,
+      throttle: {
+        onRateLimit: () => false,           // don't retry — fail immediately
+        onSecondaryRateLimit: () => false,   // don't retry abuse limits either
+      },
+      retry: { enabled: false },
+    });
   }
   return octokit;
 }
