@@ -267,6 +267,10 @@ if (data) {
       const remainingSuggestions = fresh.pendingSuggestions || [];
       const newWorkingDoc = buildWorkingDoc(newOriginal, remainingSuggestions);
 
+      console.log('[REFRESH] remaining suggestions:', remainingSuggestions.length,
+        remainingSuggestions.map(s => s.id + ' ' + s.type + ' "' + (s.originalText || '').slice(0, 20) + '" resolved:' + s.resolvedFrom + '-' + s.resolvedTo));
+      console.log('[REFRESH] newOriginal length:', newOriginal.length, 'workingDoc length:', newWorkingDoc.length, 'same:', newOriginal === newWorkingDoc);
+
       // Clear constraint zones first — the edit protection transactionFilter
       // would block a full-document replacement since position 0 is outside any zone
       editorView.dispatch({ effects: setZones.of([]) });
@@ -277,6 +281,59 @@ if (data) {
         effects: setOriginal.of(newOriginal),
       });
 
+      // CRITICAL: A full document replacement makes mapPos meaningless — all positions
+      // collapse to 0 or end-of-doc. We must rebuild the registry from scratch with
+      // fresh server-resolved positions, and reset savedHunks so auto-save starts clean.
+      savedHunks.clear();
+
+      // Repopulate registry with remaining suggestions + comments (fresh positions from server)
+      const registryEntries = [];
+      for (const s of remainingSuggestions) {
+        if (s.resolvedStale) continue;
+        const pos = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+        const textLen = s.type === 'insertion' ? (s.newText || '').length
+          : s.type === 'deletion' ? 0
+          : (s.newText || '').length;
+        registryEntries.push({
+          id: s.id,
+          kind: 'suggestion',
+          type: s.type,
+          originalText: s.originalText || '',
+          newText: s.newText || '',
+          originalFrom: s.originalFrom,
+          originalTo: s.originalTo,
+          currentFrom: pos,
+          currentTo: pos + textLen,
+          authorEmail: s.authorEmail,
+          authorName: s.authorName,
+          firestoreId: s.id,
+          loadedFromServer: true,
+        });
+        // Rebuild savedHunks mapping for auto-save
+        const key = s.originalFrom + ':' + s.originalTo;
+        savedHunks.set(key, s.id);
+      }
+      const existingComments = fresh.pendingComments || [];
+      for (const c of existingComments) {
+        if (c.resolvedStale) continue;
+        const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
+        const to = c.resolvedTo != null ? c.resolvedTo : c.to;
+        registryEntries.push({
+          id: c.id,
+          kind: 'comment',
+          selectedText: c.selectedText || '',
+          commentText: c.commentText || '',
+          currentFrom: from,
+          currentTo: to,
+          authorEmail: c.authorEmail,
+          authorName: c.authorName,
+          firestoreId: c.id,
+          loadedFromServer: true,
+        });
+      }
+      editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
+      console.log('[REFRESH] rebuilt registry with', registryEntries.length, 'entries, savedHunks:', savedHunks.size);
+
       // Restore constraint zones from the new document
       if (editMode === 'suggest') {
         const zones = recomputeZones(editorView.state.doc);
@@ -285,18 +342,19 @@ if (data) {
 
       // Update local data
       data.pendingSuggestions = remainingSuggestions;
-      data.pendingComments = fresh.pendingComments || [];
+      data.pendingComments = existingComments;
       data.pendingReplies = fresh.pendingReplies || [];
 
       // Refresh comment and reply cards
-      const existingComments = fresh.pendingComments || [];
       const { initComments } = await import('/static/js/editor-comments.js');
       initComments(editorView, existingComments, (comments) => {
         updateCommentCards(comments);
       });
       if (existingComments.length > 0) updateCommentCards(existingComments);
       updateReplies(fresh.pendingReplies || []);
-    } catch { /* ignore refresh errors */ }
+    } catch (err) {
+      console.error('[REFRESH] error:', err.message, err.stack);
+    }
     hideRefreshOverlay();
   }
 
