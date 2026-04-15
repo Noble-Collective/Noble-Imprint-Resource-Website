@@ -439,8 +439,15 @@ if (data) {
   }
 
   // --- Reject/delete a hunk ---
+  let isDiscarding = false; // Guard: suppress auto-save during multi-dispatch discard
   async function rejectOrDeleteHunk(hunkId) {
     const firestoreId = findFirestoreId(hunkId);
+    console.log('[DISCARD] hunkId:', hunkId, 'firestoreId:', firestoreId);
+
+    // Suppress auto-save during discard — the removeAnnotation and document rebuild
+    // happen in separate dispatches, and between them the draftPlugin would see the
+    // diff as "new" and auto-save would re-create the suggestion we're deleting.
+    isDiscarding = true;
 
     // Remove from the annotation registry
     if (firestoreId) {
@@ -469,6 +476,8 @@ if (data) {
       editorView.dispatch({ effects: setZones.of(zones) });
     }
 
+    isDiscarding = false;
+
     // Delete or reject from Firestore immediately
     if (firestoreId) {
       try {
@@ -490,7 +499,12 @@ if (data) {
       if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
       fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
     } catch { /* ignore */ }
-    // Registry already updated via removeAnnotation above
+    // Clean up savedHunks — check both draft hunks and direct firestoreId lookup
+    if (firestoreId) {
+      for (const [key, docId] of savedHunks) {
+        if (docId === firestoreId) { savedHunks.delete(key); break; }
+      }
+    }
     const hunks = getCurrentHunks();
     const hunk = hunks.find(h => h.id === hunkId);
     if (hunk) {
@@ -648,7 +662,7 @@ if (data) {
           }
           updateCommentCards(regComments);
         }
-        if (mode === 'suggest') {
+        if (mode === 'suggest' && !isDiscarding) {
           clearTimeout(saveTimer);
           saveTimer = setTimeout(() => autoSave(hunks), 1500);
         }
