@@ -1161,7 +1161,6 @@ test.describe('Accept Refresh', () => {
         });
         lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
       });
-      await new Promise(r => http.request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
     }
   });
 
@@ -1244,7 +1243,6 @@ test.describe('Accept Precision', () => {
         });
         lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
       });
-      await new Promise(r => http.request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
     }
   });
 
@@ -1949,7 +1947,6 @@ test.describe('Integration - Full Editing Session', () => {
         });
         lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
       });
-      await new Promise(r => require('http').request('http://localhost:8080/api/refresh', { method: 'POST' }, res => { res.on('data', () => {}); res.on('end', r); }).end());
     }
   });
 
