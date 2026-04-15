@@ -6,6 +6,10 @@ on:
   repository_dispatch:
     types: [content-updated]
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
