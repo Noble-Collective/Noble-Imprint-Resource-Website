@@ -510,6 +510,41 @@ test.describe('Editor - Suggestion Tracking', () => {
     count = await getMarginCardCount(page);
     expect(count).toBeGreaterThanOrEqual(3);
   });
+
+  test('edit after auto-save still creates a second margin card', async ({ page }) => {
+    // Regression test: when edit #1 is auto-saved and promoted to the registry,
+    // making edit #2 should still show 2 margin cards. Previously, the auto-save
+    // pushed to data.pendingSuggestions without authorName/authorEmail, causing
+    // escapeHtml(undefined) to throw and silently break the margin render.
+    const word1 = await findUniqueWord(page, 'plain');
+    expect(word1).toBeTruthy();
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) {
+        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    }, word1);
+    expect(word2).toBeTruthy();
+
+    // Edit #1
+    await selectText(page, word1);
+    await replaceWith(page, 'FIRSTEDIT');
+    await page.waitForTimeout(500);
+    expect(await getMarginCardCount(page)).toBe(1);
+
+    // Wait for auto-save to complete
+    await waitForAutoSave(page);
+
+    // Edit #2 — the regression: this must produce a second card
+    await selectText(page, word2);
+    await replaceWith(page, 'SECONDEDIT');
+    await page.waitForTimeout(500);
+
+    const count = await getMarginCardCount(page);
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
 });
 
 // ============================================================

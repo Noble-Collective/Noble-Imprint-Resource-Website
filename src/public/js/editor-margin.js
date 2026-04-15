@@ -56,12 +56,14 @@ export function removeRepliesForParent(parentId) {
 }
 
 export function updateCommentCards(comments) {
+  console.log('[MARGIN] updateCommentCards called with', (comments || []).length, 'comments');
   currentComments = comments || [];
   renderAllCards();
 }
 
 export function updateMarginCards(hunks) {
   if (!marginEl || !editorView) return;
+  console.log('[MARGIN] updateMarginCards called with', hunks.length, 'hunks');
   currentHunks = hunks;
   renderAllCards();
 }
@@ -104,6 +106,8 @@ function buildThreadHtml(parentId, parentType) {
 
 function renderAllCards() {
   if (!marginEl || !editorView) return;
+  console.log('[MARGIN] renderAllCards: currentHunks=' + currentHunks.length + ', currentComments=' + currentComments.length);
+  try {
 
   // Preserve cards that are mid-removal animation
   const preservedCards = [];
@@ -128,7 +132,9 @@ function renderAllCards() {
   const loadedSuggestions = window.__EDITOR_DATA ? (window.__EDITOR_DATA.pendingSuggestions || []) : [];
 
   let html = '';
-  for (const hunk of hunks) {
+  for (let hunkIdx = 0; hunkIdx < hunks.length; hunkIdx++) {
+    const hunk = hunks[hunkIdx];
+    console.log('[MARGIN] rendering hunk', hunkIdx, ':', hunk.id, hunk.type, '"' + (hunk.originalText||'').slice(0,20) + '"');
     // Get vertical position from the editor
     let top = 0;
     try {
@@ -138,7 +144,7 @@ function renderAllCards() {
         const editorRect = editorView.dom.getBoundingClientRect();
         top = coords.top - editorRect.top;
       }
-    } catch { /* ignore */ }
+    } catch (e) { console.log('[MARGIN] coordsAtPos error:', e.message); }
 
     // Change summary
     let bodyHtml = '';
@@ -158,7 +164,7 @@ function renderAllCards() {
       if (s.type === hunk.type && s.originalText === hunk.originalText) return true;
       return s.id === hunk.id;
     });
-    var authorName = loaded ? (loaded.authorName || loaded.authorEmail) : (userData ? (userData.displayName || userData.email) : 'Unknown');
+    var authorName = loaded ? (loaded.authorName || loaded.authorEmail || (userData ? (userData.displayName || userData.email) : 'Unknown')) : (userData ? (userData.displayName || userData.email) : 'Unknown');
     var authorPhoto = loaded ? null : (userData ? userData.photoURL : null);
     var authorInitial = (authorName || '?')[0].toUpperCase();
     var isAuthor = loaded ? (loaded.authorEmail === userEmail) : true;
@@ -257,6 +263,9 @@ function renderAllCards() {
       + '</div>';
   }
 
+  const cardCount = (html.match(/margin-card margin-card--suggestion/g) || []).length;
+  const commentCardCount = (html.match(/margin-card margin-card--comment/g) || []).length;
+  console.log('[MARGIN] rendered HTML has', cardCount, 'suggestion cards +', commentCardCount, 'comment cards');
   marginEl.innerHTML = html;
 
   // Re-append cards that are mid-removal animation
@@ -312,6 +321,9 @@ function renderAllCards() {
 
   // Resolve overlapping cards
   resolveOverlaps();
+  } catch (err) {
+    console.error('[MARGIN] renderAllCards ERROR:', err.message, err.stack);
+  }
 }
 
 function resolveOverlaps() {
@@ -439,5 +451,6 @@ export function focusMarginCard(type, id) {
 // Reposition cards on scroll or resize
 export function repositionCards() {
   if (!editorView || !marginEl || currentHunks.length === 0) return;
+  console.log('[MARGIN] repositionCards triggered, currentHunks=' + currentHunks.length);
   updateMarginCards(currentHunks);
 }

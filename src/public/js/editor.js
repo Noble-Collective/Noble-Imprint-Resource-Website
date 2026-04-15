@@ -177,6 +177,8 @@ if (data) {
                 newText: hunk.newText || '',
                 originalFrom: hunk.originalFrom,
                 originalTo: hunk.originalTo,
+                authorEmail: data.user ? data.user.email : '',
+                authorName: data.user ? data.user.displayName : '',
                 ...ctx,
               });
             }
@@ -547,6 +549,7 @@ if (data) {
     // Wire up margin panel callback
     if (isSuggestOrReview) {
       setHunksChangedCallback((hunks) => {
+        console.log('[CALLBACK] onHunksChanged received', hunks.length, 'hunks');
         if (editorView) {
           updateMarginCards(hunks);
           // Also update comment cards from registry (positions may have shifted)

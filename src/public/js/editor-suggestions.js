@@ -262,11 +262,13 @@ const draftPlugin = ViewPlugin.fromClass(
         }
 
         const hunks = computeHunks(original, current);
+        console.log('[DRAFT] computeHunks returned', hunks.length, 'hunks:', hunks.map(h => h.type + ' "' + (h.originalText||'').slice(0,20) + '"→"' + (h.newText||'').slice(0,20) + '"'));
         currentHunks = hunks;
         this.decorations = buildDraftDecorations(hunks);
 
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
+          console.log('[DRAFT] debounce fired, currentHunks has', currentHunks.length, 'hunks');
           if (onHunksChanged) onHunksChanged(currentHunks);
         }, 300);
       }

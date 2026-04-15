@@ -23,8 +23,6 @@ The content repo (`Noble-Imprint-Resources`) is never modified directly by the w
 ### Prerequisites
 
 - Node.js 22+
-- Google Cloud CLI (`gcloud`) authenticated to the `noble-imprint-website` project
-- Access to GCP Secret Manager secrets (`github-token`, `claude-api-key`)
 
 ### Setup
 
@@ -34,26 +32,20 @@ cd Noble-Imprint-Resource-Website
 npm install
 ```
 
+A `.env` file and `service-account-key.json` must be present in the repo root (both gitignored). These contain the GitHub token, Claude API key, Firebase config, and GCP service account credentials for Firestore access. Ask the project admin if you need these files.
+
 ### Run Locally
 
 ```bash
-GITHUB_TOKEN=$(gcloud secrets versions access latest --secret=github-token --project=noble-imprint-website) \
-FIREBASE_API_KEY=AIzaSyBgjc_fFiR7tNCvNYcjZe6l2TyetjYoIP8 \
-GOOGLE_CLOUD_PROJECT=noble-imprint-website \
-CLAUDE_API_KEY=$(gcloud secrets versions access latest --secret=claude-api-key --project=noble-imprint-website) \
-CLAUDE_BOT_EMAIL=claude@noblecollective.org \
-node src/server/index.js
+npm start
 ```
 
-Server starts at http://localhost:8080. First boot takes ~2 minutes (Bible cache build); subsequent starts ~200ms.
+Server starts at http://localhost:8080. All env vars are loaded automatically from `.env` via dotenv. Firestore auth uses the service account key — no `gcloud auth` needed. First boot takes ~2 minutes (Bible cache build); subsequent starts ~200ms.
 
 ### Run Tests
 
 ```bash
-# Full suite (52 tests, ~3-4 min)
-GOOGLE_CLOUD_PROJECT=noble-imprint-website \
-GITHUB_TOKEN=$(gcloud secrets versions access latest --secret=github-token --project=noble-imprint-website) \
-CLAUDE_API_KEY=$(gcloud secrets versions access latest --secret=claude-api-key --project=noble-imprint-website) \
+# Full suite (64 tests, ~3-4 min)
 npx playwright test tests/editor.spec.js
 
 # Single test
@@ -221,11 +213,12 @@ src/
 
 | Variable | Source | Purpose |
 |----------|--------|---------|
-| `GITHUB_TOKEN` | GCP Secret Manager | GitHub API access (read content, commit changes) |
-| `FIREBASE_API_KEY` | Hardcoded | Firebase Auth client-side key |
-| `GOOGLE_CLOUD_PROJECT` | Set manually | Firestore project ID |
-| `CLAUDE_API_KEY` | GCP Secret Manager | API key for Claude AI bot access |
-| `CLAUDE_BOT_EMAIL` | Set manually | Email identity for bot user |
+| `GITHUB_TOKEN` | `.env` (from GCP Secret Manager) | GitHub API access (read content, commit changes) |
+| `FIREBASE_API_KEY` | `.env` | Firebase Auth client-side key |
+| `GOOGLE_CLOUD_PROJECT` | `.env` | Firestore project ID |
+| `CLAUDE_API_KEY` | `.env` (from GCP Secret Manager) | API key for Claude AI bot access |
+| `CLAUDE_BOT_EMAIL` | `.env` | Email identity for bot user |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `.env` | Path to service account key for Firestore access |
 | `PORT` | Cloud Run sets automatically | Server port (defaults to 8080) |
 | `BUILD_TIME` | Docker build arg | Displayed in footer as "last updated" |
 | `NODE_ENV` | Dockerfile sets to `production` | Disables test-login endpoint in prod |
