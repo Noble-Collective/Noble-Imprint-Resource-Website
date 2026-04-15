@@ -96,7 +96,11 @@ if (data) {
     // Create or update hunks
     for (const hunk of hunks) {
       const key = hunkKey(hunk);
-      const ctx = extractContext(originalContent, hunk.originalFrom, hunk.originalTo);
+      // Use the CURRENT original (updated by refreshFromGitHub after accepts),
+      // not the stale page-load originalContent. Hunk positions are relative to
+      // the current originalDocField, so context must come from the same version.
+      const currentOriginal = editorView.state.field(originalDocField);
+      const ctx = extractContext(currentOriginal, hunk.originalFrom, hunk.originalTo);
       const hunkData = {
         type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
         originalText: hunk.originalText, newText: hunk.newText, ...ctx,
