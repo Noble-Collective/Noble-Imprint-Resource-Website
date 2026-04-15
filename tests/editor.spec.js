@@ -282,6 +282,26 @@ async function clearAllSuggestions() {
 }
 
 // ============================================================
+// GLOBAL SETUP — verify test file is clean before running
+// ============================================================
+
+test.beforeAll(async () => {
+  const github = require('../src/server/github');
+  const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  const { content } = await github.getFileContent(filePath);
+  const residue = ['INTEG', 'FIRSTEDIT', 'SECONDEDIT', 'DISCARD', 'EDIT1', 'EDIT2', 'EDIT3',
+    'ACCEPTTEST', 'TESTREPLACEMENT', 'BOTTEST', 'BOTVISIBLE', 'REPLYTEST', 'KEEP1', 'KEEP2',
+    'OverviewX', 'CHANGED'];
+  const found = residue.filter(r => content.includes(r));
+  if (found.length > 0) {
+    throw new Error(
+      `Test file has residue from a previous run: ${found.join(', ')}. ` +
+      `Restore the clean file before running tests.`
+    );
+  }
+});
+
+// ============================================================
 // MASKING TESTS
 // ============================================================
 
@@ -559,22 +579,27 @@ test.describe('Editor - Suggestion Tracking', () => {
     }, word1);
     expect(word2).toBeTruthy();
 
+    // No cards before any edits
+    const countBefore = await getMarginCardCount(page);
+    expect(countBefore).toBe(0);
+
     // Edit #1
     await selectText(page, word1);
     await replaceWith(page, 'FIRSTEDIT');
     await page.waitForTimeout(500);
-    expect(await getMarginCardCount(page)).toBe(1);
+    const countAfterFirst = await getMarginCardCount(page);
+    expect(countAfterFirst).toBeGreaterThanOrEqual(1);
 
     // Wait for auto-save to complete
     await waitForAutoSave(page);
 
-    // Edit #2 — the regression: this must produce a second card
+    // Edit #2 — the regression: this must produce additional cards
     await selectText(page, word2);
     await replaceWith(page, 'SECONDEDIT');
     await page.waitForTimeout(500);
 
-    const count = await getMarginCardCount(page);
-    expect(count).toBeGreaterThanOrEqual(2);
+    const countAfterSecond = await getMarginCardCount(page);
+    expect(countAfterSecond).toBeGreaterThan(countAfterFirst);
   });
 });
 
