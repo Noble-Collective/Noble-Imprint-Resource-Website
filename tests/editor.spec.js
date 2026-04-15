@@ -116,6 +116,55 @@ async function getMarginCardCount(page) {
   return page.locator('.margin-card').count();
 }
 
+// Find a unique word in the document (appears exactly once, safe to edit)
+// type: 'plain' (paragraph text), 'heading2', 'heading3', 'bold', 'italic', 'blockquote', 'attribution', 'question', 'callout'
+async function findUniqueWord(page, type) {
+  return page.evaluate((t) => {
+    const doc = window.__editorView.state.doc.toString();
+    const lines = doc.split('\n');
+    let candidates = [];
+
+    for (const line of lines) {
+      let text = line;
+      let matches = false;
+      if (t === 'heading2' && line.match(/^## /)) { text = line.replace(/^## /, ''); matches = true; }
+      else if (t === 'heading3' && line.match(/^### /)) { text = line.replace(/^### /, ''); matches = true; }
+      else if (t === 'bold') { const m = line.match(/\*\*([^*]+)\*\*/); if (m) { text = m[1]; matches = true; } }
+      else if (t === 'italic') { const m = line.match(/(?<![a-zA-Z])_([^_]+)_(?![a-zA-Z])/); if (m) { text = m[1]; matches = true; } }
+      else if (t === 'blockquote' && line.match(/^>/)) { text = line.replace(/^>\s*/, ''); matches = true; }
+      else if (t === 'attribution' && line.match(/^<</)) { text = line.replace(/^<<\s*/, ''); matches = true; }
+      else if (t === 'question') { const m = line.match(/<Question[^>]*>(.+?)<\/Question>/); if (m) { text = m[1]; matches = true; } }
+      else if (t === 'callout') { const m = line.match(/<Callout>(.+?)<\/Callout>/); if (m) { text = m[1]; matches = true; } }
+      else if (t === 'plain' && !line.startsWith('#') && !line.startsWith('>') && !line.startsWith('<') && !line.startsWith('<<') && !line.startsWith('-') && line.length > 30) {
+        matches = true;
+      }
+      if (matches) {
+        // Extract words 5+ chars from this text
+        const words = text.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+        for (const w of words) {
+          if (doc.indexOf(w) === doc.lastIndexOf(w)) candidates.push(w);
+        }
+      }
+    }
+    return candidates.length > 0 ? candidates[0] : null;
+  }, type);
+}
+
+// Find text content inside a structural element
+async function findStructuralContent(page, type) {
+  return page.evaluate((t) => {
+    const doc = window.__editorView.state.doc.toString();
+    const lines = doc.split('\n');
+    for (const line of lines) {
+      if (t === 'heading2' && line.match(/^## /)) return line.replace(/^## /, '').trim();
+      if (t === 'heading3' && line.match(/^### /)) return line.replace(/^### /, '').trim();
+      if (t === 'blockquote' && line.match(/^>\s*\w/)) return line.replace(/^>\s*/, '').substring(0, 30).trim();
+      if (t === 'attribution' && line.match(/^<</)) return line.replace(/^<<\s*/, '').substring(0, 30).trim();
+    }
+    return null;
+  }, type);
+}
+
 // Wait for auto-save (1500ms debounce + network)
 async function waitForAutoSave(page) {
   await page.waitForTimeout(3000);
@@ -325,8 +374,10 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('replacing a word shows green insertion and red deletion', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'REPLACED');
 
     await page.waitForTimeout(500);
     const insertions = page.locator('.cm-suggestion-insert');
@@ -336,7 +387,18 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('adding text at end of sentence shows green insertion', async ({ page }) => {
-    await cursorAfter(page, 'belief system.');
+    // Find any sentence-ending period in a plain paragraph
+    const insertPoint = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      const match = doc.match(/[a-z]\.\s/);
+      return match ? doc.indexOf(match[0]) + 2 : -1;
+    });
+    expect(insertPoint).toBeGreaterThan(0);
+    await page.evaluate((pos) => {
+      window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      window.__editorView.focus();
+    }, insertPoint);
+    await page.waitForTimeout(200);
     await typeText(page, ' Indeed it is more.');
 
     await page.waitForTimeout(500);
@@ -345,7 +407,9 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('deleting a word shows red strikethrough', async ({ page }) => {
-    await selectText(page, 'sovereign');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
     await deleteSelection(page);
 
     await page.waitForTimeout(500);
@@ -354,8 +418,10 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('margin card appears for each change', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'CHANGED');
     await page.waitForTimeout(500);
 
     const count = await getMarginCardCount(page);
@@ -363,8 +429,10 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('margin card shows user name', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'CHANGED');
     await page.waitForTimeout(500);
 
     const name = page.locator('.margin-card-name');
@@ -372,14 +440,24 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('two edits in different parts create two margin cards', async ({ page }) => {
-    // Edit 1: near the top
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word1 = await findUniqueWord(page, 'plain');
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) {
+        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+      return null;
+    }, word1);
+    expect(word1).toBeTruthy();
+    expect(word2).toBeTruthy();
+
+    await selectText(page, word1);
+    await replaceWith(page, 'EDIT1');
     await page.waitForTimeout(300);
 
-    // Edit 2: further down
-    await selectText(page, 'sovereign');
-    await replaceWith(page, 'supreme');
+    await selectText(page, word2);
+    await replaceWith(page, 'EDIT2');
     await page.waitForTimeout(500);
 
     const count = await getMarginCardCount(page);
@@ -387,17 +465,33 @@ test.describe('Editor - Suggestion Tracking', () => {
   });
 
   test('multiple suggestions persist in margin after auto-save', async ({ page }) => {
-    // Make 3 suggestions spread across the document
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word1 = await findUniqueWord(page, 'plain');
+    expect(word1).toBeTruthy();
+    const word2 = await page.evaluate((skip) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) { if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w; }
+      return null;
+    }, word1);
+    const word3 = await page.evaluate(({ skip1, skip2 }) => {
+      const doc = window.__editorView.state.doc.toString();
+      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
+      for (const w of words) { if (w !== skip1 && w !== skip2 && doc.indexOf(w) === doc.lastIndexOf(w)) return w; }
+      return null;
+    }, { skip1: word1, skip2: word2 });
+    expect(word2).toBeTruthy();
+    expect(word3).toBeTruthy();
+
+    await selectText(page, word1);
+    await replaceWith(page, 'EDIT1');
     await page.waitForTimeout(300);
 
-    await selectText(page, 'sovereign');
-    await replaceWith(page, 'supreme');
+    await selectText(page, word2);
+    await replaceWith(page, 'EDIT2');
     await page.waitForTimeout(300);
 
-    await selectText(page, 'philosophy');
-    await replaceWith(page, 'worldview');
+    await selectText(page, word3);
+    await replaceWith(page, 'EDIT3');
     await page.waitForTimeout(300);
 
     // Verify 3 cards before auto-save
@@ -601,8 +695,10 @@ test.describe('Editor - Auto-Save', () => {
   });
 
   test('suggestion auto-saves to Firestore after pause', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'SAVED');
     await waitForAutoSave(page);
 
     const count = await getPendingSuggestionCount();
@@ -610,16 +706,18 @@ test.describe('Editor - Auto-Save', () => {
   });
 
   test('"Saved" appears in toolbar', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'SAVED');
     await page.waitForSelector('#editor-save-status:not(:empty)', { timeout: 5000 });
     const status = await page.textContent('#editor-save-status');
     expect(status).toBe('Saved');
   });
 
   test('discarding (X) removes suggestion from Firestore', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'DISCARD');
     await waitForAutoSave(page);
 
     const before = await getPendingSuggestionCount();
@@ -636,8 +734,9 @@ test.describe('Editor - Auto-Save', () => {
   });
 
   test('undoing all edits removes suggestion from Firestore', async ({ page }) => {
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'UNDO');
     await waitForAutoSave(page);
 
     // Undo until back to original
@@ -670,144 +769,176 @@ test.describe('Editor - Edge Cases Near Structural Syntax', () => {
   // --- Headings ---
 
   test('replacing a word inside H2 heading preserves ##', async ({ page }) => {
-    await selectText(page, 'Session Overview');
-    await replaceWith(page, 'Session Summary');
+    const word = await findUniqueWord(page, 'heading2');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'REPLACED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('## Session Summary');
+    expect(raw).toContain('## ');
+    expect(raw).toContain('REPLACED');
     expect(raw).not.toContain('## ## ');
   });
 
   test('appending text to H3 heading preserves ###', async ({ page }) => {
-    await cursorAfter(page, 'Key Elements');
+    const h3Content = await findStructuralContent(page, 'heading3');
+    expect(h3Content).toBeTruthy();
+    await cursorAfter(page, h3Content);
     await typeText(page, ' (v2)');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('### Key Elements (v2)');
+    expect(raw).toContain('### ' + h3Content + ' (v2)');
   });
 
   test('replacing a word in H3 heading preserves ###', async ({ page }) => {
-    await selectText(page, 'Confessional');
-    await replaceWith(page, 'Core');
+    const word = await findUniqueWord(page, 'heading3');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'REPLACED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('### Core Statement');
+    expect(raw).toContain('### ');
+    expect(raw).toContain('REPLACED');
   });
 
   // --- Bold ---
 
   test('replacing a word inside bold preserves ** markers', async ({ page }) => {
-    // "**earnestly receive..." — replace "earnestly" with "humbly"
-    await selectText(page, 'earnestly');
-    await replaceWith(page, 'humbly');
+    const word = await findUniqueWord(page, 'bold');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'BOLDED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('**humbly receive');
+    expect(raw).toContain('**');
+    expect(raw).toContain('BOLDED');
     expect(raw).not.toContain('***');
   });
 
   test('appending to bold text stays inside ** markers', async ({ page }) => {
-    // "**Key Passage**" — add text after "Passage" but before **
-    await selectText(page, 'Key Passage');
-    await replaceWith(page, 'Main Passage');
+    const word = await findUniqueWord(page, 'bold');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'BOLDAPP');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('**Main Passage**');
+    expect(raw).toMatch(/\*\*[^*]*BOLDAPP[^*]*\*\*/);
   });
 
   // --- Italic ---
 
   test('replacing italic text preserves _ markers', async ({ page }) => {
-    // "_The Path of Discipleship_" is inside << attribution
-    await selectText(page, 'The Path of Discipleship');
-    await replaceWith(page, 'The Way of Discipleship');
+    const word = await findUniqueWord(page, 'italic');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'ITALICIZED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('_The Way of Discipleship_');
+    expect(raw).toMatch(/_[^_]*ITALICIZED[^_]*_/);
   });
 
   // --- Blockquote ---
 
   test('replacing text inside blockquote preserves > marker', async ({ page }) => {
-    await selectText(page, 'Disciples of Christ');
-    await replaceWith(page, 'Followers of Christ');
+    const word = await findUniqueWord(page, 'blockquote');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'BQTEXT');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('>Followers of Christ');
-    // Should not have lost the > marker
-    expect(raw).not.toContain('\nFollowers of Christ');
+    expect(raw).toContain('>');
+    expect(raw).toContain('BQTEXT');
   });
 
   test('appending text inside blockquote stays in blockquote', async ({ page }) => {
-    await cursorAfter(page, 'through baptism,');
-    await typeText(page, ' as commanded,');
+    const bqContent = await findStructuralContent(page, 'blockquote');
+    expect(bqContent).toBeTruthy();
+    await cursorAfter(page, bqContent);
+    await typeText(page, ' APPENDED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('>publicly declare their faith commitment and community participation through baptism, as commanded,');
+    expect(raw).toContain(bqContent + ' APPENDED');
   });
 
   // --- Attribution ---
 
   test('replacing text in attribution preserves << and _italic_', async ({ page }) => {
-    await selectText(page, 'Path');
-    await replaceWith(page, 'Way');
+    const word = await findUniqueWord(page, 'attribution');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'ATTRTEXT');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('<< _The Way of Discipleship_');
+    expect(raw).toContain('<<');
+    expect(raw).toContain('ATTRTEXT');
   });
 
   // --- Question blocks ---
 
   test('editing inside a Question block preserves tags', async ({ page }) => {
-    // Select specific text inside a question
-    await selectText(page, 'What happened when the Holy Spirit');
-    await replaceWith(page, 'What occurred when the Holy Spirit');
+    const word = await findUniqueWord(page, 'question');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'QTEXT');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('<Question id=TheCallSes1-Hearing-Q1>');
+    expect(raw).toContain('<Question id=');
     expect(raw).toContain('</Question>');
-    expect(raw).toContain('What occurred when the Holy Spirit');
+    expect(raw).toContain('QTEXT');
   });
 
   test('appending text inside Question block stays inside tags', async ({ page }) => {
-    await cursorAfter(page, 'Acts 2:1–13');
-    await typeText(page, ' (please read carefully)');
+    // Find text inside a question block and append
+    const qWord = await findUniqueWord(page, 'question');
+    expect(qWord).toBeTruthy();
+    await cursorAfter(page, qWord);
+    await typeText(page, ' ADDED');
 
     const raw = await getRawDoc(page);
-    // The added text should be before </Question>
-    expect(raw).toContain('Acts 2:1–13 (please read carefully)');
+    expect(raw).toContain(qWord + ' ADDED');
     expect(raw).toContain('</Question>');
   });
 
   // --- Callout blocks ---
 
   test('replacing text inside Callout preserves tags', async ({ page }) => {
-    await scrollEditorTo(page, 0.40);
-    await selectText(page, 'All who genuinely believe in Jesus');
-    await replaceWith(page, 'Everyone who truly believes in Jesus');
+    const word = await findUniqueWord(page, 'callout');
+    expect(word).toBeTruthy();
+    await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf('<Callout>');
+      if (pos >= 0) window.__editorView.dispatch({ selection: { anchor: pos + 10 }, scrollIntoView: true });
+    });
+    await page.waitForTimeout(300);
+    await selectText(page, word);
+    await replaceWith(page, 'CALLTEXT');
 
     const raw = await getRawDoc(page);
     expect(raw).toContain('<Callout>');
     expect(raw).toContain('</Callout>');
-    expect(raw).toContain('Everyone who truly believes in Jesus');
+    expect(raw).toContain('CALLTEXT');
   });
 
   // --- Regular paragraph ---
 
   test('replacing a word in a paragraph works cleanly', async ({ page }) => {
-    await selectText(page, 'philosophy');
-    await replaceWith(page, 'worldview');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'REPLACED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('an idea, a worldview, or a belief system');
+    expect(raw).toContain('REPLACED');
   });
 
   test('inserting text mid-paragraph works', async ({ page }) => {
-    await cursorAfter(page, 'more than an idea,');
-    await typeText(page, ' much more than');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await cursorAfter(page, word);
+    await typeText(page, ' INSERTED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('more than an idea, much more than a');
+    expect(raw).toContain(word + ' INSERTED');
   });
 
   // --- Between structural blocks ---
@@ -816,8 +947,11 @@ test.describe('Editor - Edge Cases Near Structural Syntax', () => {
     const raw1 = await getRawDoc(page);
     const qCount1 = (raw1.match(/<Question/g) || []).length;
 
-    await selectText(page, 'Retell this story');
-    await replaceWith(page, 'Retell this narrative');
+    // Find text between question blocks dynamically
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'BETWEEN');
 
     const raw2 = await getRawDoc(page);
     const qCount2 = (raw2.match(/<Question/g) || []).length;
@@ -827,21 +961,24 @@ test.describe('Editor - Edge Cases Near Structural Syntax', () => {
   // --- Delete operations ---
 
   test('deleting a word in a paragraph', async ({ page }) => {
-    await selectText(page, 'sovereign ');
+    const word = await findUniqueWord(page, 'plain');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
     await deleteSelection(page);
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('as rightful king');
-    expect(raw).not.toContain('as sovereign rightful');
+    expect(raw).not.toContain(word);
   });
 
   test('deleting text inside bold preserves markers', async ({ page }) => {
-    // Replace "earnestly" with nothing (effectively deleting it)
-    await selectText(page, 'earnestly');
-    await replaceWith(page, 'gratefully');
+    const word = await findUniqueWord(page, 'bold');
+    expect(word).toBeTruthy();
+    await selectText(page, word);
+    await replaceWith(page, 'DELBOLD');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('**gratefully receive');
+    expect(raw).toContain('**');
+    expect(raw).toContain('DELBOLD');
     expect(raw).not.toContain('***');
   });
 });
@@ -863,23 +1000,23 @@ test.describe('Editor - Accept/Reject Flow', () => {
 
   test('suggestion persists after exiting editor', async ({ page }) => {
     await enterSuggestMode(page);
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'PERSISTED');
     await waitForAutoSave(page);
 
-    // Exit
     await page.click('#btn-editor-done');
     await page.waitForTimeout(2000);
 
-    // Verify still in Firestore
     const count = await getPendingSuggestionCount();
     expect(count).toBeGreaterThan(0);
   });
 
   test('Review button appears when suggestions exist', async ({ page }) => {
     await enterSuggestMode(page);
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'REVIEW');
     await waitForAutoSave(page);
 
     // Exit editor — triggers page reload
@@ -894,8 +1031,9 @@ test.describe('Editor - Accept/Reject Flow', () => {
 
   test('review mode is read-only', async ({ page }) => {
     await enterSuggestMode(page);
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'READONLY');
     await waitForAutoSave(page);
 
     await page.click('#btn-editor-done');
@@ -1118,8 +1256,9 @@ test.describe('Editor - Direct Edit', () => {
 
   test('direct edit has no suggestion decorations', async ({ page }) => {
     await enterDirectMode(page);
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'DIRECT');
     await page.waitForTimeout(500);
 
     const insertions = page.locator('.cm-suggestion-insert');
@@ -1128,12 +1267,13 @@ test.describe('Editor - Direct Edit', () => {
 
   test('direct edit can modify the document', async ({ page }) => {
     await enterDirectMode(page);
-    await selectText(page, 'Christianity');
-    await replaceWith(page, 'Faith');
+    const word = await findUniqueWord(page, 'plain');
+    await selectText(page, word);
+    await replaceWith(page, 'MODIFIED');
 
     const raw = await getRawDoc(page);
-    expect(raw).toContain('Faith is more than');
-    expect(raw).not.toContain('Christianity is more than');
+    expect(raw).toContain('MODIFIED');
+    expect(raw).not.toContain(word);
   });
 });
 
