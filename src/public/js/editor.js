@@ -456,7 +456,8 @@ if (data) {
       for (const [, a] of registry) {
         if (a.kind === 'suggestion') remainingSuggestions.push(a);
       }
-      const newWorkingDoc = buildWorkingDoc(originalContent, remainingSuggestions);
+      const currentOriginal = editorView.state.field(originalDocField);
+      const newWorkingDoc = buildWorkingDoc(currentOriginal, remainingSuggestions);
 
       // Clear zones, replace document, restore zones
       editorView.dispatch({ effects: setZones.of([]) });
@@ -973,7 +974,8 @@ if (data) {
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;
-      if (currentContent !== originalContent) {
+      const currentOriginal = editorView ? editorView.state.field(originalDocField) : originalContent;
+      if (currentContent !== currentOriginal) {
         showCommitModal();
       } else {
         exitEditor();
