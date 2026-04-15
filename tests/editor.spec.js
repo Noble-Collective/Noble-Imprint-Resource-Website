@@ -280,7 +280,16 @@ test.describe('Editor - Masking', () => {
   });
 
   test('Callout tags hidden, content highlighted', async ({ page }) => {
-    await scrollEditorTo(page, 0.40);
+    // Scroll to Callout via CodeMirror API (not scroll percentage — which breaks when content width changes)
+    await page.evaluate(() => {
+      if (!window.__editorView) return;
+      const doc = window.__editorView.state.doc.toString();
+      const pos = doc.indexOf('<Callout>');
+      if (pos >= 0) {
+        window.__editorView.dispatch({ selection: { anchor: pos + 10 }, scrollIntoView: true });
+      }
+    });
+    await page.waitForTimeout(500);
     const callout = page.locator('.cm-callout');
     await expect(callout.first()).toBeVisible({ timeout: 5000 });
     const text = await callout.first().textContent();
@@ -406,6 +415,172 @@ test.describe('Editor - Suggestion Tracking', () => {
     await page.waitForTimeout(3000);
     count = await getMarginCardCount(page);
     expect(count).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ============================================================
+// REGISTRY ROBUSTNESS TESTS — critical regression tests
+// ============================================================
+
+test.describe('Registry Robustness', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearAllSuggestions();
+    await clearAllComments();
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+  });
+
+  test.afterEach(async () => {
+    await clearAllSuggestions();
+    await clearAllComments();
+  });
+
+  test('discarding one suggestion does not remove others', async ({ page }) => {
+    // Make 2 suggestions
+    await selectText(page, 'Christianity');
+    await replaceWith(page, 'Faith');
+    await page.waitForTimeout(300);
+
+    await selectText(page, 'sovereign');
+    await replaceWith(page, 'supreme');
+    await page.waitForTimeout(300);
+
+    // Wait for auto-save
+    await waitForAutoSave(page);
+    await page.waitForTimeout(1000);
+
+    // Verify both saved
+    let fsCount = await getPendingSuggestionCount();
+    expect(fsCount).toBeGreaterThanOrEqual(2);
+
+    // Discard the first suggestion
+    const rejectBtn = page.locator('.margin-action--reject').first();
+    await expect(rejectBtn).toBeVisible({ timeout: 3000 });
+    await rejectBtn.click();
+
+    // Wait for discard + auto-save cycle
+    await page.waitForTimeout(5000);
+
+    // CRITICAL: the other must still exist in Firestore
+    fsCount = await getPendingSuggestionCount();
+    expect(fsCount).toBeGreaterThanOrEqual(1);
+  });
+
+  test('comment survives after nearby suggestion is made', async ({ page }) => {
+    // Find a paragraph with enough text
+    const textInfo = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      // Find a line with 50+ chars of plain text
+      const lines = doc.split('\n');
+      for (const line of lines) {
+        if (line.length > 60 && !line.startsWith('#') && !line.startsWith('>') && !line.startsWith('<') && !line.startsWith('<<')) {
+          const pos = doc.indexOf(line);
+          return { line: line.substring(0, 60), pos };
+        }
+      }
+      return null;
+    });
+    expect(textInfo).not.toBeNull();
+
+    // Select first 10 chars and add a comment
+    await page.evaluate((pos) => {
+      window.__editorView.dispatch({ selection: { anchor: pos, head: pos + 10 }, scrollIntoView: true });
+      window.__editorView.focus();
+    }, textInfo.pos);
+    await page.waitForTimeout(300);
+
+    // Click the comment tooltip
+    const tooltip = page.locator('.comment-tooltip');
+    await expect(tooltip).toBeVisible({ timeout: 3000 });
+    await tooltip.click();
+    await page.waitForTimeout(300);
+
+    // Type comment and submit
+    await page.fill('#comment-popup-input', 'Test comment');
+    await page.click('#comment-popup-submit');
+    await page.waitForTimeout(1000);
+
+    // Verify comment highlight exists
+    const highlights = await page.locator('.cm-comment-highlight').count();
+    expect(highlights).toBeGreaterThan(0);
+
+    // Now make a suggestion on text further in the same line
+    await page.evaluate((pos) => {
+      const doc = window.__editorView.state.doc.toString();
+      // Find a word 20+ chars after the comment
+      const after = doc.substring(pos + 15, pos + 50);
+      const wordMatch = after.match(/\b\w{4,}\b/);
+      if (wordMatch) {
+        const wordPos = pos + 15 + after.indexOf(wordMatch[0]);
+        window.__editorView.dispatch({ selection: { anchor: wordPos, head: wordPos + wordMatch[0].length } });
+      }
+    }, textInfo.pos);
+    await page.keyboard.type('CHANGED');
+    await page.waitForTimeout(1000);
+
+    // CRITICAL: comment highlight must still exist after the suggestion edit
+    const highlightsAfter = await page.locator('.cm-comment-highlight').count();
+    expect(highlightsAfter).toBeGreaterThan(0);
+  });
+
+  test('accepting one suggestion does not remove others', async ({ request }) => {
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+    const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+    const bookPath = 'series/Narrative Journey Series/Foundations/Test Book';
+
+    // Read file
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath },
+      headers: { 'x-api-key': apiKey },
+    });
+    const { content, sha } = await contentRes.json();
+
+    // Find 2 unique words
+    const wordRe = /\b[A-Z][a-z]{7,12}\b/g;
+    const words = [];
+    let match;
+    while ((match = wordRe.exec(content)) !== null) {
+      const w = match[0];
+      if (content.indexOf(w) === content.lastIndexOf(w) && words.indexOf(w) === -1) {
+        words.push({ word: w, pos: match.index });
+        if (words.length >= 2) break;
+      }
+    }
+    expect(words.length).toBe(2);
+
+    // Create 2 suggestions via API
+    const ids = [];
+    for (const { word, pos } of words) {
+      const ctxBefore = content.substring(Math.max(0, pos - 80), pos);
+      const ctxAfter = content.substring(pos + word.length, Math.min(content.length, pos + word.length + 80));
+      const res = await request.post(BASE_URL + '/api/suggestions/hunk', {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        data: {
+          filePath, bookPath, baseCommitSha: sha,
+          type: 'replacement', originalFrom: pos, originalTo: pos + word.length,
+          originalText: word, newText: word + 'X',
+          contextBefore: ctxBefore, contextAfter: ctxAfter,
+        },
+      });
+      const result = await res.json();
+      ids.push(result.id);
+    }
+    expect(ids.length).toBe(2);
+
+    // Accept the first suggestion
+    await request.post(BASE_URL + '/api/auth/test-login', { data: { email: 'steve@noblecollective.org' } });
+    const acceptRes = await request.put(BASE_URL + '/api/suggestions/hunk/' + ids[0] + '/accept', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(acceptRes.ok()).toBeTruthy();
+
+    // CRITICAL: the second suggestion must still be pending
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) admin.initializeApp();
+    const doc = await admin.firestore().collection('suggestions').doc(ids[1]).get();
+    expect(doc.exists).toBeTruthy();
+    expect(doc.data().status).toBe('pending');
   });
 });
 

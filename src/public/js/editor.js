@@ -63,13 +63,15 @@ if (data) {
     // Build set of current hunk position ranges
     const currentKeys = new Set(hunks.map(hunkKey));
 
-    // Delete saved hunks that no longer exist in the diff (user reverted/undid)
-    // Protect suggestions that were LOADED from Firestore on init (not created this session)
+    // Delete saved hunks that no longer exist in the diff.
+    // NEVER auto-delete a suggestion that's in the annotation registry.
+    // Registry entries are only removed by explicit user action (discard, accept, reject).
+    // Auto-delete only applies to hunks that were saved but never made it to the registry
+    // (e.g., very short-lived edits that were saved then immediately undone).
     const registry = editorView ? editorView.state.field(annotationRegistry) : new Map();
+
     for (const [key, docId] of savedHunks) {
-      // Only protect entries loaded from Firestore on init (they have loadedFromServer flag)
-      const regEntry = registry.get(docId);
-      if (regEntry && regEntry.loadedFromServer) continue;
+      if (registry.has(docId)) continue; // Protected by registry — never auto-delete
 
       const [kFrom, kTo] = key.split(':').map(Number);
       const stillExists = hunks.some(h => h.originalFrom <= kTo + 1 && h.originalTo >= kFrom - 1);
@@ -77,10 +79,6 @@ if (data) {
         try {
           await fetch('/api/suggestions/hunk/' + docId, { method: 'DELETE' });
           savedHunks.delete(key);
-          // Also remove from registry if it was there
-          if (editorView && registry.has(docId)) {
-            editorView.dispatch({ effects: removeAnnotation.of(docId) });
-          }
         } catch { /* ignore */ }
       }
     }
