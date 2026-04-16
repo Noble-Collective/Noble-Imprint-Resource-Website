@@ -877,6 +877,17 @@ if (data) {
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       }
+
+      // Populate savedHunks so auto-save knows these suggestions already exist
+      // in Firestore. Without this, the diff engine's draft hunks for loaded
+      // suggestions leak through and auto-save re-creates them as duplicates.
+      savedHunks.clear();
+      for (const e of registryEntries) {
+        if (e.kind === 'suggestion' && e.firestoreId) {
+          const key = e.originalFrom + ':' + e.originalTo;
+          savedHunks.set(key, e.firestoreId);
+        }
+      }
     }
 
     // Initialize editable zones for constrained mode
