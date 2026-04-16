@@ -3193,7 +3193,7 @@ body.drawer-open {
 }
 /* Line numbers toggle */
 .cm-hide-gutters .cm-gutters {
-  display: none;
+  display: none !important;
 }
 .editor-toggle {
   display: flex;
@@ -3378,6 +3378,14 @@ body.drawer-open {
   0% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
   30% { transform: scale(1.03); box-shadow: 0 2px 12px rgba(215,180,74,0.35); }
   100% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+}
+/* Pulse animation for inline decorations when clicking a margin card */
+.cm-inline-pulse {
+  animation: inline-pulse 0.6s ease;
+}
+@keyframes inline-pulse {
+  0% { background: rgba(215,180,74,0.5); }
+  100% { background: inherit; }
 }
 .margin-card-body {
   line-height: 1.5;

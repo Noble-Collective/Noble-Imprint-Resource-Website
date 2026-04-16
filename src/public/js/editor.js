@@ -5,7 +5,7 @@ import {
   suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, injectStaleCard } from '/static/js/editor-margin.js';
 import { commentExtension, initComments } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
@@ -16,8 +16,9 @@ if (data) {
   let editMode = null; // 'suggest' | 'direct' | 'review'
   const originalContent = data.rawContent;
 
-  // --- View Source toggle (compartment for masking) ---
+  // --- View Source toggle (compartments for masking + read-only) ---
   const maskingCompartment = new Compartment();
+  const viewSourceCompartment = new Compartment();
   let viewSourceActive = false;
 
   const readingContent = document.getElementById('reading-content');
@@ -362,11 +363,20 @@ if (data) {
       if (!res.ok) {
         const err = await res.json();
         if (res.status === 409) {
-          setCardStatus(hunkId, 'stale', err.message || 'Stale');
-          // Refresh to show the latest content from GitHub — the file changed
-          // externally, so the editor is showing stale content
+          // Save stale card data before refresh rebuilds the margin panel
+          // Try hunk first, fall back to card data attributes (for registry entries)
+          const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+          const staleData = {
+            hunkId,
+            origText: hunk?.originalText || card?.dataset.origText || '',
+            newText: hunk?.newText || card?.dataset.newText || '',
+            type: hunk?.type || card?.dataset.hunkType || '',
+          };
+          // Refresh to show the latest content from GitHub
           console.log('[ACCEPT] stale — refreshing from GitHub to show latest content');
           await refreshFromGitHub();
+          // Re-inject stale card after refresh (the refresh nuked it)
+          injectStaleCard(staleData, dismissStaleSuggestion);
         } else {
           setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
         }
@@ -742,14 +752,28 @@ if (data) {
     }) : [];
 
     viewSourceActive = false;
+
+    // In direct mode, update Done button text to "Save Changes" when content differs
+    const directEditButtonUpdater = mode === 'direct' ? EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        const doneBtn = document.getElementById('btn-editor-done');
+        if (doneBtn) {
+          const changed = update.view.state.doc.toString() !== originalContent;
+          doneBtn.textContent = changed ? 'Save Changes' : 'Done';
+        }
+      }
+    }) : [];
+
     const extensions = [
       basicSetup,
       markdown(),
       EditorView.lineWrapping,
       maskingCompartment.of(maskingExtension()),
+      viewSourceCompartment.of([]),
       ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
       ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
+      directEditButtonUpdater,
     ];
 
     editorView = new EditorView({
@@ -799,17 +823,17 @@ if (data) {
         updateRegistryCards();
       });
 
-      // Load existing comments into margin panel from registry
+      // Load existing comments and replies into margin panel.
+      // Defer the first render so CM6 has finished layout — coordsAtPos() needs
+      // final line heights to compute correct card positions.
       const existingComments = data.pendingComments || [];
-      if (existingComments.length > 0) {
-        updateCommentCards(existingComments);
-      }
-
-      // Load existing replies
       const existingReplies = data.pendingReplies || [];
-      if (existingReplies.length > 0) {
-        updateReplies(existingReplies);
-      }
+      requestAnimationFrame(() => {
+        if (existingComments.length > 0) updateCommentCards(existingComments);
+        if (existingReplies.length > 0) updateReplies(existingReplies);
+        // Trigger a margin card refresh for registry suggestions too
+        updateRegistryCards();
+      });
     }
 
     // Reposition margin on scroll
@@ -830,6 +854,12 @@ if (data) {
       });
     }
 
+    // Sync line numbers visibility with checkbox state
+    const chkLineNumbers = document.getElementById('chk-line-numbers');
+    if (chkLineNumbers && !chkLineNumbers.checked) {
+      editorView.dom.classList.add('cm-hide-gutters');
+    }
+
     // Expose for testing
     window.__editorView = editorView;
 
@@ -839,6 +869,9 @@ if (data) {
   function exitEditor() {
     setRevealFocusedLine(false);
     editorContainer.classList.remove('direct-editing');
+    // Reset Done button text
+    const doneBtn = document.getElementById('btn-editor-done');
+    if (doneBtn) doneBtn.textContent = 'Done';
     if (editorView) {
       editorView.destroy();
       editorView = null;
@@ -861,9 +894,16 @@ if (data) {
   function toggleViewSource() {
     if (!editorView) return;
     viewSourceActive = !viewSourceActive;
-    editorView.dispatch({
-      effects: maskingCompartment.reconfigure(viewSourceActive ? [] : maskingExtension()),
-    });
+    const effects = [
+      maskingCompartment.reconfigure(viewSourceActive ? [] : maskingExtension()),
+    ];
+    // In suggest mode, make editor read-only when viewing source
+    if (editMode === 'suggest') {
+      effects.push(viewSourceCompartment.reconfigure(
+        viewSourceActive ? EditorState.readOnly.of(true) : []
+      ));
+    }
+    editorView.dispatch({ effects });
     const btn = document.getElementById('btn-view-source');
     if (btn) btn.classList.toggle('active', viewSourceActive);
   }
@@ -995,8 +1035,7 @@ if (data) {
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {
     if (editMode === 'direct') {
       const currentContent = editorView ? editorView.state.doc.toString() : originalContent;
-      const currentOriginal = editorView ? editorView.state.field(originalDocField) : originalContent;
-      if (currentContent !== currentOriginal) {
+      if (currentContent !== originalContent) {
         showCommitModal();
       } else {
         exitEditor();

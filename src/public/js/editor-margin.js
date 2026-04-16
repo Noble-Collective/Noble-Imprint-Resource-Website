@@ -319,6 +319,26 @@ function renderAllCards() {
     });
   });
 
+  // Click card → scroll editor to inline text + pulse
+  marginEl.querySelectorAll('.margin-card').forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      // Don't trigger if clicking a button, input, or link inside the card
+      if (e.target.closest('button, input, textarea, a')) return;
+      if (!editorView) return;
+      var hunkId = card.getAttribute('data-hunk-id');
+      var commentId = card.getAttribute('data-comment-id');
+      var target = null;
+      if (hunkId) target = editorView.dom.querySelector('[data-hunk-id="' + hunkId + '"]');
+      if (commentId) target = editorView.dom.querySelector('[data-comment-id="' + commentId + '"]');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('cm-inline-pulse');
+        setTimeout(function() { target.classList.remove('cm-inline-pulse'); }, 700);
+      }
+    });
+    card.style.cursor = 'pointer';
+  });
+
   // Resolve overlapping cards
   resolveOverlaps();
   } catch (err) {
@@ -446,6 +466,41 @@ export function focusMarginCard(type, id) {
   void card.offsetWidth;
   card.classList.add('margin-card--focused');
   setTimeout(function() { card.classList.remove('margin-card--focused'); }, 700);
+}
+
+// Inject a stale card into the margin panel (survives refreshFromGitHub rebuild)
+export function injectStaleCard(data, onDismiss) {
+  if (!marginEl) return;
+  // Remove "No changes yet" placeholder if present
+  var empty = marginEl.querySelector('.margin-empty');
+  if (empty) empty.remove();
+
+  var suggHtml = '';
+  if (data.type === 'deletion') {
+    suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(data.origText, 60)) + '</span>';
+  } else if (data.type === 'insertion') {
+    suggHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(data.newText, 60)) + '</span>';
+  } else if (data.origText || data.newText) {
+    suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(data.origText, 40)) + '</span>'
+      + ' <span class="margin-card-arrow">&rarr;</span> '
+      + '<span class="margin-card-ins">' + escapeHtml(truncate(data.newText, 40)) + '</span>';
+  }
+  var card = document.createElement('div');
+  card.className = 'margin-card margin-card--suggestion margin-card--stale';
+  card.setAttribute('data-hunk-id', data.hunkId);
+  card.style.top = '0px';
+  card.innerHTML = '<div class="margin-card-body">'
+    + '<div class="margin-card-status margin-card-status--stale">'
+    + '\u26A0 The text you suggested an edit to has changed.</div>'
+    + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
+    + '<div class="margin-card-stale-actions">'
+    + '<button class="edit-btn" data-action="dismiss-stale" data-hunk-id="' + data.hunkId + '">Dismiss</button>'
+    + '</div></div>';
+  marginEl.insertBefore(card, marginEl.firstChild);
+  var dismissBtn = card.querySelector('[data-action="dismiss-stale"]');
+  if (dismissBtn && onDismiss) {
+    dismissBtn.addEventListener('click', function(e) { e.stopPropagation(); onDismiss(data.hunkId); });
+  }
 }
 
 // Reposition cards on scroll or resize

@@ -267,10 +267,10 @@ const maskingTheme = EditorView.theme({
     backgroundColor: 'rgba(215, 180, 74, 0.3) !important',
   },
 
-  // Revealed syntax on focused line — visible but muted
+  // Revealed syntax on focused line — visible but muted (Obsidian style: same size, muted color)
   '.cm-revealed-syntax': {
     color: '#bbb',
-    fontSize: '0.75em',
+    fontSize: 'inherit',
   },
 
   // Zero-width hidden syntax — text stays in DOM but takes no space
