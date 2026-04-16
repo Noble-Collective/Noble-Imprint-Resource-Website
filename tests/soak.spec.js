@@ -392,6 +392,7 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
     await verify(page, 'R10: after accept');
 
     // === R11: Discard remaining suggestion if any ===
+    // === R11: Discard remaining suggestion if any ===
     console.log('\n=== R11: Discard remaining suggestions ===');
     const rejectBtn2 = page.locator('.margin-action--reject').first();
     if (await rejectBtn2.isVisible()) {

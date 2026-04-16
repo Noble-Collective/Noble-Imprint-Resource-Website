@@ -595,6 +595,10 @@ if (data) {
           const ctxPos = doc.indexOf(ctx);
           if (ctxPos >= 0) insertAt = ctxPos + (s.contextBefore || '').length;
         }
+        // Fallback: use originalFrom (position in the original file)
+        if (insertAt < 0 && s.originalFrom != null && s.originalFrom >= 0) {
+          insertAt = s.originalFrom;
+        }
         if (insertAt >= 0) {
           doc = doc.slice(0, insertAt) + s.newText + doc.slice(insertAt);
         }
