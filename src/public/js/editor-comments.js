@@ -3,12 +3,47 @@
 // Comments are tracked in the annotationRegistry StateField (in editor-suggestions.js).
 // This file only handles: tooltip UI, popup UI, and submitting to the API.
 // Decorations are built by the registry decoration plugin, not here.
-import { EditorView } from '/static/js/codemirror-bundle.js';
+import { EditorView, keymap } from '/static/js/codemirror-bundle.js';
 
 let editorViewRef = null;
 let onCommentAdded = null; // callback after new comment saved
 
-// --- Selection listener: show "Add Comment" tooltip on text selection ---
+// --- Bold/Italic toggle: wrap/unwrap selected text ---
+function toggleFormat(marker) {
+  if (!editorViewRef) return;
+  const sel = editorViewRef.state.selection.main;
+  if (sel.empty) return;
+  const selected = editorViewRef.state.sliceDoc(sel.from, sel.to);
+
+  // Check if already wrapped — unwrap if so
+  if (selected.startsWith(marker) && selected.endsWith(marker) && selected.length > marker.length * 2) {
+    const unwrapped = selected.slice(marker.length, -marker.length);
+    editorViewRef.dispatch({ changes: { from: sel.from, to: sel.to, insert: unwrapped } });
+  } else {
+    // Check if the surrounding text already has the markers
+    const before = sel.from >= marker.length ? editorViewRef.state.sliceDoc(sel.from - marker.length, sel.from) : '';
+    const after = editorViewRef.state.sliceDoc(sel.to, sel.to + marker.length);
+    if (before === marker && after === marker) {
+      // Remove surrounding markers
+      editorViewRef.dispatch({ changes: [
+        { from: sel.from - marker.length, to: sel.from, insert: '' },
+        { from: sel.to, to: sel.to + marker.length, insert: '' },
+      ] });
+    } else {
+      // Wrap with markers
+      editorViewRef.dispatch({ changes: { from: sel.from, to: sel.to, insert: marker + selected + marker } });
+    }
+  }
+  hideCommentTooltip();
+}
+
+// Keyboard shortcuts for bold/italic
+const formatKeymap = keymap.of([
+  { key: 'Mod-b', run: () => { toggleFormat('**'); return true; } },
+  { key: 'Mod-i', run: () => { toggleFormat('_'); return true; } },
+]);
+
+// --- Selection listener: show formatting toolbar on text selection ---
 const selectionListener = EditorView.updateListener.of((update) => {
   if (!update.selectionSet && !update.focusChanged) return;
   const sel = update.view.state.selection.main;
@@ -26,18 +61,37 @@ let tooltipEl = null;
 
 function showCommentTooltip(x, y) {
   if (!tooltipEl) {
-    tooltipEl = document.createElement('button');
+    tooltipEl = document.createElement('div');
     tooltipEl.className = 'comment-tooltip';
-    tooltipEl.textContent = '+ Comment';
-    tooltipEl.addEventListener('click', (e) => {
+
+    const boldBtn = document.createElement('button');
+    boldBtn.className = 'comment-tooltip-btn comment-tooltip-bold';
+    boldBtn.innerHTML = '<strong>B</strong>';
+    boldBtn.title = 'Bold (Ctrl+B)';
+    boldBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleFormat('**'); });
+
+    const italicBtn = document.createElement('button');
+    italicBtn.className = 'comment-tooltip-btn comment-tooltip-italic';
+    italicBtn.innerHTML = '<em>I</em>';
+    italicBtn.title = 'Italic (Ctrl+I)';
+    italicBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleFormat('_'); });
+
+    const commentBtn = document.createElement('button');
+    commentBtn.className = 'comment-tooltip-btn comment-tooltip-comment';
+    commentBtn.textContent = '+ Comment';
+    commentBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       hideCommentTooltip();
       showCommentPopup();
     });
+
+    tooltipEl.appendChild(boldBtn);
+    tooltipEl.appendChild(italicBtn);
+    tooltipEl.appendChild(commentBtn);
     document.body.appendChild(tooltipEl);
   }
-  tooltipEl.style.display = 'block';
+  tooltipEl.style.display = 'flex';
   tooltipEl.style.left = x + 'px';
   tooltipEl.style.top = (y - 36) + 'px';
 }
@@ -69,7 +123,7 @@ function showCommentPopup() {
 // --- Public API ---
 
 export function commentExtension() {
-  return [selectionListener];
+  return [selectionListener, formatKeymap];
 }
 
 export function initComments(view, callback) {

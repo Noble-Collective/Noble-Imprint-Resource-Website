@@ -174,11 +174,21 @@ function findZone(zones, pos) {
 }
 
 // --- Selection clamping via transactionFilter (synchronous, no flicker) ---
+let _clampCount = 0;
 const selectionClamp = EditorState.transactionFilter.of((tr) => {
   if (!tr.newSelection) return tr;
 
   const zones = tr.startState.field(editableZonesField);
   if (zones.length === 0) return tr;
+
+  // Safety: detect runaway filter loops (shouldn't happen, but protects Safari)
+  _clampCount++;
+  if (_clampCount > 100) {
+    console.warn('[CLAMP] runaway detected — breaking out');
+    _clampCount = 0;
+    return tr;
+  }
+  setTimeout(() => { _clampCount = 0; }, 0);
 
   const sel = tr.newSelection.main;
 
@@ -195,7 +205,9 @@ const selectionClamp = EditorState.transactionFilter.of((tr) => {
   const clampedHead = Math.max(anchorZone.from, Math.min(anchorZone.to, sel.head));
   if (clampedHead === sel.anchor) return tr; // Would collapse to cursor
 
-  return [tr, { selection: EditorSelection.single(sel.anchor, clampedHead) }];
+  // Return a single spec with the clamped selection (avoids the overhead of
+  // returning [tr, {selection}] which can cause stutter on rapid mouse events)
+  return { selection: EditorSelection.single(sel.anchor, clampedHead), scrollIntoView: tr.scrollIntoView };
 });
 
 // --- Edit protection via transactionFilter ---

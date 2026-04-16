@@ -131,6 +131,8 @@ function buildMaskingDecorations(view, skipLineNumber) {
       const prefixLen = headingMatch[0].length;
       hideInline(lineFrom, lineFrom + prefixLen);
       mark(lineFrom + prefixLen, line.to, 'cm-heading-' + level);
+      // Line-level decoration for spacing — CM6 syncs gutter height with .cm-line height
+      decorations.push(Decoration.line({ class: 'cm-heading-line-' + level }).range(lineFrom));
       continue;
     }
 
@@ -286,29 +288,24 @@ const maskingTheme = EditorView.theme({
     color: 'transparent',
   },
 
-  // Headings
+  // Headings — font styling on mark (inline span), spacing on line-level decoration
   '.cm-heading-1': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '2rem',
     fontWeight: '600',
     lineHeight: '1.3',
-    marginTop: '0.5em',
   },
   '.cm-heading-2': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '1.5rem',
     fontWeight: '600',
     lineHeight: '1.3',
-    marginTop: '0.5em',
-    paddingBottom: '0.25em',
-    borderBottom: '1px solid #e5e5e5',
   },
   '.cm-heading-3': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '1.15rem',
     fontWeight: '600',
     lineHeight: '1.4',
-    marginTop: '0.3em',
   },
   '.cm-heading-4': {
     fontFamily: "'Poppins', sans-serif",
@@ -325,6 +322,10 @@ const maskingTheme = EditorView.theme({
     letterSpacing: '0.5px',
     color: '#888',
   },
+  // Line-level heading spacing — on .cm-line so CM6 syncs gutter heights
+  '.cm-heading-line-1': { marginTop: '0.5em' },
+  '.cm-heading-line-2': { marginTop: '0.5em', paddingBottom: '0.25em', borderBottom: '1px solid #e5e5e5' },
+  '.cm-heading-line-3': { marginTop: '0.3em' },
 
   // Question blocks — border on line to prevent duplication from split spans
   '.cm-line:has(.cm-question-block)': {
