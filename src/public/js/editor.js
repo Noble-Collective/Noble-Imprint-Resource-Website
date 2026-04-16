@@ -184,10 +184,10 @@ if (data) {
                 authorName: data.user ? data.user.displayName : '',
                 firestoreId: result.id,
                 loadedFromServer: false,
+                ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
               }) });
 
               // Legacy: keep pendingSuggestions in sync for findFirestoreId fallback
-              // TODO: remove once findFirestoreId is fully registry-based
               if (!data.pendingSuggestions) data.pendingSuggestions = [];
               data.pendingSuggestions.push({
                 id: result.id,
@@ -199,6 +199,7 @@ if (data) {
                 authorEmail: data.user ? data.user.email : '',
                 authorName: data.user ? data.user.displayName : '',
                 ...ctx,
+                ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
               });
             }
           }
@@ -206,9 +207,10 @@ if (data) {
       }
     }
 
-    // Clear pending format groups that were processed
+    // Clear pending format groups only if they were actually matched to hunks
     for (const fg of formatGroups) {
-      clearPendingFormatGroup(fg.groupId);
+      const wasMatched = hunks.some(h => h.type === 'insertion' && h.newText === fg.marker);
+      if (wasMatched) clearPendingFormatGroup(fg.groupId);
     }
 
     if (saveStatus) {
