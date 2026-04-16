@@ -123,19 +123,54 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   // and verify the decoration exists. CM6 virtualizes rendering so we must scroll first.
   for (const s of fs.suggestions) {
     if (!s.newText || s.newText.length <= 2) continue;
-    const found = await page.evaluate((nt) => {
+    // Use context to scroll to the right part of the doc
+    const searchText = s.contextBefore ? s.contextBefore.slice(-20) + s.newText : s.newText;
+    await page.evaluate(({ nt, ctx }) => {
       const v = window.__editorView;
-      if (!v) return false;
+      if (!v) return;
       const doc = v.state.doc.toString();
-      const pos = doc.indexOf(nt);
+      // Try context-aware search first, fall back to bare search
+      let pos = ctx ? doc.indexOf(ctx) : -1;
+      if (pos >= 0) pos += ctx.length - nt.length;
+      else pos = doc.indexOf(nt);
       if (pos >= 0) v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-      return null; // need to wait after scroll
-    }, s.newText);
+    }, { nt: s.newText, ctx: searchText });
     await page.waitForTimeout(300);
-    const visible = await page.evaluate((nt) => {
+    const visible = await page.evaluate(({ nt }) => {
       return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
-    }, s.newText);
-    if (!visible) errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}"`);
+    }, { nt: s.newText });
+    if (!visible) {
+      // Retry: scroll to the registry entry's actual position (indexOf might have found wrong occurrence)
+      const retryPos = await page.evaluate(({ nt }) => {
+        const v = window.__editorView;
+        if (!v || !window.__annotationRegistry) return -1;
+        const reg = v.state.field(window.__annotationRegistry);
+        for (const [, a] of reg) {
+          if (a.kind === 'suggestion' && a.newText === nt) return a.currentFrom;
+        }
+        return -1;
+      }, { nt: s.newText });
+      if (retryPos >= 0) {
+        await page.evaluate(({ pos }) => {
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+        }, { pos: retryPos });
+        await page.waitForTimeout(300);
+        const retryVisible = await page.evaluate(({ nt }) => {
+          return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
+        }, { nt: s.newText });
+        if (!retryVisible) {
+          const ctx = await page.evaluate(({ pos }) => {
+            const v = window.__editorView;
+            if (!v) return 'no view';
+            const doc = v.state.doc.toString();
+            return 'text@pos: "' + doc.substring(pos - 5, pos + 10) + '" allInserts: ' + [...document.querySelectorAll('.cm-suggestion-insert')].map(el => el.textContent).join(',');
+          }, { pos: retryPos });
+          errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}" at pos ${retryPos} — ${ctx}`);
+        }
+      } else {
+        errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}" (not in registry)`);
+      }
+    }
   }
   for (const c of fs.comments) {
     if (!c.selectedText) continue;

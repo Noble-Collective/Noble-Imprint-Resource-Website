@@ -325,7 +325,7 @@ if (data) {
 
       // Repopulate registry with shifted positions + rebuild savedHunks
       const existingComments = fresh.pendingComments || [];
-      const registryEntries = buildShiftedRegistryEntries(remainingSuggestions, existingComments);
+      const registryEntries = buildShiftedRegistryEntries(remainingSuggestions, existingComments, newWorkingDoc);
       // Rebuild savedHunks from the suggestion entries
       for (const e of registryEntries) {
         if (e.kind === 'suggestion') {
@@ -513,7 +513,7 @@ if (data) {
 
       // CRITICAL: Full doc replacement makes mapPos meaningless — all registry
       // positions collapsed to 0. Rebuild the registry with correct working-doc positions.
-      const rebuiltEntries = buildShiftedRegistryEntries(remainingSuggestions, remainingComments);
+      const rebuiltEntries = buildShiftedRegistryEntries(remainingSuggestions, remainingComments, newWorkingDoc);
       editorView.dispatch({ effects: setAnnotations.of(rebuiltEntries) });
 
       const zones = recomputeZones(editorView.state.doc);
@@ -627,7 +627,7 @@ if (data) {
   // buildWorkingDoc applies suggestions end-to-start, which shifts positions.
   // This function computes the correct positions for BOTH suggestions and comments
   // in the working doc by tracking cumulative shifts from suggestion applications.
-  function buildShiftedRegistryEntries(suggestions, comments) {
+  function buildShiftedRegistryEntries(suggestions, comments, workingDocContent) {
     const entries = [];
     const validSuggs = (suggestions || []).filter(s => !s.resolvedStale);
 
@@ -694,11 +694,35 @@ if (data) {
       if (c.resolvedStale) continue;
       const from = c.resolvedFrom != null ? c.resolvedFrom : (c.from != null ? c.from : c.originalFrom);
       const to = c.resolvedTo != null ? c.resolvedTo : (c.to != null ? c.to : c.originalTo);
+
+      // Find the comment's actual position in the working doc by searching for its text.
+      // The shift-based computation (toWorkingPos) can drift by a few chars when multiple
+      // suggestions interact. Direct text search is more reliable for comments.
+      let curFrom = toWorkingPos(from);
+      let curTo = toWorkingPos(to);
+      if (workingDocContent && c.selectedText) {
+        // Use context to find the correct occurrence if text appears multiple times
+        const shiftedPos = curFrom;
+        const searchStart = Math.max(0, shiftedPos - 50);
+        const searchEnd = Math.min(workingDocContent.length, shiftedPos + c.selectedText.length + 50);
+        const nearbyIdx = workingDocContent.indexOf(c.selectedText, searchStart);
+        if (nearbyIdx >= 0 && nearbyIdx < searchEnd) {
+          curFrom = nearbyIdx;
+          curTo = nearbyIdx + c.selectedText.length;
+        } else {
+          // Fallback: global search
+          const globalIdx = workingDocContent.indexOf(c.selectedText);
+          if (globalIdx >= 0) {
+            curFrom = globalIdx;
+            curTo = globalIdx + c.selectedText.length;
+          }
+        }
+      }
+
       entries.push({
         id: c.id, kind: 'comment',
         selectedText: c.selectedText || '', commentText: c.commentText || '',
-        currentFrom: toWorkingPos(from), currentTo: toWorkingPos(to),
-        // Preserve original-file positions so rebuild after discard can recompute
+        currentFrom: curFrom, currentTo: curTo,
         originalFrom: from, originalTo: to,
         authorEmail: c.authorEmail, authorName: c.authorName,
         firestoreId: c.id, loadedFromServer: true,
@@ -871,9 +895,7 @@ if (data) {
       // Populate annotation registry with suggestions + comments.
       // Positions shifted to working-doc coordinates (buildWorkingDoc shifts content).
       const existingComments = data.pendingComments || [];
-      const registryEntries = buildShiftedRegistryEntries(existingSuggestions, existingComments);
-
-      console.log('[INIT] registryEntries:', registryEntries.length, registryEntries.map(e => e.kind + ' ' + (e.id||'').substring(0,8) + ' curFrom:' + e.currentFrom + ' curTo:' + e.currentTo));
+      const registryEntries = buildShiftedRegistryEntries(existingSuggestions, existingComments, workingDoc);
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       }
