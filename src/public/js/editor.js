@@ -292,6 +292,9 @@ if (data) {
   // --- Smart refresh: re-fetch from GitHub and rebuild editor state ---
   async function refreshFromGitHub() {
     showRefreshOverlay();
+    // Save scroll position to restore after rebuild
+    const scroller = editorView?.scrollDOM;
+    const savedScrollTop = scroller ? scroller.scrollTop : 0;
     try {
       const freshRes = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (!freshRes.ok) { hideRefreshOverlay(); return; }
@@ -350,6 +353,10 @@ if (data) {
       updateReplies(fresh.pendingReplies || []);
     } catch (err) {
       console.error('[REFRESH] error:', err.message, err.stack);
+    }
+    // Restore scroll position after rebuild
+    if (scroller && savedScrollTop) {
+      requestAnimationFrame(() => { scroller.scrollTop = savedScrollTop; });
     }
     hideRefreshOverlay();
   }
