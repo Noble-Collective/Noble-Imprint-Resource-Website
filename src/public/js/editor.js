@@ -693,12 +693,14 @@ if (data) {
 
     for (const c of (comments || [])) {
       if (c.resolvedStale) continue;
-      const from = c.resolvedFrom != null ? c.resolvedFrom : c.from;
-      const to = c.resolvedTo != null ? c.resolvedTo : c.to;
+      const from = c.resolvedFrom != null ? c.resolvedFrom : (c.from != null ? c.from : c.originalFrom);
+      const to = c.resolvedTo != null ? c.resolvedTo : (c.to != null ? c.to : c.originalTo);
       entries.push({
         id: c.id, kind: 'comment',
         selectedText: c.selectedText || '', commentText: c.commentText || '',
         currentFrom: toWorkingPos(from), currentTo: toWorkingPos(to),
+        // Preserve original-file positions so rebuild after discard can recompute
+        originalFrom: from, originalTo: to,
         authorEmail: c.authorEmail, authorName: c.authorName,
         firestoreId: c.id, loadedFromServer: true,
       });
@@ -896,6 +898,16 @@ if (data) {
 
       // Init comment popup UI (no module array — comments are in the registry)
       initComments(editorView, (commentData) => {
+        // Compute original-file position for the comment so it survives
+        // discard rebuilds (which need original-file positions, not working-doc)
+        const original = editorView.state.field(originalDocField);
+        if (original && commentData.selectedText) {
+          const origIdx = original.indexOf(commentData.selectedText);
+          if (origIdx >= 0) {
+            commentData.originalFrom = origIdx;
+            commentData.originalTo = origIdx + commentData.selectedText.length;
+          }
+        }
         // Add new comment to registry
         editorView.dispatch({ effects: addAnnotation.of(commentData) });
         // Notify margin panel
