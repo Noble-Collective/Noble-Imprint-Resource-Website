@@ -716,10 +716,10 @@ test.describe('Registry Robustness', () => {
     }, textInfo.pos);
     await page.waitForTimeout(300);
 
-    // Click the comment tooltip
-    const tooltip = page.locator('.comment-tooltip');
-    await expect(tooltip).toBeVisible({ timeout: 3000 });
-    await tooltip.click();
+    // Click the Comment button in the tooltip
+    const commentBtn = page.locator('.comment-tooltip-comment');
+    await expect(commentBtn).toBeVisible({ timeout: 3000 });
+    await commentBtn.click();
     await page.waitForTimeout(300);
 
     // Type comment and submit
@@ -1395,7 +1395,7 @@ test.describe('Editor - Comments', () => {
     await selectText(page, 'belief system');
     await page.waitForTimeout(500);
     // Click the floating tooltip
-    await page.click('.comment-tooltip');
+    await page.click('.comment-tooltip-comment');
     await page.waitForTimeout(300);
     // Type in the popup
     await page.fill('#comment-popup-input', 'This needs clarification');
@@ -1409,7 +1409,7 @@ test.describe('Editor - Comments', () => {
   test('comment shows yellow highlight in editor', async ({ page }) => {
     await selectText(page, 'belief system');
     await page.waitForTimeout(500);
-    await page.click('.comment-tooltip');
+    await page.click('.comment-tooltip-comment');
     await page.waitForTimeout(300);
     await page.fill('#comment-popup-input', 'Test comment');
     await page.click('#comment-popup-submit');
@@ -1422,7 +1422,7 @@ test.describe('Editor - Comments', () => {
   test('comment shows in margin panel', async ({ page }) => {
     await selectText(page, 'belief system');
     await page.waitForTimeout(500);
-    await page.click('.comment-tooltip');
+    await page.click('.comment-tooltip-comment');
     await page.waitForTimeout(300);
     await page.fill('#comment-popup-input', 'Needs rewording');
     await page.click('#comment-popup-submit');
@@ -2102,11 +2102,10 @@ test.describe('Integration - Full Editing Session', () => {
     }, commentWord);
     await page.waitForTimeout(1000);
 
-    // Click comment tooltip — use force:true to bypass viewport check since
-    // Playwright's auto-scroll doesn't understand CM's nested scroll container
-    const tooltip = page.locator('.comment-tooltip');
-    await expect(tooltip).toBeVisible({ timeout: 5000 });
-    await tooltip.click({ force: true });
+    // Click the Comment button via JS — the tooltip has position:fixed and after
+    // multiple accept+refresh cycles it can end up outside Playwright's viewport
+    await page.waitForSelector('.comment-tooltip-comment', { timeout: 5000 });
+    await page.evaluate(() => document.querySelector('.comment-tooltip-comment').click());
     await page.waitForTimeout(300);
 
     // Type and submit comment
