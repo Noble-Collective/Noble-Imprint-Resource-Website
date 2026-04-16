@@ -285,20 +285,47 @@ async function clearAllSuggestions() {
 // GLOBAL SETUP — verify test file is clean before running
 // ============================================================
 
+// Shared: save and restore the test file on GitHub for tests that accept suggestions
+const TEST_FILE_PATH_FULL = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+let _cleanFileContent = null;
+
+async function saveCleanFile() {
+  if (_cleanFileContent) return; // already saved
+  const github = require('../src/server/github');
+  const { content } = await github.getFileContent(TEST_FILE_PATH_FULL);
+  _cleanFileContent = content;
+}
+
+async function restoreCleanFile() {
+  if (!_cleanFileContent) return;
+  const github = require('../src/server/github');
+  const { content, sha } = await github.getFileContent(TEST_FILE_PATH_FULL);
+  if (content !== _cleanFileContent) {
+    await github.updateFileContent(TEST_FILE_PATH_FULL, _cleanFileContent, sha, 'Restore clean test file after test');
+    console.log('[TEST] Restored clean file on GitHub');
+  }
+}
+
 test.beforeAll(async () => {
   const github = require('../src/server/github');
-  const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
-  const { content } = await github.getFileContent(filePath);
+  const { content, sha } = await github.getFileContent(TEST_FILE_PATH_FULL);
   const residue = ['INTEG', 'FIRSTEDIT', 'SECONDEDIT', 'DISCARD', 'EDIT1', 'EDIT2', 'EDIT3',
     'ACCEPTTEST', 'TESTREPLACEMENT', 'BOTTEST', 'BOTVISIBLE', 'REPLYTEST', 'KEEP1', 'KEEP2',
     'OverviewX', 'CHANGED'];
   const found = residue.filter(r => content.includes(r));
   if (found.length > 0) {
-    throw new Error(
-      `Test file has residue from a previous run: ${found.join(', ')}. ` +
-      `Restore the clean file before running tests.`
-    );
+    // Auto-clean instead of throwing — remove residue and restore the file
+    console.warn('[TEST] Auto-cleaning residue from test file:', found.join(', '));
+    let clean = content;
+    // Remove appended residue (e.g. "OverviewX" → "Overview", "wordINTEG" → "word")
+    for (const r of found) {
+      clean = clean.split(r).join(r === 'OverviewX' ? 'Overview' : '');
+    }
+    await github.updateFileContent(TEST_FILE_PATH_FULL, clean, sha, 'Auto-clean test file residue: ' + found.join(', '));
+    console.log('[TEST] File cleaned successfully');
   }
+  // Save the clean content for restore
+  _cleanFileContent = found.length > 0 ? (await github.getFileContent(TEST_FILE_PATH_FULL)).content : content;
 });
 
 // ============================================================
@@ -619,6 +646,8 @@ test.describe('Registry Robustness', () => {
   test.afterEach(async () => {
     await clearAllSuggestions();
     await clearAllComments();
+    // Restore GitHub file if any test accepted a suggestion (modifies the file)
+    await restoreCleanFile();
   });
 
   test('discarding one suggestion does not remove others', async ({ page }) => {
@@ -1157,7 +1186,6 @@ test.describe('Editor - Accept/Reject Flow', () => {
 // ============================================================
 
 test.describe('Accept Refresh', () => {
-  let savedContent = null;
   const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
 
   test.beforeEach(async ({ page }) => {
@@ -1168,36 +1196,17 @@ test.describe('Accept Refresh', () => {
 
   test.afterEach(async () => {
     await clearAllSuggestions();
-    // Restore original file if the test modified it
-    if (savedContent) {
-      const http = require('http');
-      await new Promise((resolve) => {
-        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
-          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
-          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
-            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
-              const sha = JSON.parse(d).sha;
-              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after accept refresh test' });
-              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
-                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
-              }); er.write(body); er.end();
-            });
-          });
-        });
-        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
-      });
-    }
+    await restoreCleanFile();
   });
 
   test('accepting a suggestion clears inline decorations and refreshes from GitHub', async ({ page, request }) => {
-    // Save original content for restoration
+    await saveCleanFile();
     const apiKey = process.env.CLAUDE_API_KEY || '';
     const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
       params: { filePath: TEST_FILE },
       headers: { 'x-api-key': apiKey },
     });
     const { content } = await contentRes.json();
-    savedContent = content;
 
     await enterSuggestMode(page);
 
@@ -1244,31 +1253,11 @@ test.describe('Accept Refresh', () => {
 test.describe('Accept Precision', () => {
   const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
   const TEST_BOOK = 'series/Narrative Journey Series/Foundations/Test Book';
-  let savedContent = null;
 
   // Restore original file after each test (the test modifies GitHub)
   test.afterEach(async () => {
     await clearAllSuggestions();
-    if (savedContent) {
-      const http = require('http');
-      await new Promise((resolve) => {
-        // Login
-        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
-          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
-          // Get current SHA (file was modified by the test)
-          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
-            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
-              const sha = JSON.parse(d).sha;
-              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after precision test' });
-              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
-                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
-              }); er.write(body); er.end();
-            });
-          });
-        });
-        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
-      });
-    }
+    await restoreCleanFile();
   });
 
   test('context-based accept targets the correct occurrence, not the first', async ({ request }) => {
@@ -1280,7 +1269,7 @@ test.describe('Accept Precision', () => {
       headers: { 'x-api-key': apiKey },
     });
     const { content, sha } = await contentRes.json();
-    savedContent = content;
+    await saveCleanFile();
 
     // Find ALL periods in the file
     const periods = [];
@@ -1959,7 +1948,6 @@ test.describe('API Key Auth (Claude AI bot)', () => {
 
 test.describe('Integration - Full Editing Session', () => {
   const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
-  let savedContent = null;
 
   test.beforeEach(async ({ page }) => {
     await clearAllSuggestions();
@@ -1972,25 +1960,7 @@ test.describe('Integration - Full Editing Session', () => {
   test.afterEach(async () => {
     await clearAllSuggestions();
     await clearAllComments();
-    // Restore original file if the test modified it
-    if (savedContent) {
-      const http = require('http');
-      await new Promise((resolve) => {
-        const lr = http.request('http://localhost:8080/api/auth/test-login', { method: 'POST', headers: { 'Content-Type': 'application/json' } }, (loginRes) => {
-          const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0] || '';
-          http.get('http://localhost:8080/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), { headers: { 'x-api-key': process.env.CLAUDE_API_KEY || '' } }, (gr) => {
-            let d = ''; gr.on('data', c => d += c); gr.on('end', () => {
-              const sha = JSON.parse(d).sha;
-              const body = JSON.stringify({ filePath: TEST_FILE, content: savedContent, sha, comment: 'Restore after integration test' });
-              const er = http.request('http://localhost:8080/api/suggestions/direct-edit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Cookie': cookie, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
-                let o = ''; r.on('data', c => o += c); r.on('end', () => { savedContent = null; resolve(); });
-              }); er.write(body); er.end();
-            });
-          });
-        });
-        lr.write(JSON.stringify({ email: 'steve@noblecollective.org' })); lr.end();
-      });
-    }
+    await restoreCleanFile();
   });
 
   // Helper: fetch suggestions/comments via page context (uses session cookie)
@@ -2013,12 +1983,7 @@ test.describe('Integration - Full Editing Session', () => {
   test('edit → auto-save → edit → accept both → comment: full session', async ({ page }) => {
     test.setTimeout(180000); // 3 minutes — sequential accepts are slow
 
-    // Save original content for restoration
-    const apiKey = process.env.CLAUDE_API_KEY || '';
-    const initialContent = await (await fetch(BASE_URL + '/api/suggestions/content?filePath=' + encodeURIComponent(TEST_FILE), {
-      headers: { 'x-api-key': apiKey },
-    })).json();
-    savedContent = initialContent.content;
+    await saveCleanFile();
 
     await enterSuggestMode(page);
 
