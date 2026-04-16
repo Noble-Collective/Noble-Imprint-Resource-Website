@@ -116,9 +116,9 @@ function showCommentTooltip(x, y) {
       showCommentPopup();
     });
 
+    tooltipEl.appendChild(commentBtn);
     tooltipEl.appendChild(boldBtn);
     tooltipEl.appendChild(italicBtn);
-    tooltipEl.appendChild(commentBtn);
     document.body.appendChild(tooltipEl);
   }
   tooltipEl.style.display = 'flex';

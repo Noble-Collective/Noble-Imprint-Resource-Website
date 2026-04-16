@@ -28,6 +28,41 @@ test.describe('Bold/Italic creates single card', () => {
     await clearAllSuggestions();
   });
 
+  test('bold shows 1 card immediately (no flash of 2)', async ({ page }) => {
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await page.click('#btn-suggest-edit');
+    await page.waitForSelector('#codemirror-host .cm-editor');
+    await page.waitForTimeout(500);
+
+    const word = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      const lines = doc.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        const ws = line.match(/\b[a-zA-Z]{6,10}\b/g) || [];
+        for (const w of ws) { if (doc.indexOf(w) === doc.lastIndexOf(w)) return w; }
+      }
+      return null;
+    });
+    expect(word).toBeTruthy();
+
+    await page.evaluate((w) => {
+      const view = window.__editorView;
+      const pos = view.state.doc.toString().indexOf(w);
+      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
+    }, word);
+    await page.waitForTimeout(300);
+
+    await page.locator('.comment-tooltip-bold').click();
+    // Check IMMEDIATELY — before auto-save (500ms, not 4000ms)
+    await page.waitForTimeout(500);
+
+    const cardCount = await page.locator('.margin-card').count();
+    console.log('Cards immediately after bold:', cardCount);
+    expect(cardCount).toBe(1);
+  });
+
   test('bolding 3 different words creates 3 cards with correct labels', async ({ page }) => {
     await page.goto(BASE_URL + TEST_SESSION_PATH);
     await login(page);

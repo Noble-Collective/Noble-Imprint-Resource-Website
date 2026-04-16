@@ -1,5 +1,6 @@
 // Noble Imprint — Margin Panel for Suggestions and Comments
 // Shows cards alongside the editor, positioned to align with document text.
+import { getPendingFormatGroups } from '/static/js/editor-comments.js';
 
 let marginEl = null;
 let editorView = null;
@@ -167,20 +168,34 @@ function renderAllCards() {
 
   // Merge linked hunks (e.g., bold/italic formatting that produces 2 insertion hunks).
   // Keep the first item, hide the second, and store the linked IDs for atomic accept/reject.
+  // Also check pending format groups for DRAFT hunks that haven't been auto-saved yet.
+  const pendingFmtGroups = getPendingFormatGroups();
   const linkedGroups = new Map(); // groupId → [item, item, ...]
   for (const item of items) {
     if (item.kind !== 'suggestion') continue;
-    // Check registry annotation first (has linkedGroup from auto-save promotion),
-    // then fall back to loaded Firestore data. Match loaded by ID only — content
-    // matching fails when multiple hunks have identical text (e.g., all "**").
-    const groupId = item.data.linkedGroup
+    // 1. Check registry annotation (has linkedGroup after auto-save promotion)
+    // 2. Check loaded Firestore data by ID
+    // 3. Check pending format groups for draft hunks (not yet saved)
+    let groupId = item.data.linkedGroup
       || loadedSuggestions.find(s => s.id === item.data.id)?.linkedGroup;
+    let label = item.data.linkedLabel
+      || loadedSuggestions.find(s => s.id === item.data.id)?.linkedLabel || '';
+    if (!groupId && item.data.type === 'insertion' && pendingFmtGroups.length > 0) {
+      const hPos = item.data.originalFrom != null ? item.data.originalFrom : item.pos;
+      for (const fg of pendingFmtGroups) {
+        if (item.data.newText !== fg.marker) continue;
+        if (hPos >= fg.origFrom - 2 && hPos <= fg.origFrom + fg.textLen + 2) {
+          groupId = fg.groupId;
+          label = fg.label;
+          break;
+        }
+      }
+    }
     if (groupId) {
       if (!linkedGroups.has(groupId)) linkedGroups.set(groupId, []);
       linkedGroups.get(groupId).push(item);
       item._linkedGroup = groupId;
-      item._linkedLabel = item.data.linkedLabel
-        || loadedSuggestions.find(s => s.id === item.data.id)?.linkedLabel || '';
+      item._linkedLabel = label;
     }
   }
   // Mark secondary items in each group as hidden
