@@ -808,6 +808,82 @@ test.describe('Registry Robustness', () => {
     expect(doc.exists).toBeTruthy();
     expect(doc.data().status).toBe('pending');
   });
+
+  test('after accepting one suggestion, remaining suggestion highlights correct text', async ({ page, request }) => {
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+    const filePath = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+    const bookPath = 'series/Narrative Journey Series/Foundations/Test Book';
+    await saveCleanFile();
+
+    // Read file and find 2 unique words
+    const contentRes = await request.get(BASE_URL + '/api/suggestions/content', {
+      params: { filePath },
+      headers: { 'x-api-key': apiKey },
+    });
+    const { content, sha } = await contentRes.json();
+
+    const wordRe = /\b[A-Z][a-z]{7,12}\b/g;
+    const words = [];
+    let match;
+    while ((match = wordRe.exec(content)) !== null) {
+      const w = match[0];
+      if (content.indexOf(w) === content.lastIndexOf(w) && words.indexOf(w) === -1) {
+        words.push({ word: w, pos: match.index });
+        if (words.length >= 2) break;
+      }
+    }
+    expect(words.length).toBe(2);
+
+    // Create 2 suggestions via API — word → wordCHANGED
+    const ids = [];
+    for (const { word, pos } of words) {
+      const ctxBefore = content.substring(Math.max(0, pos - 80), pos);
+      const ctxAfter = content.substring(pos + word.length, Math.min(content.length, pos + word.length + 80));
+      const res = await request.post(BASE_URL + '/api/suggestions/hunk', {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        data: {
+          filePath, bookPath, baseCommitSha: sha,
+          type: 'replacement', originalFrom: pos, originalTo: pos + word.length,
+          originalText: word, newText: word + 'CHANGED',
+          contextBefore: ctxBefore, contextAfter: ctxAfter,
+        },
+      });
+      ids.push((await res.json()).id);
+    }
+
+    // Accept the FIRST suggestion via API
+    await request.post(BASE_URL + '/api/auth/test-login', { data: { email: 'steve@noblecollective.org' } });
+    await request.put(BASE_URL + '/api/suggestions/hunk/' + ids[0] + '/accept', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // Now load the page and enter suggest mode — the second suggestion should
+    // be positioned correctly despite the first being accepted (file changed)
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+    await page.waitForTimeout(1000);
+
+    // Scroll to where the second suggestion should be
+    const word2 = words[1].word;
+    await page.evaluate((w) => {
+      const view = window.__editorView;
+      const doc = view.state.doc.toString();
+      const pos = doc.indexOf(w + 'CHANGED');
+      if (pos >= 0) view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    }, word2);
+    await page.waitForTimeout(500);
+
+    // The insert decoration should highlight the replacement text including "CHANGED"
+    const highlights = await page.evaluate((w) => {
+      const els = document.querySelectorAll('.cm-suggestion-insert');
+      const result = [];
+      els.forEach(el => result.push(el.textContent));
+      return result;
+    }, word2);
+    console.log('Highlights after accept:', highlights, 'expected to contain:', word2 + 'CHANGED');
+    expect(highlights.some(h => h.includes(word2 + 'CHANGED'))).toBeTruthy();
+  });
 });
 
 // ============================================================

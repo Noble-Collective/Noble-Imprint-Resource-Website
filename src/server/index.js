@@ -314,6 +314,28 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
         allPendingComments = await suggestions.getCommentsForFile(session.path);
         allReplies = await suggestions.getRepliesForFile(session.path);
+
+        // Resolve anchor positions against current file content — without this,
+        // suggestions have stale originalFrom after other suggestions are accepted
+        const fileContent = sessionData.content;
+        for (const s of allPendingSuggestions) {
+          const resolved = suggestions.resolveAnchor(s, fileContent);
+          if (!resolved.stale) {
+            s.resolvedFrom = resolved.from;
+            s.resolvedTo = resolved.to;
+          } else {
+            s.resolvedStale = true;
+          }
+        }
+        for (const c of allPendingComments) {
+          const resolved = suggestions.resolveAnchor(c, fileContent);
+          if (!resolved.stale) {
+            c.resolvedFrom = resolved.from;
+            c.resolvedTo = resolved.to;
+          } else {
+            c.resolvedStale = true;
+          }
+        }
       }
 
       res.render('session', {
