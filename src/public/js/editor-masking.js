@@ -293,51 +293,52 @@ const maskingTheme = EditorView.theme({
     color: 'transparent',
   },
 
-  // Headings — font styling on mark (inline span), spacing on line-level decoration
-  '.cm-heading-1': {
+  // Headings — mark class just flags the text; font styling on line-level so
+  // CM6 measures consistent height for gutter alignment (no mixed font sizes)
+  '.cm-heading-1': {},
+  '.cm-heading-2': {},
+  '.cm-heading-3': {},
+  '.cm-heading-4': { color: '#6b6b6b' },
+  '.cm-heading-5': { textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888' },
+  // Line-level heading styles — font on the .cm-line so gutter syncs properly
+  '.cm-heading-line-1': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '2rem',
     fontWeight: '600',
     lineHeight: '1.3',
   },
-  '.cm-heading-2': {
+  '.cm-heading-line-2': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '1.5rem',
     fontWeight: '600',
     lineHeight: '1.3',
+    paddingBottom: '0.2em',
+    borderBottom: '1px solid #e5e5e5',
   },
-  '.cm-heading-3': {
+  '.cm-heading-line-3': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '1.15rem',
     fontWeight: '600',
     lineHeight: '1.4',
   },
-  '.cm-heading-4': {
+  '.cm-heading-line-4': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '0.95rem',
     fontWeight: '600',
     lineHeight: '1.4',
-    color: '#6b6b6b',
   },
-  '.cm-heading-5': {
+  '.cm-heading-line-5': {
     fontFamily: "'Poppins', sans-serif",
     fontSize: '0.85rem',
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    color: '#888',
   },
-  // Line-level heading spacing — padding (not margin) so CM6 includes it in gutter height measurement
-  '.cm-heading-line-1': { paddingTop: '0.5em' },
-  '.cm-heading-line-2': { paddingTop: '0.5em', paddingBottom: '0.25em', borderBottom: '1px solid #e5e5e5' },
-  '.cm-heading-line-3': { paddingTop: '0.3em' },
 
   // Question blocks — border on line to prevent duplication from split spans
+  // Minimal paddingTop so line number aligns with text; spacing mostly in paddingBottom
   '.cm-line:has(.cm-question-block)': {
     borderLeft: '3px solid #dfb53b',
     background: '#fdfbf4',
-    padding: '0.75rem 1.25rem !important',
-    margin: '0.5rem 0',
+    padding: '0.3rem 1.25rem 0.8rem 1.25rem !important',
     borderRadius: '0 6px 6px 0',
   },
   '.cm-question-block': {
@@ -374,12 +375,12 @@ const maskingTheme = EditorView.theme({
   },
 
   // Section blocks — border on line to prevent duplication
+  // Minimal paddingTop so line number aligns with text; spacing in paddingBottom
   '.cm-line:has(.cm-section-block)': {
     background: '#f6f8f5',
     border: '1px solid #e2e6df',
     borderRadius: '6px',
-    padding: '1rem 1.5rem !important',
-    margin: '0.5rem 0',
+    padding: '0.3rem 1.5rem 1rem 1.5rem !important',
   },
   '.cm-section-block': {
     display: 'inline',
