@@ -28,6 +28,63 @@ test.describe('Bold/Italic creates single card', () => {
     await clearAllSuggestions();
   });
 
+  test('bolding 3 different words creates 3 cards with correct labels', async ({ page }) => {
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await page.click('#btn-suggest-edit');
+    await page.waitForSelector('#codemirror-host .cm-editor');
+    await page.waitForTimeout(500);
+
+    // Find 3 unique words in plain text
+    const words = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      const lines = doc.split('\n');
+      const found = [];
+      for (const line of lines) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        const ws = line.match(/\b[a-zA-Z]{6,10}\b/g) || [];
+        for (const w of ws) {
+          if (doc.indexOf(w) === doc.lastIndexOf(w) && !found.includes(w)) {
+            found.push(w);
+            if (found.length >= 3) return found;
+          }
+        }
+      }
+      return found;
+    });
+    console.log('Words to bold:', words);
+    expect(words.length).toBe(3);
+
+    // Bold each word one at a time
+    for (const word of words) {
+      await page.evaluate((w) => {
+        const view = window.__editorView;
+        const doc = view.state.doc.toString();
+        const pos = doc.indexOf(w);
+        if (pos >= 0) view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
+      }, word);
+      await page.waitForTimeout(300);
+      const boldBtn = page.locator('.comment-tooltip-bold');
+      await expect(boldBtn).toBeVisible({ timeout: 3000 });
+      await boldBtn.click();
+      await page.waitForTimeout(500);
+    }
+
+    // Wait for auto-save
+    await page.waitForTimeout(4000);
+
+    const cardTexts = await page.evaluate(() => {
+      return [...document.querySelectorAll('.margin-card .margin-card-body')].map(el => el.textContent.trim());
+    });
+    console.log('Card texts:', JSON.stringify(cardTexts));
+
+    // Each card should contain the correct word
+    expect(cardTexts.length).toBe(3);
+    for (let i = 0; i < words.length; i++) {
+      expect(cardTexts[i]).toContain(words[i]);
+    }
+  });
+
   test('bolding a word creates exactly 1 margin card', async ({ page }) => {
     await page.goto(BASE_URL + TEST_SESSION_PATH);
     await login(page);

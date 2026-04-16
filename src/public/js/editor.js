@@ -110,12 +110,20 @@ if (data) {
         originalText: hunk.originalText, newText: hunk.newText, ...ctx,
       };
 
-      // Tag formatting hunks with a linkedGroup so they're treated as one change
+      // Tag formatting hunks with a linkedGroup so they're treated as one change.
+      // Match by marker text AND position proximity — the 2 hunks for a bold/italic
+      // wrap bracket the original text position (one just before, one just after).
       if (hunk.type === 'insertion' && formatGroups.length > 0) {
         for (const fg of formatGroups) {
-          if (hunk.newText === fg.marker) {
+          if (hunk.newText !== fg.marker) continue;
+          if (fg._matchCount >= 2) continue; // Already matched 2 hunks for this group
+          // Hunk's originalFrom should be near the format group's text range
+          const origStart = fg.origFrom;
+          const origEnd = fg.origFrom + fg.textLen;
+          if (hunk.originalFrom >= origStart - 2 && hunk.originalFrom <= origEnd + 2) {
             hunkData.linkedGroup = fg.groupId;
             hunkData.linkedLabel = fg.label;
+            fg._matchCount = (fg._matchCount || 0) + 1;
             break;
           }
         }

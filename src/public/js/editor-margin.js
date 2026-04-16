@@ -170,13 +170,17 @@ function renderAllCards() {
   const linkedGroups = new Map(); // groupId → [item, item, ...]
   for (const item of items) {
     if (item.kind !== 'suggestion') continue;
-    const loaded = loadedSuggestions.find(s => s.id === item.data.id || (s.originalText === item.data.originalText && s.newText === item.data.newText));
-    const groupId = loaded?.linkedGroup || item.data.linkedGroup;
+    // Check registry annotation first (has linkedGroup from auto-save promotion),
+    // then fall back to loaded Firestore data. Match loaded by ID only — content
+    // matching fails when multiple hunks have identical text (e.g., all "**").
+    const groupId = item.data.linkedGroup
+      || loadedSuggestions.find(s => s.id === item.data.id)?.linkedGroup;
     if (groupId) {
       if (!linkedGroups.has(groupId)) linkedGroups.set(groupId, []);
       linkedGroups.get(groupId).push(item);
       item._linkedGroup = groupId;
-      item._linkedLabel = loaded?.linkedLabel || item.data.linkedLabel || '';
+      item._linkedLabel = item.data.linkedLabel
+        || loadedSuggestions.find(s => s.id === item.data.id)?.linkedLabel || '';
     }
   }
   // Mark secondary items in each group as hidden

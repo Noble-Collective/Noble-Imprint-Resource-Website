@@ -4,6 +4,7 @@
 // This file only handles: tooltip UI, popup UI, and submitting to the API.
 // Decorations are built by the registry decoration plugin, not here.
 import { EditorView, keymap } from '/static/js/codemirror-bundle.js';
+import { originalDocField } from '/static/js/editor-suggestions.js';
 
 let editorViewRef = null;
 let onCommentAdded = null; // callback after new comment saved
@@ -39,12 +40,16 @@ function toggleFormat(marker) {
         { from: sel.to, to: sel.to + marker.length, insert: '' },
       ] });
     } else {
-      // Record a pending format group so auto-save links the 2 insertion hunks
+      // Record a pending format group so auto-save links the 2 insertion hunks.
+      // Store the original-file position so auto-save can match by position.
       const groupId = 'fmt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      const original = editorViewRef.state.field(originalDocField);
+      const origPos = original ? original.indexOf(selected) : sel.from;
       pendingFormatGroups.push({
         groupId,
         marker,
-        textFrom: sel.from,   // position of text being wrapped (in current doc)
+        textFrom: sel.from,
+        origFrom: origPos >= 0 ? origPos : sel.from,
         textLen: selected.length,
         label: (marker === '**' ? 'Bold' : 'Italic') + ': ' + selected,
       });
