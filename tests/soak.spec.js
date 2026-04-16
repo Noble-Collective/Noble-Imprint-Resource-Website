@@ -107,7 +107,16 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   // Check for cards stuck at top (position 0-10)
   const topCards = editor.cardPositions.filter(c => c.top < 10);
   if (topCards.length > 0) {
-    errors.push(`${topCards.length} card(s) stuck at top (pos < 10px): ${topCards.map(c => c.type + '@' + c.top).join(', ')}`);
+    const details = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.margin-card')];
+      return cards.filter(c => parseFloat(c.style.top) < 10).map(c => ({
+        type: c.classList.contains('margin-card--comment') ? 'comment' : 'suggestion',
+        top: parseFloat(c.style.top),
+        body: c.querySelector('.margin-card-body')?.textContent?.substring(0, 50),
+        hunkId: c.dataset.hunkId || c.dataset.commentId || 'none',
+      }));
+    });
+    errors.push(`${topCards.length} card(s) stuck at top: ${JSON.stringify(details)}`);
   }
 
   // Check Firestore for duplicate suggestions (same originalText+originalFrom)
@@ -223,6 +232,19 @@ test('Soak test: full editing session with random operations', async ({ page }) 
     await login(page);
     await enterSuggest(page);
     await page.waitForTimeout(2000);
+
+    // Debug: dump card positions
+    const regDebug = await page.evaluate(() => {
+      const cards = document.querySelectorAll('.margin-card');
+      return [...cards].map(c => ({
+        id: (c.dataset.hunkId || c.dataset.commentId || '').substring(0, 8),
+        type: c.classList.contains('margin-card--comment') ? 'C' : 'S',
+        top: Math.round(parseFloat(c.style.top)),
+        body: (c.querySelector('.margin-card-body')?.textContent || '').substring(0, 30),
+      }));
+    });
+    for (const c of regDebug) console.log(`  Card ${c.type} id=${c.id} top=${c.top} "${c.body}"`);
+
     await verify(page, 'R2: after re-enter', 3, 2);
 
     // === ROUND 3: Discard the first suggestion ===

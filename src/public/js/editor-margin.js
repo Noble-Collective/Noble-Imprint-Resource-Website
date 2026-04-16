@@ -137,13 +137,22 @@ function renderAllCards() {
   const items = [];
   const editorRect = editorView.dom.getBoundingClientRect();
 
-  for (const hunk of hunks) {
-    let top = 0;
-    const pos = hunk.type === 'deletion' ? (hunk.currentPos || 0) : (hunk.currentFrom || 0);
+  // Fallback position when coordsAtPos returns null (position below viewport, CM6 virtualization)
+  function estimateTop(pos) {
     try {
       const coords = editorView.coordsAtPos(pos);
-      if (coords) top = coords.top - editorRect.top;
-    } catch (e) { /* ignore */ }
+      if (coords) return coords.top - editorRect.top;
+    } catch { /* ignore */ }
+    // Approximate: use line number × default line height
+    try {
+      const line = editorView.state.doc.lineAt(pos);
+      return (line.number - 1) * editorView.defaultLineHeight;
+    } catch { return 0; }
+  }
+
+  for (const hunk of hunks) {
+    const pos = hunk.type === 'deletion' ? (hunk.currentPos || 0) : (hunk.currentFrom || 0);
+    const top = estimateTop(pos);
     items.push({ kind: 'suggestion', data: hunk, top, pos });
   }
 
@@ -151,15 +160,10 @@ function renderAllCards() {
   for (const c of currentComments) {
     let top = 0;
     let cPos = -1;
-    try {
-      if (c.resolvedFrom != null && !c.resolvedStale) cPos = c.resolvedFrom;
-      else if (c.currentFrom != null) cPos = c.currentFrom;
-      else cPos = doc.indexOf(c.selectedText);
-      if (cPos >= 0) {
-        const coords = editorView.coordsAtPos(cPos);
-        if (coords) top = coords.top - editorRect.top;
-      }
-    } catch { /* ignore */ }
+    if (c.resolvedFrom != null && !c.resolvedStale) cPos = c.resolvedFrom;
+    else if (c.currentFrom != null) cPos = c.currentFrom;
+    else cPos = doc.indexOf(c.selectedText);
+    if (cPos >= 0) top = estimateTop(cPos);
     items.push({ kind: 'comment', data: c, top, pos: cPos >= 0 ? cPos : 0 });
   }
 

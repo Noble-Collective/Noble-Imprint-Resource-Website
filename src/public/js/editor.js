@@ -651,7 +651,6 @@ if (data) {
       if (s.type === 'insertion') { curFrom = wp; curTo = wp + newLen; }
       else if (s.type === 'deletion') { curFrom = wp; curTo = wp; }
       else { curFrom = wp; curTo = wp + newLen; }
-
       entries.push({
         id: s.id, kind: 'suggestion', type: s.type,
         originalText: s.originalText || '', newText: s.newText || '',
@@ -874,6 +873,7 @@ if (data) {
       const existingComments = data.pendingComments || [];
       const registryEntries = buildShiftedRegistryEntries(existingSuggestions, existingComments);
 
+      console.log('[INIT] registryEntries:', registryEntries.length, registryEntries.filter(e => e.kind === 'suggestion').map(e => e.id?.substring(0,8) + ' ' + e.type + ' curFrom:' + e.currentFrom + ' curTo:' + e.currentTo));
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       }

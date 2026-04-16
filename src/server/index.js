@@ -325,6 +325,7 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
             s.resolvedTo = resolved.to;
           } else {
             s.resolvedStale = true;
+            console.log('[RESOLVE] suggestion', s.id, 'marked STALE — type:', s.type, 'origText:', (s.originalText||'').substring(0,20), 'anchor.exact:', (s.anchor?.exact||'').substring(0,20), 'prefix:', (s.anchor?.prefix || s.contextBefore || '').substring(0,20));
           }
         }
         for (const c of allPendingComments) {
