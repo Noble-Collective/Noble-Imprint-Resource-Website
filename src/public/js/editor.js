@@ -873,7 +873,7 @@ if (data) {
       const existingComments = data.pendingComments || [];
       const registryEntries = buildShiftedRegistryEntries(existingSuggestions, existingComments);
 
-      console.log('[INIT] registryEntries:', registryEntries.length, registryEntries.filter(e => e.kind === 'suggestion').map(e => e.id?.substring(0,8) + ' ' + e.type + ' curFrom:' + e.currentFrom + ' curTo:' + e.currentTo));
+      console.log('[INIT] registryEntries:', registryEntries.length, registryEntries.map(e => e.kind + ' ' + (e.id||'').substring(0,8) + ' curFrom:' + e.currentFrom + ' curTo:' + e.currentTo));
       if (registryEntries.length > 0) {
         editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       }
@@ -965,6 +965,7 @@ if (data) {
 
     // Expose for testing
     window.__editorView = editorView;
+    window.__annotationRegistry = annotationRegistry;
 
     editorView.focus();
   }

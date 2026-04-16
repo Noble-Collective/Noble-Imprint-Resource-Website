@@ -119,29 +119,48 @@ async function verify(page, step, expectedSuggs, expectedComments) {
 
   // 4. Inline decoration verification — scroll to each annotation's position
   //    and verify the decoration exists with correct text (CM6 virtualizes rendering)
+  // Scroll to each annotation's text in the WORKING doc (not original-file position)
+  // and verify the decoration exists. CM6 virtualizes rendering so we must scroll first.
   for (const s of fs.suggestions) {
-    if (!s.newText || s.newText.length <= 2) continue; // skip bold markers
-    const pos = s.resolvedFrom || s.originalFrom || 0;
-    await page.evaluate((p) => {
-      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: p }, scrollIntoView: true });
-    }, pos);
-    await page.waitForTimeout(300);
+    if (!s.newText || s.newText.length <= 2) continue;
     const found = await page.evaluate((nt) => {
+      const v = window.__editorView;
+      if (!v) return false;
+      const doc = v.state.doc.toString();
+      const pos = doc.indexOf(nt);
+      if (pos >= 0) v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      return null; // need to wait after scroll
+    }, s.newText);
+    await page.waitForTimeout(300);
+    const visible = await page.evaluate((nt) => {
       return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
     }, s.newText);
-    if (!found) errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}"`);
+    if (!visible) errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}"`);
   }
   for (const c of fs.comments) {
     if (!c.selectedText) continue;
-    const pos = c.resolvedFrom || c.from || 0;
-    await page.evaluate((p) => {
-      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: p }, scrollIntoView: true });
-    }, pos);
-    await page.waitForTimeout(300);
-    const found = await page.evaluate((st) => {
-      return [...document.querySelectorAll('.cm-comment-highlight')].some(el => el.textContent.includes(st));
+    await page.evaluate((st) => {
+      const v = window.__editorView;
+      if (!v) return;
+      const doc = v.state.doc.toString();
+      const pos = doc.indexOf(st);
+      if (pos >= 0) v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
     }, c.selectedText);
-    if (!found) errors.push(`Comment highlight missing for "${c.selectedText.substring(0, 20)}"`);
+    await page.waitForTimeout(300);
+    const check = await page.evaluate(({ st }) => {
+      const v = window.__editorView;
+      if (!v || !window.__annotationRegistry) return { noRegistry: true };
+      const reg = v.state.field(window.__annotationRegistry);
+      let regEntry = null;
+      for (const [id, a] of reg) { if (a.kind === 'comment' && a.selectedText === st) { regEntry = { id, currentFrom: a.currentFrom, currentTo: a.currentTo }; break; } }
+      const highlights = [...document.querySelectorAll('.cm-comment-highlight')].map(el => el.textContent);
+      const docPos = v.state.doc.toString().indexOf(st);
+      return { regEntry, highlights, docPos, docLen: v.state.doc.length };
+    }, { st: c.selectedText });
+    if (!check.highlights.some(h => h.includes(c.selectedText))) {
+      const detail = check.regEntry ? `registry curFrom:${check.regEntry.currentFrom} curTo:${check.regEntry.currentTo} docPos:${check.docPos}` : 'NOT IN REGISTRY';
+      errors.push(`Comment highlight missing for "${c.selectedText.substring(0, 20)}" (${detail})`);
+    }
   }
 
   // 5. Card order matches document order — cards should appear in the same
