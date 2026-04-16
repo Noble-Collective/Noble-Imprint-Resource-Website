@@ -193,7 +193,7 @@ function repliesCollection() {
 
 // --- Suggestion Hunk CRUD ---
 
-async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, fileContent }) {
+async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, fileContent, linkedGroup, linkedLabel }) {
   // Build enhanced anchor data if file content is available
   const anchorData = fileContent
     ? buildAnchorData(fileContent, originalFrom, originalTo, originalText || '')
@@ -223,6 +223,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedAt: null,
     resolvedBy: null,
+    ...(linkedGroup ? { linkedGroup, linkedLabel: linkedLabel || '' } : {}),
   });
   return ref.id;
 }

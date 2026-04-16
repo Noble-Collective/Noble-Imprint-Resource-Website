@@ -6,7 +6,7 @@ import {
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, injectStaleCard } from '/static/js/editor-margin.js';
-import { commentExtension, initComments } from '/static/js/editor-comments.js';
+import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
@@ -94,6 +94,9 @@ if (data) {
       }
     }
 
+    // Check for pending format groups — tag linked hunks
+    const formatGroups = getPendingFormatGroups();
+
     // Create or update hunks
     for (const hunk of hunks) {
       const key = hunkKey(hunk);
@@ -106,6 +109,17 @@ if (data) {
         type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
         originalText: hunk.originalText, newText: hunk.newText, ...ctx,
       };
+
+      // Tag formatting hunks with a linkedGroup so they're treated as one change
+      if (hunk.type === 'insertion' && formatGroups.length > 0) {
+        for (const fg of formatGroups) {
+          if (hunk.newText === fg.marker) {
+            hunkData.linkedGroup = fg.groupId;
+            hunkData.linkedLabel = fg.label;
+            break;
+          }
+        }
+      }
 
       // Check exact key match first, then overlapping match
       const existing = savedHunks.has(key)
@@ -190,6 +204,11 @@ if (data) {
           }
         } catch { /* ignore */ }
       }
+    }
+
+    // Clear pending format groups that were processed
+    for (const fg of formatGroups) {
+      clearPendingFormatGroup(fg.groupId);
     }
 
     if (saveStatus) {
@@ -331,6 +350,10 @@ if (data) {
     if (acceptingInProgress) return;
     acceptingInProgress = true;
 
+    // Check for linked hunks (e.g., bold/italic formatting = 2 insertions)
+    const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+    const linkedIds = card?.dataset.linkedIds?.split(',').filter(Boolean) || [];
+
     const firestoreId = findFirestoreId(hunkId);
     if (!firestoreId) {
       showToast('Could not find this suggestion. It may not be saved yet.', 'error');
@@ -389,6 +412,17 @@ if (data) {
       setCardStatus(hunkId, 'success', 'Committed to GitHub');
       removeRepliesForParent(firestoreId);
 
+      // Accept linked hunks atomically (e.g., bold/italic = 2 insertions)
+      for (const lid of linkedIds) {
+        if (lid !== firestoreId) {
+          try {
+            await fetch('/api/suggestions/hunk/' + lid + '/accept', {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            });
+          } catch { /* linked hunk may already be accepted */ }
+        }
+      }
+
       // Smart refresh: fetch latest from GitHub and rebuild editor
       await refreshFromGitHub();
 
@@ -420,14 +454,23 @@ if (data) {
     const firestoreId = findFirestoreId(hunkId);
     console.log('[DISCARD] hunkId:', hunkId, 'firestoreId:', firestoreId);
 
+    // Check for linked hunks (e.g., bold/italic = 2 insertions)
+    const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+    const linkedIds = card?.dataset.linkedIds?.split(',').filter(Boolean) || [];
+
     // Suppress auto-save during discard — the removeAnnotation and document rebuild
     // happen in separate dispatches, and between them the draftPlugin would see the
     // diff as "new" and auto-save would re-create the suggestion we're deleting.
     isDiscarding = true;
 
-    // Remove from the annotation registry
+    // Remove from the annotation registry (including linked hunks)
     if (firestoreId) {
       editorView.dispatch({ effects: removeAnnotation.of(firestoreId) });
+    }
+    for (const lid of linkedIds) {
+      if (lid !== firestoreId) {
+        editorView.dispatch({ effects: removeAnnotation.of(lid) });
+      }
     }
 
     // Rebuild the document from scratch: original + remaining registry suggestions
@@ -462,16 +505,17 @@ if (data) {
 
     isDiscarding = false;
 
-    // Delete or reject from Firestore immediately
-    if (firestoreId) {
+    // Delete or reject from Firestore immediately (including linked hunks)
+    const allIds = [firestoreId, ...linkedIds.filter(lid => lid !== firestoreId)].filter(Boolean);
+    for (const id of allIds) {
       try {
         if (editMode === 'review') {
-          await fetch('/api/suggestions/hunk/' + firestoreId + '/reject', {
+          await fetch('/api/suggestions/hunk/' + id + '/reject', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
           });
         } else {
-          await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' });
+          await fetch('/api/suggestions/hunk/' + id, { method: 'DELETE' });
         }
       } catch { /* ignore */ }
     }

@@ -165,14 +165,45 @@ function renderAllCards() {
   // Sort by document position so cards render in correct order
   items.sort((a, b) => a.pos - b.pos);
 
+  // Merge linked hunks (e.g., bold/italic formatting that produces 2 insertion hunks).
+  // Keep the first item, hide the second, and store the linked IDs for atomic accept/reject.
+  const linkedGroups = new Map(); // groupId → [item, item, ...]
+  for (const item of items) {
+    if (item.kind !== 'suggestion') continue;
+    const loaded = loadedSuggestions.find(s => s.id === item.data.id || (s.originalText === item.data.originalText && s.newText === item.data.newText));
+    const groupId = loaded?.linkedGroup || item.data.linkedGroup;
+    if (groupId) {
+      if (!linkedGroups.has(groupId)) linkedGroups.set(groupId, []);
+      linkedGroups.get(groupId).push(item);
+      item._linkedGroup = groupId;
+      item._linkedLabel = loaded?.linkedLabel || item.data.linkedLabel || '';
+    }
+  }
+  // Mark secondary items in each group as hidden
+  for (const [, groupItems] of linkedGroups) {
+    if (groupItems.length > 1) {
+      // First item becomes the visible card; store all IDs for atomic operations
+      groupItems[0]._linkedIds = groupItems.map(gi => gi.data.id);
+      for (let i = 1; i < groupItems.length; i++) {
+        groupItems[i]._linkedHidden = true;
+      }
+    }
+  }
+
   let html = '';
   for (const item of items) {
+    // Skip secondary items in a linked group (merged into the first card)
+    if (item._linkedHidden) continue;
+
     if (item.kind === 'suggestion') {
       const hunk = item.data;
       const top = item.top;
 
       let bodyHtml = '';
-      if (hunk.type === 'deletion') {
+      // Linked formatting group: show the label instead of raw marker text
+      if (item._linkedLabel) {
+        bodyHtml = '<span class="margin-card-ins">' + escapeHtml(item._linkedLabel) + '</span>';
+      } else if (hunk.type === 'deletion') {
         bodyHtml = '<span class="margin-card-del">' + escapeHtml(truncate(hunk.originalText, 80)) + '</span>';
       } else if (hunk.type === 'insertion') {
         bodyHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(hunk.newText, 80)) + '</span>';
@@ -215,7 +246,8 @@ function renderAllCards() {
       var firestoreId = loaded ? loaded.id : null;
       var threadHtml = buildThreadHtml(firestoreId || hunk.id, 'suggestion');
 
-      html += '<div class="margin-card margin-card--suggestion" data-hunk-id="' + hunk.id + '" style="top:' + top + 'px">'
+      var linkedIdsAttr = item._linkedIds ? ' data-linked-ids="' + item._linkedIds.join(',') + '"' : '';
+      html += '<div class="margin-card margin-card--suggestion" data-hunk-id="' + hunk.id + '"' + linkedIdsAttr + ' style="top:' + top + 'px">'
         + '<div class="margin-card-header">'
         + '<div class="margin-card-user">'
         + avatarHtml
