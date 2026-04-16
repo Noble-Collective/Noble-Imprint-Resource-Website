@@ -267,12 +267,21 @@ const draftPlugin = ViewPlugin.fromClass(
         const allHunks = computeHunks(original, current);
 
         // Filter out hunks already in the registry (they have their own decorations
-        // from registryDecoPlugin). Match by originalText+newText content.
+        // from registryDecoPlugin). Match by content AND position — content-only matching
+        // causes identical edits at different positions to be incorrectly filtered out
+        // (e.g., adding "s" to multiple words would only show the first one).
         const registry = update.view.state.field(annotationRegistry);
         const hunks = allHunks.filter(h => {
           for (const [, a] of registry) {
             if (a.kind !== 'suggestion') continue;
-            if (a.originalText === h.originalText && a.newText === h.newText && a.type === h.type) return false;
+            if (a.originalText !== h.originalText || a.newText !== h.newText || a.type !== h.type) continue;
+            // Content matches — also check position overlap
+            const hFrom = h.type === 'deletion' ? h.currentPos : h.currentFrom;
+            const hTo = h.type === 'deletion' ? h.currentPos : h.currentTo;
+            const aFrom = a.currentFrom;
+            const aTo = a.currentTo;
+            // Positions overlap or are adjacent (within 2 chars) → same hunk
+            if (Math.abs(hFrom - aFrom) <= 2 && Math.abs(hTo - aTo) <= 2) return false;
           }
           return true;
         });
