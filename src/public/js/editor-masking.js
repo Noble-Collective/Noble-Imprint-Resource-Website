@@ -129,7 +129,12 @@ function buildMaskingDecorations(view, skipLineNumber) {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const prefixLen = headingMatch[0].length;
-      hideInline(lineFrom, lineFrom + prefixLen);
+      // Heading markers revealed at the heading's font size, not base size
+      if (isOnFocusedLine(lineFrom, lineFrom + prefixLen)) {
+        decorations.push(Decoration.mark({ class: 'cm-revealed-syntax cm-heading-' + level }).range(lineFrom, lineFrom + prefixLen));
+      } else {
+        decorations.push(Decoration.mark({ class: 'cm-hidden-syntax' }).range(lineFrom, lineFrom + prefixLen));
+      }
       mark(lineFrom + prefixLen, line.to, 'cm-heading-' + level);
       // Line-level decoration for spacing — CM6 syncs gutter height with .cm-line height
       decorations.push(Decoration.line({ class: 'cm-heading-line-' + level }).range(lineFrom));
@@ -322,10 +327,10 @@ const maskingTheme = EditorView.theme({
     letterSpacing: '0.5px',
     color: '#888',
   },
-  // Line-level heading spacing — on .cm-line so CM6 syncs gutter heights
-  '.cm-heading-line-1': { marginTop: '0.5em' },
-  '.cm-heading-line-2': { marginTop: '0.5em', paddingBottom: '0.25em', borderBottom: '1px solid #e5e5e5' },
-  '.cm-heading-line-3': { marginTop: '0.3em' },
+  // Line-level heading spacing — padding (not margin) so CM6 includes it in gutter height measurement
+  '.cm-heading-line-1': { paddingTop: '0.5em' },
+  '.cm-heading-line-2': { paddingTop: '0.5em', paddingBottom: '0.25em', borderBottom: '1px solid #e5e5e5' },
+  '.cm-heading-line-3': { paddingTop: '0.3em' },
 
   // Question blocks — border on line to prevent duplication from split spans
   '.cm-line:has(.cm-question-block)': {

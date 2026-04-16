@@ -436,8 +436,10 @@ if (data) {
     if (editorView && editMode === 'suggest') {
       const registry = editorView.state.field(annotationRegistry);
       const remainingSuggestions = [];
+      const remainingComments = [];
       for (const [, a] of registry) {
         if (a.kind === 'suggestion') remainingSuggestions.push(a);
+        else if (a.kind === 'comment') remainingComments.push(a);
       }
       const currentOriginal = editorView.state.field(originalDocField);
       const newWorkingDoc = buildWorkingDoc(currentOriginal, remainingSuggestions);
@@ -448,6 +450,12 @@ if (data) {
         changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
         annotations: isRevert.of(true),
       });
+
+      // CRITICAL: Full doc replacement makes mapPos meaningless — all registry
+      // positions collapsed to 0. Rebuild the registry with correct working-doc positions.
+      const rebuiltEntries = buildShiftedRegistryEntries(remainingSuggestions, remainingComments);
+      editorView.dispatch({ effects: setAnnotations.of(rebuiltEntries) });
+
       const zones = recomputeZones(editorView.state.doc);
       editorView.dispatch({ effects: setZones.of(zones) });
     }
@@ -764,6 +772,15 @@ if (data) {
       }
     }) : [];
 
+    // Line number gutter hiding — re-apply on every view update in case CM6 recreates the element
+    const gutterHider = EditorView.updateListener.of(() => {
+      const chk = document.getElementById('chk-line-numbers');
+      if (chk && !chk.checked) {
+        const gutters = editorView?.dom?.querySelector('.cm-gutters');
+        if (gutters && gutters.style.display !== 'none') gutters.style.display = 'none';
+      }
+    });
+
     const extensions = [
       basicSetup,
       markdown(),
@@ -774,6 +791,7 @@ if (data) {
       ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
       directEditButtonUpdater,
+      gutterHider,
     ];
 
     editorView = new EditorView({
@@ -857,7 +875,8 @@ if (data) {
     // Sync line numbers visibility with checkbox state
     const chkLineNumbers = document.getElementById('chk-line-numbers');
     if (chkLineNumbers && !chkLineNumbers.checked) {
-      editorView.dom.classList.add('cm-hide-gutters');
+      const gutters = editorView.dom.querySelector('.cm-gutters');
+      if (gutters) gutters.style.display = 'none';
     }
 
     // Expose for testing
@@ -1029,7 +1048,8 @@ if (data) {
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
   document.getElementById('chk-line-numbers')?.addEventListener('change', (e) => {
     if (editorView) {
-      editorView.dom.classList.toggle('cm-hide-gutters', !e.target.checked);
+      const gutters = editorView.dom.querySelector('.cm-gutters');
+      if (gutters) gutters.style.display = e.target.checked ? '' : 'none';
     }
   });
   document.getElementById('btn-editor-done')?.addEventListener('click', () => {

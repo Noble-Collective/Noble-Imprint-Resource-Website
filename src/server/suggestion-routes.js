@@ -181,6 +181,10 @@ router.put('/hunk/:id/accept', async (req, res) => {
     res.json({ status: 'accepted' });
   } catch (err) {
     console.error('Accept hunk error:', err.message);
+    // GitHub returns 409 when the SHA is stale (file was modified externally)
+    if (err.status === 409 || err.message?.includes('SHA')) {
+      return res.status(409).json({ status: 'stale', message: 'The file was modified since you loaded the page. Your suggestion is preserved — reload to see the latest version.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });

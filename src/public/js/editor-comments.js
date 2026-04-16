@@ -4,6 +4,7 @@
 // This file only handles: tooltip UI, popup UI, and submitting to the API.
 // Decorations are built by the registry decoration plugin, not here.
 import { EditorView, keymap } from '/static/js/codemirror-bundle.js';
+import { addAnnotation, originalDocField } from '/static/js/editor-suggestions.js';
 
 let editorViewRef = null;
 let onCommentAdded = null; // callback after new comment saved
@@ -30,8 +31,30 @@ function toggleFormat(marker) {
         { from: sel.to, to: sel.to + marker.length, insert: '' },
       ] });
     } else {
-      // Wrap with markers
-      editorViewRef.dispatch({ changes: { from: sel.from, to: sel.to, insert: marker + selected + marker } });
+      // Wrap with markers AND register as a single annotation so the diff engine
+      // treats it as one suggestion, not two separate ** insertions.
+      const formatted = marker + selected + marker;
+      const origFrom = sel.from;
+      // Get the original-file position (before any working-doc shifts)
+      const original = editorViewRef.state.field(originalDocField);
+      const origPos = original ? original.indexOf(selected) : sel.from;
+      const annotationId = 'format-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      editorViewRef.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: formatted },
+        effects: addAnnotation.of({
+          id: annotationId,
+          kind: 'suggestion',
+          type: 'replacement',
+          originalText: selected,
+          newText: formatted,
+          originalFrom: origPos >= 0 ? origPos : sel.from,
+          originalTo: (origPos >= 0 ? origPos : sel.from) + selected.length,
+          currentFrom: sel.from,
+          currentTo: sel.from + formatted.length,
+          authorEmail: window.__EDITOR_DATA?.user?.email || '',
+          authorName: window.__EDITOR_DATA?.user?.displayName || '',
+        }),
+      });
     }
   }
   hideCommentTooltip();
@@ -46,6 +69,11 @@ const formatKeymap = keymap.of([
 // --- Selection listener: show formatting toolbar on text selection ---
 const selectionListener = EditorView.updateListener.of((update) => {
   if (!update.selectionSet && !update.focusChanged) return;
+  // Don't show tooltip when editor is read-only (View Source or review mode)
+  if (update.view.state.readOnly) {
+    hideCommentTooltip();
+    return;
+  }
   const sel = update.view.state.selection.main;
   if (sel.empty) {
     hideCommentTooltip();
