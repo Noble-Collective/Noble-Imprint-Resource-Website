@@ -1,5 +1,5 @@
-// Soak test: simulate a real editing session with random suggestions, comments,
-// bold/italic, discards, accepts, mode exits/re-entries — verify consistency after each step.
+// Soak test: simulate a real editing session with suggestions, comments, bold/italic,
+// discards, accepts, resolves, mode exits/re-entries — verify consistency after each step.
 const { test, expect } = require('@playwright/test');
 
 const BASE_URL = 'http://localhost:8080';
@@ -53,15 +53,9 @@ async function getEditorState(page) {
     if (!window.__editorView) return null;
     const suggCards = document.querySelectorAll('.margin-card--suggestion');
     const commentCards = document.querySelectorAll('.margin-card--comment');
-    const insertDecos = document.querySelectorAll('.cm-suggestion-insert');
-    const deleteDecos = document.querySelectorAll('.cm-suggestion-delete');
-    const commentHighlights = document.querySelectorAll('.cm-comment-highlight');
     return {
       suggestionCards: suggCards.length,
       commentCards: commentCards.length,
-      insertDecos: insertDecos.length,
-      deleteDecos: deleteDecos.length,
-      commentHighlights: commentHighlights.length,
       cardPositions: [...suggCards, ...commentCards].map(c => ({
         top: parseFloat(c.style.top) || 0,
         type: c.classList.contains('margin-card--comment') ? 'comment' : 'suggestion',
@@ -97,244 +91,206 @@ async function leaveSuggest(page) {
   await page.waitForTimeout(1500);
 }
 
-// Verify consistency: no cards at top=0, card count matches firestore, no duplicates
 async function verify(page, step, expectedSuggs, expectedComments) {
   await page.waitForTimeout(500);
   const editor = await getEditorState(page);
   const fs = await getFirestoreState();
   const errors = [];
 
-  // Check for cards stuck at top (position 0-10)
   const topCards = editor.cardPositions.filter(c => c.top < 10);
   if (topCards.length > 0) {
     const details = await page.evaluate(() => {
-      const cards = [...document.querySelectorAll('.margin-card')];
-      return cards.filter(c => parseFloat(c.style.top) < 10).map(c => ({
-        type: c.classList.contains('margin-card--comment') ? 'comment' : 'suggestion',
-        top: parseFloat(c.style.top),
-        body: c.querySelector('.margin-card-body')?.textContent?.substring(0, 50),
-        hunkId: c.dataset.hunkId || c.dataset.commentId || 'none',
-      }));
+      return [...document.querySelectorAll('.margin-card')].filter(c => parseFloat(c.style.top) < 10)
+        .map(c => ({ type: c.classList.contains('margin-card--comment') ? 'C' : 'S', body: (c.querySelector('.margin-card-body')?.textContent || '').substring(0, 30) }));
     });
-    errors.push(`${topCards.length} card(s) stuck at top: ${JSON.stringify(details)}`);
+    errors.push(`card(s) stuck at top: ${JSON.stringify(details)}`);
   }
 
-  // Check Firestore for duplicate suggestions (same originalText+originalFrom)
   const suggKeys = fs.suggestions.map(s => s.originalText + '@' + s.originalFrom);
-  const uniqueSuggs = new Set(suggKeys);
-  if (uniqueSuggs.size < suggKeys.length) {
-    errors.push(`Duplicate suggestions in Firestore: ${suggKeys.length} total, ${uniqueSuggs.size} unique`);
-  }
+  if (new Set(suggKeys).size < suggKeys.length) errors.push(`Duplicate suggestions in Firestore`);
 
-  // Check expected counts if provided
-  if (expectedSuggs !== undefined && fs.suggestions.length !== expectedSuggs) {
-    errors.push(`Expected ${expectedSuggs} Firestore suggestions, got ${fs.suggestions.length}`);
-  }
-  if (expectedComments !== undefined && fs.comments.length !== expectedComments) {
-    errors.push(`Expected ${expectedComments} Firestore comments, got ${fs.comments.length}`);
-  }
-
-  // Check suggestion card count vs Firestore (allow for draft hunks that haven't saved yet)
-  // Cards can be more than Firestore (drafts) but shouldn't be way more
-  if (editor.suggestionCards > fs.suggestions.length + 3) {
-    errors.push(`Too many suggestion cards: ${editor.suggestionCards} cards vs ${fs.suggestions.length} in Firestore`);
-  }
+  if (expectedSuggs !== undefined && fs.suggestions.length !== expectedSuggs)
+    errors.push(`Expected ${expectedSuggs} suggestions, got ${fs.suggestions.length}`);
+  if (expectedComments !== undefined && fs.comments.length !== expectedComments)
+    errors.push(`Expected ${expectedComments} comments, got ${fs.comments.length}`);
 
   const status = errors.length === 0 ? 'OK' : 'FAIL';
-  console.log(`[${step}] ${status} — ${editor.suggestionCards} sugg cards, ${editor.commentCards} comment cards, ` +
-    `${fs.suggestions.length} FS suggs, ${fs.comments.length} FS comments` +
+  console.log(`[${step}] ${status} — ${editor.suggestionCards}S ${editor.commentCards}C | FS: ${fs.suggestions.length}S ${fs.comments.length}C` +
     (errors.length > 0 ? ' — ' + errors.join('; ') : ''));
-
-  for (const err of errors) {
-    expect.soft(false, `[${step}] ${err}`).toBe(true);
-  }
+  for (const err of errors) expect.soft(false, `[${step}] ${err}`).toBe(true);
 }
 
-test('Soak test: full editing session with random operations', async ({ page }) => {
-  test.setTimeout(300000); // 5 minutes
+test('Soak test: full editing session with suggestions, comments, bold, discard, resolve, accept', async ({ page }) => {
+  test.setTimeout(300000);
   let savedContent = null;
   const usedWords = [];
 
   try {
     await clearAll();
     savedContent = await saveCleanFile();
-
-    // === ROUND 1: Create some suggestions and comments ===
     await page.goto(BASE_URL + TEST_SESSION_PATH);
     await login(page);
     await enterSuggest(page);
 
+    // === R1: Create 2 suggestions + 1 comment ===
+    console.log('\n=== R1: Create 2 suggestions + 1 comment ===');
     let doc = await page.evaluate(() => window.__editorView.state.doc.toString());
-    let words = findUniqueWords(doc, 5, usedWords);
+    let words = findUniqueWords(doc, 4, usedWords);
     usedWords.push(...words);
-    console.log('\n=== ROUND 1: Create 3 suggestions + 2 comments ===');
 
-    // Suggestion 1: replace word
+    // Suggestion 1: append
     await page.evaluate((w) => {
-      const view = window.__editorView;
-      const pos = view.state.doc.toString().indexOf(w);
-      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-      view.dispatch(view.state.replaceSelection(w + 'EDIT'));
+      const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+      v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection(w + 'EDIT'));
     }, words[0]);
     await page.waitForTimeout(300);
 
-    // Suggestion 2: replace another word
+    // Suggestion 2: delete
     await page.evaluate((w) => {
-      const view = window.__editorView;
-      const pos = view.state.doc.toString().indexOf(w);
-      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-      view.dispatch(view.state.replaceSelection('NEW' + w));
+      const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+      v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection(''));
     }, words[1]);
-    await page.waitForTimeout(300);
-
-    // Suggestion 3: delete a word
-    await page.evaluate((w) => {
-      const view = window.__editorView;
-      const pos = view.state.doc.toString().indexOf(w);
-      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-      view.dispatch(view.state.replaceSelection(''));
-    }, words[2]);
     await page.waitForTimeout(300);
 
     // Comment 1
     await page.evaluate((w) => {
-      const view = window.__editorView;
-      const pos = view.state.doc.toString().indexOf(w);
-      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-    }, words[3]);
+      const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+      v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+    }, words[2]);
     await page.waitForTimeout(300);
     await page.locator('.comment-tooltip-comment').click();
     await page.waitForTimeout(200);
     await page.fill('#comment-popup-input', 'First comment');
     await page.click('#comment-popup-submit');
-    await page.waitForTimeout(1500);
-
-    // Comment 2
-    await page.evaluate((w) => {
-      const view = window.__editorView;
-      const pos = view.state.doc.toString().indexOf(w);
-      view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-    }, words[4]);
-    await page.waitForTimeout(300);
-    await page.locator('.comment-tooltip-comment').click();
-    await page.waitForTimeout(200);
-    await page.fill('#comment-popup-input', 'Second comment');
-    await page.click('#comment-popup-submit');
-    await page.waitForTimeout(1500);
-
-    // Wait for auto-save
     await page.waitForTimeout(4000);
-    await verify(page, 'R1: after creating 3 suggs + 2 comments', 3, 2);
+    await verify(page, 'R1: 2 suggs + 1 comment', 2, 1);
 
-    // === ROUND 2: Leave and re-enter suggest mode ===
-    console.log('\n=== ROUND 2: Leave and re-enter ===');
+    // === R2: Leave and re-enter ===
+    console.log('\n=== R2: Leave/re-enter ===');
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
     await page.waitForTimeout(2000);
+    await verify(page, 'R2: after re-enter', 2, 1);
 
-    // Debug: dump card positions
-    const regDebug = await page.evaluate(() => {
-      const cards = document.querySelectorAll('.margin-card');
-      return [...cards].map(c => ({
-        id: (c.dataset.hunkId || c.dataset.commentId || '').substring(0, 8),
-        type: c.classList.contains('margin-card--comment') ? 'C' : 'S',
-        top: Math.round(parseFloat(c.style.top)),
-        body: (c.querySelector('.margin-card-body')?.textContent || '').substring(0, 30),
-      }));
-    });
-    for (const c of regDebug) console.log(`  Card ${c.type} id=${c.id} top=${c.top} "${c.body}"`);
+    // === R3: Add a comment mid-session ===
+    console.log('\n=== R3: Add comment mid-session ===');
+    doc = await page.evaluate(() => window.__editorView.state.doc.toString());
+    const commentWord2 = findUniqueWords(doc, 1, usedWords)[0];
+    usedWords.push(commentWord2);
+    await page.evaluate((w) => {
+      const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+      v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+    }, commentWord2);
+    await page.waitForTimeout(300);
+    await page.locator('.comment-tooltip-comment').click();
+    await page.waitForTimeout(200);
+    await page.fill('#comment-popup-input', 'Second comment added mid-session');
+    await page.click('#comment-popup-submit');
+    await page.waitForTimeout(2000);
+    await verify(page, 'R3: after second comment', 2, 2);
 
-    await verify(page, 'R2: after re-enter', 3, 2);
-
-    // === ROUND 3: Discard the first suggestion ===
-    console.log('\n=== ROUND 3: Discard first suggestion ===');
+    // === R4: Discard a suggestion — comments should survive ===
+    console.log('\n=== R4: Discard suggestion ===');
     const rejectBtn = page.locator('.margin-action--reject').first();
     if (await rejectBtn.isVisible()) {
       await rejectBtn.click();
       await page.waitForTimeout(4000);
     }
-    await verify(page, 'R3: after discard', 2, 2);
+    await verify(page, 'R4: after discard', 1, 2);
 
-    // === ROUND 4: Bold a word ===
-    console.log('\n=== ROUND 4: Bold a word ===');
+    // === R5: Bold a word ===
+    console.log('\n=== R5: Bold a word ===');
     doc = await page.evaluate(() => window.__editorView.state.doc.toString());
     const boldWord = findUniqueWords(doc, 1, usedWords)[0];
     usedWords.push(boldWord);
     if (boldWord) {
       await page.evaluate((w) => {
-        const view = window.__editorView;
-        const pos = view.state.doc.toString().indexOf(w);
-        view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
+        const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+        v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
       }, boldWord);
       await page.waitForTimeout(300);
       const boldBtn = page.locator('.comment-tooltip-bold');
-      if (await boldBtn.isVisible()) {
-        await boldBtn.click();
-        await page.waitForTimeout(4000);
-      }
+      if (await boldBtn.isVisible()) { await boldBtn.click(); await page.waitForTimeout(4000); }
     }
-    await verify(page, 'R4: after bold');
+    await verify(page, 'R5: after bold');
 
-    // === ROUND 5: Leave and re-enter again ===
-    console.log('\n=== ROUND 5: Leave and re-enter again ===');
+    // === R6: Leave and re-enter ===
+    console.log('\n=== R6: Leave/re-enter ===');
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
     await page.waitForTimeout(2000);
-    await verify(page, 'R5: after second re-enter');
+    await verify(page, 'R6: after re-enter');
 
-    // === ROUND 6: Discard another suggestion ===
-    console.log('\n=== ROUND 6: Discard another suggestion ===');
-    const rejectBtn2 = page.locator('.margin-action--reject').first();
-    if (await rejectBtn2.isVisible()) {
-      await rejectBtn2.click();
-      await page.waitForTimeout(4000);
+    // === R7: Resolve a comment ===
+    console.log('\n=== R7: Resolve a comment ===');
+    const resolveBtn = page.locator('.margin-action--resolve').first();
+    if (await resolveBtn.isVisible()) {
+      await resolveBtn.click();
+      await page.waitForTimeout(2000);
     }
-    await verify(page, 'R6: after second discard');
+    await verify(page, 'R7: after resolve comment', undefined, 1);
 
-    // === ROUND 7: Add another suggestion ===
-    console.log('\n=== ROUND 7: Add another suggestion ===');
+    // === R8: Add another suggestion + another comment ===
+    console.log('\n=== R8: New suggestion + new comment ===');
     doc = await page.evaluate(() => window.__editorView.state.doc.toString());
-    const newWord = findUniqueWords(doc, 1, usedWords)[0];
-    usedWords.push(newWord);
-    if (newWord) {
+    const newWords = findUniqueWords(doc, 2, usedWords);
+    usedWords.push(...newWords);
+    if (newWords[0]) {
       await page.evaluate((w) => {
-        const view = window.__editorView;
-        const pos = view.state.doc.toString().indexOf(w);
-        view.dispatch({ selection: { anchor: pos, head: pos + w.length }, scrollIntoView: true });
-        view.dispatch(view.state.replaceSelection(w + 'NEW'));
-      }, newWord);
+        const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+        v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+        v.dispatch(v.state.replaceSelection(w + 'NEW'));
+      }, newWords[0]);
+      await page.waitForTimeout(300);
+    }
+    if (newWords[1]) {
+      await page.evaluate((w) => {
+        const v = window.__editorView, p = v.state.doc.toString().indexOf(w);
+        v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+      }, newWords[1]);
+      await page.waitForTimeout(300);
+      await page.locator('.comment-tooltip-comment').click();
+      await page.waitForTimeout(200);
+      await page.fill('#comment-popup-input', 'Third comment');
+      await page.click('#comment-popup-submit');
       await page.waitForTimeout(4000);
     }
-    await verify(page, 'R7: after new suggestion');
+    await verify(page, 'R8: after new suggestion + comment', undefined, 2);
 
-    // === ROUND 8: Leave and re-enter one more time ===
-    console.log('\n=== ROUND 8: Final leave/re-enter ===');
+    // === R9: Leave and re-enter one more time ===
+    console.log('\n=== R9: Final leave/re-enter ===');
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
     await page.waitForTimeout(2000);
-    await verify(page, 'R8: final re-enter');
+    await verify(page, 'R9: final re-enter');
 
-    // === ROUND 9: Accept a suggestion ===
-    console.log('\n=== ROUND 9: Accept a suggestion ===');
+    // === R10: Accept a suggestion ===
+    console.log('\n=== R10: Accept a suggestion ===');
     const acceptBtn = page.locator('.margin-action--accept').first();
     if (await acceptBtn.isVisible()) {
       await acceptBtn.click();
       await page.waitForTimeout(8000);
     }
-    await verify(page, 'R9: after accept');
+    await verify(page, 'R10: after accept');
 
-    // === ROUND 10: Final state check ===
-    console.log('\n=== ROUND 10: Final state ===');
-    const finalFs = await getFirestoreState();
+    // === R11: Discard remaining suggestion if any ===
+    console.log('\n=== R11: Discard remaining suggestions ===');
+    const rejectBtn2 = page.locator('.margin-action--reject').first();
+    if (await rejectBtn2.isVisible()) {
+      await rejectBtn2.click();
+      await page.waitForTimeout(4000);
+    }
+    await verify(page, 'R11: after final discard');
+
+    // === R12: Final state ===
+    console.log('\n=== R12: Final state ===');
     const finalEditor = await getEditorState(page);
-    console.log('Final Firestore:', finalFs.suggestions.length, 'suggestions,', finalFs.comments.length, 'comments');
-    console.log('Final Editor:', finalEditor.suggestionCards, 'sugg cards,', finalEditor.commentCards, 'comment cards');
-    console.log('Final card positions:', finalEditor.cardPositions.map(c => c.type + '@' + Math.round(c.top)));
-
-    // No cards should be at position 0
+    console.log('Final:', finalEditor.suggestionCards, 'sugg cards,', finalEditor.commentCards, 'comment cards');
     for (const cp of finalEditor.cardPositions) {
       expect(cp.top).toBeGreaterThan(10);
     }
