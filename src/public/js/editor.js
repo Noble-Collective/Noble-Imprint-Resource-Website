@@ -135,6 +135,12 @@ if (data) {
         : findOverlappingSavedHunk(hunk);
 
       if (existing) {
+        // Don't overwrite server-loaded suggestions — the diff engine's character-level
+        // view (e.g., insertion of "EXTRA") differs from the Firestore replacement
+        // (e.g., "philosophy" → "philosophyEXTRA"). Updating would corrupt the data.
+        const regEntry = editorView ? editorView.state.field(annotationRegistry).get(existing.docId) : null;
+        if (regEntry && regEntry.loadedFromServer) continue;
+
         // Update existing Firestore record
         try {
           await fetch('/api/suggestions/hunk/' + existing.docId, {

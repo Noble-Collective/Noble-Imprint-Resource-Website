@@ -1695,8 +1695,11 @@ test.describe('Editor - Loading Existing Suggestions', () => {
       });
       return result;
     });
-    expect(highlights.some(h => h.includes(replacement1))).toBeTruthy();
-    expect(highlights.some(h => h.includes(replacement2))).toBeTruthy();
+    // CM6 may split decorations into multiple spans when they overlap —
+    // check that the replacement text exists in the concatenated highlights
+    const allHighlightText = highlights.join('');
+    expect(allHighlightText).toContain(replacement1);
+    expect(allHighlightText).toContain(replacement2);
   });
 
   test('comment positioned correctly when suggestion before it changes length', async ({ page }) => {
@@ -1776,7 +1779,7 @@ test.describe('Editor - Loading Existing Suggestions', () => {
       const els = document.querySelectorAll('.cm-suggestion-insert');
       return Array.from(els).map(el => el.textContent);
     });
-    expect(suggestionHighlights.some(h => h.includes(replacementText))).toBeTruthy();
+    expect(suggestionHighlights.join('')).toContain(replacementText);
   });
 });
 
