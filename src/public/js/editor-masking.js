@@ -253,7 +253,7 @@ const maskingTheme = EditorView.theme({
   '.cm-gutter.cm-lineNumbers .cm-gutterElement': {
     paddingRight: '8px',
     paddingLeft: '8px',
-    paddingTop: '5px',
+    lineHeight: '2.8',
   },
   '.cm-scroller': {
     minHeight: '400px',
