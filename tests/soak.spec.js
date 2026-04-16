@@ -97,6 +97,7 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   const fs = await getFirestoreState();
   const errors = [];
 
+  // 1. No cards stuck at position 0
   const topCards = editor.cardPositions.filter(c => c.top < 10);
   if (topCards.length > 0) {
     const details = await page.evaluate(() => {
@@ -106,13 +107,71 @@ async function verify(page, step, expectedSuggs, expectedComments) {
     errors.push(`card(s) stuck at top: ${JSON.stringify(details)}`);
   }
 
+  // 2. No Firestore duplicates
   const suggKeys = fs.suggestions.map(s => s.originalText + '@' + s.originalFrom);
   if (new Set(suggKeys).size < suggKeys.length) errors.push(`Duplicate suggestions in Firestore`);
 
+  // 3. Count checks
   if (expectedSuggs !== undefined && fs.suggestions.length !== expectedSuggs)
     errors.push(`Expected ${expectedSuggs} suggestions, got ${fs.suggestions.length}`);
   if (expectedComments !== undefined && fs.comments.length !== expectedComments)
     errors.push(`Expected ${expectedComments} comments, got ${fs.comments.length}`);
+
+  // 4. Inline decoration verification — scroll to each annotation's position
+  //    and verify the decoration exists with correct text (CM6 virtualizes rendering)
+  for (const s of fs.suggestions) {
+    if (!s.newText || s.newText.length <= 2) continue; // skip bold markers
+    const pos = s.resolvedFrom || s.originalFrom || 0;
+    await page.evaluate((p) => {
+      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: p }, scrollIntoView: true });
+    }, pos);
+    await page.waitForTimeout(300);
+    const found = await page.evaluate((nt) => {
+      return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
+    }, s.newText);
+    if (!found) errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}"`);
+  }
+  for (const c of fs.comments) {
+    if (!c.selectedText) continue;
+    const pos = c.resolvedFrom || c.from || 0;
+    await page.evaluate((p) => {
+      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: p }, scrollIntoView: true });
+    }, pos);
+    await page.waitForTimeout(300);
+    const found = await page.evaluate((st) => {
+      return [...document.querySelectorAll('.cm-comment-highlight')].some(el => el.textContent.includes(st));
+    }, c.selectedText);
+    if (!found) errors.push(`Comment highlight missing for "${c.selectedText.substring(0, 20)}"`);
+  }
+
+  // 5. Card order matches document order — cards should appear in the same
+  //    sequence as their positions in the editor (resolveOverlaps pushes them
+  //    down, so absolute position won't match, but ORDER should be correct)
+  const cardOrder = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.margin-card')];
+    return cards.map(c => ({
+      top: parseFloat(c.style.top) || 0,
+      hunkId: c.dataset.hunkId || null,
+      commentId: c.dataset.commentId || null,
+    })).sort((a, b) => a.top - b.top);
+  });
+  // Build expected order from Firestore positions
+  const allAnnotations = [
+    ...fs.suggestions.map(s => ({ id: s.id, pos: s.resolvedFrom || s.originalFrom || 0, type: 'S' })),
+    ...fs.comments.map(c => ({ id: c.id, pos: c.resolvedFrom || c.from || 0, type: 'C' })),
+  ].sort((a, b) => a.pos - b.pos);
+  // Check order matches (skip linked bold hunks which share a card)
+  const cardIds = cardOrder.map(c => c.hunkId || c.commentId).filter(Boolean);
+  const expectedIds = allAnnotations.map(a => a.id);
+  // Cards may have fewer IDs due to linked groups — just verify the ones present are in order
+  let lastExpectedIdx = -1;
+  let orderOk = true;
+  for (const cid of cardIds) {
+    const idx = expectedIds.indexOf(cid);
+    if (idx >= 0 && idx < lastExpectedIdx) { orderOk = false; break; }
+    if (idx >= 0) lastExpectedIdx = idx;
+  }
+  if (!orderOk) errors.push(`Cards not in document order`);
 
   const status = errors.length === 0 ? 'OK' : 'FAIL';
   console.log(`[${step}] ${status} — ${editor.suggestionCards}S ${editor.commentCards}C | FS: ${fs.suggestions.length}S ${fs.comments.length}C` +
