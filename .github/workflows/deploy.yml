@@ -48,6 +48,5 @@ jobs:
           sleep 10
           curl -s -X POST https://resources.noblecollective.org/api/refresh || true
 
-      - name: Clean up test book data
-        run: |
-          curl -s -X POST https://resources.noblecollective.org/api/cleanup-test-data || true
+      # Test data cleanup available manually: POST /api/cleanup-test-data
+      # Removed from auto-deploy to avoid wiping Session 1 data between test runs
