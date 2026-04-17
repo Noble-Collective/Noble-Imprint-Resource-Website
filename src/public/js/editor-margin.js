@@ -137,13 +137,16 @@ function renderAllCards() {
   const items = [];
   const editorRect = editorView.dom.getBoundingClientRect();
 
-  // Fallback position when coordsAtPos returns null (position below viewport, CM6 virtualization)
+  // Get the document-relative top position for a character position.
+  // lineBlockAt gives accurate positions even for lines outside the viewport
+  // (unlike coordsAtPos which returns null for virtualized content, and
+  // lineNumber × defaultLineHeight which underestimates by ~3x due to
+  // varying heading sizes and paragraph spacing).
   function estimateTop(pos) {
     try {
-      const coords = editorView.coordsAtPos(pos);
-      if (coords) return coords.top - editorRect.top;
+      const block = editorView.lineBlockAt(pos);
+      if (block) return block.top;
     } catch { /* ignore */ }
-    // Approximate: use line number × default line height
     try {
       const line = editorView.state.doc.lineAt(pos);
       return (line.number - 1) * editorView.defaultLineHeight;

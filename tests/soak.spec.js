@@ -297,7 +297,43 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   }
   if (!orderOk) errors.push(`Cards not in document order`);
 
-  // 8. DOM card count matches Firestore (accounting for linked bold groups)
+  // 8. Card proximity: each card should be near its inline decoration.
+  //    resolveOverlaps pushes stacked cards down (~140px each), so the threshold
+  //    scales with the total number of cards. A single card should be within 80px;
+  //    with N total cards, allow up to 80 + (N-1)*140 px for the furthest card.
+  const totalCards = (registryState?.entries || []).length;
+  const maxAllowedDrift = 80 + Math.max(0, totalCards - 1) * 140;
+  for (const entry of (registryState?.entries || [])) {
+    if (entry.currentFrom == null) continue;
+    await page.evaluate(({ pos }) => {
+      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    }, { pos: entry.currentFrom });
+    await page.waitForTimeout(300);
+
+    const drift = await page.evaluate(({ id, kind }) => {
+      const selector = kind === 'comment'
+        ? '.margin-card[data-comment-id="' + id + '"]'
+        : '.margin-card[data-hunk-id="' + id + '"]';
+      const card = document.querySelector(selector);
+      if (!card) return null;
+
+      const decoSelector = kind === 'comment'
+        ? '.cm-comment-highlight[data-comment-id="' + id + '"]'
+        : '.cm-suggestion-insert[data-hunk-id="' + id + '"], .cm-suggestion-delete[data-hunk-id="' + id + '"]';
+      const deco = document.querySelector(decoSelector);
+      if (!deco) return null;
+
+      const cardRect = card.getBoundingClientRect();
+      const decoRect = deco.getBoundingClientRect();
+      return { cardTop: Math.round(cardRect.top), decoTop: Math.round(decoRect.top), drift: Math.round(Math.abs(cardRect.top - decoRect.top)) };
+    }, { id: entry.id, kind: entry.kind });
+
+    if (drift && drift.drift > maxAllowedDrift) {
+      errors.push(`Card ${entry.id} drift=${drift.drift}px > max ${maxAllowedDrift}px (card@${drift.cardTop} vs deco@${drift.decoTop})`);
+    }
+  }
+
+  // 9. DOM card count matches Firestore (accounting for linked bold groups)
   const linkedGroupCount = await page.evaluate(() => {
     return document.querySelectorAll('.margin-card--suggestion:not(.margin-card--stale)').length;
   });
