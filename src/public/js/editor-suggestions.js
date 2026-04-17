@@ -282,10 +282,11 @@ const draftPlugin = ViewPlugin.fromClass(
             if (a.originalText === h.originalText && a.newText === h.newText && a.type === h.type) {
               if (Math.abs(hFrom - aFrom) <= 2 && Math.abs(hTo - aTo) <= 2) return false;
             }
-            // Overlap match: draft hunk falls within a registry entry's range
+            // Overlap match: draft insertion whose text is part of a registry entry's newText
             // (e.g., diff engine splits a replacement into insertion + unchanged,
             // or a server-submitted replacement decomposes differently than local diffChars)
-            if (hFrom >= aFrom - 1 && hTo <= aTo + 1) return false;
+            if (h.type === 'insertion' && a.newText && hFrom >= aFrom - 1 && hTo <= aTo + 1
+                && a.newText.includes(h.newText)) return false;
           }
           return true;
         });

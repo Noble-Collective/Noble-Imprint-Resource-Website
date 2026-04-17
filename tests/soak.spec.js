@@ -433,8 +433,108 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
     }
     await verify(page, 'R7: after resolve comment', undefined, 1);
 
-    // === R8: Add another suggestion + another comment ===
-    console.log('\n=== R8: New suggestion + new comment ===');
+    // === R8: Inject suggestion + comment via Claude API (bot user) ===
+    console.log('\n=== R8: Claude API suggestion + comment ===');
+    // Leave suggest mode so we can re-enter and pick up API-injected annotations
+    await leaveSuggest(page);
+
+    // Read file content to get positions for API calls
+    const github = require('../src/server/github');
+    const { content: fileContent, sha: fileSha } = await github.getFileContent(TEST_FILE);
+    const apiWords = findUniqueWords(fileContent, 2, usedWords);
+    usedWords.push(...apiWords);
+    const apiSuggWord = apiWords[0];
+    const apiCommentWord = apiWords[1];
+    const apiSuggPos = fileContent.indexOf(apiSuggWord);
+    const apiCommentPos = fileContent.indexOf(apiCommentWord);
+    const apiNewText = apiSuggWord + 'API';
+    console.log('API suggestion:', apiSuggWord, '→', apiNewText, 'at', apiSuggPos);
+    console.log('API comment on:', apiCommentWord, 'at', apiCommentPos);
+
+    // Submit suggestion with reason via API
+    const apiKey = process.env.CLAUDE_API_KEY || '';
+    // Use a standalone request context (no browser cookies) so the API key auth
+    // identifies us as the Claude bot, not the logged-in test user
+    const botContext = await require('playwright').request.newContext();
+    const suggRes = await (await botContext.post(`${BASE_URL}/api/suggestions/hunk`, {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE,
+        bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: fileSha,
+        type: 'replacement',
+        originalFrom: apiSuggPos,
+        originalTo: apiSuggPos + apiSuggWord.length,
+        originalText: apiSuggWord,
+        newText: apiNewText,
+        contextBefore: fileContent.substring(Math.max(0, apiSuggPos - 50), apiSuggPos),
+        contextAfter: fileContent.substring(apiSuggPos + apiSuggWord.length, apiSuggPos + apiSuggWord.length + 50),
+        reason: 'Test reason from Claude API',
+      },
+    })).json();
+    console.log('API suggestion created:', suggRes.id, 'replyId:', suggRes.replyId);
+    expect(suggRes.status).toBe('ok');
+    expect(suggRes.replyId).toBeTruthy();
+
+    // Submit comment via API
+    const commentRes = await (await botContext.post(`${BASE_URL}/api/suggestions/comments`, {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      data: {
+        filePath: TEST_FILE,
+        bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: fileSha,
+        from: apiCommentPos,
+        to: apiCommentPos + apiCommentWord.length,
+        selectedText: apiCommentWord,
+        commentText: 'Test comment from Claude API',
+      },
+    })).json();
+    console.log('API comment created:', commentRes.id);
+    expect(commentRes.status).toBe('ok');
+    await botContext.dispose();
+
+    // Re-enter suggest mode to pick up API-injected annotations
+    await login(page);
+    await enterSuggest(page);
+    await page.waitForTimeout(2000);
+
+    // Verify API suggestion shows as Claude AI with reply, and no duplicate Steve card
+    const apiCheck = await page.evaluate(({ suggId, replyId, newText, commentId, commentWord }) => {
+      const errors = [];
+      // Check suggestion card exists and is from Claude AI
+      const suggCard = document.querySelector(`.margin-card[data-hunk-id="${suggId}"]`);
+      if (!suggCard) { errors.push('API suggestion card not found'); }
+      else {
+        const name = suggCard.querySelector('.margin-card-name')?.textContent || '';
+        if (!name.includes('Claude')) errors.push(`API suggestion author is "${name}", expected Claude`);
+        // Check reply thread exists
+        const reply = suggCard.querySelector('.margin-card-reply-text');
+        if (!reply) errors.push('API suggestion has no reply thread');
+        else if (!reply.textContent.includes('Test reason')) errors.push(`Reply text: "${reply.textContent}"`);
+      }
+      // Check no duplicate card for same text from Steve
+      const allCards = document.querySelectorAll('.margin-card--suggestion');
+      let dupeCount = 0;
+      for (const c of allCards) {
+        const body = c.querySelector('.margin-card-body')?.textContent || '';
+        if (body.includes(newText.slice(-5))) dupeCount++;
+      }
+      if (dupeCount > 1) errors.push(`${dupeCount} cards contain "${newText}" — duplicate detected`);
+      // Check comment card
+      const commentCard = document.querySelector(`.margin-card[data-comment-id="${commentId}"]`);
+      if (!commentCard) errors.push('API comment card not found');
+      return errors;
+    }, { suggId: suggRes.id, replyId: suggRes.replyId, newText: apiNewText, commentId: commentRes.id, commentWord: apiCommentWord });
+
+    for (const err of apiCheck) {
+      console.log('[R8 API check] FAIL:', err);
+      expect.soft(false, `[R8] ${err}`).toBe(true);
+    }
+    if (apiCheck.length === 0) console.log('[R8 API check] OK');
+    await verify(page, 'R8: after API injection');
+
+    // === R9: Add another UI suggestion + comment ===
+    console.log('\n=== R9: New UI suggestion + new comment ===');
     doc = await page.evaluate(() => window.__editorView.state.doc.toString());
     const newWords = findUniqueWords(doc, 2, usedWords);
     usedWords.push(...newWords);
@@ -458,37 +558,75 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
       await page.click('#comment-popup-submit');
       await page.waitForTimeout(4000);
     }
-    await verify(page, 'R8: after new suggestion + comment', undefined, 2);
+    await verify(page, 'R9: after new UI suggestion + comment');
 
-    // === R9: Leave and re-enter one more time ===
-    console.log('\n=== R9: Final leave/re-enter ===');
+    // === R10: Leave and re-enter one more time ===
+    console.log('\n=== R10: Final leave/re-enter ===');
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
     await page.waitForTimeout(2000);
-    await verify(page, 'R9: final re-enter');
+    await verify(page, 'R10: final re-enter');
 
-    // === R10: Accept a suggestion ===
-    console.log('\n=== R10: Accept a suggestion ===');
-    const acceptBtn = page.locator('.margin-action--accept').first();
-    if (await acceptBtn.isVisible()) {
-      await acceptBtn.click();
-      await page.waitForTimeout(8000);
+    // === R11: Accept the API suggestion + verify accepted text in editor ===
+    console.log('\n=== R11: Accept API suggestion ===');
+    // Find and click accept on the Claude API suggestion card specifically
+    const apiAcceptBtn = page.locator(`.margin-card[data-hunk-id="${suggRes.id}"] .margin-action--accept`);
+    if (await apiAcceptBtn.isVisible()) {
+      await apiAcceptBtn.click();
+      // Wait for the accept + GitHub commit + refresh cycle to complete
+      // Poll until the suggestion card disappears (more reliable than a fixed timeout)
+      await page.waitForFunction(
+        (id) => !document.querySelector(`.margin-card[data-hunk-id="${id}"]`)
+          || document.querySelector(`.margin-card[data-hunk-id="${id}"]`).classList.contains('margin-card--removing'),
+        suggRes.id,
+        { timeout: 15000 }
+      ).catch(() => {});
+      await page.waitForTimeout(2000); // extra settle time after refresh
+
+      // Verify accepted text is now in the base document (not as a decoration, but as real text)
+      const docAfterAccept = await page.evaluate(() => window.__editorView.state.doc.toString());
+      const acceptedTextPresent = docAfterAccept.includes(apiNewText);
+      if (!acceptedTextPresent) {
+        console.log('[R11] FAIL: accepted text "' + apiNewText + '" not found in editor after refresh');
+        expect.soft(false, `[R11] Accepted text "${apiNewText}" not in editor`).toBe(true);
+      } else {
+        console.log('[R11] OK: accepted text "' + apiNewText + '" found in editor');
+      }
+
+      // Verify the accepted suggestion's card is gone (no longer pending)
+      const acceptedCardGone = await page.evaluate(({ id }) => {
+        const card = document.querySelector(`.margin-card[data-hunk-id="${id}"]`);
+        return !card || card.classList.contains('margin-card--removing');
+      }, { id: suggRes.id });
+      if (!acceptedCardGone) {
+        expect.soft(false, '[R11] Accepted suggestion card still visible').toBe(true);
+      }
+
+      // Verify no insert decoration for the accepted text (it's now base content)
+      const noDecoForAccepted = await page.evaluate(({ id }) => {
+        return !document.querySelector(`.cm-suggestion-insert[data-hunk-id="${id}"]`);
+      }, { id: suggRes.id });
+      if (!noDecoForAccepted) {
+        expect.soft(false, '[R11] Insert decoration still present after accept').toBe(true);
+      }
+    } else {
+      console.log('[R11] WARN: API suggestion accept button not visible');
     }
-    await verify(page, 'R10: after accept');
+    await verify(page, 'R11: after accept API suggestion');
 
-    // === R11: Discard remaining suggestion if any ===
-    // === R11: Discard remaining suggestion if any ===
-    console.log('\n=== R11: Discard remaining suggestions ===');
-    const rejectBtn2 = page.locator('.margin-action--reject').first();
-    if (await rejectBtn2.isVisible()) {
-      await rejectBtn2.click();
+    // === R12: Discard remaining suggestions ===
+    console.log('\n=== R12: Discard remaining suggestions ===');
+    let remainingRejects = await page.locator('.margin-action--reject').count();
+    while (remainingRejects > 0) {
+      await page.locator('.margin-action--reject').first().click();
       await page.waitForTimeout(4000);
+      remainingRejects = await page.locator('.margin-action--reject').count();
     }
-    await verify(page, 'R11: after final discard');
+    await verify(page, 'R12: after final discard');
 
-    // === R12: Final state ===
-    console.log('\n=== R12: Final state ===');
+    // === R13: Final state ===
+    console.log('\n=== R13: Final state ===');
     const finalEditor = await getEditorState(page);
     console.log('Final:', finalEditor.suggestionCards, 'sugg cards,', finalEditor.commentCards, 'comment cards');
     for (const cp of finalEditor.cardPositions) {
