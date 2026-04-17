@@ -111,13 +111,12 @@ app.post('/api/cleanup-test-data', async (req, res) => {
   try {
     const admin = require('firebase-admin');
     const db = admin.firestore();
-    const testBookPath = 'series/Narrative Journey Series/Foundations/Test Book';
+    const testFile = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
     let deleted = 0;
 
     for (const col of ['suggestions', 'comments', 'replies']) {
       const snap = await db.collection(col)
-        .where('filePath', '>=', testBookPath)
-        .where('filePath', '<=', testBookPath + '\uf8ff')
+        .where('filePath', '==', testFile)
         .get();
       if (!snap.empty) {
         const batch = db.batch();
