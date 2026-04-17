@@ -16,7 +16,7 @@ async function clearAll() {
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
   for (const col of ['suggestions', 'comments', 'replies']) {
-    const snap = await db.collection(col).get();
+    const snap = await db.collection(col).where('filePath', '==', TEST_FILE).get();
     if (!snap.empty) { const b = db.batch(); snap.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
   }
 }
@@ -111,96 +111,169 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   const suggKeys = fs.suggestions.map(s => s.originalText + '@' + s.originalFrom);
   if (new Set(suggKeys).size < suggKeys.length) errors.push(`Duplicate suggestions in Firestore`);
 
-  // 3. Count checks
+  // 3. Firestore count checks
   if (expectedSuggs !== undefined && fs.suggestions.length !== expectedSuggs)
-    errors.push(`Expected ${expectedSuggs} suggestions, got ${fs.suggestions.length}`);
+    errors.push(`Expected ${expectedSuggs} FS suggestions, got ${fs.suggestions.length}`);
   if (expectedComments !== undefined && fs.comments.length !== expectedComments)
-    errors.push(`Expected ${expectedComments} comments, got ${fs.comments.length}`);
+    errors.push(`Expected ${expectedComments} FS comments, got ${fs.comments.length}`);
 
-  // 4. Inline decoration verification — scroll to each annotation's position
-  //    and verify the decoration exists with correct text (CM6 virtualizes rendering)
-  // Scroll to each annotation's text in the WORKING doc (not original-file position)
-  // and verify the decoration exists. CM6 virtualizes rendering so we must scroll first.
-  for (const s of fs.suggestions) {
-    if (!s.newText || s.newText.length <= 2) continue;
-    // Use context to scroll to the right part of the doc
-    const searchText = s.contextBefore ? s.contextBefore.slice(-20) + s.newText : s.newText;
-    await page.evaluate(({ nt, ctx }) => {
-      const v = window.__editorView;
-      if (!v) return;
-      const doc = v.state.doc.toString();
-      // Try context-aware search first, fall back to bare search
-      let pos = ctx ? doc.indexOf(ctx) : -1;
-      if (pos >= 0) pos += ctx.length - nt.length;
-      else pos = doc.indexOf(nt);
-      if (pos >= 0) v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-    }, { nt: s.newText, ctx: searchText });
-    await page.waitForTimeout(300);
-    const visible = await page.evaluate(({ nt }) => {
-      return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
-    }, { nt: s.newText });
-    if (!visible) {
-      // Retry: scroll to the registry entry's actual position (indexOf might have found wrong occurrence)
-      const retryPos = await page.evaluate(({ nt }) => {
-        const v = window.__editorView;
-        if (!v || !window.__annotationRegistry) return -1;
-        const reg = v.state.field(window.__annotationRegistry);
-        for (const [, a] of reg) {
-          if (a.kind === 'suggestion' && a.newText === nt) return a.currentFrom;
-        }
-        return -1;
-      }, { nt: s.newText });
-      if (retryPos >= 0) {
-        await page.evaluate(({ pos }) => {
-          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-        }, { pos: retryPos });
-        await page.waitForTimeout(300);
-        const retryVisible = await page.evaluate(({ nt }) => {
-          return [...document.querySelectorAll('.cm-suggestion-insert')].some(el => el.textContent.includes(nt));
-        }, { nt: s.newText });
-        if (!retryVisible) {
-          const ctx = await page.evaluate(({ pos }) => {
-            const v = window.__editorView;
-            if (!v) return 'no view';
-            const doc = v.state.doc.toString();
-            return 'text@pos: "' + doc.substring(pos - 5, pos + 10) + '" allInserts: ' + [...document.querySelectorAll('.cm-suggestion-insert')].map(el => el.textContent).join(',');
-          }, { pos: retryPos });
-          errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}" at pos ${retryPos} — ${ctx}`);
-        }
-      } else {
-        errors.push(`Insert decoration missing for "${s.newText.substring(0, 20)}" (not in registry)`);
+  // 4. Registry ↔ Firestore consistency: every Firestore entry should be in the registry
+  const registryState = await page.evaluate(() => {
+    const v = window.__editorView;
+    if (!v || !window.__annotationRegistry) return null;
+    const reg = v.state.field(window.__annotationRegistry);
+    const entries = [];
+    for (const [id, a] of reg) {
+      entries.push({
+        id, kind: a.kind, type: a.type,
+        currentFrom: a.currentFrom, currentTo: a.currentTo,
+        newText: a.newText || null, originalText: a.originalText || null,
+        selectedText: a.selectedText || null,
+      });
+    }
+    return { entries, docLen: v.state.doc.length, doc: v.state.doc.toString() };
+  });
+
+  if (!registryState) {
+    errors.push('Editor registry not available');
+  } else {
+    const regById = {};
+    for (const e of registryState.entries) regById[e.id] = e;
+
+    // 4a. Every Firestore suggestion has a registry entry
+    for (const s of fs.suggestions) {
+      if (!regById[s.id]) {
+        errors.push(`FS suggestion "${(s.newText || s.originalText || '').substring(0, 15)}" (${s.id}) missing from registry`);
       }
     }
-  }
-  for (const c of fs.comments) {
-    if (!c.selectedText) continue;
-    await page.evaluate((st) => {
-      const v = window.__editorView;
-      if (!v) return;
-      const doc = v.state.doc.toString();
-      const pos = doc.indexOf(st);
-      if (pos >= 0) v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-    }, c.selectedText);
-    await page.waitForTimeout(300);
-    const check = await page.evaluate(({ st }) => {
-      const v = window.__editorView;
-      if (!v || !window.__annotationRegistry) return { noRegistry: true };
-      const reg = v.state.field(window.__annotationRegistry);
-      let regEntry = null;
-      for (const [id, a] of reg) { if (a.kind === 'comment' && a.selectedText === st) { regEntry = { id, currentFrom: a.currentFrom, currentTo: a.currentTo }; break; } }
-      const highlights = [...document.querySelectorAll('.cm-comment-highlight')].map(el => el.textContent);
-      const docPos = v.state.doc.toString().indexOf(st);
-      return { regEntry, highlights, docPos, docLen: v.state.doc.length };
-    }, { st: c.selectedText });
-    if (!check.highlights.some(h => h.includes(c.selectedText))) {
-      const detail = check.regEntry ? `registry curFrom:${check.regEntry.currentFrom} curTo:${check.regEntry.currentTo} docPos:${check.docPos}` : 'NOT IN REGISTRY';
-      errors.push(`Comment highlight missing for "${c.selectedText.substring(0, 20)}" (${detail})`);
+    for (const c of fs.comments) {
+      if (!regById[c.id]) {
+        errors.push(`FS comment "${(c.selectedText || '').substring(0, 15)}" (${c.id}) missing from registry`);
+      }
     }
+
+    // 5. Exact highlight text verification via registry positions
+    // For each registry entry, check the doc text at currentFrom..currentTo matches expected text,
+    // then scroll there and verify the DOM decoration covers exactly those characters.
+    for (const entry of registryState.entries) {
+      if (entry.currentFrom == null || entry.currentTo == null) continue;
+      if (entry.currentFrom < 0 || entry.currentTo > registryState.docLen) continue;
+
+      if (entry.kind === 'suggestion' && (entry.type === 'insertion' || entry.type === 'replacement')) {
+        // Check: doc text at registry position matches newText
+        const docSlice = registryState.doc.slice(entry.currentFrom, entry.currentTo);
+        if (entry.newText && docSlice !== entry.newText) {
+          errors.push(`Suggestion "${entry.newText.substring(0, 15)}": doc[${entry.currentFrom}..${entry.currentTo}]="${docSlice.substring(0, 15)}" !== newText`);
+        }
+
+        // Scroll to position and verify DOM decoration has exact text
+        await page.evaluate(({ pos }) => {
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+        }, { pos: entry.currentFrom });
+        await page.waitForTimeout(200);
+
+        const decoCheck = await page.evaluate(({ id, expectedText }) => {
+          const el = document.querySelector(`.cm-suggestion-insert[data-hunk-id="${id}"]`);
+          if (!el) return { found: false };
+          return { found: true, text: el.textContent };
+        }, { id: entry.id, expectedText: entry.newText });
+
+        if (!decoCheck.found) {
+          errors.push(`Insert decoration missing for hunk ${entry.id} "${(entry.newText || '').substring(0, 15)}"`);
+        } else if (entry.newText && decoCheck.text !== entry.newText) {
+          errors.push(`Insert decoration text mismatch for "${entry.newText.substring(0, 15)}": DOM="${decoCheck.text.substring(0, 15)}" !== expected`);
+        }
+      }
+
+      if (entry.kind === 'suggestion' && (entry.type === 'deletion' || entry.type === 'replacement')) {
+        // Deletion widget: check DOM has the widget with correct data-hunk-id
+        await page.evaluate(({ pos }) => {
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+        }, { pos: entry.currentFrom });
+        await page.waitForTimeout(200);
+
+        const delCheck = await page.evaluate(({ id, expectedOriginal }) => {
+          const el = document.querySelector(`.cm-suggestion-delete[data-hunk-id="${id}"]`);
+          if (!el) return { found: false };
+          return { found: true, text: el.textContent };
+        }, { id: entry.id, expectedOriginal: entry.originalText });
+
+        if (!delCheck.found) {
+          errors.push(`Delete widget missing for hunk ${entry.id} "${(entry.originalText || '').substring(0, 15)}"`);
+        } else if (entry.originalText && delCheck.text !== entry.originalText) {
+          errors.push(`Delete widget text mismatch for "${entry.originalText.substring(0, 15)}": DOM="${delCheck.text.substring(0, 15)}" !== expected`);
+        }
+      }
+
+      if (entry.kind === 'comment') {
+        // Check: doc text at registry position matches selectedText
+        const docSlice = registryState.doc.slice(entry.currentFrom, entry.currentTo);
+        if (entry.selectedText && docSlice !== entry.selectedText) {
+          errors.push(`Comment highlight range wrong: doc[${entry.currentFrom}..${entry.currentTo}]="${docSlice.substring(0, 15)}" !== "${entry.selectedText.substring(0, 15)}"`);
+        }
+
+        await page.evaluate(({ pos }) => {
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+        }, { pos: entry.currentFrom });
+        await page.waitForTimeout(200);
+
+        const commentCheck = await page.evaluate(({ id, expectedText }) => {
+          const el = document.querySelector(`.cm-comment-highlight[data-comment-id="${id}"]`);
+          if (!el) return { found: false };
+          return { found: true, text: el.textContent };
+        }, { id: entry.id, expectedText: entry.selectedText });
+
+        if (!commentCheck.found) {
+          errors.push(`Comment highlight missing for ${entry.id} "${(entry.selectedText || '').substring(0, 15)}"`);
+        } else if (entry.selectedText && commentCheck.text !== entry.selectedText) {
+          errors.push(`Comment highlight text mismatch: DOM="${commentCheck.text.substring(0, 15)}" !== "${entry.selectedText.substring(0, 15)}"`);
+        }
+      }
+    }
+
+    // 6. Every inline decoration has a matching margin card (and vice versa)
+    const cardVsDecoCheck = await page.evaluate(() => {
+      const errors = [];
+      // Suggestion cards → inline decorations
+      const suggCards = document.querySelectorAll('.margin-card--suggestion:not(.margin-card--stale)');
+      for (const card of suggCards) {
+        const hunkId = card.dataset.hunkId;
+        if (!hunkId) continue;
+        // Check for linked IDs (bold groups)
+        const linkedIds = card.dataset.linkedIds ? card.dataset.linkedIds.split(',') : [hunkId];
+        for (const id of linkedIds) {
+          const deco = document.querySelector(`.cm-suggestion-insert[data-hunk-id="${id}"], .cm-suggestion-delete[data-hunk-id="${id}"]`);
+          if (!deco) errors.push(`Card ${id} has no inline decoration`);
+        }
+      }
+      // Comment cards → inline highlights
+      const commentCards = document.querySelectorAll('.margin-card--comment');
+      for (const card of commentCards) {
+        const commentId = card.dataset.commentId;
+        if (!commentId) continue;
+        const deco = document.querySelector(`.cm-comment-highlight[data-comment-id="${commentId}"]`);
+        if (!deco) errors.push(`Comment card ${commentId} has no inline highlight`);
+      }
+      // Inline decorations → margin cards (orphan check)
+      const insertDecos = document.querySelectorAll('.cm-suggestion-insert[data-hunk-id]');
+      for (const deco of insertDecos) {
+        const id = deco.dataset.hunkId;
+        const card = document.querySelector(`.margin-card[data-hunk-id="${id}"]`)
+          || document.querySelector(`.margin-card[data-linked-ids*="${id}"]`);
+        if (!card) errors.push(`Orphan insert decoration ${id} (no card)`);
+      }
+      const commentDecos = document.querySelectorAll('.cm-comment-highlight[data-comment-id]');
+      for (const deco of commentDecos) {
+        const id = deco.dataset.commentId;
+        const card = document.querySelector(`.margin-card[data-comment-id="${id}"]`);
+        if (!card) errors.push(`Orphan comment highlight ${id} (no card)`);
+      }
+      return errors;
+    });
+    errors.push(...cardVsDecoCheck);
   }
 
-  // 5. Card order matches document order — cards should appear in the same
-  //    sequence as their positions in the editor (resolveOverlaps pushes them
-  //    down, so absolute position won't match, but ORDER should be correct)
+  // 7. Card order matches document order
   const cardOrder = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('.margin-card')];
     return cards.map(c => ({
@@ -209,15 +282,12 @@ async function verify(page, step, expectedSuggs, expectedComments) {
       commentId: c.dataset.commentId || null,
     })).sort((a, b) => a.top - b.top);
   });
-  // Build expected order from Firestore positions
   const allAnnotations = [
     ...fs.suggestions.map(s => ({ id: s.id, pos: s.resolvedFrom || s.originalFrom || 0, type: 'S' })),
     ...fs.comments.map(c => ({ id: c.id, pos: c.resolvedFrom || c.from || 0, type: 'C' })),
   ].sort((a, b) => a.pos - b.pos);
-  // Check order matches (skip linked bold hunks which share a card)
   const cardIds = cardOrder.map(c => c.hunkId || c.commentId).filter(Boolean);
   const expectedIds = allAnnotations.map(a => a.id);
-  // Cards may have fewer IDs due to linked groups — just verify the ones present are in order
   let lastExpectedIdx = -1;
   let orderOk = true;
   for (const cid of cardIds) {
@@ -227,8 +297,24 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   }
   if (!orderOk) errors.push(`Cards not in document order`);
 
+  // 8. DOM card count matches Firestore (accounting for linked bold groups)
+  const linkedGroupCount = await page.evaluate(() => {
+    return document.querySelectorAll('.margin-card--suggestion:not(.margin-card--stale)').length;
+  });
+  const commentCardCount = await page.evaluate(() => {
+    return document.querySelectorAll('.margin-card--comment').length;
+  });
+  // Bold groups: N Firestore suggestions may map to fewer cards.
+  // But card count should never EXCEED Firestore count.
+  if (linkedGroupCount > fs.suggestions.length) {
+    errors.push(`More suggestion cards (${linkedGroupCount}) than Firestore suggestions (${fs.suggestions.length})`);
+  }
+  if (commentCardCount !== fs.comments.length) {
+    errors.push(`Comment card count ${commentCardCount} !== Firestore ${fs.comments.length}`);
+  }
+
   const status = errors.length === 0 ? 'OK' : 'FAIL';
-  console.log(`[${step}] ${status} — ${editor.suggestionCards}S ${editor.commentCards}C | FS: ${fs.suggestions.length}S ${fs.comments.length}C` +
+  console.log(`[${step}] ${status} — ${linkedGroupCount}S ${commentCardCount}C cards | FS: ${fs.suggestions.length}S ${fs.comments.length}C` +
     (errors.length > 0 ? ' — ' + errors.join('; ') : ''));
   for (const err of errors) expect.soft(false, `[${step}] ${err}`).toBe(true);
 }

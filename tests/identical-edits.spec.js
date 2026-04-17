@@ -4,6 +4,7 @@ const { test, expect } = require('@playwright/test');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
+const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
 
 async function login(page) {
   await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
@@ -14,7 +15,7 @@ async function clearAllSuggestions() {
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
-  const snap = await db.collection('suggestions').get();
+  const snap = await db.collection('suggestions').where('filePath', '==', TEST_FILE).get();
   if (snap.empty) return;
   const batch = db.batch();
   snap.docs.forEach(d => batch.delete(d.ref));
