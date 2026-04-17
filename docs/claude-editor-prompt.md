@@ -65,10 +65,13 @@ Body: {
   "originalText": "the text being replaced or deleted",
   "newText": "the replacement text (empty for deletion)",
   "contextBefore": "~50 chars before the edit in the original",
-  "contextAfter": "~50 chars after the edit in the original"
+  "contextAfter": "~50 chars after the edit in the original",
+  "reason": "Brief explanation of why this change is suggested"
 }
 ```
-Returns: `{ id, status: "ok" }`
+Returns: `{ id, status: "ok", replyId: "..." }`
+
+The `reason` field is **required for every suggestion**. It creates a reply on the suggestion card explaining the rationale. Keep it to one short sentence (e.g., "Correcting subject-verb agreement" or "Simplifying for clarity"). Reviewers see this reason as a reply thread on the suggestion card in the editor.
 
 #### Submit a comment
 ```
@@ -141,7 +144,7 @@ The markdown files use custom syntax that MUST be preserved exactly:
 2. **Be precise** — use the exact `originalText` from the file. Even a single character difference will cause the suggestion to fail.
 3. **Include context** — provide 30-50 characters of surrounding text in `contextBefore` and `contextAfter` so the system can locate the edit even if the file changes.
 4. **One suggestion per change** — each distinct edit should be a separate API call. Don't batch multiple changes into one suggestion.
-5. **Explain your reasoning** — use comments (not suggestions) to explain why you're recommending a change, especially for theological or substantive edits.
+5. **Always include a reason** — every suggestion MUST include the `reason` field with a short sentence explaining why. This appears as a reply on the suggestion card so reviewers understand the rationale without asking.
 
 ### Suggestion Types
 
@@ -160,15 +163,15 @@ You would:
    ```
 2. Read the introduction section
 3. Identify improvements
-4. Submit each suggestion:
+4. Submit each suggestion with a reason:
    ```
    POST /api/suggestions/hunk
-   { "type": "replacement", "originalText": "...", "newText": "...", ... }
+   { "type": "replacement", "originalText": "...", "newText": "...", "reason": "Simplifying for clarity", ... }
    ```
-5. Add explanatory comments where helpful:
+5. Use standalone comments for broader observations that aren't tied to a specific edit:
    ```
    POST /api/suggestions/comments
-   { "selectedText": "...", "commentText": "Suggested rewording for clarity...", ... }
+   { "selectedText": "...", "commentText": "This section might benefit from a concrete example...", ... }
    ```
 6. Tell the user what you suggested and that they can review the suggestions in the editor at resources.noblecollective.org
 

@@ -77,7 +77,7 @@ async function canReview(email, bookPath) {
 // Create a suggestion hunk (auto-save from editor)
 router.post('/hunk', async (req, res) => {
   try {
-    const { filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, linkedGroup, linkedLabel } = req.body;
+    const { filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, linkedGroup, linkedLabel, reason } = req.body;
     if (!filePath || !bookPath || !type) {
       return res.status(400).json({ error: 'filePath, bookPath, and type required' });
     }
@@ -94,7 +94,17 @@ router.post('/hunk', async (req, res) => {
       ...(linkedGroup ? { linkedGroup, linkedLabel } : {}),
     });
 
-    res.json({ id, status: 'ok' });
+    // If a reason is provided, create a reply on the suggestion explaining the change
+    let replyId = null;
+    if (reason) {
+      replyId = await suggestions.createReply({
+        parentId: id, parentType: 'suggestion', filePath, text: reason,
+        authorEmail: req.user.email,
+        authorName: req.user.displayName,
+      });
+    }
+
+    res.json({ id, status: 'ok', ...(replyId ? { replyId } : {}) });
   } catch (err) {
     console.error('Create hunk error:', err.message);
     res.status(500).json({ error: err.message });
