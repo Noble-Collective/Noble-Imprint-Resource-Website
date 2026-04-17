@@ -28,6 +28,15 @@ app.use('/static', express.static(path.join(__dirname, '../public')));
 // Attach user to every request
 app.use(auth.attachUser);
 
+// Prevent CDN from caching HTML pages (they vary by auth state)
+app.use((req, res, next) => {
+  // Only allow caching on static assets and cover/image proxies (they set their own headers)
+  if (!req.path.startsWith('/static') && !req.path.startsWith('/cover/') && !req.path.startsWith('/image/')) {
+    res.set('Cache-Control', 'private, no-store');
+  }
+  next();
+});
+
 // Build timestamp — available in all templates
 const buildTimeRaw = process.env.BUILD_TIME;
 let buildTimeFormatted = null;
