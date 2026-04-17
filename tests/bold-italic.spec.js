@@ -14,11 +14,13 @@ async function clearAllSuggestions() {
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
-  const snap = await db.collection('suggestions').where('filePath', '==', TEST_FILE).get();
-  if (snap.empty) return;
-  const batch = db.batch();
-  snap.docs.forEach(d => batch.delete(d.ref));
-  await batch.commit();
+  for (const col of ['suggestions', 'comments']) {
+    const snap = await db.collection(col).where('filePath', '==', TEST_FILE).get();
+    if (snap.empty) continue;
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
 }
 
 test.describe('Bold/Italic creates single card', () => {
@@ -59,8 +61,8 @@ test.describe('Bold/Italic creates single card', () => {
     // Check IMMEDIATELY — before auto-save (500ms, not 4000ms)
     await page.waitForTimeout(500);
 
-    const cardCount = await page.locator('.margin-card').count();
-    console.log('Cards immediately after bold:', cardCount);
+    const cardCount = await page.locator('.margin-card--suggestion').count();
+    console.log('Suggestion cards immediately after bold:', cardCount);
     expect(cardCount).toBe(1);
   });
 
@@ -110,9 +112,9 @@ test.describe('Bold/Italic creates single card', () => {
     await page.waitForTimeout(4000);
 
     const cardTexts = await page.evaluate(() => {
-      return [...document.querySelectorAll('.margin-card .margin-card-body')].map(el => el.textContent.trim());
+      return [...document.querySelectorAll('.margin-card--suggestion .margin-card-body')].map(el => el.textContent.trim());
     });
-    console.log('Card texts:', JSON.stringify(cardTexts));
+    console.log('Suggestion card texts:', JSON.stringify(cardTexts));
 
     // Each card should contain the correct word
     expect(cardTexts.length).toBe(3);
@@ -188,7 +190,7 @@ test.describe('Bold/Italic creates single card', () => {
     });
     console.log('Card texts:', JSON.stringify(cardTexts));
 
-    // The bold formatting should produce exactly 1 margin card
-    expect(allCards).toBe(1);
+    // The bold formatting should produce exactly 1 suggestion card
+    expect(suggCards).toBe(1);
   });
 });

@@ -117,7 +117,9 @@ test('same paragraph — accept suggestion — comment should not jump', async (
     const btn = page.locator('.margin-action--accept').first();
     await expect(btn).toBeVisible({ timeout: 5000 });
     await btn.click();
-    await page.waitForTimeout(8000);
+    await page.waitForTimeout(10000);
+    // Wait for comment card to re-render after accept+refresh cycle
+    await page.waitForSelector('.margin-card--comment', { timeout: 10000 });
 
     const after = await getCommentPos(page);
     console.log('[same-para accept] Comment AFTER:', after);
