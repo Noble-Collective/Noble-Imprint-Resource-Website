@@ -272,16 +272,20 @@ const draftPlugin = ViewPlugin.fromClass(
         // (e.g., adding "s" to multiple words would only show the first one).
         const registry = update.view.state.field(annotationRegistry);
         const hunks = allHunks.filter(h => {
+          const hFrom = h.type === 'deletion' ? h.currentPos : h.currentFrom;
+          const hTo = h.type === 'deletion' ? h.currentPos : h.currentTo;
           for (const [, a] of registry) {
             if (a.kind !== 'suggestion') continue;
-            if (a.originalText !== h.originalText || a.newText !== h.newText || a.type !== h.type) continue;
-            // Content matches — also check position overlap
-            const hFrom = h.type === 'deletion' ? h.currentPos : h.currentFrom;
-            const hTo = h.type === 'deletion' ? h.currentPos : h.currentTo;
             const aFrom = a.currentFrom;
             const aTo = a.currentTo;
-            // Positions overlap or are adjacent (within 2 chars) → same hunk
-            if (Math.abs(hFrom - aFrom) <= 2 && Math.abs(hTo - aTo) <= 2) return false;
+            // Exact match: same type, text, and position
+            if (a.originalText === h.originalText && a.newText === h.newText && a.type === h.type) {
+              if (Math.abs(hFrom - aFrom) <= 2 && Math.abs(hTo - aTo) <= 2) return false;
+            }
+            // Overlap match: draft hunk falls within a registry entry's range
+            // (e.g., diff engine splits a replacement into insertion + unchanged,
+            // or a server-submitted replacement decomposes differently than local diffChars)
+            if (hFrom >= aFrom - 1 && hTo <= aTo + 1) return false;
           }
           return true;
         });
