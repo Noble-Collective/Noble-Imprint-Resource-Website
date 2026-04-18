@@ -12,6 +12,26 @@ router.use((req, res, next) => {
   next();
 });
 
+// --- Lightweight version check (for polling + stale detection) ---
+router.get('/file-version', async (req, res) => {
+  try {
+    const { filePath } = req.query;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+
+    const { sha } = await github.getFileContent(filePath);
+    const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
+    const pendingComments = await suggestions.getCommentsForFile(filePath);
+    res.json({
+      sha,
+      pendingSuggestionCount: pendingSuggestions.length,
+      pendingCommentCount: pendingComments.length,
+    });
+  } catch (err) {
+    console.error('File version check error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Content read endpoint (for bots/automation) ---
 router.get('/content', async (req, res) => {
   try {

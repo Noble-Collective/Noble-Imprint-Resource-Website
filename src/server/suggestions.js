@@ -200,6 +200,23 @@ function repliesCollection() {
 // --- Suggestion Hunk CRUD ---
 
 async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, fileContent, linkedGroup, linkedLabel }) {
+  // Deduplication: check for an existing pending suggestion with the same text
+  // at an overlapping position (±5 chars). Prevents duplicates from rapid auto-save
+  // cycles or two users making the exact same edit.
+  const existingSnap = await suggestionsCollection()
+    .where('filePath', '==', filePath)
+    .where('status', '==', 'pending')
+    .where('originalText', '==', originalText || '')
+    .where('newText', '==', newText || '')
+    .get();
+  for (const doc of existingSnap.docs) {
+    const d = doc.data();
+    if (Math.abs((d.originalFrom || 0) - (originalFrom || 0)) <= 5) {
+      console.log('[DEDUP] Found existing suggestion', doc.id, 'at', d.originalFrom, '— skipping create');
+      return doc.id;
+    }
+  }
+
   // Build enhanced anchor data if file content is available
   const anchorData = fileContent
     ? buildAnchorData(fileContent, originalFrom, originalTo, originalText || '')

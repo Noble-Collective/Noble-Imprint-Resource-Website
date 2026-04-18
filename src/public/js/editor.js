@@ -30,6 +30,8 @@ if (data) {
   // --- Auto-save state ---
   let savedHunks = new Map(); // hunkKey → firestore doc id
   let saveTimer = null;
+  let saveFailCount = 0; // consecutive failures — show error after 2
+  let fileStale = false;  // set when file-version check detects a SHA change
 
   function hunkKey(hunk) {
     // Key by position in the ORIGINAL document — stable as the user types,
@@ -60,6 +62,30 @@ if (data) {
 
   async function autoSave(hunks) {
     if (!data.sessionFilePath || !data.bookRepoPath || editMode !== 'suggest') return;
+    if (fileStale) return; // file changed underneath us — don't save stale data
+    let hadSaveError = false;
+
+    // Check file version before saving — detect if the file changed on GitHub
+    // since we loaded it (e.g., another user accepted a suggestion).
+    // Advisory only: on failure/timeout, proceed with the save.
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const vRes = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(data.sessionFilePath), { signal: controller.signal });
+      clearTimeout(timeout);
+      if (vRes.ok) {
+        const vData = await vRes.json();
+        if (vData.sha && data.contentSha && vData.sha !== data.contentSha) {
+          fileStale = true;
+          console.warn('[AUTO-SAVE] file version changed:', data.contentSha, '→', vData.sha);
+          if (saveStatus) {
+            saveStatus.textContent = 'File updated — reload to continue';
+            saveStatus.classList.add('save-error');
+          }
+          return;
+        }
+      }
+    } catch { /* timeout or network error — proceed with save */ }
 
     // Build set of current hunk position ranges
     const currentKeys = new Set(hunks.map(hunkKey));
@@ -90,7 +116,9 @@ if (data) {
           if (editorView && registry.has(docId)) {
             editorView.dispatch({ effects: removeAnnotation.of(docId) });
           }
-        } catch { /* ignore */ }
+        } catch (err) {
+          console.warn('[AUTO-SAVE] delete failed:', err.message);
+        }
       }
     }
 
@@ -143,11 +171,12 @@ if (data) {
 
         // Update existing Firestore record
         try {
-          await fetch('/api/suggestions/hunk/' + existing.docId, {
+          const updateRes = await fetch('/api/suggestions/hunk/' + existing.docId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(hunkData),
           });
+          if (!updateRes.ok) throw new Error('HTTP ' + updateRes.status);
           // Update the key if it changed (merge threshold shifted the range)
           if (existing.key !== key) {
             savedHunks.delete(existing.key);
@@ -165,7 +194,10 @@ if (data) {
               currentTo: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentTo,
             }) });
           }
-        } catch { /* ignore */ }
+        } catch (err) {
+          hadSaveError = true;
+          console.warn('[AUTO-SAVE] update failed:', err.message);
+        }
       } else {
         // Create new Firestore record
         try {
@@ -177,8 +209,8 @@ if (data) {
               baseCommitSha: data.contentSha, ...hunkData,
             }),
           });
-          if (res.ok) {
-            const result = await res.json();
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const result = await res.json();
             savedHunks.set(key, result.id);
 
             // Promote to annotation registry — now this suggestion has a stable ID
@@ -216,8 +248,10 @@ if (data) {
                 ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
               });
             }
-          }
-        } catch { /* ignore */ }
+        } catch (err) {
+          hadSaveError = true;
+          console.warn('[AUTO-SAVE] create failed:', err.message);
+        }
       }
     }
 
@@ -227,9 +261,19 @@ if (data) {
       if (wasMatched) clearPendingFormatGroup(fg.groupId);
     }
 
-    if (saveStatus) {
-      saveStatus.textContent = 'Saved';
-      setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+    if (hadSaveError) {
+      saveFailCount++;
+      if (saveFailCount >= 2 && saveStatus) {
+        saveStatus.textContent = 'Save failed';
+        saveStatus.classList.add('save-error');
+      }
+    } else {
+      saveFailCount = 0;
+      if (saveStatus) {
+        saveStatus.classList.remove('save-error');
+        saveStatus.textContent = 'Saved';
+        setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+      }
     }
   }
 
@@ -351,7 +395,9 @@ if (data) {
         editorView.dispatch({ effects: setZones.of(zones) });
       }
 
-      // Update local data
+      // Update local data — reset stale flag since we now have fresh content
+      data.contentSha = fresh.sha || data.contentSha;
+      fileStale = false;
       data.pendingSuggestions = remainingSuggestions;
       data.pendingComments = existingComments;
       data.pendingReplies = fresh.pendingReplies || [];

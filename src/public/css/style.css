@@ -3221,6 +3221,10 @@ body.drawer-open {
   font-family: 'DM Sans', sans-serif;
   margin-left: 8px;
 }
+.editor-save-status.save-error {
+  color: #c62828;
+  font-weight: 500;
+}
 .editor-comment-input {
   width: 260px;
   padding: 6px 10px;

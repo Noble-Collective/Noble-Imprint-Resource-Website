@@ -1,0 +1,458 @@
+// Multi-user safety tests: auto-save errors, version checks, deduplication, presence.
+const { test, expect } = require('@playwright/test');
+
+const BASE_URL = 'http://localhost:8080';
+const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
+const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+
+async function login(page) {
+  await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
+  await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 30000 });
+}
+
+async function clearAll() {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) admin.initializeApp();
+  const db = admin.firestore();
+  for (const col of ['suggestions', 'comments', 'replies']) {
+    const snap = await db.collection(col).where('filePath', '==', TEST_FILE).get();
+    if (!snap.empty) { const b = db.batch(); snap.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
+  }
+}
+
+async function enterSuggest(page) {
+  await page.click('#btn-suggest-edit');
+  await page.waitForSelector('.cm-editor');
+  await page.waitForTimeout(500);
+}
+
+async function findUniqueWord(page) {
+  return page.evaluate(() => {
+    const doc = window.__editorView.state.doc.toString();
+    for (const line of doc.split('\n')) {
+      if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+      for (const w of (line.match(/\b[a-zA-Z]{7,10}\b/g) || [])) {
+        if (doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      }
+    }
+    return null;
+  });
+}
+
+async function makeSuggestion(page, word) {
+  await page.evaluate((w) => {
+    const v = window.__editorView, doc = v.state.doc.toString(), p = doc.indexOf(w);
+    if (p >= 0) {
+      v.dispatch({ selection: { anchor: p, head: p + w.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection(w + 'EDIT'));
+    }
+  }, word);
+  await page.waitForTimeout(300);
+}
+
+async function countFirestoreSuggestions() {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) admin.initializeApp();
+  const db = admin.firestore();
+  const snap = await db.collection('suggestions').where('filePath', '==', TEST_FILE).where('status', '==', 'pending').get();
+  return { count: snap.size, docs: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
+}
+
+// ============================================================
+// Step 1: Auto-save error surfacing
+// ============================================================
+
+test.describe('Auto-save error surfacing', () => {
+  test('save failure shows "Save failed" after 2 consecutive errors', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Intercept the hunk create endpoint to return 500
+      await page.route('**/api/suggestions/hunk', (route) => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"test failure"}' });
+        } else {
+          route.continue();
+        }
+      });
+
+      // Make first suggestion — triggers save cycle 1 (fails, saveFailCount=1)
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(3000); // debounce + auto-save
+
+      // Make second edit — triggers save cycle 2 (fails, saveFailCount=2 → shows error)
+      await page.evaluate(() => {
+        const v = window.__editorView, doc = v.state.doc.toString();
+        const p = doc.indexOf('EDIT');
+        if (p >= 0) {
+          v.dispatch({ selection: { anchor: p + 4 }, scrollIntoView: true });
+          v.dispatch(v.state.replaceSelection('X'));
+        }
+      });
+      await page.waitForTimeout(3000);
+
+      // The status should show error after 2 consecutive failed cycles
+      const status = page.locator('#editor-save-status');
+      await expect(status).toHaveText('Save failed');
+      await expect(status).toHaveClass(/save-error/);
+
+    } finally { await clearAll(); }
+  });
+
+  test('save error clears after successful save', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      let saveCallCount = 0;
+      // Fail the first 2 save cycles, then allow through
+      await page.route('**/api/suggestions/hunk', (route) => {
+        if (route.request().method() === 'POST') {
+          saveCallCount++;
+          if (saveCallCount <= 2) {
+            route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"test"}' });
+          } else {
+            route.continue();
+          }
+        } else {
+          route.continue();
+        }
+      });
+
+      // Cycle 1: make edit, auto-save fails
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(3000);
+
+      // Cycle 2: another edit, auto-save fails again → error shows
+      await page.evaluate(() => {
+        const v = window.__editorView, doc = v.state.doc.toString();
+        const p = doc.indexOf('EDIT');
+        if (p >= 0) {
+          v.dispatch({ selection: { anchor: p + 4 }, scrollIntoView: true });
+          v.dispatch(v.state.replaceSelection('X'));
+        }
+      });
+      await page.waitForTimeout(3000);
+
+      const status = page.locator('#editor-save-status');
+      await expect(status).toHaveText('Save failed');
+
+      // Cycle 3: another edit — this time the route allows through → error clears
+      await page.evaluate(() => {
+        const v = window.__editorView, doc = v.state.doc.toString();
+        const p = doc.indexOf('EDITX');
+        if (p >= 0) {
+          v.dispatch({ selection: { anchor: p + 5 }, scrollIntoView: true });
+          v.dispatch(v.state.replaceSelection('Y'));
+        }
+      });
+      await page.waitForTimeout(4000);
+
+      // Should clear the error
+      await expect(status).not.toHaveClass(/save-error/);
+
+    } finally { await clearAll(); }
+  });
+
+  test('single transient failure does NOT show error', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      let failCount = 0;
+      // Fail only the first POST, then succeed
+      await page.route('**/api/suggestions/hunk', (route) => {
+        if (route.request().method() === 'POST') {
+          failCount++;
+          if (failCount === 1) {
+            route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"transient"}' });
+          } else {
+            route.continue();
+          }
+        } else {
+          route.continue();
+        }
+      });
+
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(5000);
+
+      // Should NOT show error — only 1 failure, threshold is 2
+      const status = page.locator('#editor-save-status');
+      await expect(status).not.toHaveClass(/save-error/);
+
+    } finally { await clearAll(); }
+  });
+});
+
+// ============================================================
+// Step 2: File version check before saving
+// ============================================================
+
+let _cleanFileContent = null;
+async function saveCleanFile() {
+  if (_cleanFileContent) return;
+  const github = require('../src/server/github');
+  const { content } = await github.getFileContent(TEST_FILE);
+  _cleanFileContent = content;
+}
+async function restoreCleanFile() {
+  if (!_cleanFileContent) return;
+  const github = require('../src/server/github');
+  const { content, sha } = await github.getFileContent(TEST_FILE);
+  if (content !== _cleanFileContent) {
+    await github.updateFileContent(TEST_FILE, _cleanFileContent, sha, 'Restore after multi-user test');
+  }
+}
+
+test.describe('File version check', () => {
+  test('auto-save blocked when file SHA changes after page load', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Make a suggestion so there's something to auto-save
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(3000); // let first auto-save complete
+
+      let r = await countFirestoreSuggestions();
+      console.log('Version check: after first save:', r.count);
+      expect(r.count).toBe(1);
+
+      // Simulate another user accepting a suggestion (changes the file SHA)
+      // by directly modifying the file on GitHub
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      await github.updateFileContent(TEST_FILE, content + '\n<!-- version check test -->', sha, 'Test: change SHA');
+
+      // Clear the SERVER's content cache so the version endpoint returns the new SHA
+      // (cache.invalidateAll() from the test process doesn't affect the server's cache)
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      // Check that contentSha is set
+      const pageSha = await page.evaluate(() => window.__EDITOR_DATA?.contentSha);
+      console.log('Version check: page SHA:', pageSha);
+      expect(pageSha).toBeTruthy();
+
+      // Wait for cache refresh to settle
+      await page.waitForTimeout(2000);
+
+      // Verify the version endpoint now returns a different SHA (call from browser context for auth)
+      const vData = await page.evaluate(async (fp) => {
+        const res = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(fp));
+        if (!res.ok) return { error: res.status };
+        return res.json();
+      }, TEST_FILE);
+      console.log('Version check: server response:', JSON.stringify(vData));
+      console.log('Version check: page SHA:', pageSha);
+      expect(vData.sha).toBeTruthy();
+      expect(vData.sha).not.toBe(pageSha);
+
+      // Now make another edit — the version check should detect the stale SHA and block
+      await page.evaluate(() => {
+        const v = window.__editorView, doc = v.state.doc.toString();
+        const p = doc.indexOf('EDIT');
+        if (p >= 0) {
+          v.dispatch({ selection: { anchor: p + 4 }, scrollIntoView: true });
+          v.dispatch(v.state.replaceSelection('X'));
+        }
+      });
+      await page.waitForTimeout(6000); // debounce + version check + auto-save
+
+      // Should show stale warning
+      const status = page.locator('#editor-save-status');
+      await expect(status).toContainText('File updated');
+      await expect(status).toHaveClass(/save-error/);
+
+      // The edit should NOT have been saved to Firestore (still 1 suggestion)
+      r = await countFirestoreSuggestions();
+      console.log('Version check: after stale detection:', r.count);
+      expect(r.count).toBe(1);
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('version check timeout does not block saves', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Intercept the version endpoint to hang forever (simulating timeout)
+      await page.route('**/api/suggestions/file-version*', (route) => {
+        // Don't respond — let the AbortController timeout handle it
+      });
+
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      // Wait for debounce + version check timeout (3s) + auto-save
+      await page.waitForTimeout(6000);
+
+      // Save should have proceeded despite the version check timing out
+      const r = await countFirestoreSuggestions();
+      console.log('Version timeout: suggestions saved:', r.count);
+      expect(r.count).toBe(1);
+
+    } finally { await clearAll(); }
+  });
+
+  test('normal flow: file unchanged, save proceeds', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(4000);
+
+      // Should save normally — no stale warning
+      const status = page.locator('#editor-save-status');
+      await expect(status).not.toHaveClass(/save-error/);
+
+      const r = await countFirestoreSuggestions();
+      expect(r.count).toBe(1);
+
+    } finally { await clearAll(); }
+  });
+});
+
+// ============================================================
+// Step 3: Server-side suggestion deduplication
+// ============================================================
+
+test.describe('Server-side suggestion dedup', () => {
+  test('identical suggestion at same position is deduped', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const pos = content.indexOf('sovereign');
+      expect(pos).toBeGreaterThan(0);
+
+      // Create first suggestion
+      const id1 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + 9,
+        originalText: 'sovereign', newText: 'DEDUP_TEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + 9, pos + 59),
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+      console.log('Dedup: created first:', id1);
+
+      // Create identical suggestion (same text, same position)
+      const id2 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + 9,
+        originalText: 'sovereign', newText: 'DEDUP_TEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + 9, pos + 59),
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+      console.log('Dedup: second returned:', id2);
+
+      // Should return the same ID (deduped)
+      expect(id2).toBe(id1);
+
+      // Firestore should have exactly 1 document
+      const r = await countFirestoreSuggestions();
+      expect(r.count).toBe(1);
+
+    } finally { await clearAll(); }
+  });
+
+  test('same text at different positions is NOT deduped', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      const word = 'the';
+      const pos1 = content.indexOf(word);
+      const pos2 = content.indexOf(word, pos1 + 100);
+      expect(pos1).toBeGreaterThan(0);
+      expect(pos2).toBeGreaterThan(pos1 + 5);
+      console.log('Dedup distance:', word, 'at', pos1, 'and', pos2, '(', pos2 - pos1, 'chars apart)');
+
+      const id1 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos1, originalTo: pos1 + word.length,
+        originalText: word, newText: 'DEDUP_POS1',
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+
+      const id2 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos2, originalTo: pos2 + word.length,
+        originalText: word, newText: 'DEDUP_POS1',
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+
+      expect(id2).not.toBe(id1);
+      const r = await countFirestoreSuggestions();
+      expect(r.count).toBe(2);
+
+    } finally { await clearAll(); }
+  });
+
+  test('same position but different text is NOT deduped', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const pos = content.indexOf('sovereign');
+      expect(pos).toBeGreaterThan(0);
+
+      const id1 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + 9,
+        originalText: 'sovereign', newText: 'EDIT_A',
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+
+      const id2 = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + 9,
+        originalText: 'sovereign', newText: 'EDIT_B',
+        authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
+      });
+
+      expect(id2).not.toBe(id1);
+      const r = await countFirestoreSuggestions();
+      expect(r.count).toBe(2);
+
+    } finally { await clearAll(); }
+  });
+});
