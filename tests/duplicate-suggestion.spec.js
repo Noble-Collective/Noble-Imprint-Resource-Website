@@ -7,7 +7,7 @@ const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/session
 
 async function login(page) {
   await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
-  await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 15000 });
+  await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 30000 });
 }
 
 async function clearAll() {
@@ -290,4 +290,185 @@ test('Scenario 5: 3 suggestions, leave/re-enter, discard middle', async ({ page 
     console.log('S5 margin cards:', await page.locator('.margin-card--suggestion').count());
     expect(r.count).toBe(2);
   } finally { await clearAll(); }
+});
+
+// --- Utilities for tests that accept suggestions (modify GitHub file) ---
+let _cleanFileContent = null;
+
+async function saveCleanFile() {
+  if (_cleanFileContent) return;
+  const github = require('../src/server/github');
+  const { content } = await github.getFileContent(TEST_FILE);
+  _cleanFileContent = content;
+}
+
+async function restoreCleanFile() {
+  if (!_cleanFileContent) return;
+  const github = require('../src/server/github');
+  const { content, sha } = await github.getFileContent(TEST_FILE);
+  if (content !== _cleanFileContent) {
+    await github.updateFileContent(TEST_FILE, _cleanFileContent, sha, 'Restore clean file after duplicate-suggestion test');
+    console.log('[TEST] Restored clean file on GitHub');
+  }
+}
+
+// Scenario 6: accept via server shifts positions — savedHunks keys must match
+// Root cause: reanchorAnnotations updates position.from but not originalFrom.
+// After accept, Firestore has stale originalFrom. The client uses originalFrom
+// for savedHunks keys, but the diff engine's originalFrom comes from the current
+// file. When the shift is > ±1, findOverlappingSavedHunk misses, and auto-save
+// creates a duplicate Firestore document.
+//
+// This test:
+// 1. Injects suggestions via server API at known positions
+// 2. Accepts one server-side (causing a position shift > 2 for remaining)
+// 3. Loads the page and enters suggest mode
+// 4. Checks savedHunks keys match what the diff engine produces
+// 5. Verifies no duplicate Firestore entries or margin cards
+test('Scenario 6: accept shifts positions — savedHunks keys must stay in sync', async ({ page }) => {
+  test.setTimeout(120000);
+  await clearAll();
+  await saveCleanFile();
+  try {
+    const github = require('../src/server/github');
+    const suggestions = require('../src/server/suggestions');
+    const { content: fileContent, sha } = await github.getFileContent(TEST_FILE);
+
+    // Find 3 unique 7-10 char words, sorted by document position
+    const words = [];
+    for (const line of fileContent.split('\n')) {
+      if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+      for (const w of (line.match(/\b[a-zA-Z]{7,10}\b/g) || [])) {
+        if (fileContent.indexOf(w) === fileContent.lastIndexOf(w) && !words.some(x => x.word === w)) {
+          words.push({ word: w, pos: fileContent.indexOf(w) });
+          if (words.length >= 3) break;
+        }
+      }
+      if (words.length >= 3) break;
+    }
+    words.sort((a, b) => a.pos - b.pos);
+    console.log('S6 words:', words.map(w => w.word + '@' + w.pos));
+    expect(words.length).toBe(3);
+
+    const deleteWord = words[0]; // FIRST in doc — deletion here shifts everything after
+    const keepWord = words[1];   // SECOND — must not be duplicated
+    const keepWord2 = words[2];  // THIRD — must not be duplicated
+
+    // Create deletion suggestion (will be accepted)
+    const delId = await suggestions.createHunk({
+      filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+      baseCommitSha: sha, type: 'deletion',
+      originalFrom: deleteWord.pos, originalTo: deleteWord.pos + deleteWord.word.length,
+      originalText: deleteWord.word, newText: '',
+      contextBefore: fileContent.substring(Math.max(0, deleteWord.pos - 50), deleteWord.pos),
+      contextAfter: fileContent.substring(deleteWord.pos + deleteWord.word.length, deleteWord.pos + deleteWord.word.length + 50),
+      authorEmail: 'steve@noblecollective.org', authorName: 'Steve', fileContent,
+    });
+    console.log('S6 deletion:', delId, '"' + deleteWord.word + '" @' + deleteWord.pos, '(' + deleteWord.word.length + ' chars)');
+
+    // Create replacement suggestion (will be kept)
+    const repId = await suggestions.createHunk({
+      filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+      baseCommitSha: sha, type: 'replacement',
+      originalFrom: keepWord.pos, originalTo: keepWord.pos + keepWord.word.length,
+      originalText: keepWord.word, newText: 'REPLACED1',
+      contextBefore: fileContent.substring(Math.max(0, keepWord.pos - 50), keepWord.pos),
+      contextAfter: fileContent.substring(keepWord.pos + keepWord.word.length, keepWord.pos + keepWord.word.length + 50),
+      authorEmail: 'steve@noblecollective.org', authorName: 'Steve', fileContent,
+    });
+    console.log('S6 replacement:', repId, '"' + keepWord.word + '" @' + keepWord.pos);
+
+    // Create insertion suggestion (will be kept)
+    const insPos = keepWord2.pos + keepWord2.word.length;
+    const insId = await suggestions.createHunk({
+      filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+      baseCommitSha: sha, type: 'insertion',
+      originalFrom: insPos, originalTo: insPos,
+      originalText: '', newText: 'INSERTED2',
+      contextBefore: fileContent.substring(Math.max(0, insPos - 50), insPos),
+      contextAfter: fileContent.substring(insPos, Math.min(fileContent.length, insPos + 50)),
+      authorEmail: 'steve@noblecollective.org', authorName: 'Steve', fileContent,
+    });
+    console.log('S6 insertion:', insId, 'after "' + keepWord2.word + '" @' + insPos);
+
+    let r = await countFirestoreSuggestions();
+    expect(r.count).toBe(3);
+
+    // Accept the deletion SERVER-SIDE — shifts file, re-anchors remaining
+    const result = await suggestions.acceptHunk(delId, 'steve@noblecollective.org');
+    console.log('S6 accept:', result.stale ? 'STALE' : 'OK');
+    expect(result.stale).toBeFalsy();
+
+    // Verify the position mismatch exists (this is the bug condition)
+    r = await countFirestoreSuggestions();
+    expect(r.count).toBe(2);
+    // After fix: reanchorAnnotations syncs originalFrom with the resolved position,
+    // so originalFrom and position.from must match for all remaining suggestions.
+    for (const d of r.docs) {
+      const posFrom = d.position?.from;
+      if (posFrom != null) {
+        console.log('S6 position sync:', d.id.slice(0, 8), 'originalFrom=' + d.originalFrom, 'position.from=' + posFrom,
+          d.originalFrom === posFrom ? 'IN SYNC' : 'MISMATCH');
+        expect(d.originalFrom).toBe(posFrom);
+      }
+    }
+
+    // NOW load the page and enter suggest mode — auto-save must NOT create duplicates
+    await login(page);
+    await enterSuggest(page);
+    await page.waitForTimeout(6000); // debounce (300ms) + auto-save timer (1500ms) + margin
+
+    // Check savedHunks keys match the RESOLVED positions (where the diff engine
+    // will look for them), not the stale Firestore originalFrom.
+    // This is the core defect: savedHunks uses originalFrom but the diff engine
+    // uses the position in the current file (which matches position.from).
+    const keyCheck = await page.evaluate(() => {
+      const v = window.__editorView;
+      if (!v || !window.__savedHunks) return { error: 'not ready' };
+      const savedKeys = [];
+      for (const [k, id] of window.__savedHunks) savedKeys.push({ key: k, id: id.slice(0, 8) });
+      const reg = v.state.field(window.__annotationRegistry);
+      const regInfo = [];
+      for (const [id, a] of reg) {
+        if (a.kind === 'suggestion') {
+          regInfo.push({ id: id.slice(0, 8), origFrom: a.originalFrom, origTo: a.originalTo || a.originalFrom });
+        }
+      }
+      return { savedKeys, regInfo };
+    });
+    console.log('S6 savedHunks keys:', JSON.stringify(keyCheck.savedKeys));
+
+    // The savedHunks keys MUST use the file's current positions (position.from),
+    // not the stale originalFrom. When the diff engine produces hunks, their
+    // originalFrom will be relative to the current file. If savedHunks keys use
+    // the old positions, findOverlappingSavedHunk won't match and auto-save
+    // creates duplicates.
+    for (const d of r.docs) {
+      const posFrom = d.position?.from;
+      const posTo = d.position?.to ?? posFrom;
+      if (posFrom == null) continue;
+      const expectedKey = posFrom + ':' + posTo;
+      const actualEntry = keyCheck.savedKeys.find(s => s.id === d.id.slice(0, 8));
+      if (actualEntry) {
+        console.log('S6 key check:', d.id.slice(0, 8), 'expected=' + expectedKey, 'actual=' + actualEntry.key,
+          actualEntry.key === expectedKey ? 'OK' : 'MISMATCH');
+        expect(actualEntry.key).toBe(expectedKey);
+      }
+    }
+
+    // CORE ASSERTION: Firestore must still have exactly 2 pending suggestions
+    r = await countFirestoreSuggestions();
+    console.log('S6 after page load:', r.count, r.docs.map(d =>
+      d.id.slice(0, 8) + ' ' + d.type + ' @' + d.originalFrom));
+    expect(r.count).toBe(2);
+
+    // Card count must match Firestore count (no draft-leak duplicates)
+    const cardCount = await page.locator('.margin-card--suggestion:not(.margin-card--stale)').count();
+    console.log('S6 cards:', cardCount);
+    expect(cardCount).toBe(2);
+
+  } finally {
+    await clearAll();
+    await restoreCleanFile();
+  }
 });

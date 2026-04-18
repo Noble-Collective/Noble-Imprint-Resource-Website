@@ -130,11 +130,17 @@ async function reanchorAnnotations(filePath, newContent) {
         resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Update positions AND context strings — stale context causes accepts to fail
+      // Update positions AND context strings — stale context causes accepts to fail.
+      // Also sync originalFrom/originalTo so client-side savedHunks keys match the
+      // diff engine's positions (which are relative to the current file, not the
+      // file that existed when the suggestion was first created).
       const freshCtxBefore = newContent.substring(Math.max(0, resolved.from - 80), resolved.from);
       const ctxEnd = s.type === 'insertion' ? resolved.from : resolved.from + (s.originalText || '').length;
       const freshCtxAfter = newContent.substring(ctxEnd, Math.min(newContent.length, ctxEnd + 80));
+      const resolvedTo = s.type === 'insertion' ? resolved.from : resolved.from + (s.originalText || '').length;
       batch.update(suggestionsCollection().doc(s.id), {
+        originalFrom: resolved.from,
+        originalTo: resolvedTo,
         'position.from': resolved.from,
         'position.to': resolved.to,
         'position.contentHash': newHash,

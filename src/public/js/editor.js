@@ -332,12 +332,15 @@ if (data) {
       // Repopulate registry with shifted positions + rebuild savedHunks
       const existingComments = fresh.pendingComments || [];
       const registryEntries = buildShiftedRegistryEntries(remainingSuggestions, existingComments, newWorkingDoc);
-      // Rebuild savedHunks from the suggestion entries
-      for (const e of registryEntries) {
-        if (e.kind === 'suggestion') {
-          const key = e.originalFrom + ':' + e.originalTo;
-          savedHunks.set(key, e.id);
-        }
+      // Rebuild savedHunks using the server-resolved positions (position.from/to).
+      // The diff engine produces hunks with originalFrom relative to the CURRENT file
+      // (originalDocField), which matches the server's resolvedFrom — not the Firestore
+      // originalFrom which may be stale from the pre-accept file.
+      for (const s of remainingSuggestions) {
+        if (s.resolvedStale) continue;
+        const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+        const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
+        savedHunks.set(from + ':' + to, s.id);
       }
       editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
       console.log('[REFRESH] rebuilt registry with', registryEntries.length, 'entries, savedHunks:', savedHunks.size);
@@ -913,12 +916,14 @@ if (data) {
       // Populate savedHunks so auto-save knows these suggestions already exist
       // in Firestore. Without this, the diff engine's draft hunks for loaded
       // suggestions leak through and auto-save re-creates them as duplicates.
+      // Use the server-resolved positions (resolvedFrom) for keys — they match
+      // what the diff engine produces (relative to the current originalDocField).
       savedHunks.clear();
-      for (const e of registryEntries) {
-        if (e.kind === 'suggestion' && e.firestoreId) {
-          const key = e.originalFrom + ':' + e.originalTo;
-          savedHunks.set(key, e.firestoreId);
-        }
+      for (const s of existingSuggestions) {
+        if (s.resolvedStale) continue;
+        const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+        const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
+        savedHunks.set(from + ':' + to, s.id);
       }
     }
 
@@ -998,6 +1003,8 @@ if (data) {
     // Expose for testing
     window.__editorView = editorView;
     window.__annotationRegistry = annotationRegistry;
+    window.__originalDocField = originalDocField;
+    window.__savedHunks = savedHunks;
 
     editorView.focus();
   }

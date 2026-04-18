@@ -287,6 +287,14 @@ const draftPlugin = ViewPlugin.fromClass(
             // or a server-submitted replacement decomposes differently than local diffChars)
             if (h.type === 'insertion' && a.newText && hFrom >= aFrom - 1 && hTo <= aTo + 1
                 && a.newText.includes(h.newText)) return false;
+            // Fuzzy match: same newText at a nearby position, regardless of type/originalText.
+            // When resolveAnchor returns a slightly off position after re-anchoring, buildWorkingDoc
+            // applies the change at the wrong spot. diffChars then decomposes it with a different
+            // type (e.g., insertion vs replacement) or different originalText, but the newText stays
+            // the same because that's what was written into the working doc.
+            // Only for newText >= 3 chars — short strings like "s" or "**" are too common and
+            // would cause false positives for identical edits at different positions.
+            if (a.newText && a.newText.length >= 3 && a.newText === h.newText && Math.abs(hFrom - aFrom) <= 5) return false;
           }
           return true;
         });
