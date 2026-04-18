@@ -120,6 +120,7 @@
           <span class="editor-mode-label" id="editor-mode-label">Suggesting Edits</span>
           <span class="editor-save-status" id="editor-save-status"></span>
         </div>
+        <div class="editor-presence" id="editor-presence"></div>
         <div class="editor-toolbar-right">
           <label class="editor-toggle" title="Show line numbers">
             <input type="checkbox" id="chk-line-numbers" checked>
@@ -128,6 +129,12 @@
           <button class="edit-btn edit-btn--source" id="btn-view-source" title="Toggle raw markdown view">&lt;/&gt; Source</button>
           <button class="edit-btn edit-btn--primary" id="btn-editor-done">Done</button>
         </div>
+      </div>
+      <div class="editor-stale-banner" id="editor-stale-banner" style="display:none">
+        <span class="stale-banner-icon">&#9888;</span>
+        <span class="stale-banner-text" id="stale-banner-text"></span>
+        <button class="stale-banner-btn" id="stale-banner-reload">Reload latest version</button>
+        <button class="stale-banner-dismiss" id="stale-banner-dismiss" title="Dismiss">&times;</button>
       </div>
       <div class="editor-body">
         <div id="codemirror-host"></div>

@@ -32,6 +32,8 @@ if (data) {
   let saveTimer = null;
   let saveFailCount = 0; // consecutive failures — show error after 2
   let fileStale = false;  // set when file-version check detects a SHA change
+  let pollingInterval = null; // 30s polling for file changes + presence heartbeat
+  let lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
 
   function hunkKey(hunk) {
     // Key by position in the ORIGINAL document — stable as the user types,
@@ -78,10 +80,7 @@ if (data) {
         if (vData.sha && data.contentSha && vData.sha !== data.contentSha) {
           fileStale = true;
           console.warn('[AUTO-SAVE] file version changed:', data.contentSha, '→', vData.sha);
-          if (saveStatus) {
-            saveStatus.textContent = 'File updated — reload to continue';
-            saveStatus.classList.add('save-error');
-          }
+          showStaleBanner('This file was updated by another user.');
           return;
         }
       }
@@ -329,6 +328,141 @@ if (data) {
     this.style.display = 'none';
   });
 
+  // --- Stale file banner ---
+  function showStaleBanner(message) {
+    const banner = document.getElementById('editor-stale-banner');
+    const bannerText = document.getElementById('stale-banner-text');
+    if (banner && bannerText) {
+      bannerText.textContent = message;
+      banner.style.display = '';
+    }
+  }
+
+  // --- Polling for file changes + presence heartbeat (Steps 4 & 5) ---
+  function startPolling() {
+    if (pollingInterval) return;
+    // Send initial presence heartbeat + fetch other editors
+    sendPresenceHeartbeat();
+    updatePresenceDisplay();
+    pollingInterval = setInterval(pollForChanges, 30000);
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+    // Exit presence on stop
+    sendPresenceExit();
+  }
+
+  async function pollForChanges() {
+    if (!data.sessionFilePath) return;
+    try {
+      // File version check
+      const vRes = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (vRes.ok) {
+        const vData = await vRes.json();
+
+        // Check for file SHA change
+        if (vData.sha && data.contentSha && vData.sha !== data.contentSha && !fileStale) {
+          fileStale = true;
+          showStaleBanner('This file was updated by another user.');
+        }
+
+        // Check for new suggestions (only if file itself hasn't changed)
+        if (!fileStale && vData.pendingSuggestionCount > lastKnownSuggestionCount) {
+          const newCount = vData.pendingSuggestionCount - lastKnownSuggestionCount;
+          showStaleBanner(newCount + ' new suggestion' + (newCount > 1 ? 's were' : ' was') + ' added.');
+        }
+      }
+
+      // Presence heartbeat
+      sendPresenceHeartbeat();
+
+      // Fetch active editors and update display
+      updatePresenceDisplay();
+    } catch (err) {
+      console.warn('[POLL] error:', err.message);
+    }
+  }
+
+  async function sendPresenceHeartbeat() {
+    if (!data.sessionFilePath) return;
+    try {
+      await fetch('/api/suggestions/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: data.sessionFilePath }),
+      });
+    } catch (err) {
+      console.warn('[PRESENCE] heartbeat failed:', err.message);
+    }
+  }
+
+  function sendPresenceExit() {
+    if (!data.sessionFilePath) return;
+    // Use sendBeacon for reliability on tab close
+    const body = JSON.stringify({ filePath: data.sessionFilePath });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/suggestions/presence/exit', new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch('/api/suggestions/presence', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }
+
+  async function updatePresenceDisplay() {
+    if (!data.sessionFilePath) return;
+    const container = document.getElementById('editor-presence');
+    if (!container) return;
+    try {
+      const res = await fetch('/api/suggestions/presence?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (!res.ok) return;
+      const { editors } = await res.json();
+      const currentEmail = data.user ? data.user.email : '';
+      // Filter out self
+      const others = editors.filter(e => e.email !== currentEmail);
+      container.innerHTML = others.map(e => {
+        const initials = getInitials(e.displayName || e.email);
+        return '<span class="presence-avatar" title="' + escapeHtml(e.displayName || e.email) + '">' + escapeHtml(initials) + '</span>';
+      }).join('');
+    } catch (err) {
+      console.warn('[PRESENCE] display update failed:', err.message);
+    }
+  }
+
+  function getInitials(name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Stale banner: reload button
+  document.getElementById('stale-banner-reload')?.addEventListener('click', async () => {
+    await refreshFromGitHub();
+    lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
+    const banner = document.getElementById('editor-stale-banner');
+    if (banner) banner.style.display = 'none';
+  });
+
+  // Stale banner: dismiss button
+  document.getElementById('stale-banner-dismiss')?.addEventListener('click', () => {
+    const banner = document.getElementById('editor-stale-banner');
+    if (banner) banner.style.display = 'none';
+  });
+
+  // Send presence exit on tab close
+  window.addEventListener('beforeunload', sendPresenceExit);
+
   // --- Refresh overlay ---
   function showRefreshOverlay() {
     const el = document.getElementById('editor-refresh-overlay');
@@ -398,6 +532,7 @@ if (data) {
       // Update local data — reset stale flag since we now have fresh content
       data.contentSha = fresh.sha || data.contentSha;
       fileStale = false;
+      lastKnownSuggestionCount = remainingSuggestions.length;
       data.pendingSuggestions = remainingSuggestions;
       data.pendingComments = existingComments;
       data.pendingReplies = fresh.pendingReplies || [];
@@ -1046,6 +1181,9 @@ if (data) {
       if (gutters) gutters.style.display = 'none';
     }
 
+    // Start polling for file changes + presence heartbeat
+    if (isSuggestOrReview) startPolling();
+
     // Expose for testing
     window.__editorView = editorView;
     window.__annotationRegistry = annotationRegistry;
@@ -1056,6 +1194,7 @@ if (data) {
   }
 
   function exitEditor() {
+    stopPolling();
     setRevealFocusedLine(false);
     editorContainer.classList.remove('direct-editing');
     // Reset Done button text

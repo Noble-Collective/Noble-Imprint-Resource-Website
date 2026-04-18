@@ -529,6 +529,50 @@ async function deleteRepliesForParent(parentId) {
   await batch.commit();
 }
 
+// --- Editing session presence ---
+
+function editingSessionsCollection() {
+  return getDb().collection('editingSessions');
+}
+
+function presenceDocId(filePath, email) {
+  // Firestore doc IDs cannot contain '/' — encode it
+  return filePath.replace(/\//g, '__') + '::' + email;
+}
+
+async function enterEditingSession({ filePath, email, displayName }) {
+  const docId = presenceDocId(filePath, email);
+  await editingSessionsCollection().doc(docId).set({
+    filePath, email, displayName,
+    heartbeat: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+async function exitEditingSession({ filePath, email }) {
+  const docId = presenceDocId(filePath, email);
+  try {
+    await editingSessionsCollection().doc(docId).delete();
+  } catch (err) {
+    console.warn('[PRESENCE] exit delete failed:', err.message);
+  }
+}
+
+async function getActiveEditors(filePath) {
+  const snap = await editingSessionsCollection()
+    .where('filePath', '==', filePath)
+    .get();
+  const now = Date.now();
+  const editors = [];
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    // Filter out stale sessions (>90 seconds without heartbeat)
+    const ts = d.heartbeat && d.heartbeat.toMillis ? d.heartbeat.toMillis() : 0;
+    if (now - ts > 90000) continue;
+    editors.push({ email: d.email, displayName: d.displayName });
+  }
+  return editors;
+}
+
 module.exports = {
   createHunk,
   updateHunk,
@@ -548,4 +592,7 @@ module.exports = {
   reanchorAnnotations,
   contentHash,
   buildAnchorData,
+  enterEditingSession,
+  exitEditingSession,
+  getActiveEditors,
 };

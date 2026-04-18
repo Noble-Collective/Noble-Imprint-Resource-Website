@@ -273,10 +273,10 @@ test.describe('File version check', () => {
       });
       await page.waitForTimeout(6000); // debounce + version check + auto-save
 
-      // Should show stale warning
-      const status = page.locator('#editor-save-status');
-      await expect(status).toContainText('File updated');
-      await expect(status).toHaveClass(/save-error/);
+      // Should show stale banner
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('#stale-banner-text')).toContainText('updated by another user');
 
       // The edit should NOT have been saved to Firestore (still 1 suggestion)
       r = await countFirestoreSuggestions();
@@ -454,5 +454,237 @@ test.describe('Server-side suggestion dedup', () => {
       expect(r.count).toBe(2);
 
     } finally { await clearAll(); }
+  });
+});
+
+// ============================================================
+// Step 4: Poll for changes + stale file banner
+// ============================================================
+
+test.describe('Poll for changes + stale banner', () => {
+  test('stale banner appears when file SHA changes', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Verify banner starts hidden
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeHidden();
+
+      // Change the file on GitHub (simulating another user accepting a suggestion)
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      await github.updateFileContent(TEST_FILE, content + '\n<!-- poll test -->', sha, 'Test: poll SHA change');
+
+      // Clear server cache so the version endpoint returns the new SHA
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      // Wait for the 30s polling interval to detect the change (up to 40s)
+      await expect(banner).toBeVisible({ timeout: 40000 });
+      const bannerText = page.locator('#stale-banner-text');
+      await expect(bannerText).toContainText('updated by another user');
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('reload button refreshes content and hides banner', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const marker = '<!-- reload-test-marker -->';
+      await github.updateFileContent(TEST_FILE, content + '\n' + marker, sha, 'Test: reload marker');
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeVisible({ timeout: 40000 });
+
+      // Click reload
+      await page.click('#stale-banner-reload');
+      // Wait for refresh to complete
+      await page.waitForTimeout(5000);
+
+      // Banner should be hidden
+      await expect(banner).toBeHidden();
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('polling clears on exit', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Verify editor is visible and presence container exists
+      const hasPresence = await page.evaluate(() => {
+        return document.getElementById('editor-presence') !== null;
+      });
+      expect(hasPresence).toBe(true);
+
+      // Exit editor (click Done)
+      await page.click('#btn-editor-done');
+      await page.waitForTimeout(2000);
+
+      // After exit, editor should be hidden
+      const editorVisible = await page.evaluate(() => {
+        return document.getElementById('editor-container')?.style.display !== 'none';
+      });
+      expect(editorVisible).toBe(false);
+
+    } finally { await clearAll(); }
+  });
+
+  test('new suggestions notification appears', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeHidden();
+
+      // Create a suggestion via API (simulating another user)
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const pos = content.indexOf('sovereign');
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + 9,
+        originalText: 'sovereign', newText: 'POLL_NEW_SUGGESTION',
+        authorEmail: 'other@example.com', authorName: 'Other User',
+      });
+
+      // Wait for polling to detect the new suggestion (up to 40s)
+      await expect(banner).toBeVisible({ timeout: 40000 });
+      const bannerText = page.locator('#stale-banner-text');
+      await expect(bannerText).toContainText('suggestion');
+
+    } finally { await clearAll(); }
+  });
+});
+
+// ============================================================
+// Step 5: Presence indicator
+// ============================================================
+
+async function clearPresence() {
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) admin.initializeApp();
+  const db = admin.firestore();
+  const snap = await db.collection('editingSessions').where('filePath', '==', TEST_FILE).get();
+  if (!snap.empty) { const b = db.batch(); snap.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
+}
+
+test.describe('Presence indicator', () => {
+  test('two users see each other in presence', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    await clearPresence();
+    try {
+      const suggestions = require('../src/server/suggestions');
+
+      // Simulate User 1 (Jane) already editing via direct Firestore entry
+      await suggestions.enterEditingSession({
+        filePath: TEST_FILE, email: 'jane@noblecollective.org', displayName: 'Jane Smith',
+      });
+
+      // User 2 (Steve) opens the editor — their heartbeat registers in Firestore
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(3000); // let heartbeat fire
+
+      // Both users should be in Firestore
+      const editors = await suggestions.getActiveEditors(TEST_FILE);
+      expect(editors.find(e => e.email === 'steve@noblecollective.org')).toBeTruthy();
+      expect(editors.find(e => e.email === 'jane@noblecollective.org')).toBeTruthy();
+      expect(editors.length).toBe(2);
+
+      // Steve's UI should show Jane's avatar (initial fetch fires immediately)
+      const avatar = page.locator('#editor-presence .presence-avatar');
+      await expect(avatar).toHaveCount(1, { timeout: 35000 });
+      await expect(avatar.first()).toHaveText('JS'); // Jane Smith initials
+
+    } finally {
+      await clearAll();
+      await clearPresence();
+    }
+  });
+
+  test('presence removed after session exit', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    await clearPresence();
+    try {
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(3000); // let heartbeat fire
+
+      // Verify we're in the presence list
+      const suggestions = require('../src/server/suggestions');
+      let editors = await suggestions.getActiveEditors(TEST_FILE);
+      const myEntry = editors.find(e => e.email === 'steve@noblecollective.org');
+      expect(myEntry).toBeTruthy();
+
+      // Exit editor
+      await page.click('#btn-editor-done');
+      await page.waitForTimeout(2000);
+
+      // Should be removed from presence
+      editors = await suggestions.getActiveEditors(TEST_FILE);
+      const removed = editors.find(e => e.email === 'steve@noblecollective.org');
+      expect(removed).toBeFalsy();
+
+    } finally {
+      await clearAll();
+      await clearPresence();
+    }
+  });
+
+  test('presence shows name initials, not email', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    await clearPresence();
+    try {
+      // Manually add a presence entry for a user with a display name
+      const suggestions = require('../src/server/suggestions');
+      await suggestions.enterEditingSession({
+        filePath: TEST_FILE,
+        email: 'jane@noblecollective.org',
+        displayName: 'Jane Smith',
+      });
+
+      await login(page);
+      await enterSuggest(page);
+      // Wait for initial presence fetch + next polling cycle
+      await page.waitForTimeout(35000);
+
+      const avatar = page.locator('#editor-presence .presence-avatar');
+      await expect(avatar).toHaveCount(1, { timeout: 5000 });
+      // Should show initials "JS" (Jane Smith), not email
+      await expect(avatar.first()).toHaveText('JS');
+
+    } finally {
+      await clearAll();
+      await clearPresence();
+    }
   });
 });

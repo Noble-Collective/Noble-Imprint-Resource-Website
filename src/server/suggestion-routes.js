@@ -32,6 +32,58 @@ router.get('/file-version', async (req, res) => {
   }
 });
 
+// --- Editing session presence ---
+router.post('/presence', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    await suggestions.enterEditingSession({
+      filePath, email: req.user.email, displayName: req.user.displayName || req.user.email,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Presence enter error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/presence', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    await suggestions.exitEditingSession({ filePath, email: req.user.email });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Presence exit error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// sendBeacon can only POST, so provide an exit route via POST
+router.post('/presence/exit', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    await suggestions.exitEditingSession({ filePath, email: req.user.email });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Presence beacon exit error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/presence', async (req, res) => {
+  try {
+    const { filePath } = req.query;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    const editors = await suggestions.getActiveEditors(filePath);
+    res.json({ editors });
+  } catch (err) {
+    console.error('Presence list error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Content read endpoint (for bots/automation) ---
 router.get('/content', async (req, res) => {
   try {
