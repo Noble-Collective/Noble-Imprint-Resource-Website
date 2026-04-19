@@ -1344,6 +1344,12 @@ test.describe('Accept Precision', () => {
   const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
   const TEST_BOOK = 'series/Narrative Journey Series/Foundations/Test Book';
 
+  // Clear server cache before each test (prior tests may have restored the file
+  // with a new SHA that the server cache doesn't know about)
+  test.beforeEach(async ({ request }) => {
+    await request.post(BASE_URL + '/api/refresh');
+  });
+
   // Restore original file after each test (the test modifies GitHub)
   test.afterEach(async () => {
     await clearAllSuggestions();
