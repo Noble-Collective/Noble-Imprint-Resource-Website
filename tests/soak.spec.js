@@ -23,6 +23,8 @@ async function clearAll() {
 
 async function saveCleanFile() {
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE);
   const { content } = await github.getFileContent(TEST_FILE);
   return content;
 }
@@ -30,6 +32,8 @@ async function saveCleanFile() {
 async function restoreFile(saved) {
   if (!saved) return;
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE);
   const { content, sha } = await github.getFileContent(TEST_FILE);
   if (content !== saved) await github.updateFileContent(TEST_FILE, saved, sha, 'Restore after soak test');
 }

@@ -203,12 +203,16 @@ let _cleanFileContent = null;
 async function saveCleanFile() {
   if (_cleanFileContent) return;
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE);
   const { content } = await github.getFileContent(TEST_FILE);
   _cleanFileContent = content;
 }
 async function restoreCleanFile() {
   if (!_cleanFileContent) return;
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE);
   const { content, sha } = await github.getFileContent(TEST_FILE);
   if (content !== _cleanFileContent) {
     await github.updateFileContent(TEST_FILE, _cleanFileContent, sha, 'Restore after multi-user test');

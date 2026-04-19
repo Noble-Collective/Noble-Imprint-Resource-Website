@@ -23,7 +23,9 @@ async function clearAll() {
 
 async function saveCleanFile() {
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
   const fp = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  cache.del('file:' + fp);
   const { content } = await github.getFileContent(fp);
   return content;
 }
@@ -31,7 +33,9 @@ async function saveCleanFile() {
 async function restoreFile(saved) {
   if (!saved) return;
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
   const fp = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+  cache.del('file:' + fp);
   const { content, sha } = await github.getFileContent(fp);
   if (content !== saved) await github.updateFileContent(fp, saved, sha, 'Restore after test');
 }

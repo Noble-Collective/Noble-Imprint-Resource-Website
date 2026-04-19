@@ -293,6 +293,8 @@ let _cleanFileContent = null;
 async function saveCleanFile() {
   if (_cleanFileContent) return; // already saved
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE_PATH_FULL); // clear cached SHA to get fresh from GitHub
   const { content } = await github.getFileContent(TEST_FILE_PATH_FULL);
   _cleanFileContent = content;
 }
@@ -300,6 +302,8 @@ async function saveCleanFile() {
 async function restoreCleanFile() {
   if (!_cleanFileContent) return;
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE_PATH_FULL); // clear cached SHA to get fresh from GitHub
   const { content, sha } = await github.getFileContent(TEST_FILE_PATH_FULL);
   if (content !== _cleanFileContent) {
     await github.updateFileContent(TEST_FILE_PATH_FULL, _cleanFileContent, sha, 'Restore clean test file after test');
@@ -309,19 +313,26 @@ async function restoreCleanFile() {
 
 test.beforeAll(async () => {
   const github = require('../src/server/github');
+  const cache = require('../src/server/cache');
+  cache.del('file:' + TEST_FILE_PATH_FULL); // ensure fresh read for residue check
   const { content, sha } = await github.getFileContent(TEST_FILE_PATH_FULL);
   const residue = ['INTEG', 'FIRSTEDIT', 'SECONDEDIT', 'DISCARD', 'EDIT1', 'EDIT2', 'EDIT3',
     'ACCEPTTEST', 'TESTREPLACEMENT', 'BOTTEST', 'BOTVISIBLE', 'REPLYTEST', 'KEEP1', 'KEEP2',
-    'OverviewX', 'CHANGED'];
+    'OverviewX', 'CHANGED', 'RETRYTEST', 'DELETETEST', 'POLL_NEW'];
+  // Also check for bare 'EDIT' appended to words (from multi-user tests' makeSuggestion),
+  // but not in the title "DO NOT EDIT MANUALLY"
+  const hasAppendedEdit = /[a-z]EDIT\b/.test(content);
   const found = residue.filter(r => content.includes(r));
-  if (found.length > 0) {
+  if (found.length > 0 || hasAppendedEdit) {
     // Auto-clean instead of throwing — remove residue and restore the file
-    console.warn('[TEST] Auto-cleaning residue from test file:', found.join(', '));
+    console.warn('[TEST] Auto-cleaning residue from test file:', found.join(', '), hasAppendedEdit ? '+ appended EDIT' : '');
     let clean = content;
     // Remove appended residue (e.g. "OverviewX" → "Overview", "wordINTEG" → "word")
     for (const r of found) {
       clean = clean.split(r).join(r === 'OverviewX' ? 'Overview' : '');
     }
+    // Remove 'EDIT' appended to words (e.g., "philosophyEDIT" → "philosophy")
+    if (hasAppendedEdit) clean = clean.replace(/([a-z])EDIT\b/g, '$1');
     await github.updateFileContent(TEST_FILE_PATH_FULL, clean, sha, 'Auto-clean test file residue: ' + found.join(', '));
     console.log('[TEST] File cleaned successfully');
   }
