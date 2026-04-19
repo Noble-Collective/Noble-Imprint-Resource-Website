@@ -14,6 +14,7 @@ let onResolveComment = null;
 let onPostReply = null;
 let onDismissStale = null;
 const removingCards = new Set(); // Card IDs mid-removal animation
+const staleCards = new Map(); // hunkId → { hunkId, firestoreId, origText, newText, type, onRetry, onDismiss }
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -110,33 +111,18 @@ function renderAllCards() {
   console.log('[MARGIN] renderAllCards: currentHunks=' + currentHunks.length + ', currentComments=' + currentComments.length);
   try {
 
-  // Preserve cards that are mid-removal animation or injected stale cards
+  // Preserve cards that are mid-removal animation
   const preservedCards = [];
   if (removingCards.size > 0) {
     marginEl.querySelectorAll('.margin-card--removing').forEach(function(card) {
       preservedCards.push(card);
     });
   }
-  // Preserve injected stale cards (from accept 409 handler) — they must survive
-  // the draftPlugin's debounced margin rebuild after refreshFromGitHub
-  marginEl.querySelectorAll('.margin-card[data-injected-stale]').forEach(function(card) {
-    preservedCards.push(card);
-  });
 
-  if (currentHunks.length === 0 && currentComments.length === 0 && preservedCards.length === 0) {
+  if (currentHunks.length === 0 && currentComments.length === 0 && staleCards.size === 0 && preservedCards.length === 0) {
     marginEl.innerHTML = '<div class="margin-empty">No changes yet</div>';
     return;
   }
-
-  // Collect hunk IDs that have preserved stale cards — skip them in normal rendering
-  // to avoid duplicate cards (a normal card + the preserved stale card)
-  const preservedStaleIds = new Set();
-  preservedCards.forEach(function(card) {
-    if (card.hasAttribute('data-injected-stale')) {
-      var id = card.getAttribute('data-hunk-id');
-      if (id) preservedStaleIds.add(id);
-    }
-  });
 
   const hunks = currentHunks;
 
@@ -144,7 +130,9 @@ function renderAllCards() {
   const userEmail = userData ? userData.email : '';
   const now = new Date();
 
-  // Check if we have loaded suggestions from Firestore (for author info)
+  // Get suggestion metadata from the annotation registry (live state, not stale page data).
+  // Falls back to window.__EDITOR_DATA.pendingSuggestions for initial page load data.
+  const registry = (editorView && window.__annotationRegistry) ? editorView.state.field(window.__annotationRegistry) : null;
   const loadedSuggestions = window.__EDITOR_DATA ? (window.__EDITOR_DATA.pendingSuggestions || []) : [];
 
   // --- Build unified items array with positions, then sort by position ---
@@ -235,8 +223,8 @@ function renderAllCards() {
   for (const item of items) {
     // Skip secondary items in a linked group (merged into the first card)
     if (item._linkedHidden) continue;
-    // Skip suggestions that have a preserved stale card (avoid duplicate)
-    if (item.kind === 'suggestion' && preservedStaleIds.has(item.data.id)) continue;
+    // Skip suggestions that have a stale card (rendered separately below)
+    if (item.kind === 'suggestion' && staleCards.has(item.data.id)) continue;
 
     if (item.kind === 'suggestion') {
       const hunk = item.data;
@@ -256,7 +244,9 @@ function renderAllCards() {
           + '<span class="margin-card-ins">' + escapeHtml(truncate(hunk.newText, 40)) + '</span>';
       }
 
-      var loaded = loadedSuggestions.find(function(s) {
+      // Look up author info: prefer registry (live), fall back to page data
+      var regEntry = registry ? registry.get(hunk.id) : null;
+      var loaded = regEntry || loadedSuggestions.find(function(s) {
         if (s.originalText === hunk.originalText && s.newText === hunk.newText) return true;
         if (s.type === hunk.type && s.originalText === hunk.originalText) return true;
         return s.id === hunk.id;
@@ -340,6 +330,33 @@ function renderAllCards() {
     }
   }
 
+  // Render stale accept cards (from 409 conflicts) at the top of the panel
+  for (const [hunkId, sd] of staleCards) {
+    var suggHtml = '';
+    if (sd.type === 'deletion') {
+      suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(sd.origText, 60)) + '</span>';
+    } else if (sd.type === 'insertion') {
+      suggHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(sd.newText, 60)) + '</span>';
+    } else if (sd.origText || sd.newText) {
+      suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(sd.origText, 40)) + '</span>'
+        + ' <span class="margin-card-arrow">&rarr;</span> '
+        + '<span class="margin-card-ins">' + escapeHtml(truncate(sd.newText, 40)) + '</span>';
+    }
+    var retryBtnHtml = sd.onRetry
+      ? '<button class="edit-btn edit-btn--primary" data-action="retry-stale" data-hunk-id="' + hunkId + '">Try again</button>'
+      : '';
+    html = '<div class="margin-card margin-card--suggestion margin-card--stale" data-hunk-id="' + hunkId + '" style="top:0px">'
+      + '<div class="margin-card-body">'
+      + '<div class="margin-card-status margin-card-status--stale">'
+      + '\u26A0 The text you suggested an edit to has changed.</div>'
+      + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
+      + '<div class="margin-card-stale-actions">'
+      + retryBtnHtml
+      + '<button class="edit-btn" data-action="dismiss-stale" data-hunk-id="' + hunkId + '">Dismiss</button>'
+      + '</div></div></div>'
+      + html;
+  }
+
   const cardCount = (html.match(/margin-card margin-card--suggestion/g) || []).length;
   const commentCardCount = (html.match(/margin-card margin-card--comment/g) || []).length;
   console.log('[MARGIN] rendered HTML has', cardCount, 'suggestion cards +', commentCardCount, 'comment cards');
@@ -362,6 +379,15 @@ function renderAllCards() {
       } else if (action === 'resolve-comment') {
         var commentId = btn.getAttribute('data-comment-id');
         if (onResolveComment) onResolveComment(commentId);
+      } else if (action === 'dismiss-stale') {
+        var hunkId = btn.getAttribute('data-hunk-id');
+        var sd = staleCards.get(hunkId);
+        if (sd && sd.onDismiss) sd.onDismiss(hunkId);
+        staleCards.delete(hunkId);
+      } else if (action === 'retry-stale') {
+        var hunkId = btn.getAttribute('data-hunk-id');
+        var sd = staleCards.get(hunkId);
+        if (sd && sd.onRetry) sd.onRetry(hunkId, sd);
       }
     });
   });
@@ -545,48 +571,15 @@ export function focusMarginCard(type, id) {
   setTimeout(function() { card.classList.remove('margin-card--focused'); }, 700);
 }
 
-// Inject a stale card into the margin panel (survives refreshFromGitHub rebuild)
-export function injectStaleCard(data, onDismiss, onRetry) {
-  if (!marginEl) return;
-  // Remove "No changes yet" placeholder if present
-  var empty = marginEl.querySelector('.margin-empty');
-  if (empty) empty.remove();
+// Add a stale card to the rendering pipeline (replaces DOM injection)
+export function addStaleCard(hunkId, staleData, onDismiss, onRetry) {
+  staleCards.set(hunkId, { ...staleData, onDismiss, onRetry });
+  renderAllCards();
+}
 
-  var suggHtml = '';
-  if (data.type === 'deletion') {
-    suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(data.origText, 60)) + '</span>';
-  } else if (data.type === 'insertion') {
-    suggHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(data.newText, 60)) + '</span>';
-  } else if (data.origText || data.newText) {
-    suggHtml = '<span class="margin-card-del">' + escapeHtml(truncate(data.origText, 40)) + '</span>'
-      + ' <span class="margin-card-arrow">&rarr;</span> '
-      + '<span class="margin-card-ins">' + escapeHtml(truncate(data.newText, 40)) + '</span>';
-  }
-  var retryBtnHtml = onRetry
-    ? '<button class="edit-btn edit-btn--primary" data-action="retry-stale" data-hunk-id="' + data.hunkId + '">Try again</button>'
-    : '';
-  var card = document.createElement('div');
-  card.className = 'margin-card margin-card--suggestion margin-card--stale';
-  card.setAttribute('data-hunk-id', data.hunkId);
-  card.setAttribute('data-injected-stale', 'true');
-  card.style.top = '0px';
-  card.innerHTML = '<div class="margin-card-body">'
-    + '<div class="margin-card-status margin-card-status--stale">'
-    + '\u26A0 The text you suggested an edit to has changed.</div>'
-    + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
-    + '<div class="margin-card-stale-actions">'
-    + retryBtnHtml
-    + '<button class="edit-btn" data-action="dismiss-stale" data-hunk-id="' + data.hunkId + '">Dismiss</button>'
-    + '</div></div>';
-  marginEl.insertBefore(card, marginEl.firstChild);
-  var dismissBtn = card.querySelector('[data-action="dismiss-stale"]');
-  if (dismissBtn && onDismiss) {
-    dismissBtn.addEventListener('click', function(e) { e.stopPropagation(); onDismiss(data.hunkId); });
-  }
-  var retryBtn = card.querySelector('[data-action="retry-stale"]');
-  if (retryBtn && onRetry) {
-    retryBtn.addEventListener('click', function(e) { e.stopPropagation(); onRetry(data.hunkId, data); });
-  }
+// Remove a stale card from the rendering pipeline
+export function removeStaleCard(hunkId) {
+  staleCards.delete(hunkId);
 }
 
 // Reposition cards on scroll or resize

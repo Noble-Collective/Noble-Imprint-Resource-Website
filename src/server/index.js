@@ -277,12 +277,24 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
     if (resolved.type === 'book') {
       const { series, subseries, book } = resolved;
       await content.loadSessionTitles(book);
+
+      // Suggestion counts for badge display (users with suggest access or higher)
+      let suggestionCounts = {};
+      if (req.user) {
+        const editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
+        if (editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest') {
+          const suggestions = require('./suggestions');
+          suggestionCounts = await suggestions.getSuggestionCountsByBook(book.repoPath);
+        }
+      }
+
       res.render('book', {
         series,
         subseries: subseries || null,
         book,
         content,
         title: book.title,
+        suggestionCounts,
       });
     } else if (resolved.type === 'session') {
       const { series, subseries, book, session } = resolved;

@@ -19,6 +19,9 @@
           <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item">
             <span class="session-num"><%= i + 1 %></span>
             <span class="nav-session-name"><%= s.displayName %></span>
+            <% if (typeof suggestionCounts !== 'undefined' && suggestionCounts[s.path] > 0) { %>
+              <span class="suggestion-badge"><%= suggestionCounts[s.path] %></span>
+            <% } %>
           </a>
         </li>
       <% }); %>
@@ -73,6 +76,9 @@
             <a href="<%= content.sessionUrl(series, subseries, book, s) %>">
               <span class="session-num"><%= i + 1 %></span>
               <span class="session-name"><%= s.displayName %></span>
+              <% if (typeof suggestionCounts !== 'undefined' && suggestionCounts[s.path] > 0) { %>
+                <span class="suggestion-badge"><%= suggestionCounts[s.path] %></span>
+              <% } %>
               <span class="session-arrow">&rsaquo;</span>
             </a>
           </li>

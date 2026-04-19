@@ -1,7 +1,10 @@
 const { Octokit } = require('octokit');
+const cache = require('./cache');
 
 const OWNER = 'Noble-Collective';
 const REPO = 'Noble-Imprint-Resources';
+
+const FILE_CACHE_TTL = 30 * 1000; // 30 seconds
 
 let octokit;
 
@@ -32,6 +35,10 @@ async function getDirectoryContents(path) {
 }
 
 async function getFileContent(path) {
+  const cacheKey = 'file:' + path;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
   const { data } = await getOctokit().rest.repos.getContent({
     owner: OWNER,
     repo: REPO,
@@ -39,7 +46,9 @@ async function getFileContent(path) {
   });
   if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
   const content = Buffer.from(data.content, 'base64').toString('utf-8');
-  return { content, sha: data.sha };
+  const result = { content, sha: data.sha };
+  cache.set(cacheKey, result, FILE_CACHE_TTL);
+  return result;
 }
 
 async function getFileBinary(path) {
@@ -71,6 +80,7 @@ async function updateFileContent(filePath, content, sha, message) {
     content: Buffer.from(content).toString('base64'),
     sha,
   });
+  cache.del('file:' + filePath);
 }
 
 module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, OWNER, REPO };

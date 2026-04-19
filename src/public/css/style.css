@@ -976,6 +976,21 @@ body.text-mode .home-text {
 .session-arrow {
   color: var(--color-text-light);
 }
+.suggestion-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: #f0a800;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 5px;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
 
 /* ============================================================
    7. SESSION READING PAGE

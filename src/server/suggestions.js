@@ -285,6 +285,19 @@ async function getSuggestionsForFile(filePath) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
+async function getSuggestionCountsByBook(bookPath) {
+  const snapshot = await suggestionsCollection()
+    .where('bookPath', '==', bookPath)
+    .where('status', '==', 'pending')
+    .get();
+  const counts = {};
+  for (const doc of snapshot.docs) {
+    const fp = doc.data().filePath;
+    counts[fp] = (counts[fp] || 0) + 1;
+  }
+  return counts;
+}
+
 async function listSuggestions({ bookPath, status, limit } = {}) {
   let query = suggestionsCollection().orderBy('createdAt', 'desc');
   if (bookPath) query = query.where('bookPath', '==', bookPath);
@@ -579,6 +592,7 @@ module.exports = {
   deleteHunk,
   getHunk,
   getSuggestionsForFile,
+  getSuggestionCountsByBook,
   listSuggestions,
   acceptHunk,
   rejectHunk,

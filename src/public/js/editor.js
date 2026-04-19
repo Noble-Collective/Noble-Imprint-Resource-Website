@@ -5,11 +5,13 @@ import {
   suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, injectStaleCard } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
 
+// data.pendingSuggestions is the INITIAL snapshot from the server — read-only.
+// During the session, the annotation registry is the live source of truth.
 const data = window.__EDITOR_DATA;
 if (data) {
   let editorView = null;
@@ -232,20 +234,6 @@ if (data) {
                 ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
               }) });
 
-              // Legacy: keep pendingSuggestions in sync for findFirestoreId fallback
-              if (!data.pendingSuggestions) data.pendingSuggestions = [];
-              data.pendingSuggestions.push({
-                id: result.id,
-                type: hunk.type,
-                originalText: hunk.originalText || '',
-                newText: hunk.newText || '',
-                originalFrom: hunk.originalFrom,
-                originalTo: hunk.originalTo,
-                authorEmail: data.user ? data.user.email : '',
-                authorName: data.user ? data.user.displayName : '',
-                ...ctx,
-                ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
-              });
             }
         } catch (err) {
           hadSaveError = true;
@@ -678,7 +666,7 @@ if (data) {
           console.log('[ACCEPT] stale — refreshing from GitHub to show latest content');
           await refreshFromGitHub();
           // Re-inject stale card after refresh (the refresh nuked it)
-          injectStaleCard(staleData, dismissStaleSuggestion, retryStaleAccept);
+          addStaleCard(staleData.hunkId, staleData, dismissStaleSuggestion, retryStaleAccept);
         } else {
           setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
         }
@@ -724,6 +712,7 @@ if (data) {
     if (firestoreId) {
       try { await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' }); } catch { /* ignore */ }
     }
+    removeStaleCard(hunkId);
     animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
   }
 
@@ -740,7 +729,7 @@ if (data) {
         const pos = fresh.content.indexOf(staleData.origText);
         if (pos === -1) {
           // Update the stale card to show the text is gone
-          const card = document.querySelector('.margin-card[data-injected-stale][data-hunk-id="' + hunkId + '"]')
+          const card = document.querySelector('.margin-card--stale[data-hunk-id="' + hunkId + '"]')
             || document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
           if (card) {
             const statusEl = card.querySelector('.margin-card-status');
@@ -748,6 +737,8 @@ if (data) {
             const retryBtn = card.querySelector('[data-action="retry-stale"]');
             if (retryBtn) retryBtn.remove();
           }
+          // Remove from stale map so retry button stays gone on re-render
+          removeStaleCard(hunkId);
           return;
         }
       }
@@ -769,6 +760,7 @@ if (data) {
         return;
       }
 
+      removeStaleCard(hunkId);
       setCardStatus(hunkId, 'success', 'Committed to GitHub');
       removeRepliesForParent(fsId);
       await refreshFromGitHub();
