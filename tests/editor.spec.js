@@ -327,9 +327,16 @@ test.beforeAll(async () => {
     // Auto-clean instead of throwing — remove residue and restore the file
     console.warn('[TEST] Auto-cleaning residue from test file:', found.join(', '), hasAppendedEdit ? '+ appended EDIT' : '');
     let clean = content;
+    // Restore the title first (integration tests may have replaced "TESTING" with "INTEGFIRST"/"INTEGSECOND")
+    clean = clean.replace(/^# Session 1: FOR .+$/m, '# Session 1: FOR TESTING DO NOT EDIT MANUALLY');
     // Remove appended residue (e.g. "OverviewX" → "Overview", "wordINTEG" → "word")
+    // Skip the title line (already restored above)
+    const titleLine = clean.match(/^# Session 1:.+$/m)?.[0] || '';
     for (const r of found) {
-      clean = clean.split(r).join(r === 'OverviewX' ? 'Overview' : '');
+      // Split/join on the body only (everything after the title line)
+      const titleEnd = clean.indexOf(titleLine) + titleLine.length;
+      const body = clean.substring(titleEnd);
+      clean = clean.substring(0, titleEnd) + body.split(r).join(r === 'OverviewX' ? 'Overview' : '');
     }
     // Remove 'EDIT' appended to words (e.g., "philosophyEDIT" → "philosophy")
     if (hasAppendedEdit) clean = clean.replace(/([a-z])EDIT\b/g, '$1');
@@ -533,9 +540,11 @@ test.describe('Editor - Suggestion Tracking', () => {
     const word1 = await findUniqueWord(page, 'plain');
     const word2 = await page.evaluate((skip) => {
       const doc = window.__editorView.state.doc.toString();
-      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
-      for (const w of words) {
-        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        for (const w of (line.match(/\b[a-zA-Z]{5,14}\b/g) || [])) {
+          if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+        }
       }
       return null;
     }, word1);
@@ -610,9 +619,11 @@ test.describe('Editor - Suggestion Tracking', () => {
     expect(word1).toBeTruthy();
     const word2 = await page.evaluate((skip) => {
       const doc = window.__editorView.state.doc.toString();
-      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
-      for (const w of words) {
-        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        for (const w of (line.match(/\b[a-zA-Z]{5,14}\b/g) || [])) {
+          if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+        }
       }
       return null;
     }, word1);
@@ -668,9 +679,11 @@ test.describe('Registry Robustness', () => {
     expect(word1).toBeTruthy();
     const word2 = await page.evaluate((skip) => {
       const doc = window.__editorView.state.doc.toString();
-      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
-      for (const w of words) {
-        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        for (const w of (line.match(/\b[a-zA-Z]{5,14}\b/g) || [])) {
+          if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+        }
       }
       return null;
     }, word1);
@@ -2106,9 +2119,11 @@ test.describe('Integration - Full Editing Session', () => {
     // --- PHASE 2: Second edit AFTER auto-save (regression: escapeHtml crash) ---
     const word2 = await page.evaluate((skip) => {
       const doc = window.__editorView.state.doc.toString();
-      const words = doc.match(/\b[a-zA-Z]{5,14}\b/g) || [];
-      for (const w of words) {
-        if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        for (const w of (line.match(/\b[a-zA-Z]{5,14}\b/g) || [])) {
+          if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+        }
       }
       return null;
     }, word1);
