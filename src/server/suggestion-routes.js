@@ -12,7 +12,7 @@ router.use((req, res, next) => {
   next();
 });
 
-// --- Lightweight version check (for polling + stale detection) ---
+// --- Lightweight version check (for stale detection — includes GitHub SHA) ---
 router.get('/file-version', async (req, res) => {
   try {
     const { filePath } = req.query;
@@ -28,6 +28,18 @@ router.get('/file-version', async (req, res) => {
     });
   } catch (err) {
     console.error('File version check error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Suggestion count only (Firestore only, no GitHub API) ---
+router.get('/suggestion-count', async (req, res) => {
+  try {
+    const { filePath } = req.query;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
+    res.json({ count: pendingSuggestions.length });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -603,10 +603,13 @@ test.describe('Poll for changes + stale banner', () => {
         authorEmail: 'other@example.com', authorName: 'Other User',
       });
 
-      // Wait for polling to detect the new suggestion (up to 40s)
-      await expect(banner).toBeVisible({ timeout: 40000 });
-      const bannerText = page.locator('#stale-banner-text');
-      await expect(bannerText).toContainText('suggestion');
+      // Wait for polling to auto-load the new suggestion (up to 15s with 10s interval)
+      // Should show a toast notification, NOT the stale banner
+      const toast = page.locator('#editor-toast');
+      await expect(toast).toBeVisible({ timeout: 15000 });
+      await expect(toast).toContainText('suggestion');
+      // Banner should stay hidden (auto-load, not stale file)
+      await expect(banner).toBeHidden();
 
     } finally { await clearAll(); }
   });

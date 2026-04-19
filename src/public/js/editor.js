@@ -354,6 +354,56 @@ if (data) {
     this.style.display = 'none';
   });
 
+  // --- Auto-load new suggestions from other users ---
+  async function autoLoadNewSuggestions() {
+    if (!data.sessionFilePath || !editorView) return;
+    try {
+      const res = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (!res.ok) return;
+      const fresh = await res.json();
+      const freshSuggestions = fresh.pendingSuggestions || [];
+
+      // Find suggestions not already in the registry
+      const registry = editorView.state.field(annotationRegistry);
+      const newSuggestions = freshSuggestions.filter(s => !registry.has(s.id));
+      if (newSuggestions.length === 0) return;
+
+      console.log('[POLL] Auto-loading', newSuggestions.length, 'new suggestions from other users');
+
+      // Rebuild working doc with ALL suggestions (existing + new) and replace editor
+      const currentOriginal = editorView.state.field(originalDocField);
+      const allSuggestions = freshSuggestions.filter(s => !s.resolvedStale);
+      const newWorkingDoc = buildWorkingDoc(currentOriginal, allSuggestions);
+      const existingComments = fresh.pendingComments || [];
+      const registryEntries = buildShiftedRegistryEntries(allSuggestions, existingComments, newWorkingDoc);
+
+      // Clear zones, replace document + registry atomically, restore zones
+      editorView.dispatch({ effects: setZones.of([]) });
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+        effects: [setOriginal.of(currentOriginal), setAnnotations.of(registryEntries)],
+        annotations: isRevert.of(true),
+      });
+
+      // Rebuild savedHunks for the new suggestions
+      for (const s of allSuggestions) {
+        if (s.resolvedStale) continue;
+        const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+        const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
+        savedHunks.set(from + ':' + to, s.id);
+      }
+
+      const zones = recomputeZones(editorView.state.doc);
+      editorView.dispatch({ effects: setZones.of(zones) });
+
+      data.pendingSuggestions = freshSuggestions;
+      data.pendingComments = existingComments;
+      showToast(newSuggestions.length + ' new suggestion' + (newSuggestions.length > 1 ? 's' : '') + ' loaded', 'info');
+    } catch (err) {
+      console.warn('[POLL] auto-load failed:', err.message);
+    }
+  }
+
   // --- Stale file banner ---
   function showStaleBanner(message) {
     const banner = document.getElementById('editor-stale-banner');
@@ -365,51 +415,61 @@ if (data) {
   }
 
   // --- Polling for file changes + presence heartbeat (Steps 4 & 5) ---
+  let presenceInterval = null;
+  let shaCheckInterval = null;
   function startPolling() {
     if (pollingInterval) return;
     // Send initial presence heartbeat + fetch other editors
     sendPresenceHeartbeat();
     updatePresenceDisplay();
-    pollingInterval = setInterval(pollForChanges, 30000);
+    // Fast poll: check Firestore for new suggestions (no GitHub API)
+    pollingInterval = setInterval(pollForNewSuggestions, 10000);
+    // Slow poll: check GitHub SHA for file changes + presence heartbeat
+    shaCheckInterval = setInterval(pollForFileChanges, 30000);
+    presenceInterval = setInterval(() => {
+      sendPresenceHeartbeat();
+      updatePresenceDisplay();
+    }, 30000);
   }
 
   function stopPolling() {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
-    }
-    // Exit presence on stop
+    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+    if (shaCheckInterval) { clearInterval(shaCheckInterval); shaCheckInterval = null; }
+    if (presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
     sendPresenceExit();
   }
 
-  async function pollForChanges() {
+  // Fast poll: Firestore-only suggestion count check (every 10s)
+  async function pollForNewSuggestions() {
+    if (!data.sessionFilePath || fileStale) return;
+    try {
+      const res = await fetch('/api/suggestions/suggestion-count?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (res.ok) {
+        const { count } = await res.json();
+        if (count > lastKnownSuggestionCount) {
+          lastKnownSuggestionCount = count;
+          await autoLoadNewSuggestions();
+        }
+      }
+    } catch (err) {
+      console.warn('[POLL] suggestion check error:', err.message);
+    }
+  }
+
+  // Slow poll: GitHub SHA check for file changes (every 30s)
+  async function pollForFileChanges() {
     if (!data.sessionFilePath) return;
     try {
-      // File version check
       const vRes = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (vRes.ok) {
         const vData = await vRes.json();
-
-        // Check for file SHA change
         if (vData.sha && data.contentSha && vData.sha !== data.contentSha && !fileStale) {
           fileStale = true;
           showStaleBanner('This file was updated by another user.');
         }
-
-        // Check for new suggestions (only if file itself hasn't changed)
-        if (!fileStale && vData.pendingSuggestionCount > lastKnownSuggestionCount) {
-          const newCount = vData.pendingSuggestionCount - lastKnownSuggestionCount;
-          showStaleBanner(newCount + ' new suggestion' + (newCount > 1 ? 's were' : ' was') + ' added.');
-        }
       }
-
-      // Presence heartbeat
-      sendPresenceHeartbeat();
-
-      // Fetch active editors and update display
-      updatePresenceDisplay();
     } catch (err) {
-      console.warn('[POLL] error:', err.message);
+      console.warn('[POLL] file check error:', err.message);
     }
   }
 
