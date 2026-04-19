@@ -351,18 +351,25 @@ test.describe('Server-side suggestion dedup', () => {
     try {
       const suggestions = require('../src/server/suggestions');
       const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
       const { content, sha } = await github.getFileContent(TEST_FILE);
-      const pos = content.indexOf('sovereign');
+      // Find a unique word dynamically instead of hardcoding
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
       expect(pos).toBeGreaterThan(0);
 
       // Create first suggestion
       const id1 = await suggestions.createHunk({
         filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: sha, type: 'replacement',
-        originalFrom: pos, originalTo: pos + 9,
-        originalText: 'sovereign', newText: 'DEDUP_TEST',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DEDUP_TEST',
         contextBefore: content.substring(Math.max(0, pos - 50), pos),
-        contextAfter: content.substring(pos + 9, pos + 59),
+        contextAfter: content.substring(pos + targetWord.length, pos + targetWord.length + 50),
         authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
       });
       console.log('Dedup: created first:', id1);
@@ -371,10 +378,10 @@ test.describe('Server-side suggestion dedup', () => {
       const id2 = await suggestions.createHunk({
         filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: sha, type: 'replacement',
-        originalFrom: pos, originalTo: pos + 9,
-        originalText: 'sovereign', newText: 'DEDUP_TEST',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DEDUP_TEST',
         contextBefore: content.substring(Math.max(0, pos - 50), pos),
-        contextAfter: content.substring(pos + 9, pos + 59),
+        contextAfter: content.substring(pos + targetWord.length, pos + targetWord.length + 50),
         authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
       });
       console.log('Dedup: second returned:', id2);
@@ -433,23 +440,29 @@ test.describe('Server-side suggestion dedup', () => {
     try {
       const suggestions = require('../src/server/suggestions');
       const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
       const { content, sha } = await github.getFileContent(TEST_FILE);
-      const pos = content.indexOf('sovereign');
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
       expect(pos).toBeGreaterThan(0);
 
       const id1 = await suggestions.createHunk({
         filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: sha, type: 'replacement',
-        originalFrom: pos, originalTo: pos + 9,
-        originalText: 'sovereign', newText: 'EDIT_A',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'EDIT_A',
         authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
       });
 
       const id2 = await suggestions.createHunk({
         filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: sha, type: 'replacement',
-        originalFrom: pos, originalTo: pos + 9,
-        originalText: 'sovereign', newText: 'EDIT_B',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'EDIT_B',
         authorEmail: 'steve@noblecollective.org', authorName: 'Steve',
       });
 
@@ -558,6 +571,10 @@ test.describe('Poll for changes + stale banner', () => {
     test.setTimeout(90000);
     await clearAll();
     try {
+      // Clear server cache so page loads with a fresh SHA (prior tests may have
+      // restored the file, creating a new SHA that the server cache doesn't know about)
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
       await login(page);
       await enterSuggest(page);
 
@@ -567,13 +584,22 @@ test.describe('Poll for changes + stale banner', () => {
       // Create a suggestion via API (simulating another user)
       const suggestions = require('../src/server/suggestions');
       const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
       const { content, sha } = await github.getFileContent(TEST_FILE);
-      const pos = content.indexOf('sovereign');
+      // Use dynamic word instead of hardcoded 'sovereign'
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      const pos = targetWord ? content.indexOf(targetWord) : -1;
+      expect(pos).toBeGreaterThan(0);
       await suggestions.createHunk({
         filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: sha, type: 'replacement',
-        originalFrom: pos, originalTo: pos + 9,
-        originalText: 'sovereign', newText: 'POLL_NEW_SUGGESTION',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'POLL_NEW_SUGGESTION',
         authorEmail: 'other@example.com', authorName: 'Other User',
       });
 
