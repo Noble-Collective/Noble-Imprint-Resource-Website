@@ -261,6 +261,9 @@ if (data) {
         saveStatus.textContent = 'Saved';
         setTimeout(() => { saveStatus.textContent = ''; }, 2000);
       }
+      // Keep suggestion count in sync so polling doesn't show "new suggestions"
+      // banner for suggestions the current user created themselves
+      lastKnownSuggestionCount = savedHunks.size;
     }
   }
 

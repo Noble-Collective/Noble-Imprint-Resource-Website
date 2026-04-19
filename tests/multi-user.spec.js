@@ -610,6 +610,28 @@ test.describe('Poll for changes + stale banner', () => {
 
     } finally { await clearAll(); }
   });
+
+  test('own suggestions do NOT trigger new-suggestions banner', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeHidden();
+
+      // Create suggestions by typing in the editor (same user)
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(3000); // let auto-save complete
+
+      // Wait through a full polling cycle (35s) — banner should NOT appear
+      await page.waitForTimeout(35000);
+      await expect(banner).toBeHidden();
+
+    } finally { await clearAll(); }
+  });
 });
 
 // ============================================================
