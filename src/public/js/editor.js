@@ -439,7 +439,7 @@ if (data) {
     sendPresenceExit();
   }
 
-  // Fast poll: Firestore-only suggestion count check (every 10s)
+  // Fast poll: Firestore-only suggestion count check + presence display (every 10s)
   async function pollForNewSuggestions() {
     if (!data.sessionFilePath || fileStale) return;
     try {
@@ -451,6 +451,7 @@ if (data) {
           await autoLoadNewSuggestions();
         }
       }
+      updatePresenceDisplay();
     } catch (err) {
       console.warn('[POLL] suggestion check error:', err.message);
     }
