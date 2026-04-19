@@ -545,31 +545,25 @@ if (data) {
       // would block a full-document replacement since position 0 is outside any zone
       editorView.dispatch({ effects: setZones.of([]) });
 
-      // Replace the editor document and original
-      editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
-        effects: setOriginal.of(newOriginal),
-      });
-
-      // CRITICAL: A full document replacement makes mapPos meaningless — all positions
-      // collapse to 0 or end-of-doc. We must rebuild the registry from scratch with
-      // fresh server-resolved positions, and reset savedHunks so auto-save starts clean.
+      // CRITICAL: Combine document replacement + registry rebuild in a SINGLE dispatch.
+      // If done separately, mapPos during the doc replacement collapses all annotation
+      // positions (newTo < newFrom → deleted), and the draftPlugin's immediate callback
+      // reads the corrupted registry before setAnnotations can restore it.
       savedHunks.clear();
 
       // Repopulate registry with shifted positions + rebuild savedHunks
       const existingComments = fresh.pendingComments || [];
       const registryEntries = buildShiftedRegistryEntries(remainingSuggestions, existingComments, newWorkingDoc);
-      // Rebuild savedHunks using the server-resolved positions (position.from/to).
-      // The diff engine produces hunks with originalFrom relative to the CURRENT file
-      // (originalDocField), which matches the server's resolvedFrom — not the Firestore
-      // originalFrom which may be stale from the pre-accept file.
       for (const s of remainingSuggestions) {
         if (s.resolvedStale) continue;
         const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
         const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
         savedHunks.set(from + ':' + to, s.id);
       }
-      editorView.dispatch({ effects: setAnnotations.of(registryEntries) });
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+        effects: [setOriginal.of(newOriginal), setAnnotations.of(registryEntries)],
+      });
       console.log('[REFRESH] rebuilt registry with', registryEntries.length, 'entries, savedHunks:', savedHunks.size);
 
       // Restore constraint zones from the new document
@@ -812,17 +806,19 @@ if (data) {
       const currentOriginal = editorView.state.field(originalDocField);
       const newWorkingDoc = buildWorkingDoc(currentOriginal, remainingSuggestions);
 
-      // Clear zones, replace document, restore zones
+      // Clear zones first (edit protection would block a full-document replacement)
       editorView.dispatch({ effects: setZones.of([]) });
+
+      // CRITICAL: Combine document replacement + registry rebuild in a SINGLE dispatch.
+      // If done separately, mapPos during the doc replacement collapses all annotation
+      // positions (newTo < newFrom → deleted), and the draftPlugin's immediate callback
+      // reads the corrupted registry before setAnnotations can restore it.
+      const rebuiltEntries = buildShiftedRegistryEntries(remainingSuggestions, remainingComments, newWorkingDoc);
       editorView.dispatch({
         changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+        effects: setAnnotations.of(rebuiltEntries),
         annotations: isRevert.of(true),
       });
-
-      // CRITICAL: Full doc replacement makes mapPos meaningless — all registry
-      // positions collapsed to 0. Rebuild the registry with correct working-doc positions.
-      const rebuiltEntries = buildShiftedRegistryEntries(remainingSuggestions, remainingComments, newWorkingDoc);
-      editorView.dispatch({ effects: setAnnotations.of(rebuiltEntries) });
 
       const zones = recomputeZones(editorView.state.doc);
       editorView.dispatch({ effects: setZones.of(zones) });
