@@ -110,18 +110,33 @@ function renderAllCards() {
   console.log('[MARGIN] renderAllCards: currentHunks=' + currentHunks.length + ', currentComments=' + currentComments.length);
   try {
 
-  // Preserve cards that are mid-removal animation
+  // Preserve cards that are mid-removal animation or injected stale cards
   const preservedCards = [];
   if (removingCards.size > 0) {
     marginEl.querySelectorAll('.margin-card--removing').forEach(function(card) {
       preservedCards.push(card);
     });
   }
+  // Preserve injected stale cards (from accept 409 handler) — they must survive
+  // the draftPlugin's debounced margin rebuild after refreshFromGitHub
+  marginEl.querySelectorAll('.margin-card[data-injected-stale]').forEach(function(card) {
+    preservedCards.push(card);
+  });
 
   if (currentHunks.length === 0 && currentComments.length === 0 && preservedCards.length === 0) {
     marginEl.innerHTML = '<div class="margin-empty">No changes yet</div>';
     return;
   }
+
+  // Collect hunk IDs that have preserved stale cards — skip them in normal rendering
+  // to avoid duplicate cards (a normal card + the preserved stale card)
+  const preservedStaleIds = new Set();
+  preservedCards.forEach(function(card) {
+    if (card.hasAttribute('data-injected-stale')) {
+      var id = card.getAttribute('data-hunk-id');
+      if (id) preservedStaleIds.add(id);
+    }
+  });
 
   const hunks = currentHunks;
 
@@ -220,6 +235,8 @@ function renderAllCards() {
   for (const item of items) {
     // Skip secondary items in a linked group (merged into the first card)
     if (item._linkedHidden) continue;
+    // Skip suggestions that have a preserved stale card (avoid duplicate)
+    if (item.kind === 'suggestion' && preservedStaleIds.has(item.data.id)) continue;
 
     if (item.kind === 'suggestion') {
       const hunk = item.data;
@@ -529,7 +546,7 @@ export function focusMarginCard(type, id) {
 }
 
 // Inject a stale card into the margin panel (survives refreshFromGitHub rebuild)
-export function injectStaleCard(data, onDismiss) {
+export function injectStaleCard(data, onDismiss, onRetry) {
   if (!marginEl) return;
   // Remove "No changes yet" placeholder if present
   var empty = marginEl.querySelector('.margin-empty');
@@ -545,21 +562,30 @@ export function injectStaleCard(data, onDismiss) {
       + ' <span class="margin-card-arrow">&rarr;</span> '
       + '<span class="margin-card-ins">' + escapeHtml(truncate(data.newText, 40)) + '</span>';
   }
+  var retryBtnHtml = onRetry
+    ? '<button class="edit-btn edit-btn--primary" data-action="retry-stale" data-hunk-id="' + data.hunkId + '">Try again</button>'
+    : '';
   var card = document.createElement('div');
   card.className = 'margin-card margin-card--suggestion margin-card--stale';
   card.setAttribute('data-hunk-id', data.hunkId);
+  card.setAttribute('data-injected-stale', 'true');
   card.style.top = '0px';
   card.innerHTML = '<div class="margin-card-body">'
     + '<div class="margin-card-status margin-card-status--stale">'
     + '\u26A0 The text you suggested an edit to has changed.</div>'
     + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
     + '<div class="margin-card-stale-actions">'
+    + retryBtnHtml
     + '<button class="edit-btn" data-action="dismiss-stale" data-hunk-id="' + data.hunkId + '">Dismiss</button>'
     + '</div></div>';
   marginEl.insertBefore(card, marginEl.firstChild);
   var dismissBtn = card.querySelector('[data-action="dismiss-stale"]');
   if (dismissBtn && onDismiss) {
     dismissBtn.addEventListener('click', function(e) { e.stopPropagation(); onDismiss(data.hunkId); });
+  }
+  var retryBtn = card.querySelector('[data-action="retry-stale"]');
+  if (retryBtn && onRetry) {
+    retryBtn.addEventListener('click', function(e) { e.stopPropagation(); onRetry(data.hunkId, data); });
   }
 }
 

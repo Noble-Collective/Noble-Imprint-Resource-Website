@@ -688,3 +688,271 @@ test.describe('Presence indicator', () => {
     }
   });
 });
+
+// ============================================================
+// Step 6: Warn before losing unsaved drafts on reload
+// ============================================================
+
+test.describe('Draft preservation on reload', () => {
+  test('unsaved drafts are saved before reload proceeds', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Type text to create a suggestion (don't wait for full auto-save cycle)
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      // Wait just enough for the suggestion to register in the diff engine
+      await page.waitForTimeout(500);
+
+      // Verify the suggestion is NOT yet saved (debounce hasn't fired)
+      let r = await countFirestoreSuggestions();
+      // It might or might not have saved yet — the key thing is what happens on reload
+
+      // Change the file on GitHub to trigger stale detection
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      await github.updateFileContent(TEST_FILE, content + '\n<!-- draft-save-test -->', sha, 'Test: draft save');
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      // Wait for polling to detect the stale file
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeVisible({ timeout: 40000 });
+
+      // Click reload — Step 6 should force-save unsaved drafts before refreshing
+      await page.click('#stale-banner-reload');
+      await page.waitForTimeout(5000);
+
+      // The suggestion should have been saved to Firestore before the refresh
+      r = await countFirestoreSuggestions();
+      console.log('Draft preservation: suggestions in Firestore after reload:', r.count);
+      expect(r.count).toBeGreaterThanOrEqual(1);
+
+      // Banner should be hidden (refresh succeeded)
+      await expect(banner).toBeHidden();
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('warning shown when forced save fails', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      await login(page);
+      await enterSuggest(page);
+
+      // Block ALL hunk creates so nothing gets saved
+      await page.route('**/api/suggestions/hunk', (route) => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"blocked"}' });
+        } else {
+          route.continue();
+        }
+      });
+
+      // Type text to create a suggestion
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(500);
+
+      // Trigger stale banner by changing file
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      await github.updateFileContent(TEST_FILE, content + '\n<!-- draft-fail-test -->', sha, 'Test: draft fail');
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      const banner = page.locator('#editor-stale-banner');
+      await expect(banner).toBeVisible({ timeout: 40000 });
+
+      // Click reload — forced save should fail (mocked 500), warning should appear
+      await page.click('#stale-banner-reload');
+      await page.waitForTimeout(3000);
+
+      // Toast warning should be visible
+      const toast = page.locator('#editor-toast');
+      await expect(toast).toBeVisible({ timeout: 5000 });
+      await expect(toast).toContainText('unsaved changes');
+
+      // Banner should still be visible (reload was aborted)
+      await expect(banner).toBeVisible();
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+});
+
+// ============================================================
+// Step 7: Better accept conflict UX (retry stale accepts)
+// ============================================================
+
+test.describe('Accept retry on stale conflict', () => {
+  test('retry succeeds when original text still exists', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      // Create a suggestion via API
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word for the suggestion
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'RETRYTEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'other@example.com', authorName: 'Other User',
+      });
+      console.log('Retry test: created suggestion', suggId, 'for word', targetWord);
+
+      // Login as admin and enter review mode
+      await login(page);
+      await page.click('#btn-review');
+      await page.waitForSelector('.cm-editor');
+      await page.waitForTimeout(2000);
+
+      // Mock the accept endpoint: first call returns 409, subsequent calls pass through
+      let acceptCallCount = 0;
+      await page.route('**/api/suggestions/hunk/*/accept', (route) => {
+        acceptCallCount++;
+        if (acceptCallCount === 1) {
+          route.fulfill({
+            status: 409,
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'stale', message: 'The file was modified since you loaded the page.' }),
+          });
+        } else {
+          route.continue();
+        }
+      });
+
+      // Find and click the accept button for this suggestion
+      const acceptBtn = page.locator('.margin-action--accept').first();
+      await expect(acceptBtn).toBeVisible({ timeout: 10000 });
+      await acceptBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Stale card should appear with "Try again" button
+      const retryBtn = page.locator('[data-action="retry-stale"]');
+      await expect(retryBtn).toBeVisible({ timeout: 10000 });
+
+      // Click "Try again" — should succeed on the second call (not mocked)
+      await retryBtn.click();
+      await page.waitForTimeout(8000);
+
+      // Suggestion should be accepted — card shows success or is removed
+      const successCard = page.locator('.margin-card-status--success');
+      const staleCard = page.locator('[data-action="retry-stale"]');
+      // Either the success status is shown, or the card was removed entirely
+      const hasSuccess = await successCard.count() > 0;
+      const staleGone = await staleCard.count() === 0;
+      expect(hasSuccess || staleGone).toBe(true);
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('retry shows error when original text was deleted', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word to create a suggestion for
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DELETETEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'other@example.com', authorName: 'Other User',
+      });
+      console.log('Delete retry test: created suggestion', suggId, 'for word', targetWord);
+
+      // Login as admin and enter review mode
+      await login(page);
+      await page.click('#btn-review');
+      await page.waitForSelector('.cm-editor');
+      await page.waitForTimeout(2000);
+
+      // Mock the accept endpoint to return 409
+      await page.route('**/api/suggestions/hunk/*/accept', (route) => {
+        route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'stale', message: 'The file was modified.' }),
+        });
+      });
+
+      // Click accept
+      const acceptBtn = page.locator('.margin-action--accept').first();
+      await expect(acceptBtn).toBeVisible({ timeout: 10000 });
+      await acceptBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Stale card with "Try again" should appear
+      const retryBtn = page.locator('[data-action="retry-stale"]');
+      await expect(retryBtn).toBeVisible({ timeout: 10000 });
+
+      // Now actually DELETE the target word from the file on GitHub
+      const { content: current, sha: curSha } = await github.getFileContent(TEST_FILE);
+      const cleaned = current.replace(targetWord, '');
+      await github.updateFileContent(TEST_FILE, cleaned, curSha, 'Test: delete target word');
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.waitForTimeout(2000);
+
+      // Unroute the accept mock so the content endpoint works normally
+      await page.unroute('**/api/suggestions/hunk/*/accept');
+
+      // Click "Try again" — should detect text is gone
+      await retryBtn.click();
+      await page.waitForTimeout(3000);
+
+      // Should show "Cannot re-apply" message in the stale card
+      const staleCard = page.locator('.margin-card--stale');
+      await expect(staleCard).toBeVisible({ timeout: 5000 });
+      await expect(staleCard).toContainText('Cannot re-apply');
+
+      // "Try again" button should be removed
+      await expect(retryBtn).toHaveCount(0);
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+});

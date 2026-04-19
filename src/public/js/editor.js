@@ -276,6 +276,41 @@ if (data) {
     }
   }
 
+  // --- Force-save unsaved draft hunks (skips version check) ---
+  // Used by Step 6 to preserve drafts before stale banner reload.
+  // Returns true if all saves succeeded, false if any failed.
+  async function forceSaveUnsavedDrafts() {
+    const hunks = getCurrentHunks();
+    if (!data.sessionFilePath || !data.bookRepoPath || hunks.length === 0) return true;
+
+    let allOk = true;
+    for (const hunk of hunks) {
+      const key = hunkKey(hunk);
+      if (savedHunks.has(key) || findOverlappingSavedHunk(hunk)) continue; // already saved
+
+      const currentOriginal = editorView.state.field(originalDocField);
+      const ctx = extractContext(currentOriginal, hunk.originalFrom, hunk.originalTo);
+      try {
+        const res = await fetch('/api/suggestions/hunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
+            baseCommitSha: data.contentSha,
+            type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
+            originalText: hunk.originalText, newText: hunk.newText, ...ctx,
+          }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const result = await res.json();
+        savedHunks.set(key, result.id);
+      } catch {
+        allOk = false;
+      }
+    }
+    return allOk;
+  }
+
   // --- Find the Firestore ID for a hunk ---
   function findFirestoreId(hunkId) {
     // Get the actual hunk object from the diff engine
@@ -446,8 +481,34 @@ if (data) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // Stale banner: reload button
+  // Stale banner: reload button (Step 6: check for unsaved drafts first)
   document.getElementById('stale-banner-reload')?.addEventListener('click', async () => {
+    if (editMode === 'suggest') {
+      const hunks = getCurrentHunks();
+      const hasUnsaved = saveTimer != null || hunks.some(h => {
+        const key = hunkKey(h);
+        return !savedHunks.has(key) && !findOverlappingSavedHunk(h);
+      });
+
+      if (hasUnsaved) {
+        // Cancel pending debounce and force immediate save
+        clearTimeout(saveTimer);
+        saveTimer = null;
+
+        const btn = document.getElementById('stale-banner-reload');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+        const ok = await forceSaveUnsavedDrafts();
+
+        if (btn) { btn.disabled = false; btn.textContent = 'Reload latest version'; }
+
+        if (!ok) {
+          showToast('You have unsaved changes that couldn\'t be saved because the file changed. Copy your changes before reloading.', 'error');
+          return;
+        }
+      }
+    }
+
     await refreshFromGitHub();
     lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
     const banner = document.getElementById('editor-stale-banner');
@@ -578,6 +639,16 @@ if (data) {
         card.dataset.newText = hunk.newText || '';
         card.dataset.hunkType = hunk.type || '';
       }
+    } else if (editorView) {
+      // For server-loaded suggestions, the diff engine's hunk IDs differ from
+      // registry IDs. Fall back to the annotation registry for suggestion data.
+      const registry = editorView.state.field(annotationRegistry);
+      const regEntry = registry.get(firestoreId);
+      if (regEntry && card) {
+        card.dataset.origText = regEntry.originalText || '';
+        card.dataset.newText = regEntry.newText || '';
+        card.dataset.hunkType = regEntry.type || '';
+      }
     }
 
     // Transform card to loading state, disable all other cards
@@ -598,6 +669,7 @@ if (data) {
           const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
           const staleData = {
             hunkId,
+            firestoreId,
             origText: hunk?.originalText || card?.dataset.origText || '',
             newText: hunk?.newText || card?.dataset.newText || '',
             type: hunk?.type || card?.dataset.hunkType || '',
@@ -606,7 +678,7 @@ if (data) {
           console.log('[ACCEPT] stale — refreshing from GitHub to show latest content');
           await refreshFromGitHub();
           // Re-inject stale card after refresh (the refresh nuked it)
-          injectStaleCard(staleData, dismissStaleSuggestion);
+          injectStaleCard(staleData, dismissStaleSuggestion, retryStaleAccept);
         } else {
           setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
         }
@@ -653,6 +725,60 @@ if (data) {
       try { await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' }); } catch { /* ignore */ }
     }
     animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
+  }
+
+  // --- Retry a stale accept (Step 7) ---
+  async function retryStaleAccept(hunkId, staleData) {
+    try {
+      // Fetch fresh file content to check if original text still exists
+      const freshRes = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (!freshRes.ok) { showToast('Could not fetch latest file', 'error'); return; }
+      const fresh = await freshRes.json();
+
+      // Check if the original text still exists in the new file
+      if (staleData.type !== 'insertion' && staleData.origText) {
+        const pos = fresh.content.indexOf(staleData.origText);
+        if (pos === -1) {
+          // Update the stale card to show the text is gone
+          const card = document.querySelector('.margin-card[data-injected-stale][data-hunk-id="' + hunkId + '"]')
+            || document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
+          if (card) {
+            const statusEl = card.querySelector('.margin-card-status');
+            if (statusEl) statusEl.textContent = '\u26A0 Cannot re-apply \u2014 the original text no longer exists.';
+            const retryBtn = card.querySelector('[data-action="retry-stale"]');
+            if (retryBtn) retryBtn.remove();
+          }
+          return;
+        }
+      }
+
+      // Re-attempt accept
+      const fsId = staleData.firestoreId;
+      setCardStatus(hunkId, 'loading', 'Retrying...');
+      disableAllCardActions();
+
+      const res = await fetch('/api/suggestions/hunk/' + fsId + '/accept', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setCardStatus(hunkId, 'error', err.message || 'Retry failed');
+        enableAllCardActions();
+        return;
+      }
+
+      setCardStatus(hunkId, 'success', 'Committed to GitHub');
+      removeRepliesForParent(fsId);
+      await refreshFromGitHub();
+      enableAllCardActions();
+      setTimeout(() => animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]'), 1500);
+
+    } catch (err) {
+      showToast(err.message || 'Network error', 'error');
+      enableAllCardActions();
+    }
   }
 
   // --- Reject/delete a hunk ---
