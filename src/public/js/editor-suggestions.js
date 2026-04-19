@@ -169,8 +169,11 @@ export function computeHunks(original, current) {
   // Step 2: Extend groups to word boundaries. When a group ends mid-word,
   // the trailing shared characters were absorbed into the unchanged suffix
   // by diffChars. Extend forward to include the rest of the word in both
-  // original and current documents.
+  // original and current documents. Skip pure insertions (empty origText)
+  // — they don't have original text to extend.
   for (const g of groups) {
+    if (!g.origText && !g.newText) continue; // empty group
+    if (!g.origText) continue; // pure insertion — no word boundary to extend
     let origExt = 0;
     while (g.origTo + origExt < original.length && /\w/.test(original[g.origTo + origExt])) origExt++;
     let currExt = 0;
