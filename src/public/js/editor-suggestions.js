@@ -121,7 +121,7 @@ export function computeHunks(original, current) {
 
   for (const seg of segments) {
     if (seg.type === 'same') {
-      if (currentGroup && seg.value.length < MERGE_THRESHOLD) {
+      if (currentGroup && seg.value.length < MERGE_THRESHOLD && /^\w+$/.test(seg.value)) {
         currentGroup.origText += seg.value;
         currentGroup.newText += seg.value;
         currentGroup.origTo += seg.value.length;
@@ -145,6 +145,43 @@ export function computeHunks(original, current) {
     }
   }
   if (currentGroup) groups.push(currentGroup);
+
+  // Post-process: fix diffChars character-level artifacts.
+  // diffChars splits single word replacements into fragments when the original
+  // and replacement share characters (e.g., "complete"→"compete" becomes
+  // delete "l" instead of replace "complete"→"compete").
+
+  // Step 1: Merge adjacent groups separated by word-internal gaps.
+  for (let i = groups.length - 1; i > 0; i--) {
+    const prev = groups[i - 1];
+    const curr = groups[i];
+    const origGap = original.substring(prev.origTo, curr.origFrom);
+    if (origGap.length > 0 && origGap.length <= 30 && /^\w+$/.test(origGap)) {
+      const currGap = current.substring(prev.currTo, curr.currFrom);
+      prev.origText += origGap + curr.origText;
+      prev.origTo = curr.origTo;
+      prev.newText += currGap + curr.newText;
+      prev.currTo = curr.currTo;
+      groups.splice(i, 1);
+    }
+  }
+
+  // Step 2: Extend groups to word boundaries. When a group ends mid-word,
+  // the trailing shared characters were absorbed into the unchanged suffix
+  // by diffChars. Extend forward to include the rest of the word in both
+  // original and current documents.
+  for (const g of groups) {
+    let origExt = 0;
+    while (g.origTo + origExt < original.length && /\w/.test(original[g.origTo + origExt])) origExt++;
+    let currExt = 0;
+    while (g.currTo + currExt < current.length && /\w/.test(current[g.currTo + currExt])) currExt++;
+    if (origExt > 0 || currExt > 0) {
+      g.origText += original.substring(g.origTo, g.origTo + origExt);
+      g.origTo += origExt;
+      g.newText += current.substring(g.currTo, g.currTo + currExt);
+      g.currTo += currExt;
+    }
+  }
 
   const hunks = [];
   let hunkId = 0;
