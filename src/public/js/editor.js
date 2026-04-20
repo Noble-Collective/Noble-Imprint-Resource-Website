@@ -465,8 +465,23 @@ if (data) {
       if (vRes.ok) {
         const vData = await vRes.json();
         if (vData.sha && data.contentSha && vData.sha !== data.contentSha && !fileStale) {
-          fileStale = true;
-          showStaleBanner('This file was updated by another user.');
+          // File changed on GitHub. Auto-refresh if no unsaved edits,
+          // otherwise show banner so user can save first.
+          const hunks = getCurrentHunks();
+          const hasUnsaved = saveTimer != null || hunks.some(h => {
+            const key = hunkKey(h);
+            return !savedHunks.has(key) && !findOverlappingSavedHunk(h);
+          });
+          if (hasUnsaved) {
+            fileStale = true;
+            showStaleBanner('This file was updated by another user.');
+          } else {
+            console.log('[POLL] File changed, no unsaved edits — auto-refreshing');
+            fileStale = true;
+            await refreshFromGitHub();
+            lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
+            fileStale = false;
+          }
         }
       }
     } catch (err) {
