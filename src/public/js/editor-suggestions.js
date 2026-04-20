@@ -335,6 +335,11 @@ const draftPlugin = ViewPlugin.fromClass(
             // Only for newText >= 3 chars — short strings like "s" or "**" are too common and
             // would cause false positives for identical edits at different positions.
             if (a.newText && a.newText.length >= 3 && a.newText === h.newText && Math.abs(hFrom - aFrom) <= 5) return false;
+            // Positional containment: if the draft hunk falls within a registry entry's range,
+            // it's a fragment of that entry's change decomposed differently by the diff engine.
+            // This catches API-submitted replacements where diffChars sees deletions/insertions
+            // instead of the full replacement stored in the registry.
+            if (hFrom >= aFrom - 1 && hTo <= aTo + 1) return false;
           }
           return true;
         });
