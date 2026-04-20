@@ -553,10 +553,11 @@ function presenceDocId(filePath, email) {
   return filePath.replace(/\//g, '__') + '::' + email;
 }
 
-async function enterEditingSession({ filePath, email, displayName }) {
+async function enterEditingSession({ filePath, email, displayName, photoURL }) {
   const docId = presenceDocId(filePath, email);
   await editingSessionsCollection().doc(docId).set({
     filePath, email, displayName,
+    photoURL: photoURL || null,
     heartbeat: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 }
@@ -581,7 +582,7 @@ async function getActiveEditors(filePath) {
     // Filter out stale sessions (>90 seconds without heartbeat)
     const ts = d.heartbeat && d.heartbeat.toMillis ? d.heartbeat.toMillis() : 0;
     if (now - ts > 90000) continue;
-    editors.push({ email: d.email, displayName: d.displayName });
+    editors.push({ email: d.email, displayName: d.displayName, photoURL: d.photoURL || null });
   }
   return editors;
 }

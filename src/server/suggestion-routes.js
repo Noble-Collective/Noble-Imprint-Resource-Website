@@ -57,6 +57,7 @@ router.post('/presence', async (req, res) => {
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
     await suggestions.enterEditingSession({
       filePath, email: req.user.email, displayName: req.user.displayName || req.user.email,
+      photoURL: req.user.photoURL || null,
     });
     res.json({ ok: true });
   } catch (err) {

@@ -20,6 +20,24 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Generate a consistent color from a string (email) for avatar backgrounds
+function avatarColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const colors = ['#e74c3c','#3498db','#2ecc71','#9b59b6','#e67e22','#1abc9c','#f39c12','#8e44ad','#2980b9','#c0392b'];
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function renderAvatar(name, email, photoURL, small) {
+  if (photoURL) {
+    return '<img src="' + escapeHtml(photoURL) + '" alt="" class="margin-card-avatar' + (small ? ' margin-card-avatar--small' : '') + '" referrerpolicy="no-referrer">';
+  }
+  const initial = (name || '?')[0].toUpperCase();
+  const color = avatarColor(email || name || '?');
+  const cls = 'margin-card-avatar margin-card-avatar--initials' + (small ? ' margin-card-avatar--small' : '');
+  return '<span class="' + cls + '" style="background:' + color + '">' + escapeHtml(initial) + '</span>';
+}
+
 function truncate(str, len) {
   if (str.length <= len) return str;
   return str.substring(0, len) + '...';
@@ -84,7 +102,7 @@ function buildThreadHtml(parentId, parentType) {
     var rInitial = rName[0].toUpperCase();
     var rTime = r.createdAt ? (r.createdAt._seconds ? new Date(r.createdAt._seconds * 1000) : new Date(r.createdAt)) : new Date();
     html += '<div class="margin-card-reply">'
-      + '<span class="margin-card-avatar margin-card-avatar--initials margin-card-avatar--small">' + escapeHtml(rInitial) + '</span>'
+      + renderAvatar(rName, r.authorEmail, r.photoURL || r.authorPhotoURL || null, true)
       + '<div class="margin-card-reply-content">'
       + '<span class="margin-card-reply-author">' + escapeHtml(rName) + '</span>'
       + '<span class="margin-card-reply-time">' + timeAgo(rTime) + '</span>'
@@ -257,12 +275,9 @@ function renderAllCards() {
       var isAuthor = loaded ? (loaded.authorEmail === userEmail) : true;
       var hunkTime = loaded && loaded.createdAt ? new Date(loaded.createdAt._seconds ? loaded.createdAt._seconds * 1000 : loaded.createdAt) : now;
 
-      var avatarHtml = '';
-      if (authorPhoto) {
-        avatarHtml = '<img src="' + escapeHtml(authorPhoto) + '" alt="" class="margin-card-avatar" referrerpolicy="no-referrer">';
-      } else {
-        avatarHtml = '<span class="margin-card-avatar margin-card-avatar--initials">' + escapeHtml(authorInitial) + '</span>';
-      }
+      var authorEmail = loaded ? (loaded.authorEmail || '') : (userData ? userData.email : '');
+      var authorPhotoURL = loaded ? (loaded.photoURL || loaded.authorPhotoURL || null) : (userData ? userData.photoURL : null);
+      var avatarHtml = renderAvatar(authorName, authorEmail, authorPhotoURL, false);
 
       var actionsHtml = '';
       if (canAccept) {
@@ -315,7 +330,7 @@ function renderAllCards() {
       html += '<div class="margin-card margin-card--comment" data-comment-id="' + c.id + '" style="top:' + top + 'px">'
         + '<div class="margin-card-header">'
         + '<div class="margin-card-user">'
-        + '<span class="margin-card-avatar margin-card-avatar--initials">' + escapeHtml(cInitial) + '</span>'
+        + renderAvatar(cAuthorName, c.authorEmail, c.photoURL || c.authorPhotoURL || null, false)
         + '<span class="margin-card-name">' + escapeHtml(cAuthorName) + '</span>'
         + '</div>'
         + '<div class="margin-card-actions">' + cActionsHtml + '</div>'

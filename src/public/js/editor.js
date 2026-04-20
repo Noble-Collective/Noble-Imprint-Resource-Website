@@ -541,15 +541,26 @@ if (data) {
       if (!res.ok) return;
       const { editors } = await res.json();
       const currentEmail = data.user ? data.user.email : '';
-      // Filter out self
       const others = editors.filter(e => e.email !== currentEmail);
       container.innerHTML = others.map(e => {
+        if (e.photoURL) {
+          return '<img class="presence-avatar presence-avatar--photo" src="' + escapeHtml(e.photoURL) + '" alt="" title="' + escapeHtml(e.displayName || e.email) + '" referrerpolicy="no-referrer">';
+        }
         const initials = getInitials(e.displayName || e.email);
-        return '<span class="presence-avatar" title="' + escapeHtml(e.displayName || e.email) + '">' + escapeHtml(initials) + '</span>';
+        const color = avatarColor(e.email);
+        return '<span class="presence-avatar" style="background:' + color + '" title="' + escapeHtml(e.displayName || e.email) + '">' + escapeHtml(initials) + '</span>';
       }).join('');
     } catch (err) {
       console.warn('[PRESENCE] display update failed:', err.message);
     }
+  }
+
+  // Generate a consistent color from a string (email)
+  function avatarColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    const colors = ['#e74c3c','#3498db','#2ecc71','#9b59b6','#e67e22','#1abc9c','#f39c12','#8e44ad','#2980b9','#c0392b'];
+    return colors[Math.abs(hash) % colors.length];
   }
 
   function getInitials(name) {
