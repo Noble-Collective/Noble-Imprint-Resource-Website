@@ -682,6 +682,40 @@ test.describe('Poll for changes + stale banner', () => {
 
     } finally { await clearAll(); }
   });
+  test('session-created suggestion discarded by another user disappears from author screen', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      // Steve opens the editor and creates a suggestion via the UI (loadedFromServer: false)
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+      const word = await findUniqueWord(page);
+      await makeSuggestion(page, word);
+      await page.waitForTimeout(3000); // wait for auto-save
+
+      // Verify suggestion card is visible
+      const cardCount = await page.locator('.margin-card--suggestion').count();
+      expect(cardCount).toBeGreaterThanOrEqual(1);
+
+      // Verify it was saved to Firestore
+      const r = await countFirestoreSuggestions();
+      expect(r.count).toBeGreaterThanOrEqual(1);
+
+      // Another user discards the suggestion (delete from Firestore)
+      const admin = require('firebase-admin');
+      if (!admin.apps.length) admin.initializeApp();
+      for (const doc of r.docs) { await admin.firestore().collection('suggestions').doc(doc.id).delete(); }
+
+      // Wait for 10s poll to detect the removal and auto-load
+      await page.waitForTimeout(15000);
+
+      // Card should be gone — the author's session-created suggestion was removed by another user
+      const afterCount = await page.locator('.margin-card--suggestion').count();
+      expect(afterCount).toBe(0);
+
+    } finally { await clearAll(); }
+  });
 });
 
 // ============================================================

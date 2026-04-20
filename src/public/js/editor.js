@@ -378,13 +378,16 @@ if (data) {
       const newSuggestions = freshSuggestions.filter(s => !registry.has(s.id));
       const removedSuggestions = [];
       for (const [id, a] of registry) {
-        if (a.kind === 'suggestion' && a.loadedFromServer && !freshIds.has(id)) removedSuggestions.push(id);
+        // Detect suggestions removed by another user. Don't require loadedFromServer —
+        // session-created suggestions (loadedFromServer: false) that were saved to Firestore
+        // and then discarded by another user must also be detected as removed.
+        if (a.kind === 'suggestion' && !freshIds.has(id)) removedSuggestions.push(id);
       }
       const freshCommentIds = new Set((fresh.pendingComments || []).map(c => c.id));
       const newComments = (fresh.pendingComments || []).filter(c => !registry.has(c.id));
       const removedComments = [];
       for (const [id, a] of registry) {
-        if (a.kind === 'comment' && a.loadedFromServer && !freshCommentIds.has(id)) removedComments.push(id);
+        if (a.kind === 'comment' && !freshCommentIds.has(id)) removedComments.push(id);
       }
       const freshReplies = fresh.pendingReplies || [];
       const hasReplyChanges = freshReplies.length !== (data.pendingReplies || []).length;
