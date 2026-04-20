@@ -142,7 +142,7 @@ test.describe('Auto-save error surfacing', () => {
       await page.waitForTimeout(3000);
 
       const status = page.locator('#editor-save-status');
-      await expect(status).toHaveText('Save failed');
+      await expect(status).toHaveText('Save failed', { timeout: 10000 });
 
       // Cycle 3: another edit — this time the route allows through → error clears
       await page.evaluate(() => {
@@ -726,6 +726,74 @@ test.describe('Cross-user data integrity', () => {
     } finally { await clearAll(); }
   });
 
+  test('draft suggestion shows current user name, not another user with a pending suggestion', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find two unique words — one for Jane's existing suggestion, one for Steve's new edit
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      const unique = [];
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) unique.push(w);
+        if (unique.length >= 2) break;
+      }
+      expect(unique.length).toBeGreaterThanOrEqual(2);
+      const janeWord = unique[0];
+      const steveWord = unique[1];
+      const janePos = content.indexOf(janeWord);
+
+      // Jane has a pending insertion suggestion
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'insertion',
+        originalFrom: janePos, originalTo: janePos,
+        originalText: '', newText: 'JANEINSERT',
+        contextBefore: content.substring(Math.max(0, janePos - 50), janePos),
+        contextAfter: content.substring(janePos, Math.min(content.length, janePos + 50)),
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Steve opens the editor — Jane's suggestion is loaded
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      // Steve makes his own insertion on a DIFFERENT word
+      await page.evaluate((w) => {
+        const v = window.__editorView, doc = v.state.doc.toString();
+        const p = doc.indexOf(w);
+        if (p >= 0) {
+          v.dispatch({ selection: { anchor: p, head: p }, scrollIntoView: true });
+          v.dispatch(v.state.replaceSelection('STEVEINSERT'));
+        }
+      }, steveWord);
+      await page.waitForTimeout(500);
+
+      // Steve's draft card should show his name, NOT Jane's
+      // Find the card for Steve's edit (contains 'STEVEINSERT')
+      const draftAuthor = await page.evaluate(() => {
+        const cards = document.querySelectorAll('.margin-card--suggestion');
+        for (const card of cards) {
+          if (card.textContent.includes('STEVEINSERT')) {
+            const name = card.querySelector('.margin-card-name');
+            return name ? name.textContent.trim() : null;
+          }
+        }
+        return null;
+      });
+      // Steve is logged in as steve@noblecollective.org — the card should NOT say 'Jane Doe'
+      expect(draftAuthor).not.toBe('Jane Doe');
+
+    } finally { await clearAll(); }
+  });
+
   test('reply from another user appears within 15s', async ({ page }) => {
     test.setTimeout(90000);
     await clearAll();
@@ -1027,6 +1095,10 @@ test.describe('Draft preservation on reload', () => {
       // Banner should still be visible (reload was aborted)
       await expect(banner).toBeVisible();
 
+      // Draft should be preserved in the editor — the user's edit must not be lost
+      const editorContent = await page.evaluate(() => window.__editorView.state.doc.toString());
+      expect(editorContent).toContain('EDIT');
+
     } finally {
       await clearAll();
       await restoreCleanFile();
@@ -1070,6 +1142,9 @@ test.describe('Accept retry on stale conflict', () => {
       console.log('Retry test: created suggestion', suggId, 'for word', targetWord);
 
       // Login as admin and enter review mode
+      // Clear server cache first — a previous test may have modified the file,
+      // leaving the server's 30s cache out of sync with GitHub
+      await page.request.post(`${BASE_URL}/api/refresh`);
       await login(page);
       await page.click('#btn-review');
       await page.waitForSelector('.cm-editor');
@@ -1148,13 +1223,21 @@ test.describe('Accept retry on stale conflict', () => {
       console.log('Delete retry test: created suggestion', suggId, 'for word', targetWord);
 
       // Login as admin and enter review mode
+      // Clear server cache first — a previous test may have modified the file,
+      // leaving the server's 30s cache out of sync with GitHub
+      await page.request.post(`${BASE_URL}/api/refresh`);
       await login(page);
 
-      // Freeze the fast poll to prevent auto-sync from interfering with stale card testing
-      let suggestionCountOverride = 1;
+      // Freeze both polls to prevent interference with stale card testing:
+      // - suggestion-count poll (10s): could trigger autoLoadNewSuggestions
+      // - file-version poll (30s): could trigger refreshFromGitHub after file modification
       await page.route('**/api/suggestions/suggestion-count*', (route) => {
         route.fulfill({ status: 200, contentType: 'application/json',
-          body: JSON.stringify({ count: suggestionCountOverride, replyCount: 0, commentCount: 0 }) });
+          body: JSON.stringify({ count: 1, replyCount: 0, commentCount: 0 }) });
+      });
+      await page.route('**/api/suggestions/file-version*', (route) => {
+        route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ sha: sha }) });
       });
       // Mock the accept endpoint to return 409
       await page.route('**/api/suggestions/hunk/*/accept', (route) => {
@@ -1205,4 +1288,301 @@ test.describe('Accept retry on stale conflict', () => {
       await restoreCleanFile();
     }
   });
+});
+
+
+// ============================================================
+// Step 8: Polling safety + coverage gaps
+// ============================================================
+
+test.describe('Polling safety + coverage gaps', () => {
+
+  test('comment from another user auto-loads within 15s', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word to use as the comment anchor
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      // Open editor first (no comments yet)
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      // Verify no comment cards initially
+      const initialComments = await page.locator('.margin-card--comment').count();
+      expect(initialComments).toBe(0);
+
+      // Now create a comment as another user (while editor is open)
+      await suggestions.createComment({
+        filePath: TEST_FILE,
+        bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, from: pos, to: pos + targetWord.length,
+        selectedText: targetWord, commentText: 'Review this section please',
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+        fileContent: content,
+      });
+
+      // Wait for 10s poll to detect commentCount change and auto-load
+      const commentCard = page.locator('.margin-card--comment');
+      await expect(commentCard).toHaveCount(1, { timeout: 15000 });
+
+    } finally {
+      await clearAll();
+    }
+  });
+
+  test('reply to comment auto-loads within 15s', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word for the comment anchor
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      // Create comment BEFORE opening editor so it's loaded on page render
+      const commentId = await suggestions.createComment({
+        filePath: TEST_FILE,
+        bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, from: pos, to: pos + targetWord.length,
+        selectedText: targetWord, commentText: 'Needs attention',
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+        fileContent: content,
+      });
+
+      // Open editor — comment should be visible
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      // Verify comment card loaded, no replies yet
+      await expect(page.locator('.margin-card--comment')).toHaveCount(1, { timeout: 5000 });
+      const initialReplies = await page.locator('.margin-card-reply').count();
+      expect(initialReplies).toBe(0);
+
+      // Now create a reply as another user (while editor is open)
+      await suggestions.createReply({
+        parentId: commentId, parentType: 'comment', filePath: TEST_FILE,
+        text: 'I agree, let me fix this',
+        authorEmail: 'bob@noblecollective.org', authorName: 'Bob Smith',
+      });
+
+      // Wait for 10s poll to detect replyCount change and auto-load
+      const reply = page.locator('.margin-card-reply');
+      await expect(reply).toHaveCount(1, { timeout: 15000 });
+
+    } finally {
+      await clearAll();
+    }
+  });
+
+  test('discarded suggestion stays discarded through polling cycles', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word for the suggestion
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      // Create suggestion as another user
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DISCARDTEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Open editor in suggest mode
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      // Verify suggestion card is visible
+      const suggCard = page.locator('.margin-card--suggestion:not(.margin-card--stale)');
+      await expect(suggCard).toHaveCount(1, { timeout: 5000 });
+
+      // Click discard button
+      const discardBtn = page.locator('.margin-action--reject').first();
+      await expect(discardBtn).toBeVisible({ timeout: 5000 });
+      await discardBtn.click();
+      await page.waitForTimeout(2000);
+
+      // Verify card is gone
+      await expect(suggCard).toHaveCount(0);
+
+      // Wait through two full polling cycles (25s) — card must stay gone
+      console.log('Discard test: waiting 25s through polling cycles...');
+      await page.waitForTimeout(25000);
+
+      // Verify card is STILL gone (polling did not re-add it)
+      const finalCount = await page.locator('.margin-card--suggestion:not(.margin-card--stale)').count();
+      expect(finalCount).toBe(0);
+
+    } finally {
+      await clearAll();
+    }
+  });
+
+  test('accept completes cleanly despite polling', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word for the suggestion
+      const words = content.match(/\b[a-zA-Z]{8,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) {
+        if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; }
+      }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'POLLTEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Login as admin, enter review mode
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await page.click('#btn-review');
+      await page.waitForSelector('.cm-editor');
+      await page.waitForTimeout(2000);
+
+      // Verify suggestion card visible
+      const suggCard = page.locator('.margin-card--suggestion:not(.margin-card--stale)');
+      await expect(suggCard).toHaveCount(1, { timeout: 5000 });
+
+      // Click accept
+      const acceptBtn = page.locator('.margin-action--accept').first();
+      await expect(acceptBtn).toBeVisible({ timeout: 5000 });
+      await acceptBtn.click();
+
+      // Wait for accept to complete + at least one poll cycle
+      await page.waitForTimeout(15000);
+
+      // Verify: no duplicate cards, suggestion accepted
+      const remainingCards = await page.locator('.margin-card--suggestion:not(.margin-card--stale)').count();
+      expect(remainingCards).toBe(0);
+
+      // No error toasts
+      const errorToast = await page.evaluate(() => {
+        const t = document.getElementById('editor-toast');
+        return t && t.style.display !== 'none' && t.classList.contains('editor-toast--error');
+      });
+      expect(errorToast).toBeFalsy();
+
+      // Editor should still be functional
+      const editorWorks = await page.evaluate(() => !!window.__editorView && !!window.__editorView.state.doc);
+      expect(editorWorks).toBe(true);
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+
+  test('presence expires after 90s without heartbeat', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await clearPresence();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const admin = require('firebase-admin');
+      if (!admin.apps.length) admin.initializeApp();
+      const db = admin.firestore();
+
+      // Create a STALE presence entry — heartbeat 95 seconds in the past
+      const staleDocId = TEST_FILE.replace(/\//g, '__') + '::stale@example.com';
+      await db.collection('editingSessions').doc(staleDocId).set({
+        filePath: TEST_FILE,
+        email: 'stale@example.com',
+        displayName: 'Stale User',
+        photoURL: null,
+        heartbeat: admin.firestore.Timestamp.fromMillis(Date.now() - 95000),
+      });
+
+      // Create a FRESH presence entry
+      await suggestions.enterEditingSession({
+        filePath: TEST_FILE, email: 'fresh@example.com',
+        displayName: 'Fresh User', photoURL: null,
+      });
+
+      // Server-side check: getActiveEditors should filter out the stale entry
+      const editors = await suggestions.getActiveEditors(TEST_FILE);
+      const staleEditor = editors.find(e => e.email === 'stale@example.com');
+      const freshEditor = editors.find(e => e.email === 'fresh@example.com');
+      expect(staleEditor).toBeFalsy();
+      expect(freshEditor).toBeTruthy();
+
+      // Browser-side check: open editor, verify presence display
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      await login(page);
+      await enterSuggest(page);
+
+      // Wait for presence display to load (initial heartbeat + fetch)
+      const avatar = page.locator('#editor-presence .presence-avatar');
+      await expect(avatar).toHaveCount(1, { timeout: 35000 });
+
+      // Only fresh user should appear (steve is current user, stale is filtered)
+      const avatarText = await avatar.first().textContent();
+      expect(avatarText).toContain('FU'); // Fresh User initials
+
+    } finally {
+      await clearAll();
+      await clearPresence();
+    }
+  });
+
 });

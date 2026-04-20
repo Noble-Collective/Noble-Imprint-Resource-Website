@@ -5,7 +5,7 @@ import {
   suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard, updateStaleCard } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
@@ -38,6 +38,7 @@ if (data) {
   let lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
   let lastKnownReplyCount = (data.pendingReplies || []).length;
   let lastKnownCommentCount = (data.pendingComments || []).length;
+  let autoLoadInProgress = false; // re-entrancy guard for autoLoadNewSuggestions
 
   function hunkKey(hunk) {
     // Key by position in the ORIGINAL document — stable as the user types,
@@ -360,6 +361,11 @@ if (data) {
   // --- Auto-load new suggestions from other users ---
   async function autoLoadNewSuggestions() {
     if (!data.sessionFilePath || !editorView) return;
+    // Don't auto-load while an accept or discard is rebuilding the document —
+    // concurrent setAnnotations dispatches cause position corruption
+    if (isDiscarding || acceptingInProgress) return;
+    if (autoLoadInProgress) return;
+    autoLoadInProgress = true;
     try {
       const res = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (!res.ok) return;
@@ -441,6 +447,8 @@ if (data) {
       }
     } catch (err) {
       console.warn('[POLL] auto-load failed:', err.message);
+    } finally {
+      autoLoadInProgress = false;
     }
   }
 
@@ -506,7 +514,10 @@ if (data) {
   async function pollForFileChanges() {
     if (!data.sessionFilePath) return;
     try {
-      const vRes = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(data.sessionFilePath));
+      const controller = new AbortController();
+      const pollTimeout = setTimeout(() => controller.abort(), 5000);
+      const vRes = await fetch('/api/suggestions/file-version?filePath=' + encodeURIComponent(data.sessionFilePath), { signal: controller.signal });
+      clearTimeout(pollTimeout);
       if (vRes.ok) {
         const vData = await vRes.json();
         if (vData.sha && data.contentSha && vData.sha !== data.contentSha && !fileStale) {
@@ -857,17 +868,8 @@ if (data) {
       if (staleData.type !== 'insertion' && staleData.origText) {
         const pos = fresh.content.indexOf(staleData.origText);
         if (pos === -1) {
-          // Update the stale card to show the text is gone
-          const card = document.querySelector('.margin-card--stale[data-hunk-id="' + hunkId + '"]')
-            || document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
-          if (card) {
-            const statusEl = card.querySelector('.margin-card-status');
-            if (statusEl) statusEl.textContent = '\u26A0 Cannot re-apply \u2014 the original text no longer exists.';
-            const retryBtn = card.querySelector('[data-action="retry-stale"]');
-            if (retryBtn) retryBtn.remove();
-          }
-          // Remove from stale map so retry button stays gone on re-render
-          removeStaleCard(hunkId);
+          // Update stale card in the Map so it survives margin re-renders
+          updateStaleCard(hunkId, { onRetry: null, cannotReapply: true });
           return;
         }
       }

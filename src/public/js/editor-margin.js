@@ -262,13 +262,11 @@ function renderAllCards() {
           + '<span class="margin-card-ins">' + escapeHtml(truncate(hunk.newText, 40)) + '</span>';
       }
 
-      // Look up author info: prefer registry (live), fall back to page data
+      // Look up author info: prefer registry (live), fall back to page data by exact ID only.
+      // Content-based matching (originalText/newText) is too loose — it can match a DIFFERENT
+      // user's suggestion on the same word, causing draft cards to flash the wrong author name.
       var regEntry = registry ? registry.get(hunk.id) : null;
-      var loaded = regEntry || loadedSuggestions.find(function(s) {
-        if (s.originalText === hunk.originalText && s.newText === hunk.newText) return true;
-        if (s.type === hunk.type && s.originalText === hunk.originalText) return true;
-        return s.id === hunk.id;
-      });
+      var loaded = regEntry || loadedSuggestions.find(function(s) { return s.id === hunk.id; });
       var authorName = loaded ? (loaded.authorName || loaded.authorEmail || (userData ? (userData.displayName || userData.email) : 'Unknown')) : (userData ? (userData.displayName || userData.email) : 'Unknown');
       var isAuthor = loaded ? (loaded.authorEmail === userEmail) : true;
       var hunkTime = loaded && loaded.createdAt ? new Date(loaded.createdAt._seconds ? loaded.createdAt._seconds * 1000 : loaded.createdAt) : now;
@@ -360,7 +358,10 @@ function renderAllCards() {
     html = '<div class="margin-card margin-card--suggestion margin-card--stale" data-hunk-id="' + hunkId + '" style="top:0px">'
       + '<div class="margin-card-body">'
       + '<div class="margin-card-status margin-card-status--stale">'
-      + '\u26A0 The text you suggested an edit to has changed.</div>'
+      + (sd.cannotReapply
+        ? '\u26A0 Cannot re-apply \u2014 the original text no longer exists.'
+        : '\u26A0 The text you suggested an edit to has changed.')
+      + '</div>'
       + (suggHtml ? '<div><span class="margin-card-stale-label">Your suggestion was:</span>' + suggHtml + '</div>' : '')
       + '<div class="margin-card-stale-actions">'
       + retryBtnHtml
@@ -592,6 +593,15 @@ export function addStaleCard(hunkId, staleData, onDismiss, onRetry) {
 // Remove a stale card from the rendering pipeline
 export function removeStaleCard(hunkId) {
   staleCards.delete(hunkId);
+}
+
+// Update a stale card in-place and re-render (survives margin rebuilds)
+export function updateStaleCard(hunkId, updates) {
+  const existing = staleCards.get(hunkId);
+  if (existing) {
+    Object.assign(existing, updates);
+    renderAllCards();
+  }
 }
 
 // Reposition cards on scroll or resize
