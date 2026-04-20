@@ -1103,10 +1103,12 @@ if (data) {
         id: s.id, kind: 'suggestion', type: s.type,
         originalText: s.originalText || '', newText: s.newText || '',
         originalFrom: s.originalFrom, originalTo: s.originalTo,
+        resolvedFrom: s.resolvedFrom, resolvedTo: s.resolvedTo,
         currentFrom: curFrom, currentTo: curTo,
         authorEmail: s.authorEmail, authorName: s.authorName,
         authorPhotoURL: s.authorPhotoURL || null,
         firestoreId: s.id, loadedFromServer: true,
+        linkedGroup: s.linkedGroup || null, linkedLabel: s.linkedLabel || '',
       });
 
       // Update cumulative shift for subsequent suggestions

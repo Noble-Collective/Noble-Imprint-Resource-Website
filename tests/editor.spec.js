@@ -1840,6 +1840,71 @@ test.describe('Editor - Loading Existing Suggestions', () => {
     });
     expect(suggestionHighlights.join('')).toContain(replacementText);
   });
+
+  test('discarding one API suggestion does not corrupt remaining suggestions', async ({ page }) => {
+    // API-submitted suggestions (like Claude AI) have originalFrom: 0 because
+    // the bot relies on context-based anchor resolution rather than positions.
+    // The registry must store resolvedFrom/resolvedTo so that rebuilding
+    // the document after a discard uses correct positions, not position 0.
+    const replacement1 = testWords[0] + 'API1';
+    const replacement2 = testWords[1] + 'API2';
+
+    // Create suggestions with originalFrom: 0 (like the real API does for bots)
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) admin.initializeApp();
+    const db = admin.firestore();
+    const github = require('../src/server/github');
+    const suggestions = require('../src/server/suggestions');
+    const origFile = await github.getFileContent(TEST_FILE);
+    const origContent = origFile.content;
+
+    for (const [origWord, newText] of [[testWords[0], replacement1], [testWords[1], replacement2]]) {
+      const pos = origContent.indexOf(origWord);
+      await db.collection('suggestions').add({
+        filePath: TEST_FILE,
+        bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: origFile.sha,
+        type: 'replacement',
+        originalFrom: 0, originalTo: 0, // API bot style — relies on anchor resolution
+        originalText: origWord, newText,
+        contextBefore: origContent.substring(Math.max(0, pos - 50), pos),
+        contextAfter: origContent.substring(pos + origWord.length, Math.min(origContent.length, pos + origWord.length + 50)),
+        anchor: suggestions.buildAnchorData(origContent, pos, pos + origWord.length, origWord).anchor,
+        position: suggestions.buildAnchorData(origContent, pos, pos + origWord.length, origWord).position,
+        structure: suggestions.buildAnchorData(origContent, pos, pos + origWord.length, origWord).structure,
+        authorEmail: 'claude@noblecollective.org', authorName: 'Claude AI',
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await enterSuggestMode(page);
+    await page.waitForTimeout(2000);
+
+    // Both cards should be visible
+    const cardsBefore = await getMarginCardCount(page);
+    expect(cardsBefore).toBeGreaterThanOrEqual(2);
+
+    // Discard the first one
+    const rejectBtn = page.locator('.margin-action--reject').first();
+    await rejectBtn.click();
+    await page.waitForTimeout(3000);
+
+    // Remaining card should still be visible and NOT at position 0
+    const cardsAfter = await getMarginCardCount(page);
+    expect(cardsAfter).toBeGreaterThanOrEqual(1);
+
+    // The working doc should contain the second replacement at its correct position
+    // (not at the top of the document)
+    const docContent = await page.evaluate(() => window.__editorView.state.doc.toString());
+    expect(docContent).toContain(replacement2);
+
+    // The second replacement should NOT appear in the first line (H1 heading)
+    const firstLine = docContent.split('\n')[0];
+    expect(firstLine).not.toContain(replacement2);
+  });
 });
 
 // ============================================================
