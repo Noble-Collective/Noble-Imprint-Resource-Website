@@ -229,6 +229,7 @@ async function submitComment() {
         currentTo: sel.to,
         authorEmail: editorData.user ? editorData.user.email : '',
         authorName: editorData.user ? editorData.user.displayName : '',
+        photoURL: editorData.user ? editorData.user.photoURL : null,
         createdAt: new Date(),
       });
     }

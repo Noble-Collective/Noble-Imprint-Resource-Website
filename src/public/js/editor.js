@@ -231,6 +231,7 @@ if (data) {
                 currentTo: hunk.type === 'deletion' ? hunk.currentPos : hunk.currentTo,
                 authorEmail: data.user ? data.user.email : '',
                 authorName: data.user ? data.user.displayName : '',
+                photoURL: data.user ? data.user.photoURL : null,
                 firestoreId: result.id,
                 loadedFromServer: false,
                 ...(hunkData.linkedGroup ? { linkedGroup: hunkData.linkedGroup, linkedLabel: hunkData.linkedLabel } : {}),
@@ -1564,6 +1565,7 @@ if (data) {
       text,
       authorEmail: data.user ? data.user.email : '',
       authorName: data.user ? data.user.displayName : '',
+      photoURL: data.user ? data.user.photoURL : null,
       createdAt: new Date(),
     };
   }
