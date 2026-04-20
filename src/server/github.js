@@ -45,7 +45,7 @@ async function getFileContent(path) {
     path,
   });
   if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
-  const content = Buffer.from(data.content, 'base64').toString('utf-8');
+  const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const result = { content, sha: data.sha };
   cache.set(cacheKey, result, FILE_CACHE_TTL);
   return result;
