@@ -685,6 +685,148 @@ test.describe('Poll for changes + stale banner', () => {
 });
 
 // ============================================================
+// Cross-user data integrity
+// ============================================================
+
+test.describe('Cross-user data integrity', () => {
+  test('suggestion from another user shows their name, not current user', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      // Create a suggestion as a different user
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'AUTHOR_TEST',
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Steve opens the editor — should see Jane's suggestion with her name
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      const authorName = await page.evaluate(() => {
+        const card = document.querySelector('.margin-card--suggestion .margin-card-name');
+        return card ? card.textContent.trim() : null;
+      });
+      expect(authorName).toBe('Jane Doe');
+
+    } finally { await clearAll(); }
+  });
+
+  test('reply from another user appears within 15s', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      // Create a suggestion as another user
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'REPLY_SYNC_TEST',
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Steve opens the editor and sees the suggestion
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+      await expect(page.locator('.margin-card--suggestion')).toHaveCount(1, { timeout: 5000 });
+
+      // Jane posts a reply (direct Firestore)
+      await suggestions.createReply({
+        parentId: suggId, parentType: 'suggestion', filePath: TEST_FILE,
+        text: 'I think this is a good change',
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Wait for fast poll to sync the reply (up to 15s)
+      const reply = page.locator('.margin-card-reply');
+      await expect(reply).toHaveCount(1, { timeout: 15000 });
+      await expect(reply.locator('.margin-card-reply-author')).toContainText('Jane');
+
+    } finally { await clearAll(); }
+  });
+
+  test('accept by another user auto-refreshes without stale banner', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      // Create a suggestion as another user
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'ACCEPT_SYNC_TEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
+      });
+
+      // Steve opens editor and sees the suggestion
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+      await expect(page.locator('.margin-card--suggestion')).toHaveCount(1, { timeout: 5000 });
+
+      // Jane accepts the suggestion (server-side)
+      await suggestions.acceptHunk(suggId, 'jane@noblecollective.org');
+      await page.request.post(`${BASE_URL}/api/refresh`);
+
+      // Wait for fast poll to detect the change and auto-refresh (up to 15s)
+      await page.waitForTimeout(15000);
+
+      // Suggestion card should be gone
+      await expect(page.locator('.margin-card--suggestion')).toHaveCount(0);
+      // Stale banner should NOT be visible
+      await expect(page.locator('#editor-stale-banner')).toBeHidden();
+      // Editor content should contain the accepted text
+      const hasAcceptedText = await page.evaluate(() =>
+        window.__editorView.state.doc.toString().includes('ACCEPT_SYNC_TEST')
+      );
+      expect(hasAcceptedText).toBe(true);
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+});
+
+// ============================================================
 // Step 5: Presence indicator
 // ============================================================
 
@@ -1007,10 +1149,13 @@ test.describe('Accept retry on stale conflict', () => {
 
       // Login as admin and enter review mode
       await login(page);
-      await page.click('#btn-review');
-      await page.waitForSelector('.cm-editor');
-      await page.waitForTimeout(2000);
 
+      // Freeze the fast poll to prevent auto-sync from interfering with stale card testing
+      let suggestionCountOverride = 1;
+      await page.route('**/api/suggestions/suggestion-count*', (route) => {
+        route.fulfill({ status: 200, contentType: 'application/json',
+          body: JSON.stringify({ count: suggestionCountOverride, replyCount: 0, commentCount: 0 }) });
+      });
       // Mock the accept endpoint to return 409
       await page.route('**/api/suggestions/hunk/*/accept', (route) => {
         route.fulfill({
@@ -1020,9 +1165,12 @@ test.describe('Accept retry on stale conflict', () => {
         });
       });
 
-      // Click accept
+      await page.click('#btn-review');
+      await page.waitForSelector('.cm-editor');
+      await page.waitForTimeout(2000);
+
       const acceptBtn = page.locator('.margin-action--accept').first();
-      await expect(acceptBtn).toBeVisible({ timeout: 10000 });
+      await expect(acceptBtn).toBeVisible({ timeout: 5000 });
       await acceptBtn.click();
       await page.waitForTimeout(3000);
 
