@@ -97,6 +97,46 @@ app.get('/image/*', async (req, res) => {
   }
 });
 
+// Content tree endpoint — list all books and sessions (for API/bot access)
+app.get('/api/content-tree', async (req, res) => {
+  try {
+    const tree = await content.buildContentTree();
+    const result = [];
+    for (const s of tree.series) {
+      for (const child of s.children) {
+        if (child.type === 'book') {
+          result.push({
+            series: s.title,
+            book: child.title,
+            bookPath: child.repoPath,
+            sessions: (child.sessions || []).map(sess => ({
+              title: sess.displayName,
+              filePath: sess.path,
+            })),
+          });
+        } else if (child.type === 'subseries') {
+          for (const book of child.books) {
+            result.push({
+              series: s.title,
+              subseries: child.title,
+              book: book.title,
+              bookPath: book.repoPath,
+              sessions: (book.sessions || []).map(sess => ({
+                title: sess.displayName,
+                filePath: sess.path,
+              })),
+            });
+          }
+        }
+      }
+    }
+    res.json({ books: result });
+  } catch (err) {
+    console.error('Content tree error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Cache refresh endpoint — called after deploy or content update to clear stale content
 app.post('/api/refresh', async (req, res) => {
   const cache = require('./cache');

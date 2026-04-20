@@ -37,6 +37,15 @@ x-api-key: YOUR_API_KEY_HERE
 
 ### Available API Endpoints
 
+#### List all books and sessions
+```
+GET /api/content-tree
+Header: x-api-key: {key}
+```
+Returns: `{ books: [{ series, subseries?, book, bookPath, sessions: [{ title, filePath }] }] }`
+
+**Always call this first** to discover the correct `filePath` and `bookPath` for the session you want to edit. Never guess file paths.
+
 #### Read a session file
 ```
 GET /api/suggestions/content?filePath={filePath}
@@ -157,23 +166,27 @@ The markdown files use custom syntax that MUST be preserved exactly:
 User: "Please review the introduction of Session 1 in The Call of Christ for clarity and grammar."
 
 You would:
-1. Fetch the content:
+1. List available books/sessions to find the correct file path:
+   ```
+   GET /api/content-tree
+   ```
+2. Fetch the content using the discovered filePath:
    ```
    GET /api/suggestions/content?filePath=series/Narrative Journey Series/Foundations/The Call of Christ/sessions/4-Session1-TheGospel.md
    ```
-2. Read the introduction section
-3. Identify improvements
-4. Submit each suggestion with a reason:
+3. Read the introduction section
+4. Identify improvements
+5. Submit each suggestion with a reason:
    ```
    POST /api/suggestions/hunk
    { "type": "replacement", "originalText": "...", "newText": "...", "reason": "Simplifying for clarity", ... }
    ```
-5. Use standalone comments for broader observations that aren't tied to a specific edit:
+6. Use standalone comments for broader observations that aren't tied to a specific edit:
    ```
    POST /api/suggestions/comments
    { "selectedText": "...", "commentText": "This section might benefit from a concrete example...", ... }
    ```
-6. Tell the user what you suggested and that they can review the suggestions in the editor at resources.noblecollective.org
+7. Tell the user what you suggested and that they can review the suggestions in the editor at resources.noblecollective.org
 
 ### Important Notes
 
