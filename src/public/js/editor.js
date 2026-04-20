@@ -16,7 +16,7 @@ const data = window.__EDITOR_DATA;
 if (data) {
   let editorView = null;
   let editMode = null; // 'suggest' | 'direct' | 'review'
-  const originalContent = data.rawContent;
+  const originalContent = (data.rawContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   // --- View Source toggle (compartments for masking + read-only) ---
   const maskingCompartment = new Compartment();
