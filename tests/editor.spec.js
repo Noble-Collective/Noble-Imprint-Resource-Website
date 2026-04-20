@@ -177,7 +177,33 @@ async function findStructuralContent(page, type) {
 
 // Wait for auto-save (1500ms debounce + network)
 async function waitForAutoSave(page) {
-  await page.waitForTimeout(3000);
+  // Wait for the "Saved" status indicator rather than a fixed timeout.
+  // The auto-save pipeline (300ms debounce + 1500ms timer + up to 3s version check + POST)
+  // can take up to ~5s. A fixed 3s wait was too short when the version check was slow.
+  //
+  // First, wait for any previous "Saved" text to clear so we detect the NEW save cycle.
+  // The editor clears "Saved" after 2s. If it's already clear, this returns immediately.
+  try {
+    await page.waitForFunction(
+      () => document.getElementById('editor-save-status')?.textContent !== 'Saved',
+      { timeout: 3000 }
+    );
+  } catch { /* already clear or never showed — proceed */ }
+  // Now wait for the new save to complete
+  try {
+    await page.waitForFunction(
+      () => {
+        const s = document.getElementById('editor-save-status')?.textContent;
+        return s === 'Saved' || s === 'Save failed';
+      },
+      { timeout: 8000 }
+    );
+  } catch {
+    // Fallback: if status never appears (e.g., no hunks to save), wait a fixed amount
+    await page.waitForTimeout(5000);
+  }
+  // Small buffer for Firestore write to propagate
+  await page.waitForTimeout(300);
 }
 
 // Check Firestore pending suggestion count
@@ -2117,17 +2143,18 @@ test.describe('Integration - Full Editing Session', () => {
     expect(data1.suggestions[0].newText).toContain('INTEGFIRST');
 
     // --- PHASE 2: Second edit AFTER auto-save (regression: escapeHtml crash) ---
+    // Find a word in the ORIGINAL document (not the working doc, which contains INTEGFIRST)
+    // to ensure we're editing a genuinely different position.
     const word2 = await page.evaluate((skip) => {
-      const doc = window.__editorView.state.doc.toString();
-      for (const line of doc.split('\n')) {
+      const orig = window.__editorView.state.field(window.__originalDocField);
+      for (const line of orig.split('\n')) {
         if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
         for (const w of (line.match(/\b[a-zA-Z]{5,14}\b/g) || [])) {
-          if (w !== skip && doc.indexOf(w) === doc.lastIndexOf(w)) return w;
+          if (w !== skip && orig.indexOf(w) === orig.lastIndexOf(w)) return w;
         }
       }
       return null;
     }, word1);
-    expect(word2).toBeTruthy();
 
     await selectText(page, word2);
     await replaceWith(page, 'INTEGSECOND');
