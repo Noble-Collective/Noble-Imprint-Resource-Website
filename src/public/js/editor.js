@@ -389,18 +389,21 @@ if (data) {
 
       console.log('[POLL] Syncing:', newSuggestions.length, 'new +', removedSuggestions.length, 'removed suggestions,', newComments.length, 'new +', removedComments.length, 'removed comments, replies changed:', hasReplyChanges);
 
-      // Only rebuild the document if suggestions or comments changed
+      // Rebuild the document if suggestions or comments changed
       if (hasSuggestionChanges || hasCommentChanges) {
-        const currentOriginal = editorView.state.field(originalDocField);
+        // Use the FRESH file content from GitHub (not the stale originalDocField).
+        // This handles accepts by other users — the accepted text is now committed
+        // to GitHub, so the original must be updated to match.
+        const freshOriginal = fresh.content || editorView.state.field(originalDocField);
         const allSuggestions = freshSuggestions.filter(s => !s.resolvedStale);
-        const newWorkingDoc = buildWorkingDoc(currentOriginal, allSuggestions);
+        const newWorkingDoc = buildWorkingDoc(freshOriginal, allSuggestions);
         const existingComments = fresh.pendingComments || [];
         const registryEntries = buildShiftedRegistryEntries(allSuggestions, existingComments, newWorkingDoc);
 
         editorView.dispatch({ effects: setZones.of([]) });
         editorView.dispatch({
           changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
-          effects: [setOriginal.of(currentOriginal), setAnnotations.of(registryEntries)],
+          effects: [setOriginal.of(freshOriginal), setAnnotations.of(registryEntries)],
           annotations: isRevert.of(true),
         });
 
@@ -413,6 +416,12 @@ if (data) {
 
         const zones = recomputeZones(editorView.state.doc);
         editorView.dispatch({ effects: setZones.of(zones) });
+
+        // Update SHA so the slow SHA poll doesn't show a stale banner
+        if (fresh.sha) {
+          data.contentSha = fresh.sha;
+          fileStale = false;
+        }
       }
 
       data.pendingSuggestions = freshSuggestions;
