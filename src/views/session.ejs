@@ -175,6 +175,12 @@
     </div>
     <% } %>
 
+    <!-- Full-page loading overlay (shown during reload after exiting editor) -->
+    <div class="page-reload-overlay" id="page-reload-overlay" style="display:none">
+      <span class="margin-card-spinner" style="width:20px;height:20px"></span>
+      <span>Loading latest content...</span>
+    </div>
+
   </main>
 
 <% if (typeof editRole !== 'undefined' && editRole) { %>

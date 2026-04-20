@@ -3445,6 +3445,20 @@ body.drawer-open {
   background: rgba(255,255,255,0.85);
   backdrop-filter: blur(2px);
 }
+.page-reload-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  color: #555;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(4px);
+}
 /* Stale card details */
 .margin-card-stale-label {
   display: block;

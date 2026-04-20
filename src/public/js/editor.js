@@ -1468,6 +1468,9 @@ if (data) {
     if (mobileToc) mobileToc.style.display = '';
     document.querySelector('.main').classList.remove('main--editing');
     editMode = null;
+    // Show loading overlay before reload so the user sees feedback instead of a frozen tab
+    const reloadOverlay = document.getElementById('page-reload-overlay');
+    if (reloadOverlay) reloadOverlay.style.display = '';
     window.location.reload();
   }
 
@@ -1530,7 +1533,11 @@ if (data) {
         throw new Error(err.error || 'Failed to save');
       }
       showToast('Changes committed successfully', 'success');
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => {
+        const reloadOverlay = document.getElementById('page-reload-overlay');
+        if (reloadOverlay) reloadOverlay.style.display = '';
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       showToast('Error: ' + err.message, 'error');
       doneBtn.disabled = false;
