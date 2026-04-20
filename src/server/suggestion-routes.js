@@ -182,6 +182,7 @@ router.post('/hunk', async (req, res) => {
       contextBefore, contextAfter,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
+      authorPhotoURL: req.user.photoURL || null,
       ...(linkedGroup ? { linkedGroup, linkedLabel } : {}),
     });
 
@@ -192,6 +193,7 @@ router.post('/hunk', async (req, res) => {
         parentId: id, parentType: 'suggestion', filePath, text: reason,
         authorEmail: req.user.email,
         authorName: req.user.displayName,
+      authorPhotoURL: req.user.photoURL || null,
       });
     }
 
@@ -329,6 +331,7 @@ router.post('/comments', async (req, res) => {
       from, to, selectedText, commentText,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
+      authorPhotoURL: req.user.photoURL || null,
       fileContent,
     });
     res.json({ id, status: 'ok' });
@@ -367,6 +370,7 @@ router.post('/replies', async (req, res) => {
       parentId, parentType, filePath, text,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
+      authorPhotoURL: req.user.photoURL || null,
     });
     res.json({ id, status: 'ok' });
   } catch (err) {

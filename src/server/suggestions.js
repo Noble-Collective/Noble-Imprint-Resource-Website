@@ -199,7 +199,7 @@ function repliesCollection() {
 
 // --- Suggestion Hunk CRUD ---
 
-async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, fileContent, linkedGroup, linkedLabel }) {
+async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, authorPhotoURL, fileContent, linkedGroup, linkedLabel }) {
   // Deduplication: check for an existing pending suggestion with the same text
   // at an overlapping position (±5 chars). Prevents duplicates from rapid auto-save
   // cycles or two users making the exact same edit.
@@ -242,6 +242,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     structure: anchorData.structure,
     authorEmail,
     authorName: authorName || authorEmail,
+    authorPhotoURL: authorPhotoURL || null,
     status: 'pending',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedAt: null,
@@ -456,7 +457,7 @@ async function rejectHunk(id, resolverEmail, reason) {
 
 // --- Comment CRUD ---
 
-async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, authorEmail, authorName, fileContent }) {
+async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, authorEmail, authorName, authorPhotoURL, fileContent }) {
   // Build enhanced anchor data if file content is available
   const anchorData = fileContent
     ? buildAnchorData(fileContent, from, to, selectedText || '')
@@ -479,6 +480,7 @@ async function createComment({ filePath, bookPath, baseCommitSha, from, to, sele
     structure: anchorData.structure,
     authorEmail,
     authorName: authorName || authorEmail,
+    authorPhotoURL: authorPhotoURL || null,
     status: 'open',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedAt: null,
@@ -508,7 +510,7 @@ async function resolveComment(id, resolverEmail) {
 
 // --- Reply CRUD ---
 
-async function createReply({ parentId, parentType, filePath, text, authorEmail, authorName }) {
+async function createReply({ parentId, parentType, filePath, text, authorEmail, authorName, authorPhotoURL }) {
   const ref = await repliesCollection().add({
     parentId,
     parentType,
@@ -516,6 +518,7 @@ async function createReply({ parentId, parentType, filePath, text, authorEmail, 
     text,
     authorEmail,
     authorName: authorName || authorEmail,
+    authorPhotoURL: authorPhotoURL || null,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return ref.id;

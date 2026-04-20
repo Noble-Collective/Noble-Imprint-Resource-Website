@@ -270,14 +270,11 @@ function renderAllCards() {
         return s.id === hunk.id;
       });
       var authorName = loaded ? (loaded.authorName || loaded.authorEmail || (userData ? (userData.displayName || userData.email) : 'Unknown')) : (userData ? (userData.displayName || userData.email) : 'Unknown');
-      var authorPhoto = loaded ? null : (userData ? userData.photoURL : null);
-      var authorInitial = (authorName || '?')[0].toUpperCase();
       var isAuthor = loaded ? (loaded.authorEmail === userEmail) : true;
       var hunkTime = loaded && loaded.createdAt ? new Date(loaded.createdAt._seconds ? loaded.createdAt._seconds * 1000 : loaded.createdAt) : now;
-
-      var authorEmail = loaded ? (loaded.authorEmail || '') : (userData ? userData.email : '');
+      var authorEmailStr = loaded ? (loaded.authorEmail || '') : (userData ? userData.email : '');
       var authorPhotoURL = loaded ? (loaded.photoURL || loaded.authorPhotoURL || null) : (userData ? userData.photoURL : null);
-      var avatarHtml = renderAvatar(authorName, authorEmail, authorPhotoURL, false);
+      var avatarHtml = renderAvatar(authorName, authorEmailStr, authorPhotoURL, false);
 
       var actionsHtml = '';
       if (canAccept) {
