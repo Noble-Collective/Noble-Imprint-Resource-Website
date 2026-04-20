@@ -421,6 +421,8 @@ if (data) {
         if (fresh.sha) {
           data.contentSha = fresh.sha;
           fileStale = false;
+          const banner = document.getElementById('editor-stale-banner');
+          if (banner) banner.style.display = 'none';
         }
       }
 
@@ -479,7 +481,7 @@ if (data) {
 
   // Fast poll: Firestore-only activity check + presence display (every 10s)
   async function pollForNewSuggestions() {
-    if (!data.sessionFilePath || fileStale) return;
+    if (!data.sessionFilePath) return;
     try {
       const res = await fetch('/api/suggestions/suggestion-count?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (res.ok) {
