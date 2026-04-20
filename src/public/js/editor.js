@@ -366,12 +366,23 @@ if (data) {
       const fresh = await res.json();
       const freshSuggestions = fresh.pendingSuggestions || [];
 
-      // Find suggestions not already in the registry
+      // Check if anything changed: new suggestions, removed suggestions, or new comments
       const registry = editorView.state.field(annotationRegistry);
+      const freshIds = new Set(freshSuggestions.map(s => s.id));
       const newSuggestions = freshSuggestions.filter(s => !registry.has(s.id));
-      if (newSuggestions.length === 0) return;
+      const removedSuggestions = [];
+      for (const [id, a] of registry) {
+        if (a.kind === 'suggestion' && a.loadedFromServer && !freshIds.has(id)) removedSuggestions.push(id);
+      }
+      const freshCommentIds = new Set((fresh.pendingComments || []).map(c => c.id));
+      const newComments = (fresh.pendingComments || []).filter(c => !registry.has(c.id));
+      const removedComments = [];
+      for (const [id, a] of registry) {
+        if (a.kind === 'comment' && a.loadedFromServer && !freshCommentIds.has(id)) removedComments.push(id);
+      }
+      if (newSuggestions.length === 0 && removedSuggestions.length === 0 && newComments.length === 0 && removedComments.length === 0) return;
 
-      console.log('[POLL] Auto-loading', newSuggestions.length, 'new suggestions from other users');
+      console.log('[POLL] Syncing:', newSuggestions.length, 'new +', removedSuggestions.length, 'removed suggestions,', newComments.length, 'new +', removedComments.length, 'removed comments');
 
       // Rebuild working doc with ALL suggestions (existing + new) and replace editor
       const currentOriginal = editorView.state.field(originalDocField);
@@ -408,6 +419,9 @@ if (data) {
 
       if (newSuggestions.length > 0) {
         showToast(newSuggestions.length + ' new suggestion' + (newSuggestions.length > 1 ? 's' : '') + ' loaded', 'info');
+      }
+      if (newComments.length > 0) {
+        showToast(newComments.length + ' new comment' + (newComments.length > 1 ? 's' : '') + ' loaded', 'info');
       }
     } catch (err) {
       console.warn('[POLL] auto-load failed:', err.message);
@@ -456,10 +470,10 @@ if (data) {
       const res = await fetch('/api/suggestions/suggestion-count?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (res.ok) {
         const { count, replyCount, commentCount } = await res.json();
-        const hasNewActivity = count > lastKnownSuggestionCount
-          || replyCount > lastKnownReplyCount
-          || commentCount > lastKnownCommentCount;
-        if (hasNewActivity) {
+        const hasActivity = count !== lastKnownSuggestionCount
+          || replyCount !== lastKnownReplyCount
+          || commentCount !== lastKnownCommentCount;
+        if (hasActivity) {
           lastKnownSuggestionCount = count;
           lastKnownReplyCount = replyCount;
           lastKnownCommentCount = commentCount;

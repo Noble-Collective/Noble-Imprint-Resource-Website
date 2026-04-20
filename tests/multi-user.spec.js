@@ -635,6 +635,53 @@ test.describe('Poll for changes + stale banner', () => {
 
     } finally { await clearAll(); }
   });
+
+  test('discarded suggestions by another user are removed from editor', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    try {
+      // Create a suggestion via API (simulating another user)
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+      const words = content.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DISCARD_SYNC_TEST',
+        authorEmail: 'other@example.com', authorName: 'Other User',
+      });
+
+      // Steve opens the editor — should see the suggestion
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+      const cardCount = await page.evaluate(() =>
+        document.querySelectorAll('.margin-card--suggestion').length
+      );
+      expect(cardCount).toBeGreaterThanOrEqual(1);
+
+      // Other user discards the suggestion (delete from Firestore)
+      const admin = require('firebase-admin');
+      if (!admin.apps.length) admin.initializeApp();
+      await admin.firestore().collection('suggestions').doc(suggId).delete();
+
+      // Wait for polling to detect the decrease and auto-refresh (up to 15s)
+      await page.waitForTimeout(15000);
+      const afterCount = await page.evaluate(() =>
+        document.querySelectorAll('.margin-card--suggestion').length
+      );
+      expect(afterCount).toBe(cardCount - 1);
+
+    } finally { await clearAll(); }
+  });
 });
 
 // ============================================================
