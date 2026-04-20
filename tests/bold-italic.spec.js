@@ -193,4 +193,67 @@ test.describe('Bold/Italic creates single card', () => {
     // The bold formatting should produce exactly 1 suggestion card
     expect(suggCards).toBe(1);
   });
+
+  test('italicizing a word creates exactly 1 margin card after auto-save', async ({ page }) => {
+    await page.goto(BASE_URL + TEST_SESSION_PATH);
+    await login(page);
+    await page.click('#btn-suggest-edit');
+    await page.waitForSelector('#codemirror-host .cm-editor');
+    await page.waitForTimeout(500);
+
+    // Select TWO adjacent words (includes a space) — this is the key scenario.
+    // Single-word italic merges into 1 replacement hunk via computeHunks' word-gap merge.
+    // Multi-word italic keeps 2 separate insertion hunks because the space breaks the merge.
+    const phrase = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 30) continue;
+        const m = line.match(/\b([a-zA-Z]{5,10} [a-zA-Z]{5,10})\b/);
+        if (m && doc.indexOf(m[1]) === doc.lastIndexOf(m[1])) return m[1];
+      }
+      return null;
+    });
+    expect(phrase).toBeTruthy();
+    console.log('Italicizing phrase:', phrase);
+
+    await page.evaluate((p) => {
+      const view = window.__editorView;
+      const pos = view.state.doc.toString().indexOf(p);
+      view.dispatch({ selection: { anchor: pos, head: pos + p.length }, scrollIntoView: true });
+    }, phrase);
+    await page.waitForTimeout(300);
+
+    // Click the Italic button
+    const italicBtn = page.locator('.comment-tooltip-italic');
+    await expect(italicBtn).toBeVisible({ timeout: 3000 });
+    await italicBtn.click();
+    await page.waitForTimeout(500);
+
+    // Verify italic was applied
+    const applied = await page.evaluate((p) => {
+      return window.__editorView.state.doc.toString().includes('_' + p + '_');
+    }, phrase);
+    expect(applied).toBe(true);
+
+    // Wait for auto-save to complete, then check BEFORE the 10s poll can fix it.
+    // The bug: after auto-save promotes hunks to registry, buildMarginHunks doesn't
+    // include linkedGroup, so the 2 insertion hunks render as 2 separate cards until
+    // the poll fires and updates loadedSuggestions with server data containing linkedGroup.
+    try {
+      await page.waitForFunction(
+        () => document.getElementById('editor-save-status')?.textContent === 'Saved',
+        { timeout: 8000 }
+      );
+    } catch { await page.waitForTimeout(5000); }
+    await page.waitForTimeout(500); // small buffer after save, but before poll fixes it
+
+    const suggCards = await page.locator('.margin-card--suggestion').count();
+    const cardTexts = await page.evaluate(() =>
+      [...document.querySelectorAll('.margin-card--suggestion .margin-card-body')].map(el => el.textContent.trim())
+    );
+    console.log('Italic cards:', suggCards, 'texts:', JSON.stringify(cardTexts));
+
+    // Italic formatting should produce exactly 1 suggestion card, not 2
+    expect(suggCards).toBe(1);
+  });
 });

@@ -1241,6 +1241,8 @@ if (data) {
           currentFrom: a.currentFrom,
           currentTo: a.currentTo,
           currentPos: a.currentFrom, // for deletions
+          linkedGroup: a.linkedGroup || null,
+          linkedLabel: a.linkedLabel || '',
         });
       }
       // Merge: registry hunks first (sorted by position), then draft hunks
