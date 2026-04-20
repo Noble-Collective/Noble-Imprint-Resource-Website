@@ -380,39 +380,44 @@ if (data) {
       for (const [id, a] of registry) {
         if (a.kind === 'comment' && a.loadedFromServer && !freshCommentIds.has(id)) removedComments.push(id);
       }
-      if (newSuggestions.length === 0 && removedSuggestions.length === 0 && newComments.length === 0 && removedComments.length === 0) return;
+      const freshReplies = fresh.pendingReplies || [];
+      const hasReplyChanges = freshReplies.length !== (data.pendingReplies || []).length;
+      const hasSuggestionChanges = newSuggestions.length > 0 || removedSuggestions.length > 0;
+      const hasCommentChanges = newComments.length > 0 || removedComments.length > 0;
 
-      console.log('[POLL] Syncing:', newSuggestions.length, 'new +', removedSuggestions.length, 'removed suggestions,', newComments.length, 'new +', removedComments.length, 'removed comments');
+      if (!hasSuggestionChanges && !hasCommentChanges && !hasReplyChanges) return;
 
-      // Rebuild working doc with ALL suggestions (existing + new) and replace editor
-      const currentOriginal = editorView.state.field(originalDocField);
-      const allSuggestions = freshSuggestions.filter(s => !s.resolvedStale);
-      const newWorkingDoc = buildWorkingDoc(currentOriginal, allSuggestions);
-      const existingComments = fresh.pendingComments || [];
-      const registryEntries = buildShiftedRegistryEntries(allSuggestions, existingComments, newWorkingDoc);
+      console.log('[POLL] Syncing:', newSuggestions.length, 'new +', removedSuggestions.length, 'removed suggestions,', newComments.length, 'new +', removedComments.length, 'removed comments, replies changed:', hasReplyChanges);
 
-      // Clear zones, replace document + registry atomically, restore zones
-      editorView.dispatch({ effects: setZones.of([]) });
-      editorView.dispatch({
-        changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
-        effects: [setOriginal.of(currentOriginal), setAnnotations.of(registryEntries)],
-        annotations: isRevert.of(true),
-      });
+      // Only rebuild the document if suggestions or comments changed
+      if (hasSuggestionChanges || hasCommentChanges) {
+        const currentOriginal = editorView.state.field(originalDocField);
+        const allSuggestions = freshSuggestions.filter(s => !s.resolvedStale);
+        const newWorkingDoc = buildWorkingDoc(currentOriginal, allSuggestions);
+        const existingComments = fresh.pendingComments || [];
+        const registryEntries = buildShiftedRegistryEntries(allSuggestions, existingComments, newWorkingDoc);
 
-      // Rebuild savedHunks for the new suggestions
-      for (const s of allSuggestions) {
-        if (s.resolvedStale) continue;
-        const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
-        const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
-        savedHunks.set(from + ':' + to, s.id);
+        editorView.dispatch({ effects: setZones.of([]) });
+        editorView.dispatch({
+          changes: { from: 0, to: editorView.state.doc.length, insert: newWorkingDoc },
+          effects: [setOriginal.of(currentOriginal), setAnnotations.of(registryEntries)],
+          annotations: isRevert.of(true),
+        });
+
+        savedHunks.clear();
+        for (const s of freshSuggestions.filter(s => !s.resolvedStale)) {
+          const from = s.resolvedFrom != null ? s.resolvedFrom : s.originalFrom;
+          const to = s.type === 'insertion' ? from : from + (s.originalText || '').length;
+          savedHunks.set(from + ':' + to, s.id);
+        }
+
+        const zones = recomputeZones(editorView.state.doc);
+        editorView.dispatch({ effects: setZones.of(zones) });
       }
 
-      const zones = recomputeZones(editorView.state.doc);
-      editorView.dispatch({ effects: setZones.of(zones) });
-
       data.pendingSuggestions = freshSuggestions;
-      data.pendingComments = existingComments;
-      data.pendingReplies = fresh.pendingReplies || [];
+      data.pendingComments = fresh.pendingComments || [];
+      data.pendingReplies = freshReplies;
 
       // Update reply cards
       updateReplies(data.pendingReplies);
@@ -1084,6 +1089,7 @@ if (data) {
         originalFrom: s.originalFrom, originalTo: s.originalTo,
         currentFrom: curFrom, currentTo: curTo,
         authorEmail: s.authorEmail, authorName: s.authorName,
+        authorPhotoURL: s.authorPhotoURL || null,
         firestoreId: s.id, loadedFromServer: true,
       });
 
@@ -1152,6 +1158,7 @@ if (data) {
         currentFrom: curFrom, currentTo: curTo,
         originalFrom: from, originalTo: to,
         authorEmail: c.authorEmail, authorName: c.authorName,
+        authorPhotoURL: c.authorPhotoURL || null,
         firestoreId: c.id, loadedFromServer: true,
       });
     }
