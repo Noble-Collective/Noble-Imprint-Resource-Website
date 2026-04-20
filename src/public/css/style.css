@@ -3418,6 +3418,13 @@ body.drawer-open {
   flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.margin-card-saving {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #999;
+}
 .margin-card-status--loading { color: #666; }
 .margin-card-status--success { color: #27ae60; font-weight: 600; }
 .margin-card-status--stale { color: #b8941f; }
