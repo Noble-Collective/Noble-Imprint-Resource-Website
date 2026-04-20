@@ -32,13 +32,19 @@ router.get('/file-version', async (req, res) => {
   }
 });
 
-// --- Suggestion count only (Firestore only, no GitHub API) ---
+// --- Activity count (Firestore only, no GitHub API) ---
 router.get('/suggestion-count', async (req, res) => {
   try {
     const { filePath } = req.query;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
     const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
-    res.json({ count: pendingSuggestions.length });
+    const replies = await suggestions.getRepliesForFile(filePath);
+    const comments = await suggestions.getCommentsForFile(filePath);
+    res.json({
+      count: pendingSuggestions.length,
+      replyCount: replies.length,
+      commentCount: comments.length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

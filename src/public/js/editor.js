@@ -34,8 +34,10 @@ if (data) {
   let saveTimer = null;
   let saveFailCount = 0; // consecutive failures — show error after 2
   let fileStale = false;  // set when file-version check detects a SHA change
-  let pollingInterval = null; // 30s polling for file changes + presence heartbeat
+  let pollingInterval = null; // 10s polling for new suggestions
   let lastKnownSuggestionCount = (data.pendingSuggestions || []).length;
+  let lastKnownReplyCount = (data.pendingReplies || []).length;
+  let lastKnownCommentCount = (data.pendingComments || []).length;
 
   function hunkKey(hunk) {
     // Key by position in the ORIGINAL document — stable as the user types,
@@ -398,7 +400,14 @@ if (data) {
 
       data.pendingSuggestions = freshSuggestions;
       data.pendingComments = existingComments;
-      showToast(newSuggestions.length + ' new suggestion' + (newSuggestions.length > 1 ? 's' : '') + ' loaded', 'info');
+      data.pendingReplies = fresh.pendingReplies || [];
+
+      // Update reply cards
+      updateReplies(data.pendingReplies);
+
+      if (newSuggestions.length > 0) {
+        showToast(newSuggestions.length + ' new suggestion' + (newSuggestions.length > 1 ? 's' : '') + ' loaded', 'info');
+      }
     } catch (err) {
       console.warn('[POLL] auto-load failed:', err.message);
     }
@@ -439,15 +448,20 @@ if (data) {
     sendPresenceExit();
   }
 
-  // Fast poll: Firestore-only suggestion count check + presence display (every 10s)
+  // Fast poll: Firestore-only activity check + presence display (every 10s)
   async function pollForNewSuggestions() {
     if (!data.sessionFilePath || fileStale) return;
     try {
       const res = await fetch('/api/suggestions/suggestion-count?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (res.ok) {
-        const { count } = await res.json();
-        if (count > lastKnownSuggestionCount) {
+        const { count, replyCount, commentCount } = await res.json();
+        const hasNewActivity = count > lastKnownSuggestionCount
+          || replyCount > lastKnownReplyCount
+          || commentCount > lastKnownCommentCount;
+        if (hasNewActivity) {
           lastKnownSuggestionCount = count;
+          lastKnownReplyCount = replyCount;
+          lastKnownCommentCount = commentCount;
           await autoLoadNewSuggestions();
         }
       }
