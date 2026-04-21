@@ -81,6 +81,11 @@ const selectionListener = EditorView.updateListener.of((update) => {
     hideCommentTooltip();
     return;
   }
+  // Don't show tooltip when search input is focused (search highlights text)
+  if (document.activeElement?.id === 'editor-search-input') {
+    hideCommentTooltip();
+    return;
+  }
   const coords = update.view.coordsAtPos(sel.head);
   if (coords) {
     showCommentTooltip(coords.left, coords.top);
