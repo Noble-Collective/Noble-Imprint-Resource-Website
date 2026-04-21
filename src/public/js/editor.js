@@ -1702,6 +1702,10 @@ if (data) {
   searchInput?.addEventListener('input', () => { lastSearchPos = 0; });
   document.getElementById('btn-search-next')?.addEventListener('click', () => searchInEditor('next'));
   document.getElementById('btn-search-prev')?.addEventListener('click', () => searchInEditor('prev'));
+  document.getElementById('btn-search-clear')?.addEventListener('click', () => {
+    if (searchInput) { searchInput.value = ''; lastSearchPos = 0; }
+    if (editorView) { editorView.dispatch({ selection: { anchor: editorView.state.selection.main.head } }); editorView.focus(); }
+  });
   // Intercept Ctrl+F to focus toolbar search instead of CM6's panel
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'f' && searchInput && editorView) {
