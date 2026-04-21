@@ -1623,6 +1623,32 @@ if (data) {
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
+
+  // Navigate between suggestion/comment cards
+  let currentCardIndex = -1;
+  function navigateCards(direction) {
+    if (!editorView) return;
+    const registry = editorView.state.field(annotationRegistry);
+    const positions = [];
+    for (const [id, a] of registry) {
+      if (a.currentFrom != null) positions.push({ id, pos: a.currentFrom, kind: a.kind });
+    }
+    positions.sort((a, b) => a.pos - b.pos);
+    if (positions.length === 0) return;
+
+    // Find the next/prev relative to current scroll position
+    if (direction === 'next') {
+      currentCardIndex = (currentCardIndex + 1) % positions.length;
+    } else {
+      currentCardIndex = currentCardIndex <= 0 ? positions.length - 1 : currentCardIndex - 1;
+    }
+    const target = positions[currentCardIndex];
+    editorView.dispatch({ selection: { anchor: target.pos }, scrollIntoView: true });
+    // Focus the margin card
+    focusMarginCard(target.kind === 'comment' ? 'comment' : 'hunk', target.id);
+  }
+  document.getElementById('btn-prev-card')?.addEventListener('click', () => navigateCards('prev'));
+  document.getElementById('btn-next-card')?.addEventListener('click', () => navigateCards('next'));
   document.getElementById('chk-line-numbers')?.addEventListener('change', (e) => {
     if (editorView) {
       const gutters = editorView.dom.querySelector('.cm-gutters');

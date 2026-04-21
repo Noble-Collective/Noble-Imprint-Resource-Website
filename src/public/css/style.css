@@ -3186,6 +3186,18 @@ body.drawer-open {
   align-items: center;
   gap: 8px;
 }
+.edit-btn--nav {
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1;
+  min-width: 0;
+  border: 1px solid #ccc;
+  background: #f8f8f8;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #666;
+}
+.edit-btn--nav:hover { background: #e8e8e8; color: #333; }
 .edit-btn--source {
   font-family: 'DM Mono', 'Consolas', monospace;
   font-size: 12px;
@@ -3343,6 +3355,27 @@ body.drawer-open {
 }
 #codemirror-host .cm-editor {
   min-height: 400px;
+}
+
+/* Search panel: move to top, hide replace/all/regexp/by-word */
+#codemirror-host .cm-editor .cm-panels-bottom {
+  border-bottom: 1px solid #e0e0e0;
+  border-top: none;
+  order: -1;
+}
+#codemirror-host .cm-search br,
+#codemirror-host .cm-search input[name="replace"],
+#codemirror-host .cm-search button[name="replace"],
+#codemirror-host .cm-search button[name="replaceAll"],
+#codemirror-host .cm-search button[name="select"],
+#codemirror-host .cm-search label:has(input[name="re"]),
+#codemirror-host .cm-search label:has(input[name="word"]) {
+  display: none;
+}
+#codemirror-host .cm-search {
+  padding: 6px 10px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
 }
 
 /* Editor body: editor + margin panel side by side */
