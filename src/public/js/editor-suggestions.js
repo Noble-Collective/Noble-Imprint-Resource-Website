@@ -173,26 +173,30 @@ export function computeHunks(original, current) {
   }
 
   // Step 2: Merge nearby groups that are fragments of a single replacement.
-  // After Step 1, groups may still be split by gaps like "ing His " (8 chars) that
-  // are too long for Step 1 but are clearly part of one user edit. The telltale sign
-  // is that at least one group's origText starts or ends mid-word — it's a fragment
-  // from diffChars, not a complete intentional word edit. Genuine separate edits
-  // (e.g., changing "humility" and "growth" independently) produce groups whose
-  // origText falls on word boundaries — leave those separate.
-  // Skip pure insertions (empty origText) to preserve bold/italic marker pairs.
+  // After Step 1, groups may still be split by gaps like "ing His " (8 chars) or
+  // common words like "this " (5 chars) that are too long for the initial threshold.
+  // When a common word appears in BOTH the original and replacement text (e.g.,
+  // replacing "this crooked generation" with "uh hih this is a test"), diffChars
+  // finds "this " as unchanged and splits the edit into a pure insertion + replacement.
+  // Skip only when BOTH groups are pure insertions (bold/italic marker pairs).
+  // When one has origText and the other doesn't, merge — it's a split replacement.
+  // For two groups that both have origText, use word-boundary check: genuine separate
+  // edits produce groups at word boundaries; diffChars fragments don't.
   for (let i = groups.length - 1; i > 0; i--) {
     const prev = groups[i - 1];
     const curr = groups[i];
-    if (!prev.origText || !curr.origText) continue;
+    if (!prev.origText && !curr.origText) continue; // both pure insertions (bold markers)
     const origGap = curr.origFrom - prev.origTo;
     if (origGap < 0 || origGap > 50) continue;
-    // Check if either group is a fragment (not at word boundaries in original).
-    // A group at a word boundary has non-\w (or doc edge) before origFrom and after origTo.
-    const prevAtBoundary = (prev.origFrom === 0 || !/\w/.test(original[prev.origFrom - 1]))
-      && (prev.origTo >= original.length || !/\w/.test(original[prev.origTo]));
-    const currAtBoundary = (curr.origFrom === 0 || !/\w/.test(original[curr.origFrom - 1]))
-      && (curr.origTo >= original.length || !/\w/.test(original[curr.origTo]));
-    if (prevAtBoundary && currAtBoundary) continue; // both complete words — separate edits
+    // Word-boundary check: only when both groups have origText (replacements/deletions).
+    // If one is a pure insertion, it's always a split fragment — merge unconditionally.
+    if (prev.origText && curr.origText) {
+      const prevAtBoundary = (prev.origFrom === 0 || !/\w/.test(original[prev.origFrom - 1]))
+        && (prev.origTo >= original.length || !/\w/.test(original[prev.origTo]));
+      const currAtBoundary = (curr.origFrom === 0 || !/\w/.test(original[curr.origFrom - 1]))
+        && (curr.origTo >= original.length || !/\w/.test(original[curr.origTo]));
+      if (prevAtBoundary && currAtBoundary) continue; // both complete words — separate edits
+    }
     const origGapText = original.substring(prev.origTo, curr.origFrom);
     const currGapText = current.substring(prev.currTo, curr.currFrom);
     prev.origText += origGapText + curr.origText;
