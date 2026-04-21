@@ -1684,7 +1684,22 @@ if (data) {
         selection: { anchor: pos, head: pos + query.length },
         effects: EditorView.scrollIntoView(pos, { y: 'center' }),
       });
-      setTimeout(() => searchInput.focus(), 50);
+      // Remove old highlight, add persistent one at match position
+      document.querySelectorAll('.search-highlight-active').forEach(el => el.remove());
+      setTimeout(() => {
+        const coords = editorView.coordsAtPos(pos);
+        const endCoords = editorView.coordsAtPos(pos + query.length);
+        if (coords && endCoords) {
+          const hl = document.createElement('div');
+          hl.className = 'search-highlight-active';
+          const editorRect = editorView.dom.getBoundingClientRect();
+          hl.style.cssText = 'position:absolute;background:rgba(255,200,0,0.5);border-radius:2px;pointer-events:none;z-index:5;'
+            + 'left:' + (coords.left - editorRect.left) + 'px;top:' + (coords.top - editorRect.top + editorView.scrollDOM.scrollTop) + 'px;'
+            + 'width:' + (endCoords.right - coords.left) + 'px;height:' + (coords.bottom - coords.top) + 'px;';
+          editorView.dom.appendChild(hl);
+        }
+        searchInput.focus();
+      }, 60);
     }
     // Update match count
     updateSearchCount(query, pos);
@@ -1731,6 +1746,7 @@ if (data) {
     if (searchInput) { searchInput.value = ''; lastSearchPos = 0; }
     if (searchCount) searchCount.textContent = '';
     if (searchClear) searchClear.style.display = 'none';
+    document.querySelectorAll('.search-highlight-active').forEach(el => el.remove());
     if (editorView) { editorView.dispatch({ selection: { anchor: editorView.state.selection.main.head } }); editorView.focus(); }
   });
   // Intercept Ctrl+F to focus toolbar search instead of CM6's panel
