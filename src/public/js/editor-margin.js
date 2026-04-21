@@ -447,13 +447,34 @@ function renderAllCards() {
       if (!editorView) return;
       var hunkId = card.getAttribute('data-hunk-id');
       var commentId = card.getAttribute('data-comment-id');
-      var target = null;
-      if (hunkId) target = editorView.dom.querySelector('[data-hunk-id="' + hunkId + '"]');
-      if (commentId) target = editorView.dom.querySelector('[data-comment-id="' + commentId + '"]');
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        target.classList.add('cm-inline-pulse');
-        setTimeout(function() { target.classList.remove('cm-inline-pulse'); }, 700);
+      var id = hunkId || commentId;
+
+      // Use the registry position to scroll CM6 — DOM elements may not exist
+      // for content outside the virtualized viewport
+      var registry = window.__annotationRegistry ? editorView.state.field(window.__annotationRegistry) : null;
+      var entry = registry ? registry.get(id) : null;
+      if (entry && entry.currentFrom != null) {
+        editorView.dispatch({ effects: [], selection: { anchor: entry.currentFrom }, scrollIntoView: true });
+        // After CM6 scrolls, the inline element should now be rendered
+        setTimeout(function() {
+          var target = null;
+          if (hunkId) target = editorView.dom.querySelector('[data-hunk-id="' + hunkId + '"]');
+          if (commentId) target = editorView.dom.querySelector('[data-comment-id="' + commentId + '"]');
+          if (target) {
+            target.classList.add('cm-inline-pulse');
+            setTimeout(function() { target.classList.remove('cm-inline-pulse'); }, 700);
+          }
+        }, 100);
+      } else {
+        // Fallback: try DOM search directly (for draft hunks not in registry)
+        var target = null;
+        if (hunkId) target = editorView.dom.querySelector('[data-hunk-id="' + hunkId + '"]');
+        if (commentId) target = editorView.dom.querySelector('[data-comment-id="' + commentId + '"]');
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('cm-inline-pulse');
+          setTimeout(function() { target.classList.remove('cm-inline-pulse'); }, 700);
+        }
       }
     });
     card.style.cursor = 'pointer';
