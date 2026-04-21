@@ -8,6 +8,7 @@
       <button class="admin-tab admin-tab--active" data-admin-tab="users">Users</button>
       <button class="admin-tab" data-admin-tab="books">Books</button>
       <button class="admin-tab" data-admin-tab="reviews">Reviews<% if (typeof pendingSuggestionCount !== 'undefined' && pendingSuggestionCount > 0) { %> <span class="admin-tab-badge"><%= pendingSuggestionCount %></span><% } %></button>
+      <button class="admin-tab" data-admin-tab="diff-reports">Diff Reports</button>
     </div>
 
     <!-- ===== USERS TAB ===== -->
@@ -151,6 +152,36 @@
       <div id="reviews-list">
         <p class="text-muted">Loading...</p>
       </div>
+    </div>
+
+    <!-- ===== DIFF REPORTS PANEL ===== -->
+    <div class="admin-panel admin-panel--hidden" id="panel-diff-reports">
+      <p class="text-muted" style="margin-bottom:16px">Compare a book's content between two points in time.</p>
+      <div class="admin-diff-controls">
+        <div class="admin-diff-row">
+          <label class="admin-label">Book</label>
+          <select class="admin-select" id="diff-book-select">
+            <option value="">Select a book...</option>
+            <% books.forEach(function(book) { %>
+              <option value="<%= book.repoPath %>"><%= book.title %><%= book.seriesTitle ? ' (' + book.seriesTitle + ')' : '' %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="admin-diff-row">
+          <label class="admin-label">From (older)</label>
+          <select class="admin-select" id="diff-from-select" disabled>
+            <option value="">Select a tag...</option>
+          </select>
+        </div>
+        <div class="admin-diff-row">
+          <label class="admin-label">To (newer)</label>
+          <select class="admin-select" id="diff-to-select">
+            <option value="main">main (latest)</option>
+          </select>
+        </div>
+        <button class="admin-btn admin-btn--primary" id="diff-generate-btn" disabled>Generate Report</button>
+      </div>
+      <div id="diff-report-output"></div>
     </div>
 
     <!-- ===== MODALS ===== -->

@@ -2967,6 +2967,82 @@ body.drawer-open {
   padding: 0 5px;
   margin-left: 4px;
 }
+/* --- Diff Report --- */
+.admin-diff-controls {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.admin-diff-row { display: flex; flex-direction: column; gap: 4px; }
+.admin-diff-row .admin-select { min-width: 220px; }
+.admin-diff-file {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.admin-diff-file-header {
+  background: #f5f5f5;
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  user-select: none;
+}
+.admin-diff-file-header:hover { background: #ececec; }
+.admin-diff-file-body {
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.admin-diff-file-body--collapsed { display: none; }
+.admin-diff-chunk { padding: 4px 14px; }
+.admin-diff-chunk--equal { color: #666; }
+.admin-diff-chunk--added { background: #d4edda; color: #155724; }
+.admin-diff-chunk--removed { background: #f8d7da; color: #721c24; text-decoration: line-through; }
+.admin-diff-chunk--changed { background: #fff8e1; padding: 4px 14px; }
+.admin-diff-word--added { background: #a6f1b0; border-radius: 2px; padding: 0 1px; }
+.admin-diff-word--removed { background: #f5a5a5; border-radius: 2px; padding: 0 1px; text-decoration: line-through; }
+.admin-diff-context-toggle {
+  display: block;
+  padding: 6px 14px;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+  background: #fafafa;
+  border-top: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+.admin-diff-context-toggle:hover { background: #f0f0f0; color: #555; }
+.admin-badge--modified { background: #d1ecf1; color: #0c5460; }
+.admin-badge--added { background: #d4edda; color: #155724; }
+.admin-badge--removed { background: #f8d7da; color: #721c24; }
+.admin-diff-loading {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+}
+.admin-diff-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+.admin-diff-empty {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
 
 /* Review meta */
 .review-meta-grid {

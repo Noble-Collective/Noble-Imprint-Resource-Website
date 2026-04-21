@@ -435,4 +435,133 @@
       });
   }
 
+  // --- Diff Reports ---
+  var tagsLoaded = false;
+  var diffFromSelect = document.getElementById('diff-from-select');
+  var diffToSelect = document.getElementById('diff-to-select');
+  var diffBookSelect = document.getElementById('diff-book-select');
+  var diffGenerateBtn = document.getElementById('diff-generate-btn');
+  var diffOutput = document.getElementById('diff-report-output');
+
+  // Load tags when the tab is first shown
+  document.querySelector('[data-admin-tab="diff-reports"]')?.addEventListener('click', function () {
+    if (tagsLoaded) return;
+    tagsLoaded = true;
+    apiCall('GET', '/api/admin/tags').then(function (tags) {
+      diffFromSelect.innerHTML = '<option value="">Select a tag...</option>';
+      diffToSelect.innerHTML = '<option value="main">main (latest)</option>';
+      tags.forEach(function (t) {
+        diffFromSelect.innerHTML += '<option value="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + '</option>';
+        diffToSelect.innerHTML += '<option value="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + '</option>';
+      });
+      diffFromSelect.disabled = false;
+      updateDiffBtn();
+    }).catch(function () {
+      diffFromSelect.innerHTML = '<option value="">Failed to load tags</option>';
+    });
+  });
+
+  function updateDiffBtn() {
+    if (diffGenerateBtn) {
+      diffGenerateBtn.disabled = !diffBookSelect?.value || !diffFromSelect?.value;
+    }
+  }
+  diffBookSelect?.addEventListener('change', updateDiffBtn);
+  diffFromSelect?.addEventListener('change', updateDiffBtn);
+
+  diffGenerateBtn?.addEventListener('click', function () {
+    var bookPath = diffBookSelect.value;
+    var from = diffFromSelect.value;
+    var to = diffToSelect.value || 'main';
+    if (!bookPath || !from) return;
+
+    diffOutput.innerHTML = '<div class="admin-diff-loading"><span class="margin-card-spinner" style="width:18px;height:18px;display:inline-block"></span> Generating diff report...</div>';
+    diffGenerateBtn.disabled = true;
+
+    var url = '/api/admin/diff-report?bookPath=' + encodeURIComponent(bookPath) + '&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    apiCall('GET', url).then(function (report) {
+      diffGenerateBtn.disabled = false;
+      renderDiffReport(report);
+    }).catch(function (err) {
+      diffGenerateBtn.disabled = false;
+      diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed to generate report') + '</p>';
+    });
+  });
+
+  function renderDiffReport(report) {
+    if (!report.files || report.files.length === 0) {
+      diffOutput.innerHTML = '<div class="admin-diff-empty">No changes found between <strong>' + escapeHtml(report.from) + '</strong> and <strong>' + escapeHtml(report.to) + '</strong>.</div>';
+      return;
+    }
+
+    var html = '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
+
+    report.files.forEach(function (file, idx) {
+      var statusClass = 'admin-badge--' + file.status;
+      html += '<div class="admin-diff-file">';
+      html += '<div class="admin-diff-file-header" data-diff-toggle="' + idx + '">';
+      html += '<span>' + escapeHtml(file.displayName || file.filename) + '</span>';
+      html += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
+      html += '</div>';
+      html += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
+
+      file.chunks.forEach(function (chunk, ci) {
+        if (chunk.type === 'equal') {
+          var lines = chunk.text.split('\n');
+          if (lines.length > 7) {
+            // Show first 3 and last 3, collapse the rest
+            var first = lines.slice(0, 3).join('\n');
+            var last = lines.slice(-3).join('\n');
+            var hidden = lines.slice(3, -3).join('\n');
+            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(first) + '\n</div>';
+            html += '<div class="admin-diff-context-toggle" data-expand="ctx-' + idx + '-' + ci + '">... ' + (lines.length - 6) + ' unchanged lines ...</div>';
+            html += '<div class="admin-diff-chunk admin-diff-chunk--equal" id="ctx-' + idx + '-' + ci + '" style="display:none">' + escapeHtml(hidden) + '\n</div>';
+            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(last) + '</div>';
+          } else {
+            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(chunk.text) + '</div>';
+          }
+        } else if (chunk.type === 'added') {
+          html += '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+        } else if (chunk.type === 'removed') {
+          html += '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+        } else if (chunk.type === 'changed') {
+          html += '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+          chunk.words.forEach(function (w) {
+            if (w.type === 'added') {
+              html += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+            } else if (w.type === 'removed') {
+              html += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
+            } else {
+              html += escapeHtml(w.text);
+            }
+          });
+          html += '</div>';
+        }
+      });
+
+      html += '</div></div>';
+    });
+
+    diffOutput.innerHTML = html;
+
+    // Bind toggle listeners for collapsible file sections
+    diffOutput.querySelectorAll('[data-diff-toggle]').forEach(function (header) {
+      header.addEventListener('click', function () {
+        var body = document.getElementById('diff-body-' + header.getAttribute('data-diff-toggle'));
+        if (body) body.classList.toggle('admin-diff-file-body--collapsed');
+      });
+    });
+
+    // Bind expand listeners for collapsed context
+    diffOutput.querySelectorAll('[data-expand]').forEach(function (toggle) {
+      toggle.addEventListener('click', function () {
+        var target = document.getElementById(toggle.getAttribute('data-expand'));
+        if (target) {
+          target.style.display = '';
+          toggle.style.display = 'none';
+        }
+      });
+    });
+  }
+
 })();

@@ -71,6 +71,35 @@ async function getFileRaw(path) {
   return data;
 }
 
+async function getFileContentAtRef(path, ref) {
+  const { data } = await getOctokit().rest.repos.getContent({
+    owner: OWNER, repo: REPO, path, ref,
+  });
+  if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
+  const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return { content, sha: data.sha };
+}
+
+async function getDirectoryContentsAtRef(path, ref) {
+  const { data } = await getOctokit().rest.repos.getContent({
+    owner: OWNER, repo: REPO, path, ref,
+  });
+  if (!Array.isArray(data)) throw new Error(`Expected directory at ${path}`);
+  return data;
+}
+
+async function listTags() {
+  const cacheKey = 'repo-tags';
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  const { data } = await getOctokit().rest.repos.listTags({
+    owner: OWNER, repo: REPO, per_page: 100,
+  });
+  const tags = data.map(t => ({ name: t.name, sha: t.commit.sha }));
+  cache.set(cacheKey, tags, 5 * 60 * 1000);
+  return tags;
+}
+
 async function updateFileContent(filePath, content, sha, message) {
   await getOctokit().rest.repos.createOrUpdateFileContents({
     owner: OWNER,
@@ -83,4 +112,4 @@ async function updateFileContent(filePath, content, sha, message) {
   cache.del('file:' + filePath);
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, OWNER, REPO };
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, OWNER, REPO };

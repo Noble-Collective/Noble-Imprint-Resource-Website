@@ -185,4 +185,85 @@ api.put('/books/status', async (req, res) => {
   }
 });
 
+// List repo tags
+api.get('/tags', async (req, res) => {
+  try {
+    const tags = await github.listTags();
+    res.json(tags);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate diff report for a book between two refs
+api.get('/diff-report', async (req, res) => {
+  try {
+    const { bookPath, from, to } = req.query;
+    if (!bookPath || !from) return res.status(400).json({ error: 'bookPath and from are required' });
+    const toRef = to || 'main';
+    const sessionsPath = bookPath + '/sessions';
+    const Diff = require('diff');
+
+    // List sessions at both refs (detect added/removed files)
+    let fromFiles = [], toFiles = [];
+    try { fromFiles = (await github.getDirectoryContentsAtRef(sessionsPath, from)).filter(f => f.name.endsWith('.md')); } catch { /* dir may not exist at old ref */ }
+    try { toFiles = (await github.getDirectoryContentsAtRef(sessionsPath, toRef)).filter(f => f.name.endsWith('.md')); } catch { /* dir may not exist at new ref */ }
+
+    const allNames = [...new Set([...fromFiles.map(f => f.name), ...toFiles.map(f => f.name)])].sort();
+
+    // Fetch all files at both refs in parallel
+    const fetches = allNames.map(async (name) => {
+      const filePath = sessionsPath + '/' + name;
+      const inFrom = fromFiles.some(f => f.name === name);
+      const inTo = toFiles.some(f => f.name === name);
+      let oldContent = '', newContent = '';
+      try { if (inFrom) oldContent = (await github.getFileContentAtRef(filePath, from)).content; } catch { /* file may not exist */ }
+      try { if (inTo) newContent = (await github.getFileContentAtRef(filePath, toRef)).content; } catch { /* file may not exist */ }
+      return { name, oldContent, newContent, inFrom, inTo };
+    });
+    const fileResults = await Promise.all(fetches);
+
+    // Compute diffs
+    const files = [];
+    for (const { name, oldContent, newContent, inFrom, inTo } of fileResults) {
+      if (oldContent === newContent) continue; // skip unchanged
+
+      let status = 'modified';
+      if (!inFrom) status = 'added';
+      else if (!inTo) status = 'removed';
+
+      // Two-pass diff: lines first, then words within changed pairs
+      const lineDiffs = Diff.diffLines(oldContent, newContent);
+      const rawChunks = lineDiffs.map(part => ({
+        type: part.added ? 'added' : part.removed ? 'removed' : 'equal',
+        text: part.value,
+      }));
+
+      // Pair adjacent removed+added chunks into 'changed' with word-level detail
+      const chunks = [];
+      for (let i = 0; i < rawChunks.length; i++) {
+        if (rawChunks[i].type === 'removed' && i + 1 < rawChunks.length && rawChunks[i + 1].type === 'added') {
+          const wordDiffs = Diff.diffWords(rawChunks[i].text, rawChunks[i + 1].text);
+          chunks.push({
+            type: 'changed',
+            words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
+          });
+          i++; // skip the paired 'added'
+        } else {
+          chunks.push(rawChunks[i]);
+        }
+      }
+
+      // Derive display name from filename
+      const displayName = name.replace(/\.md$/, '').replace(/^\d+-/, '').replace(/([A-Z])/g, ' $1').trim();
+      files.push({ filename: name, displayName, status, chunks });
+    }
+
+    res.json({ bookPath, from, to: toRef, files });
+  } catch (err) {
+    console.error('Diff report error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = { page, api };
