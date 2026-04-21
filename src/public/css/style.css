@@ -3186,18 +3186,6 @@ body.drawer-open {
   align-items: center;
   gap: 8px;
 }
-.edit-btn--nav {
-  padding: 2px 8px;
-  font-size: 10px;
-  line-height: 1;
-  min-width: 0;
-  border: 1px solid #ccc;
-  background: #f8f8f8;
-  border-radius: 3px;
-  cursor: pointer;
-  color: #666;
-}
-.edit-btn--nav:hover { background: #e8e8e8; color: #333; }
 .edit-btn--source {
   font-family: 'DM Mono', 'Consolas', monospace;
   font-size: 12px;
@@ -3357,25 +3345,46 @@ body.drawer-open {
   min-height: 400px;
 }
 
-/* Search panel: move to top, hide replace/all/regexp/by-word */
-#codemirror-host .cm-editor .cm-panels-bottom {
-  border-bottom: 1px solid #e0e0e0;
-  border-top: none;
-  order: -1;
+/* Hide CM6's built-in search panel (we use our own in the toolbar) */
+#codemirror-host .cm-panels { display: none; }
+
+/* Toolbar search input */
+.editor-search-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
-#codemirror-host .cm-search br,
-#codemirror-host .cm-search input[name="replace"],
-#codemirror-host .cm-search button[name="replace"],
-#codemirror-host .cm-search button[name="replaceAll"],
-#codemirror-host .cm-search button[name="select"],
-#codemirror-host .cm-search label:has(input[name="re"]),
-#codemirror-host .cm-search label:has(input[name="word"]) {
-  display: none;
-}
-#codemirror-host .cm-search {
-  padding: 6px 10px;
+.editor-search-input {
+  width: 130px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
   font-family: var(--font-sans);
-  font-size: 0.85rem;
+  outline: none;
+}
+.editor-search-input:focus { border-color: #999; }
+.editor-search-input::placeholder { color: #aaa; }
+
+/* Toolbar tool buttons (search nav, prev/next card) */
+.edit-btn--tool {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #f8f8f8;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #555;
+  white-space: nowrap;
+}
+.edit-btn--tool:hover { background: #e8e8e8; color: #333; }
+
+/* Toolbar separator */
+.editor-toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: #ddd;
+  margin: 0 4px;
 }
 
 /* Editor body: editor + margin panel side by side */

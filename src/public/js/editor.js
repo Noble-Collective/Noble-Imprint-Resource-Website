@@ -1643,12 +1643,69 @@ if (data) {
       currentCardIndex = currentCardIndex <= 0 ? positions.length - 1 : currentCardIndex - 1;
     }
     const target = positions[currentCardIndex];
-    editorView.dispatch({ selection: { anchor: target.pos }, scrollIntoView: true });
-    // Focus the margin card
-    focusMarginCard(target.kind === 'comment' ? 'comment' : 'hunk', target.id);
+    editorView.dispatch({ selection: { anchor: target.pos } });
+    // Natural scroll: going next → text near top; going prev → text near bottom
+    const block = editorView.lineBlockAt(target.pos);
+    if (block) {
+      const scroller = editorView.scrollDOM;
+      const viewHeight = scroller.clientHeight;
+      const offset = direction === 'next' ? viewHeight * 0.2 : viewHeight * 0.65;
+      scroller.scrollTop = block.top - offset;
+    }
+    // Pulse the margin card after scroll settles
+    setTimeout(() => {
+      focusMarginCard(target.kind === 'comment' ? 'comment' : 'hunk', target.id);
+    }, 100);
   }
   document.getElementById('btn-prev-card')?.addEventListener('click', () => navigateCards('prev'));
   document.getElementById('btn-next-card')?.addEventListener('click', () => navigateCards('next'));
+
+  // Toolbar search: find text in the editor document
+  const searchInput = document.getElementById('editor-search-input');
+  let lastSearchPos = 0;
+  function searchInEditor(direction) {
+    if (!editorView || !searchInput) return;
+    const query = searchInput.value;
+    if (!query) return;
+    const doc = editorView.state.doc.toString();
+    const lower = doc.toLowerCase();
+    const q = query.toLowerCase();
+    let pos = -1;
+    if (direction === 'next') {
+      pos = lower.indexOf(q, lastSearchPos + q.length);
+      if (pos === -1) pos = lower.indexOf(q); // wrap to start
+    } else {
+      pos = lower.lastIndexOf(q, lastSearchPos - 1);
+      if (pos === -1) pos = lower.lastIndexOf(q); // wrap to end
+    }
+    if (pos >= 0) {
+      lastSearchPos = pos;
+      editorView.dispatch({ selection: { anchor: pos, head: pos + query.length }, scrollIntoView: true });
+    }
+  }
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchInEditor(e.shiftKey ? 'prev' : 'next');
+    }
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchInput.blur();
+      editorView?.focus();
+    }
+  });
+  searchInput?.addEventListener('input', () => { lastSearchPos = 0; });
+  document.getElementById('btn-search-next')?.addEventListener('click', () => searchInEditor('next'));
+  document.getElementById('btn-search-prev')?.addEventListener('click', () => searchInEditor('prev'));
+  // Intercept Ctrl+F to focus toolbar search instead of CM6's panel
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && searchInput && editorView) {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+
   document.getElementById('chk-line-numbers')?.addEventListener('change', (e) => {
     if (editorView) {
       const gutters = editorView.dom.querySelector('.cm-gutters');

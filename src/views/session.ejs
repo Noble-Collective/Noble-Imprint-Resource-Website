@@ -122,12 +122,19 @@
         </div>
         <div class="editor-presence" id="editor-presence"></div>
         <div class="editor-toolbar-right">
+          <div class="editor-search-group">
+            <input type="text" class="editor-search-input" id="editor-search-input" placeholder="Find..." title="Search text (Enter = next, Shift+Enter = previous)">
+            <button class="edit-btn edit-btn--tool" id="btn-search-prev" title="Previous match">&#9650;</button>
+            <button class="edit-btn edit-btn--tool" id="btn-search-next" title="Next match">&#9660;</button>
+          </div>
+          <div class="editor-toolbar-sep"></div>
+          <button class="edit-btn edit-btn--tool" id="btn-prev-card" title="Previous suggestion or comment">&#9664; Prev</button>
+          <button class="edit-btn edit-btn--tool" id="btn-next-card" title="Next suggestion or comment">Next &#9654;</button>
+          <div class="editor-toolbar-sep"></div>
           <label class="editor-toggle" title="Show line numbers">
             <input type="checkbox" id="chk-line-numbers" checked>
             <span>Lines</span>
           </label>
-          <button class="edit-btn edit-btn--nav" id="btn-prev-card" title="Previous suggestion or comment">&#9650;</button>
-          <button class="edit-btn edit-btn--nav" id="btn-next-card" title="Next suggestion or comment">&#9660;</button>
           <button class="edit-btn edit-btn--source" id="btn-view-source" title="Toggle raw markdown view">&lt;/&gt; Source</button>
           <button class="edit-btn edit-btn--primary" id="btn-editor-done">Done</button>
         </div>
