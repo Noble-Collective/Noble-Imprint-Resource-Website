@@ -87,6 +87,7 @@ Full real-time collaborative editing safety across 3 batches:
 - Registry entries: must include `resolvedFrom`/`resolvedTo` (for API suggestions with originalFrom:0), `linkedGroup`/`linkedLabel` (for italic/bold card merging)
 - autoLoadNewSuggestions: guarded by `isDiscarding`, `acceptingInProgress`, `autoLoadInProgress` to prevent race conditions
 - Draft filtering: positional containment check ensures API-submitted replacement fragments don't leak as ghost cards
+- Admin Console: Diff Reports tab compares book content between git refs (tags/branches) with word-level highlighting. Uses `getFileContentAtRef`, `getDirectoryContentsAtRef`, `listTags` in github.js. Endpoints: `GET /api/admin/tags`, `GET /api/admin/diff-report?bookPath=...&from=...&to=...`. ~13 GitHub API calls per report.
 
 ## What's Next
 
