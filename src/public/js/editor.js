@@ -1332,6 +1332,10 @@ if (data) {
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
       directEditButtonUpdater,
       gutterHider,
+      // Reposition margin cards when CM6 recalculates viewport heights (e.g., after scroll)
+      ...(isSuggestOrReview ? [EditorView.updateListener.of((update) => {
+        if (update.geometryChanged || update.viewportChanged) repositionCards();
+      })] : []),
     ];
 
     editorView = new EditorView({
@@ -1643,15 +1647,10 @@ if (data) {
       currentCardIndex = currentCardIndex <= 0 ? positions.length - 1 : currentCardIndex - 1;
     }
     const target = positions[currentCardIndex];
-    editorView.dispatch({ selection: { anchor: target.pos } });
-    // Natural scroll: going next → text near top; going prev → text near bottom
-    const block = editorView.lineBlockAt(target.pos);
-    if (block) {
-      const scroller = editorView.scrollDOM;
-      const viewHeight = scroller.clientHeight;
-      const offset = direction === 'next' ? viewHeight * 0.2 : viewHeight * 0.65;
-      scroller.scrollTop = block.top - offset;
-    }
+    editorView.dispatch({
+      selection: { anchor: target.pos },
+      effects: EditorView.scrollIntoView(target.pos, { y: 'center' }),
+    });
     // Pulse the margin card after scroll settles
     setTimeout(() => {
       focusMarginCard(target.kind === 'comment' ? 'comment' : 'hunk', target.id);
@@ -1687,6 +1686,8 @@ if (data) {
       });
       setTimeout(() => searchInput.focus(), 50);
     }
+    // Update match count
+    updateSearchCount(query, pos);
   }
   searchInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -1699,11 +1700,37 @@ if (data) {
       editorView?.focus();
     }
   });
-  searchInput?.addEventListener('input', () => { lastSearchPos = 0; });
+  const searchCount = document.getElementById('editor-search-count');
+  const searchClear = document.getElementById('btn-search-clear');
+  function updateSearchCount(query, currentPos) {
+    if (!searchCount || !editorView) return;
+    if (!query) { searchCount.textContent = ''; if (searchClear) searchClear.style.display = 'none'; return; }
+    if (searchClear) searchClear.style.display = '';
+    const doc = editorView.state.doc.toString().toLowerCase();
+    const q = query.toLowerCase();
+    let total = 0, currentIdx = 0, idx = 0;
+    while ((idx = doc.indexOf(q, idx)) >= 0) {
+      total++;
+      if (idx <= currentPos) currentIdx = total;
+      idx += q.length;
+    }
+    searchCount.textContent = total > 0 ? currentIdx + ' of ' + total : 'No results';
+  }
+  // Hide X and count initially
+  if (searchClear) searchClear.style.display = 'none';
+  searchInput?.addEventListener('input', () => {
+    lastSearchPos = 0;
+    if (!searchInput.value) {
+      if (searchCount) searchCount.textContent = '';
+      if (searchClear) searchClear.style.display = 'none';
+    }
+  });
   document.getElementById('btn-search-next')?.addEventListener('click', () => searchInEditor('next'));
   document.getElementById('btn-search-prev')?.addEventListener('click', () => searchInEditor('prev'));
   document.getElementById('btn-search-clear')?.addEventListener('click', () => {
     if (searchInput) { searchInput.value = ''; lastSearchPos = 0; }
+    if (searchCount) searchCount.textContent = '';
+    if (searchClear) searchClear.style.display = 'none';
     if (editorView) { editorView.dispatch({ selection: { anchor: editorView.state.selection.main.head } }); editorView.focus(); }
   });
   // Intercept Ctrl+F to focus toolbar search instead of CM6's panel

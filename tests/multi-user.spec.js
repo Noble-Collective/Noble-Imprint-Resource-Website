@@ -1620,3 +1620,82 @@ test.describe('Polling safety + coverage gaps', () => {
   });
 
 });
+
+// ============================================================
+// Card position drift after scroll
+// ============================================================
+
+test.describe('Card position accuracy', () => {
+  test('card near end of document aligns with text after scroll', async ({ page }) => {
+    test.setTimeout(60000);
+    await clearAll();
+    try {
+      // Create a suggestion near the end of the document
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find a unique word in the last 10% of the document
+      const startPos = Math.floor(content.length * 0.9);
+      const nearby = content.substring(startPos, content.length);
+      const words = nearby.match(/\b[a-zA-Z]{7,12}\b/g) || [];
+      let targetWord = null;
+      for (const w of words) { if (content.indexOf(w) === content.lastIndexOf(w)) { targetWord = w; break; } }
+      expect(targetWord).toBeTruthy();
+      const pos = content.indexOf(targetWord);
+
+      await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: pos, originalTo: pos + targetWord.length,
+        originalText: targetWord, newText: 'DRIFT_TEST',
+        contextBefore: content.substring(Math.max(0, pos - 50), pos),
+        contextAfter: content.substring(pos + targetWord.length, Math.min(content.length, pos + targetWord.length + 50)),
+        authorEmail: 'other@example.com', authorName: 'Other User',
+        fileContent: content,
+      });
+
+      await login(page);
+      await enterSuggest(page);
+      await page.waitForTimeout(2000);
+
+      // Scroll to the suggestion (near end of document)
+      await page.evaluate(() => {
+        const v = window.__editorView;
+        const reg = v.state.field(window.__annotationRegistry);
+        for (const [id, a] of reg) {
+          if (a.kind === 'suggestion') {
+            v.dispatch({
+              selection: { anchor: a.currentFrom },
+              effects: v.constructor.scrollIntoView(a.currentFrom, { y: 'center' }),
+            });
+            break;
+          }
+        }
+      });
+      // Wait for CM6 height recalculation + debounced reposition
+      await page.waitForTimeout(800);
+
+      // Check drift: card position vs line position
+      const drift = await page.evaluate(() => {
+        const v = window.__editorView;
+        const reg = v.state.field(window.__annotationRegistry);
+        for (const [id, a] of reg) {
+          if (a.kind !== 'suggestion') continue;
+          let lineTop = 0;
+          try { lineTop = v.lineBlockAt(a.currentFrom).top; } catch {}
+          const card = document.querySelector('.margin-card[data-hunk-id="' + id + '"]');
+          const cardTop = card ? parseFloat(card.style.top) || 0 : -1;
+          return Math.abs(Math.round(cardTop - lineTop));
+        }
+        return -1;
+      });
+      console.log('Drift after scroll to end:', drift + 'px');
+      // Card should be within 30px of the text (allows for resolveOverlaps adjustment)
+      expect(drift).toBeLessThan(30);
+
+    } finally { await clearAll(); }
+  });
+});

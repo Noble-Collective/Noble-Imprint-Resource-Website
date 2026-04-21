@@ -630,8 +630,12 @@ export function updateStaleCard(hunkId, updates) {
 }
 
 // Reposition cards on scroll or resize
+let repositionTimer = null;
 export function repositionCards() {
-  if (!editorView || !marginEl || currentHunks.length === 0) return;
-  console.log('[MARGIN] repositionCards triggered, currentHunks=' + currentHunks.length);
-  updateMarginCards(currentHunks);
+  if (!editorView || !marginEl || (currentHunks.length === 0 && currentComments.length === 0)) return;
+  // Debounce reposition to let CM6 finish height recalculations
+  clearTimeout(repositionTimer);
+  repositionTimer = setTimeout(() => {
+    renderAllCards();
+  }, 100);
 }

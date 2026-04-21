@@ -3348,6 +3348,11 @@ body.drawer-open {
 /* Hide CM6's built-in search panel (we use our own in the toolbar) */
 #codemirror-host .cm-panels { display: none; }
 
+/* Keep selection highlight visible when editor loses focus (search input focused) */
+#codemirror-host .cm-editor:not(.cm-focused) .cm-selectionBackground {
+  background: rgba(212, 170, 0, 0.35) !important;
+}
+
 /* Toolbar search input */
 .editor-search-group {
   display: flex;
@@ -3365,6 +3370,12 @@ body.drawer-open {
 }
 .editor-search-input:focus { border-color: #999; }
 .editor-search-input::placeholder { color: #aaa; }
+.editor-search-count {
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
+  min-width: 45px;
+}
 
 /* Toolbar tool buttons (search nav, prev/next card) */
 .edit-btn--tool {
