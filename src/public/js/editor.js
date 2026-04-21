@@ -1680,29 +1680,12 @@ if (data) {
     }
     if (pos >= 0) {
       lastSearchPos = pos;
-      editorView.dispatch({ selection: { anchor: pos, head: pos + query.length } });
-      // Scroll naturally: match near top when going next, near bottom when going prev
-      const block = editorView.lineBlockAt(pos);
-      if (block) {
-        const scroller = editorView.scrollDOM;
-        const viewHeight = scroller.clientHeight;
-        const offset = direction === 'next' ? viewHeight * 0.25 : viewHeight * 0.65;
-        scroller.scrollTop = block.top - offset;
-      }
-      // Brief pulse on the active match to make it obvious
-      setTimeout(() => {
-        const coords = editorView.coordsAtPos(pos);
-        if (coords) {
-          // Remove previous pulse
-          document.querySelectorAll('.search-pulse').forEach(el => el.remove());
-          const pulse = document.createElement('div');
-          pulse.className = 'search-pulse';
-          pulse.style.cssText = 'position:fixed;left:' + (coords.left - 2) + 'px;top:' + (coords.top - 2) + 'px;width:' + (query.length * 8 + 4) + 'px;height:22px;background:rgba(255,165,0,0.4);border-radius:3px;pointer-events:none;z-index:999;transition:opacity 1.5s;';
-          document.body.appendChild(pulse);
-          setTimeout(() => { pulse.style.opacity = '0'; }, 100);
-          setTimeout(() => pulse.remove(), 1600);
-        }
-      }, 50);
+      editorView.focus();
+      editorView.dispatch({
+        selection: { anchor: pos, head: pos + query.length },
+        effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+      });
+      setTimeout(() => searchInput.focus(), 50);
     }
   }
   searchInput?.addEventListener('keydown', (e) => {
