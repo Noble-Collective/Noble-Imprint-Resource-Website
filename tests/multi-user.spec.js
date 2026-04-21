@@ -1699,3 +1699,183 @@ test.describe('Card position accuracy', () => {
     } finally { await clearAll(); }
   });
 });
+
+// ============================================================
+// Accept precision: short common words must not misplace
+// ============================================================
+
+test.describe('Accept precision for short words', () => {
+  test('short word accept stays correct after prior accept triggers reanchor', async ({ page }) => {
+    test.setTimeout(120000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find "that" — appears many times
+      const word = 'that';
+      const allPositions = [];
+      let idx = 0;
+      while ((idx = content.indexOf(word, idx)) >= 0) { allPositions.push(idx); idx += word.length; }
+      expect(allPositions.length).toBeGreaterThan(5);
+
+      // Target: "that" in the MIDDLE of the document
+      const targetIdx = Math.floor(allPositions.length / 2);
+      const targetPos = allPositions[targetIdx];
+      const ctx = {
+        contextBefore: content.substring(Math.max(0, targetPos - 50), targetPos),
+        contextAfter: content.substring(targetPos + word.length, Math.min(content.length, targetPos + word.length + 50)),
+      };
+
+      // Create as insertion first, then update to replacement
+      // (simulates auto-save create → update when diff recomputes)
+      const shortWordId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'insertion',
+        originalFrom: targetPos, originalTo: targetPos,
+        originalText: '', newText: 'REPLACED-' + word,
+        ...ctx, authorEmail: 'other@example.com', authorName: 'Other User',
+      });
+      await suggestions.updateHunk(shortWordId, {
+        type: 'replacement',
+        originalFrom: targetPos, originalTo: targetPos + word.length,
+        originalText: word, newText: 'REPLACED-' + word, ...ctx,
+      });
+
+      // Create a DIFFERENT suggestion NEAR the target "that" — close enough
+      // that accepting it changes the text within the 80-char prefix/suffix
+      // This causes the reanchor prefix match to fail after the other accept
+      const nearbyText = content.substring(Math.max(0, targetPos - 40), targetPos);
+      const nearbyWords = nearbyText.match(/\b[a-zA-Z]{5,10}\b/g) || [];
+      let uniqueWord = null;
+      for (const w of nearbyWords) { if (content.indexOf(w) === content.lastIndexOf(w)) { uniqueWord = w; break; } }
+      // Fallback: use any unique word in the prefix zone
+      if (!uniqueWord) {
+        const prefixZone = content.substring(Math.max(0, targetPos - 80), targetPos);
+        const pWords = prefixZone.match(/\b[a-zA-Z]{5,12}\b/g) || [];
+        for (const w of pWords) { if (content.indexOf(w) === content.lastIndexOf(w)) { uniqueWord = w; break; } }
+      }
+      expect(uniqueWord).toBeTruthy();
+      const uPos = content.indexOf(uniqueWord);
+      const otherId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: uPos, originalTo: uPos + uniqueWord.length,
+        originalText: uniqueWord, newText: 'OTHERCHANGE',
+        contextBefore: content.substring(Math.max(0, uPos - 50), uPos),
+        contextAfter: content.substring(uPos + uniqueWord.length, Math.min(content.length, uPos + uniqueWord.length + 50)),
+        authorEmail: 'other@example.com', authorName: 'Other User',
+        fileContent: content,
+      });
+
+      // Accept the OTHER suggestion first — triggers reanchorAnnotations
+      await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      const otherAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${otherId}/accept`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      expect(otherAccept.ok()).toBeTruthy();
+
+      // Now accept the short-word suggestion (after reanchor ran)
+      await page.request.post(`${BASE_URL}/api/refresh`);
+      const shortAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${shortWordId}/accept`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (shortAccept.ok()) {
+        // Verify it was applied at the RIGHT position, not at the first "that"
+        cache.del('file:' + TEST_FILE);
+        const { content: afterContent } = await github.getFileContent(TEST_FILE);
+        const offset = 'OTHERCHANGE'.length - uniqueWord.length;
+        const adjTarget = uPos < targetPos ? targetPos + offset : targetPos;
+        const replacedAt = afterContent.indexOf('REPLACED-that');
+        const firstThat = afterContent.indexOf('that');
+        console.log('First "that":', firstThat, '| REPLACED-that at:', replacedAt, '| Expected near:', adjTarget);
+        // Must be near intended position, not at the first occurrence
+        expect(Math.abs(replacedAt - adjTarget)).toBeLessThan(30);
+      } else {
+        // Stale is acceptable — better than corrupting the wrong position
+        console.log('Accept returned stale (acceptable)');
+        expect(shortAccept.status()).toBe(409);
+      }
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+});
+
+test.describe('Accept safety for short words', () => {
+  test('accept returns stale instead of misplacing short common word', async ({ page }) => {
+    test.setTimeout(90000);
+    await clearAll();
+    await saveCleanFile();
+    try {
+      const suggestions = require('../src/server/suggestions');
+      const github = require('../src/server/github');
+      const cache = require('../src/server/cache');
+      cache.del('file:' + TEST_FILE);
+      const { content, sha } = await github.getFileContent(TEST_FILE);
+
+      // Find "that" in the middle of the document
+      const word = 'that';
+      const allPositions = [];
+      let idx = 0;
+      while ((idx = content.indexOf(word, idx)) >= 0) { allPositions.push(idx); idx += word.length; }
+      const targetPos = allPositions[Math.floor(allPositions.length / 2)];
+
+      // Create suggestion with CORRECT anchor data (full fileContent provided)
+      const suggId = await suggestions.createHunk({
+        filePath: TEST_FILE, bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
+        baseCommitSha: sha, type: 'replacement',
+        originalFrom: targetPos, originalTo: targetPos + word.length,
+        originalText: word, newText: 'MISPLACE-TEST',
+        contextBefore: content.substring(Math.max(0, targetPos - 50), targetPos),
+        contextAfter: content.substring(targetPos + word.length, Math.min(content.length, targetPos + word.length + 50)),
+        authorEmail: 'other@example.com', authorName: 'Other User',
+        fileContent: content,
+      });
+
+      // Now REWRITE the text around the target position via direct edit,
+      // destroying the context but keeping "that" elsewhere in the document
+      const before = content.substring(0, targetPos - 100);
+      const after = content.substring(targetPos + 100);
+      const mangled = before + 'COMPLETELY DIFFERENT CONTENT REPLACES THE ORIGINAL SECTION HERE' + after;
+      await github.updateFileContent(TEST_FILE, mangled, sha, 'Mangle context for test');
+
+      // Clear caches so accept sees the mangled file
+      await page.request.post(BASE_URL + '/api/refresh');
+      cache.del('file:' + TEST_FILE);
+
+      // Accept the suggestion — context is destroyed, "that" still exists elsewhere
+      await page.request.post(BASE_URL + '/api/auth/test-login', { data: { email: 'steve@noblecollective.org' } });
+      const acceptRes = await page.request.put(BASE_URL + '/api/suggestions/hunk/' + suggId + '/accept', {
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (acceptRes.ok()) {
+        // If it succeeded, it MUST be near the intended position
+        cache.del('file:' + TEST_FILE);
+        const { content: afterContent } = await github.getFileContent(TEST_FILE);
+        const placedAt = afterContent.indexOf('MISPLACE-TEST');
+        console.log('MISPLACE-TEST at:', placedAt, '| intended near:', targetPos);
+        // The replacement must be near the original target (within 200 chars
+        // to account for the mangling), NOT at some random first occurrence
+        expect(Math.abs(placedAt - targetPos)).toBeLessThan(200);
+      } else {
+        // Returning 409 stale is the CORRECT behavior — refuse rather than guess
+        console.log('Accept returned stale (correct behavior)');
+        expect(acceptRes.status()).toBe(409);
+      }
+
+    } finally {
+      await clearAll();
+      await restoreCleanFile();
+    }
+  });
+});

@@ -261,6 +261,13 @@ async function updateHunk(id, { originalFrom, originalTo, originalText, newText,
     contextBefore: contextBefore || '',
     contextAfter: contextAfter || '',
     type,
+    // Keep anchor data in sync — stale anchor.exact causes reanchorAnnotations
+    // to fail, which leads to misplaced accepts for short/common words
+    'anchor.exact': originalText || '',
+    'anchor.prefix': contextBefore || '',
+    'anchor.suffix': contextAfter || '',
+    'position.from': originalFrom,
+    'position.to': originalTo,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
@@ -392,9 +399,31 @@ async function acceptHunk(id, resolverEmail) {
       }
     }
 
-    // Strategy 4: Last resort — bare indexOf (only safe for long/unique text)
-    if (pos === -1) {
+    // Strategy 4: Last resort — only for long/unique text (>= 20 chars).
+    // For short common words like "that", "the", "to", bare indexOf finds
+    // the FIRST occurrence which is almost certainly wrong. Mark stale instead.
+    if (pos === -1 && hunk.originalText.length >= 20) {
       pos = currentContent.indexOf(hunk.originalText);
+    }
+
+    // Strategy 5: Short text with structural hint — find closest match to
+    // the expected position (percentOffset), but ONLY if there's exactly one
+    // plausible candidate near the expected position.
+    if (pos === -1 && hunk.originalText.length > 0 && hunk.originalText.length < 20) {
+      const expectedPos = hunk.originalFrom || 0;
+      const candidates = [];
+      let searchFrom = 0;
+      while (true) {
+        const found = currentContent.indexOf(hunk.originalText, searchFrom);
+        if (found === -1) break;
+        candidates.push(found);
+        searchFrom = found + 1;
+      }
+      // Only use if exactly 1 candidate is within 500 chars of expected position
+      const nearby = candidates.filter(c => Math.abs(c - expectedPos) < 500);
+      if (nearby.length === 1) {
+        pos = nearby[0];
+      }
     }
 
     if (pos === -1) {
