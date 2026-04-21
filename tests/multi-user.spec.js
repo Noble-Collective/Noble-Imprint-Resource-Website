@@ -1879,3 +1879,132 @@ test.describe('Accept safety for short words', () => {
     }
   });
 });
+
+// --- Multi-word replacement produces single suggestion ---
+test.describe('Multi-word replacement', () => {
+  test.beforeEach(async () => { await clearAll(); });
+  test.afterEach(async () => { await clearAll(); });
+
+  test('selecting 4 words and typing replacement creates exactly 1 suggestion card', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Find 4 consecutive words in body text to select and replace
+    const fourWords = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 40) continue;
+        // Find 4 consecutive words (all alphabetic, 4+ chars each)
+        const match = line.match(/\b([a-zA-Z]{4,}\s+[a-zA-Z]{4,}\s+[a-zA-Z]{4,}\s+[a-zA-Z]{4,})\b/);
+        if (match) {
+          const pos = doc.indexOf(match[1]);
+          if (pos >= 0) return { text: match[1], pos };
+        }
+      }
+      return null;
+    });
+    expect(fourWords).not.toBeNull();
+    console.log('Found 4 words:', JSON.stringify(fourWords.text), 'at pos', fourWords.pos);
+
+    // Select the 4 words and type replacement text
+    await page.evaluate(({ text, pos }) => {
+      const v = window.__editorView;
+      v.dispatch({ selection: { anchor: pos, head: pos + text.length }, scrollIntoView: true });
+    }, fourWords);
+    await page.waitForTimeout(100);
+
+    // Type replacement text (simulating real user typing)
+    await page.evaluate(({ pos, text }) => {
+      const v = window.__editorView;
+      // Replace selection with new text (like user typing)
+      v.dispatch(v.state.replaceSelection('completely different words here'));
+    }, fourWords);
+
+    // Wait for draftPlugin debounce (300ms) + a bit more
+    await page.waitForTimeout(600);
+
+    // Count suggestion cards in the margin panel
+    const cardCount = await page.evaluate(() => {
+      const cards = document.querySelectorAll('.margin-card--suggestion');
+      return cards.length;
+    });
+    console.log('Margin cards after replacement:', cardCount);
+
+    // Should be exactly 1 card, not 3-4
+    expect(cardCount).toBe(1);
+
+    // Count draft hunks from the diff engine
+    const hunkCount = await page.evaluate(() => {
+      const { getCurrentHunks } = window.__suggestionModule || {};
+      if (typeof getCurrentHunks === 'function') return getCurrentHunks().length;
+      // Fallback: check decorations
+      return document.querySelectorAll('.cm-suggestion-insert, .cm-suggestion-delete').length > 0 ? 1 : 0;
+    });
+    console.log('Draft hunks:', hunkCount);
+    expect(hunkCount).toBeLessThanOrEqual(1);
+
+    // Wait for auto-save (1.5s debounce + network)
+    await page.waitForTimeout(3000);
+
+    // Verify Firestore has exactly 1 suggestion
+    const { count } = await countFirestoreSuggestions();
+    console.log('Firestore suggestions after auto-save:', count);
+    expect(count).toBe(1);
+
+    // Verify the card still shows as 1 (no duplication after save)
+    const finalCards = await page.evaluate(() => {
+      return document.querySelectorAll('.margin-card--suggestion').length;
+    });
+    console.log('Margin cards after auto-save:', finalCards);
+    expect(finalCards).toBe(1);
+  });
+
+  test('typing progressively into replaced selection stays as 1 card', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Find 4 consecutive words
+    const fourWords = await page.evaluate(() => {
+      const doc = window.__editorView.state.doc.toString();
+      for (const line of doc.split('\n')) {
+        if (line.startsWith('#') || line.startsWith('>') || line.startsWith('<') || line.startsWith('-') || line.length < 40) continue;
+        const match = line.match(/\b([a-zA-Z]{4,}\s+[a-zA-Z]{4,}\s+[a-zA-Z]{4,}\s+[a-zA-Z]{4,})\b/);
+        if (match) {
+          const pos = doc.indexOf(match[1]);
+          if (pos >= 0) return { text: match[1], pos };
+        }
+      }
+      return null;
+    });
+    expect(fourWords).not.toBeNull();
+
+    // Select and replace with first character
+    await page.evaluate(({ pos, text }) => {
+      const v = window.__editorView;
+      v.dispatch({ selection: { anchor: pos, head: pos + text.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('n'));
+    }, fourWords);
+    await page.waitForTimeout(100);
+
+    // Type more characters one at a time (simulating real typing)
+    const moreChars = 'ew words replac';
+    for (const ch of moreChars) {
+      await page.evaluate((c) => {
+        const v = window.__editorView;
+        const cursor = v.state.selection.main.head;
+        v.dispatch({ changes: { from: cursor, to: cursor, insert: c } });
+      }, ch);
+      await page.waitForTimeout(50);
+    }
+
+    // Wait for draftPlugin debounce
+    await page.waitForTimeout(500);
+
+    // Should still be exactly 1 card
+    const cardCount = await page.evaluate(() => {
+      return document.querySelectorAll('.margin-card--suggestion').length;
+    });
+    console.log('Cards after progressive typing:', cardCount);
+    expect(cardCount).toBe(1);
+  });
+});

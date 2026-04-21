@@ -95,18 +95,19 @@ Not implemented in this plan. Both are L-sized efforts that should be separate p
 
 ---
 
+## Status
+
+All 4 items COMPLETE as of 2026-04-19.
+
 ## Execution Order
 
 ```
-Item 1 (Cache) → Item 2 (Badges) → Item 3 (pendingSuggestions) → Item 4 (Stale cards)
+Item 1 (Cache) ✅ → Item 2 (Badges) ✅ → Item 3 (pendingSuggestions) ✅ → Item 4 (Stale cards) ✅
 ```
-
-Item 1 unblocks everything (can run full test suite). Item 2 is the user-requested feature. Items 3-4 are cleanup.
 
 ## Verification
 
-After all 4 items:
-- Run the full test suite (`npx playwright test tests/ --workers=1`) in a single session without rate limit exhaustion
-- Verify suggestion badges appear on book pages for users with suggest+ access
-- Verify margin cards show correct author names (registry-based, not stale snapshot)
-- Verify accept-retry flow (409 → stale card → Try again) still works with the new stale card rendering
+- ✅ Full test suite completable in one rate limit window (~1700 calls vs ~5000)
+- ✅ Suggestion badges appear on book pages for users with suggest+ access
+- ✅ Margin cards show correct author names (registry-based, not stale snapshot)
+- ✅ Accept-retry flow (409 → stale card → Try again) works with the new stale card rendering

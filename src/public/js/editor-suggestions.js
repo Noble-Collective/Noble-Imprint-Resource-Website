@@ -121,7 +121,11 @@ export function computeHunks(original, current) {
 
   for (const seg of segments) {
     if (seg.type === 'same') {
-      if (currentGroup && seg.value.length < MERGE_THRESHOLD && /^\w+$/.test(seg.value)) {
+      // Absorb short same segments (< 4 chars) into the current group regardless
+      // of content. diffChars produces 1-3 char common subsequences (including spaces)
+      // when splitting multi-word replacements. Previously this required /^\w+$/ which
+      // rejected gaps with spaces, causing single replacements to split into 4+ hunks.
+      if (currentGroup && seg.value.length < MERGE_THRESHOLD) {
         currentGroup.origText += seg.value;
         currentGroup.newText += seg.value;
         currentGroup.origTo += seg.value.length;
@@ -147,11 +151,13 @@ export function computeHunks(original, current) {
   if (currentGroup) groups.push(currentGroup);
 
   // Post-process: fix diffChars character-level artifacts.
-  // diffChars splits single word replacements into fragments when the original
-  // and replacement share characters (e.g., "complete"→"compete" becomes
-  // delete "l" instead of replace "complete"→"compete").
+  // diffChars operates at the character level and finds common subsequences
+  // within multi-word replacements, splitting a single user edit into multiple
+  // fragments. For example, replacing "disciplines that govern our" with
+  // "practices which guide my" produces 4 separate change groups because
+  // individual characters like 'e', 's', ' ' match between old and new text.
 
-  // Step 1: Merge adjacent groups separated by word-internal gaps.
+  // Step 1: Merge adjacent groups separated by word-internal gaps (≤30 chars, all \w).
   for (let i = groups.length - 1; i > 0; i--) {
     const prev = groups[i - 1];
     const curr = groups[i];
@@ -166,23 +172,71 @@ export function computeHunks(original, current) {
     }
   }
 
-  // Step 2: Extend groups to word boundaries. When a group ends mid-word,
-  // the trailing shared characters were absorbed into the unchanged suffix
-  // by diffChars. Extend forward to include the rest of the word in both
-  // original and current documents. Skip pure insertions (empty origText)
-  // — they don't have original text to extend.
+  // Step 2: Merge nearby groups that are fragments of a single replacement.
+  // After Step 1, groups may still be split by gaps like "ing His " (8 chars) that
+  // are too long for Step 1 but are clearly part of one user edit. The telltale sign
+  // is that at least one group's origText starts or ends mid-word — it's a fragment
+  // from diffChars, not a complete intentional word edit. Genuine separate edits
+  // (e.g., changing "humility" and "growth" independently) produce groups whose
+  // origText falls on word boundaries — leave those separate.
+  // Skip pure insertions (empty origText) to preserve bold/italic marker pairs.
+  for (let i = groups.length - 1; i > 0; i--) {
+    const prev = groups[i - 1];
+    const curr = groups[i];
+    if (!prev.origText || !curr.origText) continue;
+    const origGap = curr.origFrom - prev.origTo;
+    if (origGap < 0 || origGap > 50) continue;
+    // Check if either group is a fragment (not at word boundaries in original).
+    // A group at a word boundary has non-\w (or doc edge) before origFrom and after origTo.
+    const prevAtBoundary = (prev.origFrom === 0 || !/\w/.test(original[prev.origFrom - 1]))
+      && (prev.origTo >= original.length || !/\w/.test(original[prev.origTo]));
+    const currAtBoundary = (curr.origFrom === 0 || !/\w/.test(original[curr.origFrom - 1]))
+      && (curr.origTo >= original.length || !/\w/.test(original[curr.origTo]));
+    if (prevAtBoundary && currAtBoundary) continue; // both complete words — separate edits
+    const origGapText = original.substring(prev.origTo, curr.origFrom);
+    const currGapText = current.substring(prev.currTo, curr.currFrom);
+    prev.origText += origGapText + curr.origText;
+    prev.origTo = curr.origTo;
+    prev.newText += currGapText + curr.newText;
+    prev.currTo = curr.currTo;
+    groups.splice(i, 1);
+  }
+
+  // Step 3: Extend groups to word boundaries. diffChars may split a word at a
+  // character boundary (e.g., "placing" matched as "p" + "lacing"). Extend
+  // forward when the group ends mid-word, and backward when it starts mid-word,
+  // so the group covers full words in both original and current documents.
+  // Skip pure insertions (empty origText) — they don't have original text to extend.
   for (const g of groups) {
-    if (!g.origText && !g.newText) continue; // empty group
-    if (!g.origText) continue; // pure insertion — no word boundary to extend
-    let origExt = 0;
-    while (g.origTo + origExt < original.length && /\w/.test(original[g.origTo + origExt])) origExt++;
-    let currExt = 0;
-    while (g.currTo + currExt < current.length && /\w/.test(current[g.currTo + currExt])) currExt++;
-    if (origExt > 0 || currExt > 0) {
-      g.origText += original.substring(g.origTo, g.origTo + origExt);
-      g.origTo += origExt;
-      g.newText += current.substring(g.currTo, g.currTo + currExt);
-      g.currTo += currExt;
+    if (!g.origText && !g.newText) continue;
+    if (!g.origText) continue;
+
+    // Forward: only extend if the group ends mid-word (last char is \w)
+    if (/\w/.test(g.origText[g.origText.length - 1])) {
+      let origExt = 0;
+      while (g.origTo + origExt < original.length && /\w/.test(original[g.origTo + origExt])) origExt++;
+      let currExt = 0;
+      while (g.currTo + currExt < current.length && /\w/.test(current[g.currTo + currExt])) currExt++;
+      if (origExt > 0 || currExt > 0) {
+        g.origText += original.substring(g.origTo, g.origTo + origExt);
+        g.origTo += origExt;
+        g.newText += current.substring(g.currTo, g.currTo + currExt);
+        g.currTo += currExt;
+      }
+    }
+
+    // Backward: only extend if the group starts mid-word (first char is \w)
+    if (/\w/.test(g.origText[0])) {
+      let origBwd = 0;
+      while (g.origFrom - origBwd - 1 >= 0 && /\w/.test(original[g.origFrom - origBwd - 1])) origBwd++;
+      let currBwd = 0;
+      while (g.currFrom - currBwd - 1 >= 0 && /\w/.test(current[g.currFrom - currBwd - 1])) currBwd++;
+      if (origBwd > 0 || currBwd > 0) {
+        g.origText = original.substring(g.origFrom - origBwd, g.origFrom) + g.origText;
+        g.origFrom -= origBwd;
+        g.newText = current.substring(g.currFrom - currBwd, g.currFrom) + g.newText;
+        g.currFrom -= currBwd;
+      }
     }
   }
 
