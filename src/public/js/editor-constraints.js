@@ -131,6 +131,17 @@ function parseLineZones(lineText, lineFrom) {
     });
   }
 
+  // Superscript: <sup>...</sup>
+  const supRe = /<sup>(.*?)<\/sup>/g;
+  while ((m = supRe.exec(fullLine)) !== null) {
+    tagRanges.push({
+      from: lineFrom + m.index,
+      to: lineFrom + m.index + m[0].length,
+      contentFrom: lineFrom + m.index + 5,
+      contentTo: lineFrom + m.index + m[0].length - 6,
+    });
+  }
+
   // If no tags, the whole content area is one zone
   if (tagRanges.length === 0) {
     if (absStart < lineFrom + lineText.length) {

@@ -204,6 +204,16 @@ function buildMaskingDecorations(view, skipLineNumber) {
     mark(fullStart + 1, fullEnd - 1, 'cm-italic');     // Style content
   }
 
+  // --- Inline: <sup>...</sup> (verse numbers) ---
+  const supRe = /<sup>(.*?)<\/sup>/g;
+  while ((m = supRe.exec(text)) !== null) {
+    const fullStart = m.index;
+    const fullEnd = fullStart + m[0].length;
+    hideInline(fullStart, fullStart + 5);                // Hide <sup>
+    hideInline(fullEnd - 6, fullEnd);                    // Hide </sup>
+    mark(fullStart + 5, fullEnd - 6, 'cm-superscript');  // Style content
+  }
+
   // Sort by position (required by CodeMirror)
   decorations.sort((a, b) => a.from - b.from || a.to - b.to);
 
@@ -408,6 +418,12 @@ const maskingTheme = EditorView.theme({
   },
   '.cm-italic': {
     fontStyle: 'italic',
+  },
+  '.cm-superscript': {
+    fontSize: '0.7em',
+    verticalAlign: 'super',
+    lineHeight: '0',
+    color: '#888',
   },
 
   // BR spacer
