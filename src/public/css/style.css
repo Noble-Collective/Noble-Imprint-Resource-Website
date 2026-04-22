@@ -1045,22 +1045,22 @@ body.text-mode .home-text {
 .session-content h5,
 .reading-content h5 {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 1.25rem 0 0.25rem;
+  margin: 1.5rem 0 0.35rem;
   color: #555;
 }
 
 .session-content h6,
 .reading-content h6 {
   font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 600;
   font-style: italic;
-  margin: 1rem 0 0.2rem;
-  color: #777;
+  margin: 1.25rem 0 0.25rem;
+  color: #555;
 }
 
 .session-content p,

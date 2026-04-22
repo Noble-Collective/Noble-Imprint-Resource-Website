@@ -320,7 +320,7 @@ const maskingTheme = EditorView.theme({
   '.cm-heading-3': {},
   '.cm-heading-4': { color: '#6b6b6b' },
   '.cm-heading-5': { textTransform: 'uppercase', letterSpacing: '0.5px', color: '#555' },
-  '.cm-heading-6': { fontStyle: 'italic', color: '#777' },
+  '.cm-heading-6': { fontStyle: 'italic', color: '#555' },
   // Line-level heading styles — font on the .cm-line so gutter syncs properly
   '.cm-heading-line-1': {
     fontFamily: "'Poppins', sans-serif",
@@ -350,12 +350,12 @@ const maskingTheme = EditorView.theme({
   },
   '.cm-heading-line-5': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '0.88rem',
+    fontSize: '1rem',
     fontWeight: '600',
   },
   '.cm-heading-line-6': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '0.82rem',
+    fontSize: '1rem',
     fontWeight: '600',
   },
 
