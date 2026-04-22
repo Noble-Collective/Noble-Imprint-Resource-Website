@@ -529,6 +529,19 @@ const draftPlugin = ViewPlugin.fromClass(
           return;
         }
 
+        // On re-entry (page load with existing suggestions), edit regions are empty
+        // because they're transient. Reconstruct them from registry entries so that
+        // nearby saved suggestions don't get merged by the initial absorption.
+        const registry = update.view.state.field(annotationRegistry);
+        if (editRegions.length === 0 && registry.size > 0) {
+          for (const [, a] of registry) {
+            if (a.kind !== 'suggestion' || a.currentFrom == null) continue;
+            const from = a.currentFrom;
+            const to = a.type === 'deletion' ? from : (a.currentTo || from);
+            if (to >= from) editRegions.push({ from, to, origFrom: a.originalFrom || from, origTo: a.originalTo || to });
+          }
+        }
+
         // Compute hunks, then merge fragments from the same edit region
         const allHunks = mergeHunksByEditRegion(
           computeHunks(original, current, editRegions), editRegions, original, current
@@ -538,7 +551,6 @@ const draftPlugin = ViewPlugin.fromClass(
         // from registryDecoPlugin). Match by content AND position — content-only matching
         // causes identical edits at different positions to be incorrectly filtered out
         // (e.g., adding "s" to multiple words would only show the first one).
-        const registry = update.view.state.field(annotationRegistry);
         const hunks = allHunks.filter(h => {
           const hFrom = h.type === 'deletion' ? h.currentPos : h.currentFrom;
           const hTo = h.type === 'deletion' ? h.currentPos : h.currentTo;
