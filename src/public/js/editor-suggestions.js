@@ -447,29 +447,19 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     if (h.type === 'deletion') continue;
     const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
     if (!region) continue;
-    // Trim forward: if currentTo extends past region.to
+    // Trim current-doc side only. The original-doc side cannot be trimmed reliably
+    // because region.origFrom/origTo come from iterChanges(fromA, toA) which are in
+    // working-doc coordinates at the time of the transaction, not the original doc.
+    // For the first edit they match, but subsequent edits shift the working doc.
     if (h.currentTo > region.to) {
       const currExcess = h.currentTo - region.to;
       h.newText = h.newText.slice(0, -currExcess);
       h.currentTo = region.to;
     }
-    // Trim original side to region.origTo
-    if (region.origTo != null && h.originalTo > region.origTo) {
-      const origExcess = h.originalTo - region.origTo;
-      h.originalText = h.originalText.slice(0, -origExcess);
-      h.originalTo = region.origTo;
-    }
-    // Trim backward: current side
     if (h.currentFrom < region.from) {
       const currExcess = region.from - h.currentFrom;
       h.newText = h.newText.slice(currExcess);
       h.currentFrom = region.from;
-    }
-    // Trim backward: original side
-    if (region.origFrom != null && h.originalFrom < region.origFrom) {
-      const origExcess = region.origFrom - h.originalFrom;
-      h.originalText = h.originalText.slice(origExcess);
-      h.originalFrom = region.origFrom;
     }
     // Recompute type after trimming
     if (h.originalText && h.newText) h.type = 'replacement';
