@@ -341,7 +341,12 @@ if (data) {
       }
       // Keep suggestion count in sync so polling doesn't show "new suggestions"
       // banner for suggestions the current user created themselves
-      lastKnownSuggestionCount = savedHunks.size;
+      // Sync count upward only — don't decrease below what the server reported.
+      // Stale/unresolvable suggestions exist in Firestore but not in savedHunks;
+      // decreasing would cause the poll to re-detect them as "new" every 10 seconds.
+      if (savedHunks.size > lastKnownSuggestionCount) {
+        lastKnownSuggestionCount = savedHunks.size;
+      }
     }
   }
 
@@ -512,6 +517,13 @@ if (data) {
       data.pendingSuggestions = freshSuggestions;
       data.pendingComments = fresh.pendingComments || [];
       data.pendingReplies = freshReplies;
+
+      // Sync counts to server totals (including stale/unresolvable suggestions).
+      // Without this, stale suggestions that can't be added to the registry cause
+      // a polling loop: server count > lastKnown count → autoLoad → rebuild → repeat.
+      lastKnownSuggestionCount = freshSuggestions.length;
+      lastKnownCommentCount = (fresh.pendingComments || []).length;
+      lastKnownReplyCount = freshReplies.length;
 
       // Update reply cards
       updateReplies(data.pendingReplies);
