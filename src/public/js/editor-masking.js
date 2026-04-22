@@ -185,13 +185,22 @@ function buildMaskingDecorations(view, skipLineNumber) {
     mark(fullStart + 2, fullEnd - 2, 'cm-bold');       // Style content
   }
 
-  // --- Inline: _italic_ (single underscore, not inside words) ---
+  // --- Inline: _italic_ or *italic* (not inside words, not bold ** pairs) ---
   const italicRe = /(?<![a-zA-Z0-9])_(.+?)_(?![a-zA-Z0-9])/g;
   while ((m = italicRe.exec(text)) !== null) {
     const fullStart = m.index;
     const fullEnd = fullStart + m[0].length;
     hideInline(fullStart, fullStart + 1);              // Hide opening _
     hideInline(fullEnd - 1, fullEnd);                  // Hide closing _
+    mark(fullStart + 1, fullEnd - 1, 'cm-italic');     // Style content
+  }
+  // Single asterisk italic: *text* but NOT **text** (bold)
+  const italicStarRe = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
+  while ((m = italicStarRe.exec(text)) !== null) {
+    const fullStart = m.index;
+    const fullEnd = fullStart + m[0].length;
+    hideInline(fullStart, fullStart + 1);              // Hide opening *
+    hideInline(fullEnd - 1, fullEnd);                  // Hide closing *
     mark(fullStart + 1, fullEnd - 1, 'cm-italic');     // Style content
   }
 
