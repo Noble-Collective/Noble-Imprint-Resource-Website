@@ -1064,6 +1064,39 @@ body.text-mode .home-text {
   color: #555;
 }
 
+.session-content table,
+.reading-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-family: var(--font-reading);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.session-content th,
+.reading-content th {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  background: #f5f3ef;
+  border: 1px solid #ddd;
+  color: var(--color-charcoal);
+}
+
+.session-content td,
+.reading-content td {
+  padding: 10px 14px;
+  border: 1px solid #e5e5e5;
+  vertical-align: top;
+}
+
+.session-content tbody tr:nth-child(even),
+.reading-content tbody tr:nth-child(even) {
+  background: #fafaf8;
+}
+
 .session-content p,
 .reading-content p {
   font-family: var(--font-reading);
