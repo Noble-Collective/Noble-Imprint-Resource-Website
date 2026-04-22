@@ -1486,6 +1486,22 @@ if (data) {
         onDismissStale: dismissStaleSuggestion,
       });
 
+      // Show stale cards for suggestions that couldn't be resolved at load time.
+      // These are pending in Firestore but the original text no longer exists in the file.
+      for (const s of existingSuggestions) {
+        if (!s.resolvedStale) continue;
+        addStaleCard(s.id, {
+          hunkId: s.id,
+          firestoreId: s.id,
+          origText: s.originalText || '',
+          newText: s.newText || '',
+          type: s.type || 'replacement',
+          cannotReapply: true,
+          authorEmail: s.authorEmail,
+          authorName: s.authorName,
+        }, () => dismissStaleSuggestion(s.id));
+      }
+
       // Init comment popup UI (no module array — comments are in the registry)
       initComments(editorView, (commentData) => {
         // Compute original-file position for the comment so it survives
