@@ -330,7 +330,7 @@ const maskingTheme = EditorView.theme({
   },
   '.cm-heading-line-2': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '1.5rem',
+    fontSize: '1.6rem',
     fontWeight: '600',
     lineHeight: '1.3',
     paddingBottom: '0.2em',
@@ -338,13 +338,13 @@ const maskingTheme = EditorView.theme({
   },
   '.cm-heading-line-3': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '1.2rem',
+    fontSize: '1.35rem',
     fontWeight: '600',
     lineHeight: '1.4',
   },
   '.cm-heading-line-4': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '1rem',
+    fontSize: '1.15rem',
     fontWeight: '600',
     lineHeight: '1.4',
   },
