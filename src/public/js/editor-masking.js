@@ -124,8 +124,8 @@ function buildMaskingDecorations(view, skipLineNumber) {
     const lineText = line.text;
     const lineFrom = line.from;
 
-    // Headings: # through #####
-    const headingMatch = lineText.match(/^(#{1,5})\s+/);
+    // Headings: # through ######
+    const headingMatch = lineText.match(/^(#{1,6})\s+/);
     if (headingMatch) {
       const level = headingMatch[1].length;
       const prefixLen = headingMatch[0].length;
@@ -309,7 +309,8 @@ const maskingTheme = EditorView.theme({
   '.cm-heading-2': {},
   '.cm-heading-3': {},
   '.cm-heading-4': { color: '#6b6b6b' },
-  '.cm-heading-5': { textTransform: 'uppercase', letterSpacing: '0.5px', color: '#888' },
+  '.cm-heading-5': { textTransform: 'uppercase', letterSpacing: '0.5px', color: '#555' },
+  '.cm-heading-6': { fontStyle: 'italic', color: '#777' },
   // Line-level heading styles — font on the .cm-line so gutter syncs properly
   '.cm-heading-line-1': {
     fontFamily: "'Poppins', sans-serif",
@@ -327,19 +328,24 @@ const maskingTheme = EditorView.theme({
   },
   '.cm-heading-line-3': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '1.15rem',
+    fontSize: '1.2rem',
     fontWeight: '600',
     lineHeight: '1.4',
   },
   '.cm-heading-line-4': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '0.95rem',
+    fontSize: '1rem',
     fontWeight: '600',
     lineHeight: '1.4',
   },
   '.cm-heading-line-5': {
     fontFamily: "'Poppins', sans-serif",
-    fontSize: '0.85rem',
+    fontSize: '0.88rem',
+    fontWeight: '600',
+  },
+  '.cm-heading-line-6': {
+    fontFamily: "'Poppins', sans-serif",
+    fontSize: '0.82rem',
     fontWeight: '600',
   },
 

@@ -53,7 +53,7 @@ function parseLineZones(lineText, lineFrom) {
 
   // Strip line-level prefix (##, <<, >)
   let contentStart = 0;
-  const headingMatch = lineText.match(/^(#{1,5})\s+/);
+  const headingMatch = lineText.match(/^(#{1,6})\s+/);
   const attrMatch = lineText.match(/^<<\s+/);
   const bqMatch = lineText.match(/^>\s*/);
 

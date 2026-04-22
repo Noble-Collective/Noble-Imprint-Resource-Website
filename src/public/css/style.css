@@ -1028,7 +1028,7 @@ body.text-mode .home-text {
 .session-content h3,
 .reading-content h3 {
   font-family: var(--font-sans);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 600;
   margin: 2rem 0 0.75rem;
 }
@@ -1036,10 +1036,31 @@ body.text-mode .home-text {
 .session-content h4,
 .reading-content h4 {
   font-family: var(--font-sans);
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 600;
   margin: 1.25rem 0 0.35rem;
   color: var(--color-text-light);
+}
+
+.session-content h5,
+.reading-content h5 {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 1.25rem 0 0.25rem;
+  color: #555;
+}
+
+.session-content h6,
+.reading-content h6 {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-style: italic;
+  margin: 1rem 0 0.2rem;
+  color: #777;
 }
 
 .session-content p,
