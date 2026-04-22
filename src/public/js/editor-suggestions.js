@@ -449,22 +449,30 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
     if (!region) continue;
 
-    // Set newText exactly from the current doc using the edit region boundaries.
+    // Derive exact originalText by matching text BEFORE and AFTER the edit in both
+    // documents. This finds the precise original range that was selected, regardless
+    // of where computeHunks placed the hunk boundaries.
     h.newText = current.substring(region.from, region.to);
     h.currentFrom = region.from;
     h.currentTo = region.to;
 
-    // Find the correct originalTo by matching the text AFTER the edit in both
-    // documents. Since text after the edit is unchanged, we can find exactly
-    // where the original text ends.
-    const afterEdit = current.substring(region.to, region.to + 80);
-    if (afterEdit.length > 0) {
-      const matchPos = original.indexOf(afterEdit, h.originalFrom);
-      if (matchPos >= 0 && matchPos >= h.originalFrom) {
-        h.originalText = original.substring(h.originalFrom, matchPos);
-        h.originalTo = matchPos;
+    // Find originalFrom: match text before the edit
+    const beforeEdit = current.substring(Math.max(0, region.from - 80), region.from);
+    if (beforeEdit.length > 0) {
+      const beforeMatch = original.lastIndexOf(beforeEdit);
+      if (beforeMatch >= 0) {
+        h.originalFrom = beforeMatch + beforeEdit.length;
       }
     }
+    // Find originalTo: match text after the edit
+    const afterEdit = current.substring(region.to, region.to + 80);
+    if (afterEdit.length > 0) {
+      const afterMatch = original.indexOf(afterEdit, h.originalFrom);
+      if (afterMatch >= 0 && afterMatch >= h.originalFrom) {
+        h.originalTo = afterMatch;
+      }
+    }
+    h.originalText = original.substring(h.originalFrom, h.originalTo);
     // Recompute type after trimming
     if (h.originalText && h.newText) h.type = 'replacement';
     else if (h.originalText) h.type = 'deletion';

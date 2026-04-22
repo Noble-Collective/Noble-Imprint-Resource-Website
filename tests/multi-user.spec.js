@@ -2224,6 +2224,29 @@ test.describe('Edit region tracking', () => {
     expect(deleted[0]).toBe('y');
   });
 
+  test('replacement sharing prefix stores full original text in Firestore', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Replace "Jesus is calling you to follow him!" with "Jesus is calling you to do great things!"
+    // They share "Jesus is calling you to " — the Firestore entry must have the FULL original,
+    // not just the changed tail "follow him!"
+    await page.evaluate(() => {
+      const v = window.__editorView, d = v.state.doc.toString();
+      const sentence = 'Jesus is calling you to follow him!';
+      const pos = d.indexOf(sentence);
+      v.dispatch({ selection: { anchor: pos, head: pos + sentence.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('Jesus is calling you to do great things!'));
+    });
+    await page.waitForTimeout(4000);
+
+    const { docs } = await countFirestoreSuggestions();
+    expect(docs.length).toBe(1);
+    console.log('Shared prefix — FS orig:', docs[0].originalText, '| new:', docs[0].newText);
+    expect(docs[0].originalText).toBe('Jesus is calling you to follow him!');
+    expect(docs[0].newText).toBe('Jesus is calling you to do great things!');
+  });
+
   test('two character insertions in same word produce valid suggestion after save', async ({ page }) => {
     await login(page);
     await enterSuggest(page);
