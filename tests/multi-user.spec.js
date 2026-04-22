@@ -2008,3 +2008,195 @@ test.describe('Multi-word replacement', () => {
     expect(cardCount).toBe(1);
   });
 });
+
+// --- Edit region tracking: separate edits stay separate, single edits stay unified ---
+test.describe('Edit region tracking', () => {
+  test.beforeEach(async () => { await clearAll(); });
+  test.afterEach(async () => { await clearAll(); });
+
+  test('two nearby separate word replacements produce 2 cards, not 1', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Replace 'calling' → 'asking', then 'you' → 'everyone' (~8 chars apart)
+    // These are two separate user actions and should produce 2 separate suggestion cards
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const line = doc.indexOf('Jesus is calling you to follow him');
+      if (line < 0) throw new Error('Test line not found');
+
+      // Edit 1: replace 'calling' with 'asking'
+      const p1 = line + 'Jesus is '.length;
+      v.dispatch({ selection: { anchor: p1, head: p1 + 'calling'.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('asking'));
+    });
+    await page.waitForTimeout(100);
+
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const chunk = doc.indexOf('asking you');
+      if (chunk < 0) throw new Error('asking you not found after edit 1');
+
+      // Edit 2: replace 'you' with 'everyone'
+      const p2 = chunk + 'asking '.length;
+      v.dispatch({ selection: { anchor: p2, head: p2 + 'you'.length } });
+      v.dispatch(v.state.replaceSelection('everyone'));
+    });
+
+    await page.waitForTimeout(600);
+
+    const cardCount = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    console.log('Two nearby separate edits — cards:', cardCount);
+    expect(cardCount).toBe(2);
+  });
+
+  test('three separate edits in same sentence produce 3 cards', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Replace word 2 ('is' → 'was'), word 4 ('you' → 'them'), add comma after word 7 ('him')
+    // Steve's exact test case — should be 3 separate suggestion cards
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      let doc = v.state.doc.toString();
+      const line = doc.indexOf('Jesus is calling you to follow him');
+      if (line < 0) throw new Error('Test line not found');
+
+      // Edit 1: 'is' → 'was'
+      const p1 = line + 'Jesus '.length;
+      v.dispatch({ selection: { anchor: p1, head: p1 + 2 }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('was'));
+    });
+    await page.waitForTimeout(100);
+
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const chunk = doc.indexOf('was calling you');
+      // Edit 2: 'you' → 'them'
+      const p2 = chunk + 'was calling '.length;
+      v.dispatch({ selection: { anchor: p2, head: p2 + 3 } });
+      v.dispatch(v.state.replaceSelection('them'));
+    });
+    await page.waitForTimeout(100);
+
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const himIdx = doc.indexOf('follow him!');
+      // Edit 3: add comma after 'him'
+      const p3 = himIdx + 'follow him'.length;
+      v.dispatch({ changes: { from: p3, to: p3, insert: ',' } });
+    });
+
+    await page.waitForTimeout(600);
+
+    const cardCount = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    console.log('Three separate edits — cards:', cardCount);
+    expect(cardCount).toBe(3);
+  });
+
+  test('replacement sharing common word produces 1 card, not 2', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Replace 'helpless and hopeless condition' with 'dark and broken state'
+    // diffChars finds ' and ' as common and splits into 2 hunks — but it was 1 user action
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const phrase = 'helpless and hopeless condition';
+      const pos = doc.indexOf(phrase);
+      if (pos < 0) throw new Error('phrase not found: ' + phrase);
+
+      v.dispatch({ selection: { anchor: pos, head: pos + phrase.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('dark and broken state'));
+    });
+
+    await page.waitForTimeout(600);
+
+    const cardCount = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    console.log('Shared-word replacement — cards:', cardCount);
+    expect(cardCount).toBe(1);
+  });
+
+  test('edit + auto-save + nearby separate edit produces 2 cards', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Edit 1: 'calling' → 'asking'
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const line = doc.indexOf('Jesus is calling you');
+      const p = line + 'Jesus is '.length;
+      v.dispatch({ selection: { anchor: p, head: p + 'calling'.length }, scrollIntoView: true });
+      v.dispatch(v.state.replaceSelection('asking'));
+    });
+
+    // Wait for auto-save to complete (1.5s debounce + network)
+    await page.waitForTimeout(4000);
+
+    // Verify edit 1 saved
+    const savedCards = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    expect(savedCards).toBe(1);
+
+    // Edit 2: 'you' → 'everyone' (nearby but separate action)
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const chunk = doc.indexOf('asking you');
+      const p = chunk + 'asking '.length;
+      v.dispatch({ selection: { anchor: p, head: p + 'you'.length } });
+      v.dispatch(v.state.replaceSelection('everyone'));
+    });
+
+    // Wait for second auto-save
+    await page.waitForTimeout(4000);
+
+    const finalCards = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    console.log('Edit + auto-save + nearby edit — final cards:', finalCards);
+    expect(finalCards).toBe(2);
+  });
+
+  test('bold multi-word selection produces 1 card, not 2', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Bold 'follow him' — toggleFormat dispatches one transaction replacing
+    // 'follow him' with '**follow him**'. diffChars produces 2 insertion hunks
+    // for the ** markers. Should be 1 card since it's one user action.
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const phrase = 'follow him';
+      const pos = doc.indexOf(phrase + '!');
+      if (pos < 0) throw new Error('phrase not found');
+
+      v.dispatch({ selection: { anchor: pos, head: pos + phrase.length }, scrollIntoView: true });
+      const selected = v.state.sliceDoc(pos, pos + phrase.length);
+      // Simulate toggleFormat bold: replace selection with **selection**
+      v.dispatch({ changes: { from: pos, to: pos + phrase.length, insert: '**' + selected + '**' } });
+    });
+
+    await page.waitForTimeout(600);
+
+    const cardCount = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    console.log('Bold multi-word — cards:', cardCount);
+    expect(cardCount).toBe(1);
+  });
+});

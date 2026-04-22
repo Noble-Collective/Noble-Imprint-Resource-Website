@@ -53,14 +53,15 @@ if (data) {
     return { contextBefore: before, contextAfter: after };
   }
 
-  // Find a saved hunk that overlaps with this hunk's original position range
+  // Find a saved hunk that overlaps with this hunk's original position range.
+  // Strict overlap only — adjacent ranges (e.g., edit at "calling" key 1330:1337
+  // and edit at "you" key 1338:1341) must NOT match, as they're different suggestions.
   function findOverlappingSavedHunk(hunk) {
     const hFrom = hunk.originalFrom;
     const hTo = hunk.originalTo;
     for (const [key, docId] of savedHunks) {
       const [kFrom, kTo] = key.split(':').map(Number);
-      // Overlapping or adjacent ranges in the original document
-      if (hFrom <= kTo + 1 && hTo >= kFrom - 1) {
+      if (hFrom <= kTo && hTo >= kFrom) {
         return { key, docId };
       }
     }
@@ -160,6 +161,21 @@ if (data) {
           }
         }
       }
+      // Match merged replacement hunks from edit-region merging.
+      // When bold/italic wraps text, edit-region merge converts 2 insertion hunks
+      // into 1 replacement: originalText="word" → newText="**word**"
+      if (hunk.type === 'replacement' && formatGroups.length > 0) {
+        for (const fg of formatGroups) {
+          if (fg._matchCount >= 1) continue;
+          const expectedNew = fg.marker + hunk.originalText + fg.marker;
+          if (hunk.newText === expectedNew) {
+            hunkData.linkedGroup = fg.groupId;
+            hunkData.linkedLabel = fg.label;
+            fg._matchCount = (fg._matchCount || 0) + 1;
+            break;
+          }
+        }
+      }
 
       // Check exact key match first, then overlapping match
       const existing = savedHunks.has(key)
@@ -248,7 +264,10 @@ if (data) {
 
     // Clear pending format groups only if they were actually matched to hunks
     for (const fg of formatGroups) {
-      const wasMatched = hunks.some(h => h.type === 'insertion' && h.newText === fg.marker);
+      const wasMatched = hunks.some(h =>
+        (h.type === 'insertion' && h.newText === fg.marker) ||
+        (h.type === 'replacement' && h.newText === fg.marker + h.originalText + fg.marker)
+      );
       if (wasMatched) clearPendingFormatGroup(fg.groupId);
     }
 
@@ -1240,6 +1259,8 @@ if (data) {
           type: a.type,
           originalText: a.originalText,
           newText: a.newText,
+          originalFrom: a.originalFrom,
+          originalTo: a.originalTo,
           currentFrom: a.currentFrom,
           currentTo: a.currentTo,
           currentPos: a.currentFrom, // for deletions
@@ -1247,8 +1268,17 @@ if (data) {
           linkedLabel: a.linkedLabel || '',
         });
       }
-      // Merge: registry hunks first (sorted by position), then draft hunks
-      const all = [...registryHunks, ...draftHunks];
+      // Suppress registry hunks that overlap with a draft hunk at the same original position.
+      // This happens when the user extends an edit — the draft has updated text while the
+      // registry still has the old version until auto-save completes. Without this, both
+      // the old registry card and the new draft card flash simultaneously for ~2 seconds.
+      const filteredRegistry = registryHunks.filter(rh => {
+        for (const dh of draftHunks) {
+          if (dh.originalFrom <= rh.originalTo && dh.originalTo >= rh.originalFrom) return false;
+        }
+        return true;
+      });
+      const all = [...filteredRegistry, ...draftHunks];
       all.sort((a, b) => (a.currentFrom || a.currentPos || 0) - (b.currentFrom || b.currentPos || 0));
       return all;
     }

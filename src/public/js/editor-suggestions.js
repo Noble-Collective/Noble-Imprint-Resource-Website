@@ -94,7 +94,7 @@ class DeletedTextWidget extends WidgetType {
 }
 
 // --- Compute diff hunks between original and current ---
-export function computeHunks(original, current) {
+export function computeHunks(original, current, regions = []) {
   const diffs = diffChars(original, current);
 
   const segments = [];
@@ -121,11 +121,19 @@ export function computeHunks(original, current) {
 
   for (const seg of segments) {
     if (seg.type === 'same') {
-      // Absorb short same segments (< 4 chars) into the current group regardless
-      // of content. diffChars produces 1-3 char common subsequences (including spaces)
-      // when splitting multi-word replacements. Previously this required /^\w+$/ which
-      // rejected gaps with spaces, causing single replacements to split into 4+ hunks.
-      if (currentGroup && seg.value.length < MERGE_THRESHOLD) {
+      // Absorb short same segments (< 4 chars) into the current group.
+      // diffChars produces 1-3 char common subsequences when splitting replacements.
+      // BUT: don't absorb if the gap separates two different edit regions — that means
+      // the user made two separate edits and the gap is genuine unchanged text between them.
+      let shouldAbsorb = currentGroup && seg.value.length < MERGE_THRESHOLD;
+      if (shouldAbsorb && regions.length > 0) {
+        const groupPos = currentGroup.currFrom;
+        const afterGapPos = seg.currFrom + seg.value.length;
+        const rA = regions.findIndex(r => groupPos >= r.from && groupPos <= r.to);
+        const rB = regions.findIndex(r => afterGapPos >= r.from && afterGapPos <= r.to);
+        if (rA >= 0 && rB >= 0 && rA !== rB) shouldAbsorb = false;
+      }
+      if (shouldAbsorb) {
         currentGroup.origText += seg.value;
         currentGroup.newText += seg.value;
         currentGroup.origTo += seg.value.length;
@@ -172,55 +180,31 @@ export function computeHunks(original, current) {
     }
   }
 
-  // Step 2: Merge nearby groups that are fragments of a single replacement.
-  // After Step 1, groups may still be split by gaps like "ing His " (8 chars) or
-  // common words like "this " (5 chars) that are too long for the initial threshold.
-  // When a common word appears in BOTH the original and replacement text (e.g.,
-  // replacing "this crooked generation" with "uh hih this is a test"), diffChars
-  // finds "this " as unchanged and splits the edit into a pure insertion + replacement.
-  // Skip only when BOTH groups are pure insertions (bold/italic marker pairs).
-  // When one has origText and the other doesn't, merge — it's a split replacement.
-  // For two groups that both have origText, use word-boundary check: genuine separate
-  // edits produce groups at word boundaries; diffChars fragments don't.
-  for (let i = groups.length - 1; i > 0; i--) {
-    const prev = groups[i - 1];
-    const curr = groups[i];
-    if (!prev.origText && !curr.origText) continue; // both pure insertions (bold markers)
-    const origGap = curr.origFrom - prev.origTo;
-    if (origGap < 0 || origGap > 50) continue;
-    // Word-boundary check: only when both groups have origText (replacements/deletions).
-    // If one is a pure insertion, it's always a split fragment — merge unconditionally.
-    if (prev.origText && curr.origText) {
-      const prevAtBoundary = (prev.origFrom === 0 || !/\w/.test(original[prev.origFrom - 1]))
-        && (prev.origTo >= original.length || !/\w/.test(original[prev.origTo]));
-      const currAtBoundary = (curr.origFrom === 0 || !/\w/.test(original[curr.origFrom - 1]))
-        && (curr.origTo >= original.length || !/\w/.test(original[curr.origTo]));
-      if (prevAtBoundary && currAtBoundary) continue; // both complete words — separate edits
-    }
-    const origGapText = original.substring(prev.origTo, curr.origFrom);
-    const currGapText = current.substring(prev.currTo, curr.currFrom);
-    prev.origText += origGapText + curr.origText;
-    prev.origTo = curr.origTo;
-    prev.newText += currGapText + curr.newText;
-    prev.currTo = curr.currTo;
-    groups.splice(i, 1);
-  }
+  // Step 2 (REMOVED): Threshold-based merge replaced by edit-region tracking.
+  // Fragments from the same user action are now merged in mergeHunksByEditRegion()
+  // using CM6 transaction data, not distance heuristics.
 
   // Step 3: Extend groups to word boundaries. diffChars may split a word at a
   // character boundary (e.g., "placing" matched as "p" + "lacing"). Extend
   // forward when the group ends mid-word, and backward when it starts mid-word,
   // so the group covers full words in both original and current documents.
   // Skip pure insertions (empty origText) — they don't have original text to extend.
+  // When edit regions are available, never extend past the region boundary — the
+  // region represents exactly what the user edited.
   for (const g of groups) {
     if (!g.origText && !g.newText) continue;
     if (!g.origText) continue;
+
+    // Find the edit region this group belongs to (by current-doc position)
+    const region = regions.find(r => g.currFrom >= r.from && g.currFrom <= r.to);
 
     // Forward: only extend if the group ends mid-word (last char is \w)
     if (/\w/.test(g.origText[g.origText.length - 1])) {
       let origExt = 0;
       while (g.origTo + origExt < original.length && /\w/.test(original[g.origTo + origExt])) origExt++;
       let currExt = 0;
-      while (g.currTo + currExt < current.length && /\w/.test(current[g.currTo + currExt])) currExt++;
+      const currLimit = region ? region.to : current.length;
+      while (g.currTo + currExt < current.length && g.currTo + currExt < currLimit && /\w/.test(current[g.currTo + currExt])) currExt++;
       if (origExt > 0 || currExt > 0) {
         g.origText += original.substring(g.origTo, g.origTo + origExt);
         g.origTo += origExt;
@@ -234,7 +218,8 @@ export function computeHunks(original, current) {
       let origBwd = 0;
       while (g.origFrom - origBwd - 1 >= 0 && /\w/.test(original[g.origFrom - origBwd - 1])) origBwd++;
       let currBwd = 0;
-      while (g.currFrom - currBwd - 1 >= 0 && /\w/.test(current[g.currFrom - currBwd - 1])) currBwd++;
+      const currStart = region ? region.from : 0;
+      while (g.currFrom - currBwd - 1 >= 0 && g.currFrom - currBwd - 1 >= currStart && /\w/.test(current[g.currFrom - currBwd - 1])) currBwd++;
       if (origBwd > 0 || currBwd > 0) {
         g.origText = original.substring(g.origFrom - origBwd, g.origFrom) + g.origText;
         g.origFrom -= origBwd;
@@ -334,6 +319,168 @@ export function setHunksChangedCallback(fn) {
   onHunksChanged = fn;
 }
 
+// --- Edit region tracking: know what the user actually edited ---
+// Each {from, to, origFrom, origTo} tracks a range in both current-doc and original-doc coordinates.
+// Regions are created per CM6 transaction (one dispatch = one user action).
+// Regions are mapped through subsequent doc changes and merged when adjacent/overlapping.
+let editRegions = [];
+
+function addOrExtendRegion(from, to, origFrom, origTo) {
+  for (let i = 0; i < editRegions.length; i++) {
+    const r = editRegions[i];
+    // Strict overlap only — no adjacency tolerance. Adjacent regions from separate
+    // user actions (e.g., replacing word N then word N+1) must stay separate.
+    // Progressive typing works because each new char overlaps at the boundary.
+    if (from <= r.to && to >= r.from) {
+      r.from = Math.min(r.from, from);
+      r.to = Math.max(r.to, to);
+      if (origFrom != null) r.origFrom = Math.min(r.origFrom, origFrom);
+      if (origTo != null) r.origTo = Math.max(r.origTo, origTo);
+      mergeOverlappingRegions();
+      return;
+    }
+  }
+  editRegions.push({ from, to, origFrom: origFrom != null ? origFrom : from, origTo: origTo != null ? origTo : to });
+}
+
+function mergeOverlappingRegions() {
+  editRegions.sort((a, b) => a.from - b.from);
+  for (let i = editRegions.length - 1; i > 0; i--) {
+    if (editRegions[i].from <= editRegions[i - 1].to) {
+      editRegions[i - 1].to = Math.max(editRegions[i - 1].to, editRegions[i].to);
+      editRegions[i - 1].origFrom = Math.min(editRegions[i - 1].origFrom, editRegions[i].origFrom);
+      editRegions[i - 1].origTo = Math.max(editRegions[i - 1].origTo, editRegions[i].origTo);
+      editRegions.splice(i, 1);
+    }
+  }
+}
+
+export function getEditRegions() { return editRegions; }
+
+// Merge hunks that fall within the same edit region into single hunks.
+// This replaces the old threshold-based Step 2 merge in computeHunks.
+function mergeHunksByEditRegion(hunks, regions, original, current) {
+  if (regions.length === 0) return hunks;
+
+  // Assign each hunk to a region by its current-doc position
+  const assignments = hunks.map(h => {
+    const pos = h.type === 'deletion' ? h.currentPos : h.currentFrom;
+    for (let i = 0; i < regions.length; i++) {
+      if (pos >= regions[i].from && pos <= regions[i].to) return i;
+    }
+    return -1;
+  });
+
+  // Group hunks by region
+  const groups = new Map();
+  for (let i = 0; i < assignments.length; i++) {
+    const ri = assignments[i];
+    if (!groups.has(ri)) groups.set(ri, []);
+    groups.get(ri).push(i);
+  }
+
+  // Merge groups with 2+ hunks
+  const mergedIndices = new Set();
+  const merged = [];
+  for (const [ri, indices] of groups) {
+    if (ri === -1 || indices.length < 2) continue;
+
+    // Sort by original-doc position
+    indices.sort((a, b) => hunks[a].originalFrom - hunks[b].originalFrom);
+
+    // Merge sequentially
+    const first = { ...hunks[indices[0]] };
+    let mOrigText = first.originalText || '';
+    let mNewText = first.newText || '';
+    let mOrigFrom = first.originalFrom;
+    let mOrigTo = first.originalTo;
+    let mCurrFrom = first.type === 'deletion' ? first.currentPos : first.currentFrom;
+    let mCurrTo = first.type === 'deletion' ? first.currentPos : (first.currentTo || first.currentPos);
+
+    for (let j = 1; j < indices.length; j++) {
+      const h = hunks[indices[j]];
+      const hCurrFrom = h.type === 'deletion' ? h.currentPos : h.currentFrom;
+      const hCurrTo = h.type === 'deletion' ? h.currentPos : (h.currentTo || h.currentPos);
+
+      const origGap = original.substring(mOrigTo, h.originalFrom);
+      const currGap = current.substring(mCurrTo, hCurrFrom);
+
+      mOrigText += origGap + (h.originalText || '');
+      mNewText += currGap + (h.newText || '');
+      mOrigTo = h.originalTo;
+      mCurrTo = hCurrTo;
+    }
+
+    const type = (mOrigText && mNewText) ? 'replacement' : mOrigText ? 'deletion' : 'insertion';
+
+    merged.push({
+      id: first.id,
+      type,
+      originalFrom: mOrigFrom,
+      originalTo: mOrigTo,
+      originalText: mOrigText,
+      newText: mNewText,
+      currentFrom: mCurrFrom,
+      currentTo: mCurrTo,
+      currentPos: mCurrFrom,
+    });
+    for (const idx of indices) mergedIndices.add(idx);
+  }
+
+  // Collect: unmerged hunks + merged hunks, sorted by position
+  const result = [];
+  for (let i = 0; i < hunks.length; i++) {
+    if (!mergedIndices.has(i)) result.push(hunks[i]);
+  }
+  result.push(...merged);
+  result.sort((a, b) => {
+    const posA = a.type === 'deletion' ? a.currentPos : a.currentFrom;
+    const posB = b.type === 'deletion' ? b.currentPos : b.currentFrom;
+    return posA - posB;
+  });
+
+  // Trim hunks that extend past their edit region boundaries.
+  // diffChars + initial absorption can pull in common characters at the edit boundary
+  // (e.g., a "," after the replacement matching a "," in the original). Trim these so
+  // the hunk only covers what the user actually edited.
+  for (const h of result) {
+    if (h.type === 'deletion') continue;
+    const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
+    if (!region) continue;
+    // Trim forward: if currentTo extends past region.to
+    if (h.currentTo > region.to) {
+      const currExcess = h.currentTo - region.to;
+      h.newText = h.newText.slice(0, -currExcess);
+      h.currentTo = region.to;
+    }
+    // Trim original side to region.origTo
+    if (region.origTo != null && h.originalTo > region.origTo) {
+      const origExcess = h.originalTo - region.origTo;
+      h.originalText = h.originalText.slice(0, -origExcess);
+      h.originalTo = region.origTo;
+    }
+    // Trim backward: current side
+    if (h.currentFrom < region.from) {
+      const currExcess = region.from - h.currentFrom;
+      h.newText = h.newText.slice(currExcess);
+      h.currentFrom = region.from;
+    }
+    // Trim backward: original side
+    if (region.origFrom != null && h.originalFrom < region.origFrom) {
+      const origExcess = region.origFrom - h.originalFrom;
+      h.originalText = h.originalText.slice(origExcess);
+      h.originalFrom = region.origFrom;
+    }
+    // Recompute type after trimming
+    if (h.originalText && h.newText) h.type = 'replacement';
+    else if (h.originalText) h.type = 'deletion';
+    else if (h.newText) h.type = 'insertion';
+    h.currentPos = h.currentFrom;
+  }
+
+  return result;
+}
+
 const draftPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
@@ -347,6 +494,36 @@ const draftPlugin = ViewPlugin.fromClass(
       const registryChanged = update.transactions.some(tr =>
         tr.effects.some(e => e.is(addAnnotation) || e.is(removeAnnotation) || e.is(setAnnotations) || e.is(updateAnnotation))
       );
+      // Track edit regions from doc-changing transactions (before hunk computation)
+      if (update.docChanged) {
+        for (const tr of update.transactions) {
+          if (!tr.docChanged) continue;
+          if (tr.annotation(isRevert)) {
+            // System revert (discard/accept) — old regions are invalid
+            editRegions = [];
+            continue;
+          }
+          // Map existing regions through this transaction's changes
+          editRegions = editRegions.map(r => ({
+            from: tr.changes.mapPos(r.from, 1),
+            to: tr.changes.mapPos(r.to, -1),
+            origFrom: r.origFrom,
+            origTo: r.origTo,
+          })).filter(r => r.to >= r.from);
+          // Record new region: all changes in one transaction = one user action
+          let minFrom = Infinity, maxTo = -Infinity;
+          let minOrigFrom = Infinity, maxOrigTo = -Infinity;
+          tr.changes.iterChanges((fromA, toA, fromB, toB) => {
+            if (fromB < minFrom) minFrom = fromB;
+            if (toB > maxTo) maxTo = toB;
+            if (fromA < minOrigFrom) minOrigFrom = fromA;
+            if (toA > maxOrigTo) maxOrigTo = toA;
+          });
+          if (minFrom <= maxTo) addOrExtendRegion(minFrom, maxTo, minOrigFrom, maxOrigTo);
+        }
+      }
+      if (originalChanged) editRegions = [];
+
       if (update.docChanged || originalChanged || registryChanged) {
         if (!original) {
           currentHunks = [];
@@ -362,7 +539,10 @@ const draftPlugin = ViewPlugin.fromClass(
           return;
         }
 
-        const allHunks = computeHunks(original, current);
+        // Compute hunks, then merge fragments from the same edit region
+        const allHunks = mergeHunksByEditRegion(
+          computeHunks(original, current, editRegions), editRegions, original, current
+        );
 
         // Filter out hunks already in the registry (they have their own decorations
         // from registryDecoPlugin). Match by content AND position — content-only matching
