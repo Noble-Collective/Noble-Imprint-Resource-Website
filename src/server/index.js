@@ -20,7 +20,7 @@ app.set('views', path.join(__dirname, '../views'));
 
 // Middleware
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Static files
 app.use('/static', express.static(path.join(__dirname, '../public')));
