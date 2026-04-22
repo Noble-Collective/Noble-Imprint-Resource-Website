@@ -447,19 +447,26 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     if (h.type === 'deletion') continue;
     const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
     if (!region) continue;
-    // Trim current-doc side only. The original-doc side cannot be trimmed reliably
-    // because region.origFrom/origTo come from iterChanges(fromA, toA) which are in
-    // working-doc coordinates at the time of the transaction, not the original doc.
-    // For the first edit they match, but subsequent edits shift the working doc.
-    if (h.currentTo > region.to) {
-      const currExcess = h.currentTo - region.to;
-      h.newText = h.newText.slice(0, -currExcess);
-      h.currentTo = region.to;
-    }
-    if (h.currentFrom < region.from) {
-      const currExcess = region.from - h.currentFrom;
-      h.newText = h.newText.slice(currExcess);
-      h.currentFrom = region.from;
+    // Trim both sides by the same amount. Absorbed boundary text comes from "same"
+    // segments in diffChars — identical text in both original and current docs. So
+    // the excess is the same length on both sides. Trimming by the current-doc
+    // overflow correctly trims both newText and originalText.
+    // Set newText exactly from the current doc using the edit region boundaries.
+    // Then find the correct originalText by matching the text AFTER the edit in both
+    // documents — since text after the edit is unchanged, we can find exactly where
+    // the original text ends.
+    h.newText = current.substring(region.from, region.to);
+    h.currentFrom = region.from;
+    h.currentTo = region.to;
+
+    // Find correct originalTo by matching post-edit text in both docs
+    const afterEdit = current.substring(region.to, region.to + 80);
+    if (afterEdit.length > 0) {
+      const matchPos = original.indexOf(afterEdit, h.originalFrom);
+      if (matchPos >= 0 && matchPos >= h.originalFrom) {
+        h.originalText = original.substring(h.originalFrom, matchPos);
+        h.originalTo = matchPos;
+      }
     }
     // Recompute type after trimming
     if (h.originalText && h.newText) h.type = 'replacement';
