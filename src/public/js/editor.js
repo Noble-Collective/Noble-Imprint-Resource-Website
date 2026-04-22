@@ -937,10 +937,8 @@ if (data) {
 
   // --- Dismiss a stale suggestion ---
   async function dismissStaleSuggestion(hunkId) {
-    const firestoreId = findFirestoreId(hunkId);
-    if (firestoreId) {
-      try { await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' }); } catch { /* ignore */ }
-    }
+    const firestoreId = findFirestoreId(hunkId) || hunkId;
+    try { await fetch('/api/suggestions/hunk/' + firestoreId, { method: 'DELETE' }); } catch { /* ignore */ }
     removeStaleCard(hunkId);
     animateCardRemoval('.margin-card[data-hunk-id="' + hunkId + '"]');
   }
