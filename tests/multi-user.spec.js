@@ -2223,4 +2223,54 @@ test.describe('Edit region tracking', () => {
     expect(deleted.length).toBe(1);
     expect(deleted[0]).toBe('y');
   });
+
+  test('two character insertions in same word produce valid suggestion after save', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Insert 's' at end of 'hopeless' (making 'hopelesss'), wait for save
+    await page.evaluate(() => {
+      const v = window.__editorView, d = v.state.doc.toString();
+      const pos = d.indexOf('hopeless ') + 8;
+      v.dispatch({ changes: { from: pos, to: pos, insert: 's' } });
+    });
+    await page.waitForTimeout(4000);
+
+    const savedCards = await page.evaluate(() =>
+      document.querySelectorAll('.margin-card--suggestion').length
+    );
+    expect(savedCards).toBe(1);
+
+    // Now insert '1' inside the same word (before the last 2 chars)
+    await page.evaluate(() => {
+      const v = window.__editorView, d = v.state.doc.toString();
+      const pos = d.indexOf('hopelesss') + 7;
+      v.dispatch({ changes: { from: pos, to: pos, insert: '1' } });
+    });
+    await page.waitForTimeout(4000);
+
+    // The card should NOT be stuck on "Saving..."
+    const state = await page.evaluate(() => {
+      const cards = document.querySelectorAll('.margin-card--suggestion');
+      return {
+        saving: Array.from(cards).filter(c => c.textContent.includes('Saving')).length,
+        del: Array.from(document.querySelectorAll('.cm-suggestion-delete')).map(e => e.textContent),
+        ins: Array.from(document.querySelectorAll('.cm-suggestion-insert')).map(e => e.textContent),
+      };
+    });
+    console.log('Same-word double insertion — saving:', state.saving, 'del:', state.del, 'ins:', state.ins);
+    expect(state.saving).toBe(0);
+
+    // Check Firestore: no entry should be a bogus replacement of a FRAGMENT of the word.
+    // Valid results: the full word "hopeless" → combined change, or separate insertions.
+    // Bogus: a partial fragment like "hopele" → "1".
+    const { docs } = await countFirestoreSuggestions();
+    const bogus = docs.filter(d =>
+      d.type === 'replacement' && d.originalText !== 'hopeless' &&
+      d.originalText.length > 2 && 'hopeless'.includes(d.originalText)
+    );
+    console.log('Suggestions:', docs.map(d => '[' + d.type + '] ' + d.originalText + ' → ' + d.newText));
+    console.log('Bogus fragments:', bogus.length);
+    expect(bogus.length).toBe(0);
+  });
 });

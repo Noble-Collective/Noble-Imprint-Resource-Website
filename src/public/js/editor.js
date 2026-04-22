@@ -219,6 +219,69 @@ if (data) {
           console.warn('[AUTO-SAVE] update failed:', err.message);
         }
       } else {
+        // Before creating a new entry, check if this hunk overlaps with an existing
+        // registry entry within the same word. This happens when the user makes two
+        // character-level insertions in the same word — the diff engine produces a bogus
+        // replacement fragment instead of a clean insertion. Merge into the existing entry.
+        if (editorView && hunk.type === 'replacement') {
+          const registry = editorView.state.field(annotationRegistry);
+          const currentDoc = editorView.state.doc.toString();
+          const hFrom = hunk.currentFrom || hunk.currentPos || 0;
+          for (const [id, a] of registry) {
+            if (a.kind !== 'suggestion') continue;
+            const aFrom = a.currentFrom;
+            // Check if they're in the same word: no non-word chars between them in current doc
+            const lo = Math.min(hFrom, aFrom);
+            const hi = Math.max(hFrom, aFrom);
+            if (hi - lo > 30) continue; // too far apart
+            const between = currentDoc.substring(lo, hi);
+            if (/\W/.test(between)) continue; // different words
+            // Same word — merge by computing the full word change from original vs current
+            const original = editorView.state.field(originalDocField);
+            // Find word boundaries in current doc
+            let wStart = lo;
+            while (wStart > 0 && /\w/.test(currentDoc[wStart - 1])) wStart--;
+            let wEnd = hi;
+            while (wEnd < currentDoc.length && /\w/.test(currentDoc[wEnd])) wEnd++;
+            // Find corresponding word in original doc using surrounding text
+            const afterWord = currentDoc.substring(wEnd, wEnd + 60);
+            const origWordEnd = afterWord.length > 0 ? original.indexOf(afterWord) : -1;
+            if (origWordEnd < 0) continue;
+            let origWordStart = origWordEnd;
+            while (origWordStart > 0 && /\w/.test(original[origWordStart - 1])) origWordStart--;
+            const mergedOrigText = original.substring(origWordStart, origWordEnd);
+            const mergedNewText = currentDoc.substring(wStart, wEnd);
+            if (mergedOrigText === mergedNewText) continue; // no actual change
+            // Update the existing entry with the combined word-level change
+            const mergedData = {
+              type: 'replacement',
+              originalFrom: origWordStart, originalTo: origWordEnd,
+              originalText: mergedOrigText, newText: mergedNewText,
+              ...extractContext(original, origWordStart, origWordEnd),
+            };
+            try {
+              const upRes = await fetch('/api/suggestions/hunk/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(mergedData),
+              });
+              if (upRes.ok) {
+                savedHunks.delete(a.originalFrom + ':' + (a.originalTo || a.originalFrom));
+                savedHunks.set(origWordStart + ':' + origWordEnd, id);
+                editorView.dispatch({ effects: updateAnnotation.of({
+                  id, ...mergedData,
+                  currentFrom: wStart, currentTo: wEnd,
+                }) });
+                console.log('[AUTO-SAVE] merged same-word edit into existing suggestion:', mergedOrigText, '→', mergedNewText);
+              }
+            } catch (err) { console.warn('[AUTO-SAVE] merge failed:', err.message); }
+            break; // handled — skip creating new entry
+          }
+          // If we merged, skip creation (the break above exits the registry loop,
+          // but we need to skip the create below). Check if key is now in savedHunks.
+          if (savedHunks.has(key) || findOverlappingSavedHunk(hunk)) continue;
+        }
+
         // Create new Firestore record
         try {
           const res = await fetch('/api/suggestions/hunk', {
