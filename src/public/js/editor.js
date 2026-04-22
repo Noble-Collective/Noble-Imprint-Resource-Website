@@ -1762,7 +1762,7 @@ if (data) {
     const target = positions[currentCardIndex];
     editorView.dispatch({
       selection: { anchor: target.pos },
-      effects: EditorView.scrollIntoView(target.pos, { y: 'center' }),
+      effects: EditorView.scrollIntoView(target.pos, { y: 'start', yMargin: 150 }),
     });
     // Pulse the margin card after scroll settles
     setTimeout(() => {
@@ -1795,7 +1795,7 @@ if (data) {
       editorView.focus();
       editorView.dispatch({
         selection: { anchor: pos, head: pos + query.length },
-        effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+        effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 150 }),
       });
       // Remove old highlight, add persistent one at match position
       document.querySelectorAll('.search-highlight-active').forEach(el => el.remove());
