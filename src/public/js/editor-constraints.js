@@ -120,6 +120,17 @@ function parseLineZones(lineText, lineFrom) {
     });
   }
 
+  // Italic: *...* (single asterisk, not bold **)
+  const italicStarRe = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
+  while ((m = italicStarRe.exec(fullLine)) !== null) {
+    tagRanges.push({
+      from: lineFrom + m.index,
+      to: lineFrom + m.index + m[0].length,
+      contentFrom: lineFrom + m.index + 1,
+      contentTo: lineFrom + m.index + m[0].length - 1,
+    });
+  }
+
   // If no tags, the whole content area is one zone
   if (tagRanges.length === 0) {
     if (absStart < lineFrom + lineText.length) {
