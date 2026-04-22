@@ -2199,4 +2199,28 @@ test.describe('Edit region tracking', () => {
     console.log('Bold multi-word — cards:', cardCount);
     expect(cardCount).toBe(1);
   });
+
+  test('backspace 1 char from end of word shows only that char as deleted', async ({ page }) => {
+    await login(page);
+    await enterSuggest(page);
+
+    // Put cursor at end of 'philosophy' and backspace once — should delete just 'y'
+    await page.evaluate(() => {
+      const v = window.__editorView;
+      const doc = v.state.doc.toString();
+      const pos = doc.indexOf('philosophy') + 10; // right after the 'y'
+      v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+    });
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(600);
+
+    const deleted = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.cm-suggestion-delete')).map(e => e.textContent)
+    );
+    console.log('Backspace 1 char — strikethrough:', deleted);
+
+    // Should show just 'y' as deleted, not the entire word 'philosophy'
+    expect(deleted.length).toBe(1);
+    expect(deleted[0]).toBe('y');
+  });
 });

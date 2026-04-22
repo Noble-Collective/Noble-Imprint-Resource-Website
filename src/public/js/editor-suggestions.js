@@ -193,7 +193,8 @@ export function computeHunks(original, current, regions = []) {
   // region represents exactly what the user edited.
   for (const g of groups) {
     if (!g.origText && !g.newText) continue;
-    if (!g.origText) continue;
+    if (!g.origText) continue; // skip pure insertions
+    if (!g.newText) continue;  // skip pure deletions — exact text was deleted, no splitting to fix
 
     // Find the edit region this group belongs to (by current-doc position)
     const region = regions.find(r => g.currFrom >= r.from && g.currFrom <= r.to);
@@ -447,19 +448,15 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     if (h.type === 'deletion') continue;
     const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
     if (!region) continue;
-    // Trim both sides by the same amount. Absorbed boundary text comes from "same"
-    // segments in diffChars — identical text in both original and current docs. So
-    // the excess is the same length on both sides. Trimming by the current-doc
-    // overflow correctly trims both newText and originalText.
+
     // Set newText exactly from the current doc using the edit region boundaries.
-    // Then find the correct originalText by matching the text AFTER the edit in both
-    // documents — since text after the edit is unchanged, we can find exactly where
-    // the original text ends.
     h.newText = current.substring(region.from, region.to);
     h.currentFrom = region.from;
     h.currentTo = region.to;
 
-    // Find correct originalTo by matching post-edit text in both docs
+    // Find the correct originalTo by matching the text AFTER the edit in both
+    // documents. Since text after the edit is unchanged, we can find exactly
+    // where the original text ends.
     const afterEdit = current.substring(region.to, region.to + 80);
     if (afterEdit.length > 0) {
       const matchPos = original.indexOf(afterEdit, h.originalFrom);
