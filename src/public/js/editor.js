@@ -1655,7 +1655,7 @@ if (data) {
   // --- Bind buttons ---
   document.getElementById('btn-suggest-edit')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
-  document.getElementById('btn-review')?.addEventListener('click', () => initEditor('review'));
+  document.getElementById('btn-review')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
 
   // Navigate between suggestion/comment cards
