@@ -66,11 +66,11 @@ app.get('/cover/*', async (req, res) => {
 
     if (ext === '.svg') {
       const data = await github.getFileRaw(repoPath);
-      res.set('Cache-Control', 'public, max-age=3600');
+      res.set('Cache-Control', 'private, max-age=3600');
       res.send(typeof data === 'string' ? data : Buffer.from(data));
     } else {
       const buf = await github.getFileBinary(repoPath);
-      res.set('Cache-Control', 'public, max-age=3600');
+      res.set('Cache-Control', 'private, max-age=3600');
       res.send(buf);
     }
   } catch (err) {
@@ -88,7 +88,7 @@ app.get('/image/*', async (req, res) => {
     const ext = path.extname(repoPath).toLowerCase();
     const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
     res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Cache-Control', 'private, max-age=3600');
     if (typeof response === 'string') {
       res.send(response);
     } else {
