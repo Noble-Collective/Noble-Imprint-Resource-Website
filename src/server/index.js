@@ -458,8 +458,4 @@ app.listen(PORT, () => {
   }).catch(err => {
     console.error('Failed to load Bibles:', err.message);
   });
-  // Warm up disk cache in the background so all pages survive rate limits
-  content.warmDiskCache().catch(err => {
-    console.error('Disk cache warm-up error:', err.message);
-  });
 });
