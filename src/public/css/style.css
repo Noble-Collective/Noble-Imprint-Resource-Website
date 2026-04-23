@@ -3178,7 +3178,7 @@ body.drawer-open {
 }
 /* History cards */
 .margin-card--history {
-  position: static;
+  position: static !important;
   background: #fafafa;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -3187,6 +3187,8 @@ body.drawer-open {
   margin-left: 8px;
   margin-right: 8px;
   font-family: 'DM Sans', sans-serif;
+  left: auto !important;
+  right: auto !important;
 }
 .margin-card-status-badge {
   font-size: 11px;
