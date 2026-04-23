@@ -5,7 +5,7 @@ import {
   suggestionExtension, setOriginal, originalDocField, setHunksChangedCallback, getCurrentHunks,
   annotationRegistry, setAnnotations, removeAnnotation, addAnnotation, updateAnnotation, isRevert,
 } from '/static/js/editor-suggestions.js';
-import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard, updateStaleCard } from '/static/js/editor-margin.js';
+import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard, updateStaleCard, renderHistoryCards, clearHistoryCards } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
@@ -1109,13 +1109,17 @@ if (data) {
       } catch { /* ignore */ }
     }
 
-    // Clean up replies
+    // Clean up replies from UI
     if (firestoreId) removeRepliesForParent(firestoreId);
     removeRepliesForParent(hunkId);
-    try {
-      if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
-      fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
-    } catch { /* ignore */ }
+    // Only delete replies from Firestore on discard (author deleting own suggestion).
+    // On reject (reviewer), replies are preserved for history.
+    if (editMode !== 'review') {
+      try {
+        if (firestoreId) fetch('/api/suggestions/replies/by-parent/' + firestoreId, { method: 'DELETE' });
+        fetch('/api/suggestions/replies/by-parent/' + hunkId, { method: 'DELETE' });
+      } catch { /* ignore */ }
+    }
     // Clean up savedHunks — check both draft hunks and direct firestoreId lookup
     if (firestoreId) {
       for (const [key, docId] of savedHunks) {
@@ -1838,6 +1842,31 @@ if (data) {
   }
   document.getElementById('btn-prev-card')?.addEventListener('click', () => navigateCards('prev'));
   document.getElementById('btn-next-card')?.addEventListener('click', () => navigateCards('next'));
+
+  // --- History toggle ---
+  let historyMode = false;
+  document.getElementById('btn-margin-history')?.addEventListener('click', async () => {
+    if (historyMode) return;
+    historyMode = true;
+    document.getElementById('btn-margin-active')?.classList.remove('active');
+    document.getElementById('btn-margin-history')?.classList.add('active');
+    try {
+      const res = await fetch('/api/suggestions/history?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (res.ok) {
+        const historyData = await res.json();
+        renderHistoryCards(historyData);
+      }
+    } catch (err) {
+      console.warn('[HISTORY] load failed:', err.message);
+    }
+  });
+  document.getElementById('btn-margin-active')?.addEventListener('click', () => {
+    if (!historyMode) return;
+    historyMode = false;
+    document.getElementById('btn-margin-history')?.classList.remove('active');
+    document.getElementById('btn-margin-active')?.classList.add('active');
+    clearHistoryCards();
+  });
 
   // Toolbar search: find text in the editor document
   const searchInput = document.getElementById('editor-search-input');

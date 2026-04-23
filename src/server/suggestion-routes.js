@@ -399,6 +399,44 @@ router.delete('/replies/by-parent/:parentId', async (req, res) => {
   }
 });
 
+// --- History (resolved suggestions + comments with reply threads) ---
+
+router.get('/history', async (req, res) => {
+  try {
+    const { filePath, bookPath, limit } = req.query;
+    const lim = parseInt(limit, 10) || 50;
+
+    const [resolvedSuggestions, resolvedComments] = await Promise.all([
+      suggestions.getResolvedSuggestions({ filePath, bookPath, limit: lim }),
+      suggestions.getResolvedComments({ filePath, bookPath, limit: lim }),
+    ]);
+
+    // Fetch replies and join to their parents
+    const allReplies = filePath
+      ? await suggestions.getRepliesForFile(filePath)
+      : []; // book-level queries: skip reply join (too broad)
+
+    const replyMap = new Map();
+    for (const r of allReplies) {
+      if (!replyMap.has(r.parentId)) replyMap.set(r.parentId, []);
+      replyMap.get(r.parentId).push({
+        id: r.id, text: r.text,
+        authorEmail: r.authorEmail, authorName: r.authorName,
+        authorPhotoURL: r.authorPhotoURL || null,
+        createdAt: r.createdAt,
+      });
+    }
+
+    for (const s of resolvedSuggestions) s.replies = replyMap.get(s.id) || [];
+    for (const c of resolvedComments) c.replies = replyMap.get(c.id) || [];
+
+    res.json({ suggestions: resolvedSuggestions, comments: resolvedComments });
+  } catch (err) {
+    console.error('History error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Direct edit (admin only) ---
 
 router.post('/direct-edit', async (req, res) => {

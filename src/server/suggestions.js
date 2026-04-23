@@ -110,6 +110,21 @@ function buildAnchorData(content, from, to, exactText) {
   };
 }
 
+// --- Location context for history cards ---
+// Captures line number and nearest heading at the time of resolution.
+function getLocationContext(content, pos) {
+  try {
+    if (!content || pos == null || pos < 0) return {};
+    const textBefore = content.substring(0, pos);
+    const lineNumber = (textBefore.match(/\n/g) || []).length + 1;
+    const headingMatches = textBefore.match(/^#{1,6}\s+(.+)$/gm);
+    const nearestHeading = headingMatches
+      ? headingMatches[headingMatches.length - 1].replace(/^#+\s+/, '')
+      : null;
+    return { resolvedLineNumber: lineNumber, resolvedHeading: nearestHeading };
+  } catch { return {}; }
+}
+
 // --- Re-anchor all remaining annotations for a file after it changes ---
 async function reanchorAnnotations(filePath, newContent) {
   const newHash = contentHash(newContent);
@@ -458,14 +473,16 @@ async function acceptHunk(id, resolverEmail) {
   const message = `Accept suggestion by ${hunk.authorEmail}`;
   await github.updateFileContent(hunk.filePath, newContent, currentSha, message);
 
-  // Mark accepted
+  // Mark accepted with location context for history
+  const acceptLocation = getLocationContext(currentContent, hunk.originalFrom || 0);
   await suggestionsCollection().doc(id).update({
     status: 'accepted',
     resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedBy: resolverEmail,
+    ...acceptLocation,
   });
 
-  await deleteRepliesForParent(id);
+  // Replies are preserved for history — not deleted on accept
 
   // Re-anchor all remaining annotations against the new file content
   await reanchorAnnotations(hunk.filePath, newContent);
@@ -475,13 +492,24 @@ async function acceptHunk(id, resolverEmail) {
 }
 
 async function rejectHunk(id, resolverEmail, reason) {
+  // Capture location context for history before rejecting
+  let rejectLocation = {};
+  try {
+    const hunk = await getHunk(id);
+    if (hunk && hunk.filePath) {
+      const { content } = await github.getFileContent(hunk.filePath);
+      rejectLocation = getLocationContext(content, hunk.originalFrom || 0);
+    }
+  } catch { /* location context is optional */ }
+
   await suggestionsCollection().doc(id).update({
     status: 'rejected',
     resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedBy: resolverEmail,
     rejectionReason: reason || null,
+    ...rejectLocation,
   });
-  await deleteRepliesForParent(id);
+  // Replies are preserved for history — not deleted on reject
 }
 
 // --- Comment CRUD ---
@@ -529,12 +557,26 @@ async function getCommentsForFile(filePath) {
 }
 
 async function resolveComment(id, resolverEmail) {
+  // Capture location context for history
+  let commentLocation = {};
+  try {
+    const doc = await commentsCollection().doc(id).get();
+    if (doc.exists) {
+      const c = doc.data();
+      if (c.filePath) {
+        const { content } = await github.getFileContent(c.filePath);
+        commentLocation = getLocationContext(content, c.from || 0);
+      }
+    }
+  } catch { /* location context is optional */ }
+
   await commentsCollection().doc(id).update({
     status: 'resolved',
     resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedBy: resolverEmail,
+    ...commentLocation,
   });
-  await deleteRepliesForParent(id);
+  // Replies are preserved for history — not deleted on resolve
 }
 
 // --- Reply CRUD ---
@@ -620,6 +662,61 @@ async function getActiveEditors(filePath) {
   return editors;
 }
 
+// --- History queries ---
+
+async function getResolvedSuggestions({ filePath, bookPath, limit } = {}) {
+  // Query each resolved status separately to avoid needing composite indexes for `in` queries
+  const statuses = ['accepted', 'rejected', 'stale'];
+  const lim = limit || 50;
+  const allDocs = [];
+  for (const status of statuses) {
+    let query = suggestionsCollection().where('status', '==', status);
+    if (filePath) query = query.where('filePath', '==', filePath);
+    if (bookPath) query = query.where('bookPath', '==', bookPath);
+    const snapshot = await query.get();
+    for (const doc of snapshot.docs) allDocs.push({ id: doc.id, ...doc.data() });
+  }
+  // Sort by resolvedAt descending, limit
+  allDocs.sort((a, b) => {
+    const ta = a.resolvedAt?.toMillis ? a.resolvedAt.toMillis() : 0;
+    const tb = b.resolvedAt?.toMillis ? b.resolvedAt.toMillis() : 0;
+    return tb - ta;
+  });
+  return allDocs.slice(0, lim).map(d => ({
+    id: d.id, filePath: d.filePath, bookPath: d.bookPath,
+    type: d.type, originalText: d.originalText, newText: d.newText,
+    authorEmail: d.authorEmail, authorName: d.authorName,
+    status: d.status, createdAt: d.createdAt,
+    resolvedAt: d.resolvedAt, resolvedBy: d.resolvedBy,
+    rejectionReason: d.rejectionReason || null,
+    resolvedLineNumber: d.resolvedLineNumber || null,
+    resolvedHeading: d.resolvedHeading || null,
+  }));
+}
+
+async function getResolvedComments({ filePath, bookPath, limit } = {}) {
+  let query = commentsCollection().where('status', '==', 'resolved');
+  if (filePath) query = query.where('filePath', '==', filePath);
+  if (bookPath) query = query.where('bookPath', '==', bookPath);
+  const snapshot = await query.get();
+  const allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  allDocs.sort((a, b) => {
+    const ta = a.resolvedAt?.toMillis ? a.resolvedAt.toMillis() : 0;
+    const tb = b.resolvedAt?.toMillis ? b.resolvedAt.toMillis() : 0;
+    return tb - ta;
+  });
+  const lim = limit || 50;
+  return allDocs.slice(0, lim).map(d => ({
+    id: d.id, filePath: d.filePath, bookPath: d.bookPath,
+    selectedText: d.selectedText, commentText: d.commentText,
+    authorEmail: d.authorEmail, authorName: d.authorName,
+    status: d.status, createdAt: d.createdAt,
+    resolvedAt: d.resolvedAt, resolvedBy: d.resolvedBy,
+    resolvedLineNumber: d.resolvedLineNumber || null,
+    resolvedHeading: d.resolvedHeading || null,
+  }));
+}
+
 module.exports = {
   createHunk,
   updateHunk,
@@ -636,6 +733,8 @@ module.exports = {
   createReply,
   getRepliesForFile,
   deleteRepliesForParent,
+  getResolvedSuggestions,
+  getResolvedComments,
   resolveAnchor,
   reanchorAnnotations,
   contentHash,

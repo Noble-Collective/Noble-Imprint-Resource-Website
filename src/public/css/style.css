@@ -3154,6 +3154,60 @@ body.drawer-open {
   border: 1px solid #ef9a9a;
   border-radius: 6px;
 }
+/* History toggle */
+.editor-history-toggle {
+  display: flex;
+  gap: 0;
+  margin: 0 8px;
+}
+.editor-history-btn {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  border-radius: 0 !important;
+  border: 1px solid #ddd !important;
+  background: #f5f5f5 !important;
+  color: #888 !important;
+}
+.editor-history-btn:first-child { border-radius: 4px 0 0 4px !important; }
+.editor-history-btn:last-child { border-radius: 0 4px 4px 0 !important; border-left: none !important; }
+.editor-history-btn.active {
+  background: #fff !important;
+  color: #333 !important;
+  border-color: #aaa !important;
+  font-weight: 600 !important;
+}
+/* History cards */
+.margin-card--history {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-family: 'DM Sans', sans-serif;
+  position: relative;
+}
+.margin-card-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.margin-card-status-badge--accepted { background: #e8f5e9; color: #2e7d32; }
+.margin-card-status-badge--rejected { background: #fce4ec; color: #c62828; }
+.margin-card-status-badge--stale { background: #fff3e0; color: #e65100; }
+.margin-card-status-badge--resolved { background: #f5f5f5; color: #616161; }
+.margin-card-location {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+.margin-card-reject-reason {
+  font-size: 12px;
+  color: #c62828;
+  font-style: italic;
+  margin-top: 4px;
+}
 .edit-btn {
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;

@@ -646,3 +646,131 @@ export function repositionCards() {
     renderAllCards();
   }, 100);
 }
+
+// --- History view ---
+let isHistoryMode = false;
+
+export function renderHistoryCards(data) {
+  if (!marginEl) return;
+  isHistoryMode = true;
+  const suggestions = data.suggestions || [];
+  const comments = data.comments || [];
+
+  if (suggestions.length === 0 && comments.length === 0) {
+    marginEl.innerHTML = '<div class="margin-empty">No editing history for this file</div>';
+    return;
+  }
+
+  // Merge and sort by resolvedAt descending
+  const items = [];
+  for (const s of suggestions) items.push({ kind: 'suggestion', data: s, resolvedAt: s.resolvedAt });
+  for (const c of comments) items.push({ kind: 'comment', data: c, resolvedAt: c.resolvedAt });
+  items.sort((a, b) => {
+    const ta = a.resolvedAt?._seconds || a.resolvedAt?.seconds || 0;
+    const tb = b.resolvedAt?._seconds || b.resolvedAt?.seconds || 0;
+    return tb - ta;
+  });
+
+  let html = '';
+  for (const item of items) {
+    if (item.kind === 'suggestion') {
+      const s = item.data;
+      const statusClass = s.status === 'accepted' ? 'accepted' : s.status === 'rejected' ? 'rejected' : 'stale';
+      const statusLabel = s.status === 'accepted' ? 'Accepted' : s.status === 'rejected' ? 'Rejected' : 'Stale';
+      const resolvedDate = s.resolvedAt ? new Date((s.resolvedAt._seconds || s.resolvedAt.seconds || 0) * 1000) : null;
+
+      let bodyHtml = '';
+      if (s.type === 'deletion') {
+        bodyHtml = '<span class="margin-card-del">' + escapeHtml(truncate(s.originalText, 80)) + '</span>';
+      } else if (s.type === 'insertion') {
+        bodyHtml = '<span class="margin-card-ins">' + escapeHtml(truncate(s.newText, 80)) + '</span>';
+      } else {
+        bodyHtml = '<span class="margin-card-del">' + escapeHtml(truncate(s.originalText, 40)) + '</span>'
+          + ' <span class="margin-card-arrow">&rarr;</span> '
+          + '<span class="margin-card-ins">' + escapeHtml(truncate(s.newText, 40)) + '</span>';
+      }
+
+      const locationHtml = buildLocationHtml(s.resolvedLineNumber, s.resolvedHeading);
+      const threadHtml = buildHistoryThreadHtml(s.replies || []);
+
+      html += '<div class="margin-card margin-card--history">'
+        + '<div class="margin-card-header">'
+        + '<div class="margin-card-user">'
+        + renderAvatar(s.authorName || s.authorEmail, s.authorEmail, null, false)
+        + '<span class="margin-card-name">' + escapeHtml(s.authorName || s.authorEmail || 'Unknown') + '</span>'
+        + '</div>'
+        + '<span class="margin-card-status-badge margin-card-status-badge--' + statusClass + '">' + statusLabel + '</span>'
+        + '</div>'
+        + '<div class="margin-card-body">' + bodyHtml + '</div>'
+        + (s.rejectionReason ? '<div class="margin-card-reject-reason">Reason: ' + escapeHtml(s.rejectionReason) + '</div>' : '')
+        + locationHtml
+        + threadHtml
+        + '<div class="margin-card-time">'
+        + (resolvedDate ? timeAgo(resolvedDate) : '')
+        + (s.resolvedBy ? ' by ' + escapeHtml(s.resolvedBy) : '')
+        + '</div>'
+        + '</div>';
+
+    } else {
+      const c = item.data;
+      const resolvedDate = c.resolvedAt ? new Date((c.resolvedAt._seconds || c.resolvedAt.seconds || 0) * 1000) : null;
+      const locationHtml = buildLocationHtml(c.resolvedLineNumber, c.resolvedHeading);
+      const threadHtml = buildHistoryThreadHtml(c.replies || []);
+
+      html += '<div class="margin-card margin-card--history">'
+        + '<div class="margin-card-header">'
+        + '<div class="margin-card-user">'
+        + renderAvatar(c.authorName || c.authorEmail, c.authorEmail, null, false)
+        + '<span class="margin-card-name">' + escapeHtml(c.authorName || c.authorEmail || 'Unknown') + '</span>'
+        + '</div>'
+        + '<span class="margin-card-status-badge margin-card-status-badge--resolved">Resolved</span>'
+        + '</div>'
+        + '<div class="margin-card-body">'
+        + '<span class="margin-card-quote">"' + escapeHtml(truncate(c.selectedText, 60)) + '"</span>'
+        + '<p class="margin-card-comment-text">' + escapeHtml(c.commentText) + '</p>'
+        + '</div>'
+        + locationHtml
+        + threadHtml
+        + '<div class="margin-card-time">'
+        + (resolvedDate ? timeAgo(resolvedDate) : '')
+        + (c.resolvedBy ? ' by ' + escapeHtml(c.resolvedBy) : '')
+        + '</div>'
+        + '</div>';
+    }
+  }
+
+  marginEl.innerHTML = html;
+}
+
+function buildLocationHtml(lineNumber, heading) {
+  if (!lineNumber && !heading) return '';
+  const parts = [];
+  if (lineNumber) parts.push('Line ' + lineNumber);
+  if (heading) parts.push(escapeHtml(heading));
+  return '<div class="margin-card-location">' + parts.join(' &middot; ') + '</div>';
+}
+
+function buildHistoryThreadHtml(replies) {
+  if (!replies || replies.length === 0) return '';
+  var html = '<div class="margin-card-thread">';
+  for (var i = 0; i < replies.length; i++) {
+    var r = replies[i];
+    var rName = r.authorName || r.authorEmail || 'Unknown';
+    var rTime = r.createdAt ? (r.createdAt._seconds ? new Date(r.createdAt._seconds * 1000) : new Date(r.createdAt)) : new Date();
+    html += '<div class="margin-card-reply">'
+      + renderAvatar(rName, r.authorEmail, r.authorPhotoURL || null, true)
+      + '<div class="margin-card-reply-content">'
+      + '<span class="margin-card-reply-author">' + escapeHtml(rName) + '</span>'
+      + '<span class="margin-card-reply-time">' + timeAgo(rTime) + '</span>'
+      + '<div class="margin-card-reply-text">' + escapeHtml(r.text) + '</div>'
+      + '</div>'
+      + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+export function clearHistoryCards() {
+  isHistoryMode = false;
+  renderAllCards();
+}

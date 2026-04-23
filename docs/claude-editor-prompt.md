@@ -116,6 +116,14 @@ Returns: `{ id, status: "ok" }`
 
 Use replies to add context to your own suggestions (e.g., explain why you recommended a change) or to respond to other users' suggestions/comments.
 
+#### View editing history for a file
+```
+GET /api/suggestions/history?filePath={filePath}
+Header: x-api-key: {key}
+Optional query params: bookPath, limit (default 50)
+```
+Returns: `{ suggestions: [...], comments: [...] }` — resolved suggestions (accepted/rejected/stale) and resolved comments, each with their reply threads. Use this before editing to learn from past editorial decisions, common corrections, and reviewer feedback.
+
 ### Content Structure
 
 The resources repo is organized as:
