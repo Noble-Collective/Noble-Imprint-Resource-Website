@@ -411,6 +411,41 @@ function getAllBooks(tree) {
   return books;
 }
 
+// Pre-fetch all session content and cover images into disk cache.
+// Runs in the background after startup so the disk cache is warm
+// before a rate limit can hit. Fetches sequentially to avoid spiking API usage.
+async function warmDiskCache() {
+  try {
+    const tree = await buildContentTree();
+    const books = getAllBooks(tree);
+    let sessions = 0, covers = 0;
+    for (const book of books) {
+      // Cache cover image
+      if (book.coverPath) {
+        try {
+          const ext = path.extname(book.coverPath).toLowerCase();
+          if (ext === '.svg') {
+            await github.getFileRaw(book.coverPath);
+          } else {
+            await github.getFileBinary(book.coverPath);
+          }
+          covers++;
+        } catch { /* ignore individual failures */ }
+      }
+      // Cache all session content
+      for (const session of (book.sessions || [])) {
+        try {
+          await github.getFileContent(session.path);
+          sessions++;
+        } catch { /* ignore individual failures */ }
+      }
+    }
+    console.log(`Disk cache warm-up complete: ${sessions} sessions, ${covers} covers across ${books.length} books`);
+  } catch (err) {
+    console.error('Disk cache warm-up failed:', err.message);
+  }
+}
+
 module.exports = {
   buildContentTree,
   resolveRoute,
@@ -423,5 +458,6 @@ module.exports = {
   filterContentTree,
   canAccessBook,
   getAllBooks,
+  warmDiskCache,
   slugify,
 };
