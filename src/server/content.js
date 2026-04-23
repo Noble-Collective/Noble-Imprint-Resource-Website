@@ -295,13 +295,13 @@ function loadConfig() {
 
 // Get session content with title extraction
 async function loadSessionContent(session) {
-  const { content, sha } = await github.getFileContent(session.path);
+  const result = await github.getFileContent(session.path);
 
   // Extract h1 title from content
-  const h1Match = content.match(/^#\s+(.+)$/m);
+  const h1Match = result.content.match(/^#\s+(.+)$/m);
   const title = h1Match ? h1Match[1].trim() : session.displayName;
 
-  return { content, sha, title };
+  return { content: result.content, sha: result.sha, title, fromDiskCache: result.fromDiskCache || false };
 }
 
 // Load h1 titles for all sessions in a book (for book detail page)

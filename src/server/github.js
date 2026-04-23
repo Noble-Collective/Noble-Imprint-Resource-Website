@@ -66,7 +66,7 @@ async function getFileContent(path) {
     // Fall back to disk cache during rate limits or GitHub outages
     try {
       const diskData = fs.readFileSync(diskCachePath(path), 'utf8');
-      const diskResult = JSON.parse(diskData);
+      const diskResult = { ...JSON.parse(diskData), fromDiskCache: true };
       console.warn('[GITHUB] API failed for', path, '— serving from disk cache');
       cache.set(cacheKey, diskResult, 60 * 1000); // short TTL — retry API in 1 min
       return diskResult;
@@ -76,13 +76,28 @@ async function getFileContent(path) {
 }
 
 async function getFileBinary(path) {
-  const { data } = await getOctokit().rest.repos.getContent({
-    owner: OWNER,
-    repo: REPO,
-    path,
-  });
-  if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
-  return Buffer.from(data.content, 'base64');
+  try {
+    const { data } = await getOctokit().rest.repos.getContent({
+      owner: OWNER,
+      repo: REPO,
+      path,
+    });
+    if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
+    const buf = Buffer.from(data.content, 'base64');
+    // Persist to disk for rate limit fallback
+    try {
+      fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+      fs.writeFileSync(diskCachePath(path + '.bin'), buf);
+    } catch { /* ignore */ }
+    return buf;
+  } catch (err) {
+    try {
+      const buf = fs.readFileSync(diskCachePath(path + '.bin'));
+      console.warn('[GITHUB] API failed for binary', path, '— serving from disk cache');
+      return buf;
+    } catch { /* no disk cache */ }
+    throw err;
+  }
 }
 
 async function getFileRaw(path) {

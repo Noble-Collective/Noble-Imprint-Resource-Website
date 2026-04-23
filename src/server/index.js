@@ -360,10 +360,12 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const nextSession = idx < book.sessions.length - 1 ? book.sessions[idx + 1] : null;
 
       // Editor data — for users with edit/review permissions
+      // Disable editing when content came from disk cache (GitHub API unavailable) —
+      // editing must always start with the latest content to prevent stale edits
       const suggestions = require('./suggestions');
       let editRole = null;
       let allPendingSuggestions = [];
-      if (req.user) {
+      if (req.user && !sessionData.fromDiskCache) {
         editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
       }
       const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
