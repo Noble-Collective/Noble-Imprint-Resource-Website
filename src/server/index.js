@@ -458,4 +458,17 @@ app.listen(PORT, () => {
   }).catch(err => {
     console.error('Failed to load Bibles:', err.message);
   });
+  // Warm up disk cache 30s after startup — gives the server time to handle
+  // initial requests from the deploy health check before using API budget.
+  // Only runs if the disk cache is empty (no content-tree-cache.json).
+  const treeCachePath = require('path').join(__dirname, '..', '.content-tree-cache.json');
+  if (!require('fs').existsSync(treeCachePath)) {
+    setTimeout(() => {
+      content.warmDiskCache().catch(err => {
+        console.error('Disk cache warm-up error:', err.message);
+      });
+    }, 30000);
+  } else {
+    console.log('Disk cache already exists — skipping warm-up');
+  }
 });

@@ -33,13 +33,8 @@ jobs:
       - name: Build and push image
         run: |
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          docker build \
-            --build-arg BUILD_TIME="$BUILD_TIME" \
-            --build-arg GITHUB_TOKEN="${{ secrets.GH_PAT }}" \
-            -t gcr.io/noble-imprint-website/resource-website .
+          docker build --build-arg BUILD_TIME="$BUILD_TIME" -t gcr.io/noble-imprint-website/resource-website .
           docker push gcr.io/noble-imprint-website/resource-website
-        env:
-          DOCKER_BUILDKIT: "1"
 
       - name: Deploy to Cloud Run
         run: |
