@@ -1,10 +1,13 @@
 const { Octokit } = require('octokit');
+const fs = require('fs');
+const pathLib = require('path');
 const cache = require('./cache');
 
 const OWNER = 'Noble-Collective';
 const REPO = 'Noble-Imprint-Resources';
 
 const FILE_CACHE_TTL = 30 * 1000; // 30 seconds
+const DISK_CACHE_DIR = pathLib.join(__dirname, '..', '.file-cache');
 
 let octokit;
 
@@ -34,21 +37,42 @@ async function getDirectoryContents(path) {
   return data;
 }
 
+function diskCachePath(filePath) {
+  return pathLib.join(DISK_CACHE_DIR, filePath.replace(/\//g, '__') + '.json');
+}
+
 async function getFileContent(path) {
   const cacheKey = 'file:' + path;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const { data } = await getOctokit().rest.repos.getContent({
-    owner: OWNER,
-    repo: REPO,
-    path,
-  });
-  if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
-  const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const result = { content, sha: data.sha };
-  cache.set(cacheKey, result, FILE_CACHE_TTL);
-  return result;
+  try {
+    const { data } = await getOctokit().rest.repos.getContent({
+      owner: OWNER,
+      repo: REPO,
+      path,
+    });
+    if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
+    const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const result = { content, sha: data.sha };
+    cache.set(cacheKey, result, FILE_CACHE_TTL);
+    // Persist to disk so content survives rate limits and container restarts
+    try {
+      fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+      fs.writeFileSync(diskCachePath(path), JSON.stringify(result));
+    } catch { /* ignore disk errors */ }
+    return result;
+  } catch (err) {
+    // Fall back to disk cache during rate limits or GitHub outages
+    try {
+      const diskData = fs.readFileSync(diskCachePath(path), 'utf8');
+      const diskResult = JSON.parse(diskData);
+      console.warn('[GITHUB] API failed for', path, '— serving from disk cache');
+      cache.set(cacheKey, diskResult, 60 * 1000); // short TTL — retry API in 1 min
+      return diskResult;
+    } catch { /* no disk cache — rethrow original error */ }
+    throw err;
+  }
 }
 
 async function getFileBinary(path) {

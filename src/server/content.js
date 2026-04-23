@@ -6,6 +6,7 @@ const path = require('path');
 
 const TREE_CACHE_KEY = 'content-tree';
 const TREE_TTL = 10 * 60 * 1000; // 10 minutes
+const TREE_DISK_PATH = path.join(__dirname, '..', '.content-tree-cache.json');
 
 function slugify(name) {
   return name
@@ -213,12 +214,21 @@ async function buildContentTree() {
 
   const tree = { series };
   cache.set(TREE_CACHE_KEY, tree, TREE_TTL);
+  // Persist to disk so the tree survives rate limits and container restarts
+  try { fs.writeFileSync(TREE_DISK_PATH, JSON.stringify(tree)); } catch { /* ignore disk errors */ }
   console.log(`Content tree built: ${series.length} series, ${series.reduce((n, s) => n + s.bookCount, 0)} books`);
   return tree;
   } catch (err) {
     console.error('Content tree build failed:', err.message);
-    // Return empty tree so the site stays up — pages will show "no content"
-    // instead of 500. The cache is NOT set, so the next request retries.
+    // Fall back to disk cache — serves the last successful tree so all pages
+    // keep working during rate limits or GitHub outages
+    try {
+      const diskData = fs.readFileSync(TREE_DISK_PATH, 'utf8');
+      const diskTree = JSON.parse(diskData);
+      console.log('Content tree loaded from disk fallback');
+      cache.set(TREE_CACHE_KEY, diskTree, 60 * 1000); // short TTL — retry API in 1 min
+      return diskTree;
+    } catch { /* no disk cache available */ }
     return { series: [] };
   }
 }

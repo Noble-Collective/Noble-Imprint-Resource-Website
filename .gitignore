@@ -9,5 +9,9 @@ mockups/
 # Firebase
 .firebase/
 
+# Disk caches (rebuilt at runtime from GitHub API)
+.file-cache/
+.content-tree-cache.json
+
 # Test
 test-results/
