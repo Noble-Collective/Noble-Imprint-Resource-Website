@@ -1790,7 +1790,15 @@ if (data) {
         const directEditor = editors.find(e => e.mode === 'direct' && e.email !== currentEmail);
         if (directEditor) {
           const name = directEditor.displayName || directEditor.email;
-          showToast(name + ' is currently editing this file directly. Please wait or use Suggest Edits instead.', 'error');
+          // Can't use showToast — #editor-toast is inside the hidden editor container.
+          // Create a page-level toast so it's visible on the reading page.
+          const toast = document.createElement('div');
+          toast.className = 'editor-toast editor-toast--error';
+          toast.textContent = name + ' is currently editing this file directly. Please wait or use Suggest Edits instead.';
+          toast.style.display = 'block';
+          document.body.appendChild(toast);
+          toast.addEventListener('click', () => toast.remove());
+          setTimeout(() => toast.remove(), 5000);
           return;
         }
       }
