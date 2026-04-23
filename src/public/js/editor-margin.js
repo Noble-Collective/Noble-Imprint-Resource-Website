@@ -78,14 +78,14 @@ export function removeRepliesForParent(parentId) {
 export function updateCommentCards(comments) {
   console.log('[MARGIN] updateCommentCards called with', (comments || []).length, 'comments');
   currentComments = comments || [];
-  renderAllCards();
+  if (!isHistoryMode) renderAllCards();
 }
 
 export function updateMarginCards(hunks) {
   if (!marginEl || !editorView) return;
   console.log('[MARGIN] updateMarginCards called with', hunks.length, 'hunks');
   currentHunks = hunks;
-  renderAllCards();
+  if (!isHistoryMode) renderAllCards();
 }
 
 function buildThreadHtml(parentId, parentType) {
@@ -639,6 +639,7 @@ export function updateStaleCard(hunkId, updates) {
 // Reposition cards on scroll or resize
 let repositionTimer = null;
 export function repositionCards() {
+  if (isHistoryMode) return; // History cards are static — no repositioning needed
   if (!editorView || !marginEl || (currentHunks.length === 0 && currentComments.length === 0)) return;
   // Debounce reposition to let CM6 finish height recalculations
   clearTimeout(repositionTimer);
