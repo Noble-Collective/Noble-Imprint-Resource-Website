@@ -3178,13 +3178,15 @@ body.drawer-open {
 }
 /* History cards */
 .margin-card--history {
+  position: static;
   background: #fafafa;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 8px;
+  margin-left: 8px;
+  margin-right: 8px;
   font-family: 'DM Sans', sans-serif;
-  position: relative;
 }
 .margin-card-status-badge {
   font-size: 11px;
