@@ -44,10 +44,7 @@ jobs:
             --region us-central1 \
             --project=noble-imprint-website
 
-      - name: Clear content cache
-        run: |
-          sleep 10
-          curl -s -X POST https://resources.noblecollective.org/api/refresh || true
-
-      # Test data cleanup available manually: POST /api/cleanup-test-data
-      # Removed from auto-deploy to avoid wiping Session 1 data between test runs
+      # Content cache refresh not needed on deploy — new containers start with
+      # empty in-memory cache. The runtime warm-up populates the disk cache.
+      # Manual refresh still available: POST /api/refresh
+      # Test data cleanup still available: POST /api/cleanup-test-data
