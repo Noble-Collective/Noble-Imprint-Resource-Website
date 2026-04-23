@@ -68,7 +68,11 @@
       </div>
     </div>
 
-    <% if (typeof editRole !== 'undefined' && editRole) { %>
+    <% if (typeof editUnavailable !== 'undefined' && editUnavailable) { %>
+      <div class="edit-toolbar edit-toolbar--unavailable" id="edit-toolbar">
+        <span class="edit-unavailable-msg">Editing temporarily unavailable — GitHub API rate limit reached.<% if (typeof rateLimitReset !== 'undefined' && rateLimitReset) { %> Expected to resume at <strong><%= new Date(rateLimitReset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) %></strong>.<% } else { %> Please try again shortly.<% } %></span>
+      </div>
+    <% } else if (typeof editRole !== 'undefined' && editRole) { %>
       <div class="edit-toolbar" id="edit-toolbar">
         <button class="edit-btn" id="btn-suggest-edit">Suggest Edits</button>
         <% if (editRole === 'admin' || editRole === 'manuscript-owner') { %>

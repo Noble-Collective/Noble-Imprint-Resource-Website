@@ -63,16 +63,18 @@ app.get('/cover/*', async (req, res) => {
     const ext = path.extname(repoPath).toLowerCase();
     const mimeTypes = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
     res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-    res.set('Cache-Control', 'public, max-age=3600');
 
     if (ext === '.svg') {
       const data = await github.getFileRaw(repoPath);
+      res.set('Cache-Control', 'public, max-age=3600');
       res.send(typeof data === 'string' ? data : Buffer.from(data));
     } else {
       const buf = await github.getFileBinary(repoPath);
+      res.set('Cache-Control', 'public, max-age=3600');
       res.send(buf);
     }
   } catch (err) {
+    res.set('Cache-Control', 'no-store');
     res.status(404).send('Cover not found');
   }
 });
@@ -93,6 +95,7 @@ app.get('/image/*', async (req, res) => {
       res.send(Buffer.from(response));
     }
   } catch (err) {
+    res.set('Cache-Control', 'no-store');
     res.status(404).send('Image not found');
   }
 });
@@ -401,6 +404,11 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         }
       }
 
+      // If content came from disk cache and user has edit access, show a message
+      const github = require('./github');
+      const editUnavailable = sessionData.fromDiskCache && req.user ? true : false;
+      const rateLimitReset = editUnavailable ? github.getRateLimitReset() : null;
+
       res.render('session', {
         series,
         subseries: subseries || null,
@@ -422,6 +430,8 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         pendingReplies: allReplies,
         sessionFilePath: canEdit ? session.path : null,
         bookRepoPath: canEdit ? book.repoPath : null,
+        editUnavailable,
+        rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
       });
     }
   } catch (err) {

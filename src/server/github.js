@@ -9,6 +9,13 @@ const REPO = 'Noble-Imprint-Resources';
 const FILE_CACHE_TTL = 30 * 1000; // 30 seconds
 const DISK_CACHE_DIR = pathLib.join(__dirname, '..', '.file-cache');
 
+// Track rate limit reset time from GitHub API error responses
+let rateLimitResetAt = null;
+
+function getRateLimitReset() {
+  return rateLimitResetAt;
+}
+
 let octokit;
 
 function getOctokit() {
@@ -63,6 +70,9 @@ async function getFileContent(path) {
     } catch { /* ignore disk errors */ }
     return result;
   } catch (err) {
+    // Capture rate limit reset time from GitHub response headers
+    const resetHeader = err.response?.headers?.['x-ratelimit-reset'];
+    if (resetHeader) rateLimitResetAt = new Date(parseInt(resetHeader, 10) * 1000);
     // Fall back to disk cache during rate limits or GitHub outages
     try {
       const diskData = fs.readFileSync(diskCachePath(path), 'utf8');
@@ -101,13 +111,28 @@ async function getFileBinary(path) {
 }
 
 async function getFileRaw(path) {
-  const { data } = await getOctokit().request('GET /repos/{owner}/{repo}/contents/{path}', {
-    owner: OWNER,
-    repo: REPO,
-    path,
-    headers: { accept: 'application/vnd.github.raw+json' },
-  });
-  return data;
+  try {
+    const { data } = await getOctokit().request('GET /repos/{owner}/{repo}/contents/{path}', {
+      owner: OWNER,
+      repo: REPO,
+      path,
+      headers: { accept: 'application/vnd.github.raw+json' },
+    });
+    try {
+      fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
+      fs.writeFileSync(diskCachePath(path + '.raw'), typeof data === 'string' ? data : Buffer.from(data));
+    } catch { /* ignore */ }
+    return data;
+  } catch (err) {
+    const resetHeader = err.response?.headers?.['x-ratelimit-reset'];
+    if (resetHeader) rateLimitResetAt = new Date(parseInt(resetHeader, 10) * 1000);
+    try {
+      const cached = fs.readFileSync(diskCachePath(path + '.raw'));
+      console.warn('[GITHUB] API failed for raw', path, '— serving from disk cache');
+      return cached;
+    } catch { /* no disk cache */ }
+    throw err;
+  }
 }
 
 async function getFileContentAtRef(path, ref) {
@@ -151,4 +176,4 @@ async function updateFileContent(filePath, content, sha, message) {
   cache.del('file:' + filePath);
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, OWNER, REPO };
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getRateLimitReset, OWNER, REPO };

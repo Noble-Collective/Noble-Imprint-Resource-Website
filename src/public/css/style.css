@@ -3145,6 +3145,15 @@ body.drawer-open {
   gap: 10px;
   margin-bottom: 16px;
 }
+.edit-unavailable-msg {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #b71c1c;
+  padding: 8px 14px;
+  background: #fce4ec;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+}
 .edit-btn {
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
