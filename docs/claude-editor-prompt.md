@@ -122,7 +122,34 @@ GET /api/suggestions/history?filePath={filePath}
 Header: x-api-key: {key}
 Optional query params: bookPath, limit (default 50)
 ```
-Returns: `{ suggestions: [...], comments: [...] }` — resolved suggestions (accepted/rejected/stale) and resolved comments, each with their reply threads. Use this before editing to learn from past editorial decisions, common corrections, and reviewer feedback.
+Returns:
+```json
+{
+  "suggestions": [{
+    "id", "filePath", "type", "originalText", "newText",
+    "authorEmail", "authorName", "status", "createdAt",
+    "resolvedAt", "resolvedBy", "rejectionReason",
+    "resolvedLineNumber", "resolvedHeading",
+    "replies": [{ "text", "authorEmail", "authorName", "createdAt" }]
+  }],
+  "comments": [{
+    "id", "filePath", "selectedText", "commentText",
+    "authorEmail", "authorName", "status",
+    "resolvedAt", "resolvedBy",
+    "resolvedLineNumber", "resolvedHeading",
+    "replies": [...]
+  }]
+}
+```
+
+**How to use history:** Call this before editing a file to learn from past editorial decisions. Pay attention to:
+- **Accepted suggestions** — these show the editorial standards the reviewers prefer. If past suggestions of a certain type were consistently accepted, make similar suggestions.
+- **Rejected suggestions with reasons** — learn what the reviewers don't want. If a certain kind of edit was rejected, avoid making similar suggestions.
+- **Reply threads** — reviewer comments on past suggestions explain their reasoning. These are the most valuable signal for understanding editorial preferences.
+- **Your own past suggestions** — filter for `authorEmail: "claude@noblecollective.org"` to see which of your past suggestions were accepted vs. rejected and why.
+- **Patterns across a book** — use `bookPath` instead of `filePath` to see history across all sessions in a book. This reveals book-level style preferences.
+
+You can also use `GET /api/suggestions/history?bookPath={bookPath}` (without filePath) to see history across all sessions in a book. Note: reply threads are only included when querying by filePath.
 
 ### Content Structure
 
@@ -178,13 +205,18 @@ You would:
    ```
    GET /api/content-tree
    ```
-2. Fetch the content using the discovered filePath:
+2. Check editing history to learn from past decisions on this file:
+   ```
+   GET /api/suggestions/history?filePath=series/Narrative Journey Series/Foundations/The Call of Christ/sessions/4-Session1-TheGospel.md
+   ```
+   Review which past suggestions were accepted/rejected, and note any patterns or reviewer preferences from reply threads.
+3. Fetch the current content:
    ```
    GET /api/suggestions/content?filePath=series/Narrative Journey Series/Foundations/The Call of Christ/sessions/4-Session1-TheGospel.md
    ```
-3. Read the introduction section
-4. Identify improvements
-5. Submit each suggestion with a reason:
+4. Read the introduction section
+5. Identify improvements (informed by the history review)
+6. Submit each suggestion with a reason:
    ```
    POST /api/suggestions/hunk
    { "type": "replacement", "originalText": "...", "newText": "...", "reason": "Simplifying for clarity", ... }
