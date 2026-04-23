@@ -3372,6 +3372,15 @@ body.drawer-open {
   font-weight: 500;
 }
 /* Stale file banner */
+.direct-edit-lock-banner {
+  padding: 8px 16px;
+  background: #fce4ec;
+  border-bottom: 1px solid #ef9a9a;
+  color: #c62828;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  text-align: center;
+}
 .editor-stale-banner {
   display: flex;
   align-items: center;
@@ -3778,6 +3787,14 @@ body.drawer-open {
 .margin-action--accept:hover {
   background: #e8f5e9;
   border-color: #27ae60;
+}
+.margin-action--locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.margin-action--locked:hover {
+  background: transparent;
+  border-color: transparent;
 }
 .margin-action--reject {
   color: #c0392b;

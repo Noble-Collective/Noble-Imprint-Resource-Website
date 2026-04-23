@@ -53,11 +53,12 @@ router.get('/suggestion-count', async (req, res) => {
 // --- Editing session presence ---
 router.post('/presence', async (req, res) => {
   try {
-    const { filePath } = req.body;
+    const { filePath, mode } = req.body;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
     await suggestions.enterEditingSession({
       filePath, email: req.user.email, displayName: req.user.displayName || req.user.email,
       photoURL: req.user.photoURL || null,
+      mode: mode || null,
     });
     res.json({ ok: true });
   } catch (err) {
@@ -276,6 +277,14 @@ router.put('/hunk/:id/accept', async (req, res) => {
     if (!hunk) return res.status(404).json({ error: 'Not found' });
     if (!(await canReview(req.user.email, hunk.bookPath))) {
       return res.status(403).json({ error: 'No review permission' });
+    }
+
+    // Block accepts while someone is in direct edit mode on this file
+    const activeEditors = await suggestions.getActiveEditors(hunk.filePath);
+    const directEditor = activeEditors.find(e => e.mode === 'direct');
+    if (directEditor) {
+      const name = directEditor.displayName || directEditor.email;
+      return res.status(423).json({ error: name + ' is currently making direct edits to this file. Accepting suggestions is temporarily disabled.' });
     }
 
     const result = await suggestions.acceptHunk(req.params.id, req.user.email);

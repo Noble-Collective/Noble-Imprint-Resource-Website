@@ -275,15 +275,22 @@ function renderAllCards() {
       var avatarHtml = renderAvatar(authorName, authorEmailStr, authorPhotoURL, false);
 
       var firestoreId = loaded ? loaded.id : null;
+      var directEditLock = window.__directEditLockUser || null;
       var actionsHtml = '';
       if (!firestoreId) {
         // Draft not yet saved to Firestore — show saving indicator instead of buttons
         actionsHtml = '<span class="margin-card-saving"><span class="margin-card-spinner"></span> Saving\u2026</span>';
       } else {
         if (canAccept) {
-          actionsHtml += '<button class="margin-action margin-action--accept" data-action="accept" data-hunk-id="' + hunk.id + '" title="Accept">'
-            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
-            + '</button>';
+          if (directEditLock) {
+            actionsHtml += '<button class="margin-action margin-action--accept margin-action--locked" data-action="accept" data-hunk-id="' + hunk.id + '" title="' + escapeHtml(directEditLock) + ' is directly editing this file" disabled>'
+              + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+              + '</button>';
+          } else {
+            actionsHtml += '<button class="margin-action margin-action--accept" data-action="accept" data-hunk-id="' + hunk.id + '" title="Accept">'
+              + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+              + '</button>';
+          }
         }
         if (isAuthor || canAccept) {
           actionsHtml += '<button class="margin-action margin-action--reject" data-action="reject" data-hunk-id="' + hunk.id + '" title="' + (isAuthor ? 'Discard' : 'Reject') + '">'

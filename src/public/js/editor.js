@@ -576,6 +576,15 @@ if (data) {
     sendPresenceExit();
   }
 
+  // Lightweight presence for direct edit mode — heartbeat only, no suggestion/SHA polling
+  function startPresenceOnly() {
+    if (presenceInterval) return;
+    sendPresenceHeartbeat();
+    presenceInterval = setInterval(() => {
+      sendPresenceHeartbeat();
+    }, 30000);
+  }
+
   // Fast poll: Firestore-only activity check + presence display (every 10s)
   async function pollForNewSuggestions() {
     if (!data.sessionFilePath) return;
@@ -640,7 +649,7 @@ if (data) {
       await fetch('/api/suggestions/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: data.sessionFilePath }),
+        body: JSON.stringify({ filePath: data.sessionFilePath, mode: editMode }),
       });
     } catch (err) {
       console.warn('[PRESENCE] heartbeat failed:', err.message);
@@ -663,6 +672,9 @@ if (data) {
     }
   }
 
+  // Track whether another user is in direct edit mode (for accept button locking)
+  let directEditLockUser = null;
+
   async function updatePresenceDisplay() {
     if (!data.sessionFilePath) return;
     const container = document.getElementById('editor-presence');
@@ -673,6 +685,16 @@ if (data) {
       const { editors } = await res.json();
       const currentEmail = data.user ? data.user.email : '';
       const others = editors.filter(e => e.email !== currentEmail);
+
+      // Check if any other user is in direct edit mode
+      const directEditor = others.find(e => e.mode === 'direct');
+      const prevLock = directEditLockUser;
+      directEditLockUser = directEditor ? (directEditor.displayName || directEditor.email) : null;
+      // Expose for margin panel rendering
+      window.__directEditLockUser = directEditLockUser;
+      // Update accept button state if lock changed
+      if (prevLock !== directEditLockUser) updateDirectEditLockUI();
+
       container.innerHTML = others.map(e => {
         if (e.photoURL) {
           return '<img class="presence-avatar presence-avatar--photo" src="' + escapeHtml(e.photoURL) + '" alt="" title="' + escapeHtml(e.displayName || e.email) + '" referrerpolicy="no-referrer">';
@@ -682,7 +704,25 @@ if (data) {
         return '<span class="presence-avatar" style="background:' + color + '" title="' + escapeHtml(e.displayName || e.email) + '">' + escapeHtml(initials) + '</span>';
       }).join('');
     } catch (err) {
+      // Fail open — clear lock on network error so buttons don't stay stuck disabled
+      directEditLockUser = null;
+      window.__directEditLockUser = null;
+      updateDirectEditLockUI();
       console.warn('[PRESENCE] display update failed:', err.message);
+    }
+  }
+
+  function updateDirectEditLockUI() {
+    const banner = document.getElementById('direct-edit-lock-banner');
+    if (directEditLockUser) {
+      // Show lock banner
+      if (banner) {
+        banner.textContent = directEditLockUser + ' is currently making direct edits to this file. Accepting suggestions is temporarily disabled.';
+        banner.style.display = '';
+      }
+    } else {
+      // Hide lock banner
+      if (banner) banner.style.display = 'none';
     }
   }
 
@@ -896,6 +936,10 @@ if (data) {
           await refreshFromGitHub();
           // Re-inject stale card after refresh (the refresh nuked it)
           addStaleCard(staleData.hunkId, staleData, dismissStaleSuggestion, retryStaleAccept);
+        } else if (res.status === 423) {
+          // Direct edit lock — show toast and restore card to normal state
+          showToast(err.error || 'File is locked for direct editing', 'error');
+          setCardStatus(hunkId, 'error', 'Locked — direct edit in progress');
         } else {
           setCardStatus(hunkId, 'error', err.message || err.error || 'Failed to accept');
         }
@@ -1558,6 +1602,7 @@ if (data) {
 
     // Start polling for file changes + presence heartbeat
     if (isSuggestOrReview) startPolling();
+    else if (mode === 'direct') startPresenceOnly();
 
     // Expose for testing
     window.__editorView = editorView;
@@ -1735,7 +1780,23 @@ if (data) {
 
   // --- Bind buttons ---
   document.getElementById('btn-suggest-edit')?.addEventListener('click', () => initEditor('suggest'));
-  document.getElementById('btn-direct-edit')?.addEventListener('click', () => initEditor('direct'));
+  document.getElementById('btn-direct-edit')?.addEventListener('click', async () => {
+    // Check if another user already has an active direct edit session on this file
+    try {
+      const res = await fetch('/api/suggestions/presence?filePath=' + encodeURIComponent(data.sessionFilePath));
+      if (res.ok) {
+        const { editors } = await res.json();
+        const currentEmail = data.user ? data.user.email : '';
+        const directEditor = editors.find(e => e.mode === 'direct' && e.email !== currentEmail);
+        if (directEditor) {
+          const name = directEditor.displayName || directEditor.email;
+          showToast(name + ' is currently editing this file directly. Please wait or use Suggest Edits instead.', 'error');
+          return;
+        }
+      }
+    } catch { /* fail open — proceed with direct edit on network error */ }
+    initEditor('direct');
+  });
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
 
