@@ -176,6 +176,7 @@ async function buildContentTree() {
   const cached = cache.get(TREE_CACHE_KEY);
   if (cached) return cached;
 
+  try {
   console.log('Building content tree from GitHub API...');
   const seriesItems = await github.getDirectoryContents('series');
   const seriesDirs = seriesItems.filter(i => i.type === 'dir' && !i.name.startsWith('.'));
@@ -214,6 +215,12 @@ async function buildContentTree() {
   cache.set(TREE_CACHE_KEY, tree, TREE_TTL);
   console.log(`Content tree built: ${series.length} series, ${series.reduce((n, s) => n + s.bookCount, 0)} books`);
   return tree;
+  } catch (err) {
+    console.error('Content tree build failed:', err.message);
+    // Return empty tree so the site stays up — pages will show "no content"
+    // instead of 500. The cache is NOT set, so the next request retries.
+    return { series: [] };
+  }
 }
 
 // Resolve a URL path to a book or session in the tree
