@@ -65,7 +65,7 @@ async function processImmediateNotifications({ bookPath, filePath, actorEmail, a
   const bookTitle = book ? book.title : bookPath;
 
   // Build deep link
-  const link = filePath ? buildDeepLink(filePath, tree) : null;
+  const link = filePath ? await buildDeepLink(filePath, tree) : null;
 
   // 1. Send immediate emails for @-mentions
   if (mentionedUsers && mentionedUsers.length > 0) {
@@ -282,28 +282,57 @@ async function sendAdminRoleEmail({ recipientEmail, assignedByName }) {
 
 // --- Helpers ---
 
-// Build a deep link URL from a file path
-function buildDeepLink(filePath, tree) {
-  try {
-    // Extract book path and session from file path
-    // e.g., "series/Narrative Journey Series/Foundations/The Call of Christ/sessions/4-Session1-TheGospel.md"
-    const allBooks = content.getAllBooks(tree);
-    for (const book of allBooks) {
-      if (filePath.startsWith(book.repoPath + '/sessions/')) {
-        const slug = content.bookSlug ? content.bookSlug(book) : null;
-        if (slug) return 'https://resources.noblecollective.org/' + slug;
+const SITE = 'https://resources.noblecollective.org';
+
+// Walk the content tree to find a book's series/subseries context and build a URL
+function findBookInTree(tree, bookRepoPath) {
+  for (const series of tree.series || []) {
+    for (const child of series.children || []) {
+      if (child.type === 'book' && child.repoPath === bookRepoPath) {
+        return { series, subseries: null, book: child };
+      } else if (child.type === 'subseries') {
+        for (const book of child.books || []) {
+          if (book.repoPath === bookRepoPath) {
+            return { series, subseries: child, book };
+          }
+        }
       }
     }
+  }
+  return null;
+}
+
+// Build a deep link URL to a session page from a file path
+async function buildDeepLink(filePath, tree) {
+  try {
+    // Find which book this file belongs to
+    const sessionsIdx = filePath.indexOf('/sessions/');
+    if (sessionsIdx < 0) return SITE;
+    const bookPath = filePath.substring(0, sessionsIdx);
+    const found = findBookInTree(tree, bookPath);
+    if (!found) return SITE;
+
+    // Load sessions if not already loaded, then find the matching one
+    if (!found.book.sessions || found.book.sessions.length === 0) {
+      try { await content.loadSessionTitles(found.book); } catch { /* ignore */ }
+    }
+    const sessionFile = filePath.substring(sessionsIdx + '/sessions/'.length);
+    const session = (found.book.sessions || []).find(s => s.path === filePath || s.path.endsWith(sessionFile));
+    if (session) {
+      return SITE + content.sessionUrl(found.series, found.subseries, found.book, session);
+    }
+    // Fall back to book page
+    return SITE + content.bookUrl(found.series, found.subseries, found.book);
   } catch { /* fallback */ }
-  return 'https://resources.noblecollective.org';
+  return SITE;
 }
 
 function buildBookLink(book, tree) {
   try {
-    const slug = content.bookSlug ? content.bookSlug(book) : null;
-    if (slug) return 'https://resources.noblecollective.org/' + slug;
+    const found = findBookInTree(tree, book.repoPath);
+    if (found) return SITE + content.bookUrl(found.series, found.subseries, found.book);
   } catch { /* fallback */ }
-  return 'https://resources.noblecollective.org';
+  return SITE;
 }
 
 module.exports = {
