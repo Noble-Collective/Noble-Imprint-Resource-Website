@@ -131,6 +131,37 @@ function decodeBookPath(encoded) {
   return encoded.replace(/\|/g, '/');
 }
 
+// --- Notification preferences ---
+
+async function getNotificationPrefs(email) {
+  const user = await getUser(email);
+  if (!user || !user.notificationPrefs) {
+    return { globalOptIn: true, bookOverrides: {} };
+  }
+  return {
+    globalOptIn: user.notificationPrefs.globalOptIn !== false,
+    bookOverrides: user.notificationPrefs.bookOverrides || {},
+  };
+}
+
+async function updateNotificationPrefs(email, prefs) {
+  await usersCollection().doc(docId(email)).update({
+    notificationPrefs: prefs,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Check if a user should receive a notification for a given book
+async function shouldNotify(email, bookPath) {
+  const prefs = await getNotificationPrefs(email);
+  if (!prefs.globalOptIn) return false;
+  const key = bookPath.replace(/\//g, '|');
+  if (key in prefs.bookOverrides) return prefs.bookOverrides[key];
+  // Test Book defaults to OFF
+  if (bookPath.includes('Foundations/Test Book')) return false;
+  return true;
+}
+
 module.exports = {
   getUser,
   createOrUpdateUser,
@@ -144,4 +175,7 @@ module.exports = {
   getUserBookRole,
   encodeBookPath,
   decodeBookPath,
+  getNotificationPrefs,
+  updateNotificationPrefs,
+  shouldNotify,
 };

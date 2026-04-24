@@ -1755,12 +1755,13 @@ if (data) {
   }
 
   // --- Post a reply to a suggestion or comment ---
-  async function postReply(parentId, parentType, text) {
+  async function postReply(parentId, parentType, text, mentionedUsers) {
     const res = await fetch('/api/suggestions/replies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         parentId, parentType, text,
+        mentionedUsers: mentionedUsers || [],
         filePath: data.sessionFilePath,
         bookPath: data.bookRepoPath,
       }),

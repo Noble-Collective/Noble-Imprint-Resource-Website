@@ -3,6 +3,7 @@ const suggestions = require('./suggestions');
 const firestore = require('./firestore');
 const github = require('./github');
 const cache = require('./cache');
+const notifications = require('./notifications');
 
 const router = express.Router();
 
@@ -10,6 +11,41 @@ const router = express.Router();
 router.use((req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
   next();
+});
+
+// --- Taggable users for @-mention autocomplete ---
+router.get('/taggable-users', async (req, res) => {
+  try {
+    const { bookPath } = req.query;
+    if (!bookPath) return res.status(400).json({ error: 'bookPath required' });
+
+    // Check cache first (60s TTL)
+    const cacheKey = `taggable-users:${bookPath}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const allUsers = await firestore.getAllUsers();
+    const encodedBook = bookPath.replace(/\//g, '|');
+    const users = allUsers.filter(u => {
+      // Include global admins
+      if (u.globalRole === 'admin') return true;
+      // Include super admin
+      if (require('./auth').isSuperAdmin(u.email)) return true;
+      // Include users with any role on this book
+      return u.bookRoles && u.bookRoles[encodedBook];
+    }).map(u => ({
+      email: u.email,
+      displayName: u.displayName || u.email,
+      photoURL: u.photoURL || null,
+    }));
+
+    const result = { users };
+    cache.set(cacheKey, result, 60 * 1000);
+    res.json(result);
+  } catch (err) {
+    console.error('Taggable users error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Lightweight version check (for stale detection — includes GitHub SHA) ---
@@ -199,6 +235,19 @@ router.post('/hunk', async (req, res) => {
     }
 
     res.json({ id, status: 'ok', ...(replyId ? { replyId } : {}) });
+
+    // Fire-and-forget: notify manuscript owners/admins about new suggestion
+    try {
+      notifications.processImmediateNotifications({
+        bookPath, filePath,
+        actorEmail: req.user.email,
+        actorName: req.user.displayName || req.user.email,
+        action: 'suggestion',
+        text: newText || originalText || '',
+        selectedText: originalText || null,
+        mentionedUsers: [],
+      }).catch(err => console.error('[NOTIFY] hunk notification error:', err.message));
+    } catch (err) { console.error('[NOTIFY] hunk notification error:', err.message); }
   } catch (err) {
     console.error('Create hunk error:', err.message);
     res.status(500).json({ error: err.message });
@@ -323,7 +372,7 @@ router.put('/hunk/:id/reject', async (req, res) => {
 
 router.post('/comments', async (req, res) => {
   try {
-    const { filePath, bookPath, baseCommitSha, from, to, selectedText, commentText } = req.body;
+    const { filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, mentionedUsers } = req.body;
     if (!filePath || !commentText) {
       return res.status(400).json({ error: 'filePath and commentText required' });
     }
@@ -338,14 +387,48 @@ router.post('/comments', async (req, res) => {
     const id = await suggestions.createComment({
       filePath, bookPath, baseCommitSha,
       from, to, selectedText, commentText,
+      mentionedUsers: mentionedUsers || [],
       authorEmail: req.user.email,
       authorName: req.user.displayName,
       authorPhotoURL: req.user.photoURL || null,
       fileContent,
     });
     res.json({ id, status: 'ok' });
+
+    // Fire-and-forget: queue notifications
+    try {
+      notifications.processImmediateNotifications({
+        bookPath, filePath,
+        actorEmail: req.user.email,
+        actorName: req.user.displayName || req.user.email,
+        action: 'comment',
+        text: commentText,
+        selectedText,
+        mentionedUsers: mentionedUsers || [],
+      }).catch(err => console.error('[NOTIFY] comment notification error:', err.message));
+    } catch (err) { console.error('[NOTIFY] comment notification error:', err.message); }
   } catch (err) {
     console.error('Create comment error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Edit a comment (author only)
+router.put('/comments/:id', async (req, res) => {
+  try {
+    const comment = await suggestions.getComment(req.params.id);
+    if (!comment) return res.status(404).json({ error: 'Not found' });
+    if (comment.authorEmail !== req.user.email) {
+      return res.status(403).json({ error: 'Only the author can edit this comment' });
+    }
+    const { commentText, mentionedUsers } = req.body;
+    if (!commentText || !commentText.trim()) {
+      return res.status(400).json({ error: 'commentText required' });
+    }
+    await suggestions.updateComment(req.params.id, { commentText: commentText.trim(), mentionedUsers });
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Edit comment error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -364,7 +447,7 @@ router.put('/comments/:id/resolve', async (req, res) => {
 
 router.post('/replies', async (req, res) => {
   try {
-    const { parentId, parentType, filePath, bookPath, text } = req.body;
+    const { parentId, parentType, filePath, bookPath, text, mentionedUsers } = req.body;
     if (!parentId || !parentType || !filePath || !text) {
       return res.status(400).json({ error: 'parentId, parentType, filePath, and text required' });
     }
@@ -377,13 +460,47 @@ router.post('/replies', async (req, res) => {
 
     const id = await suggestions.createReply({
       parentId, parentType, filePath, text,
+      mentionedUsers: mentionedUsers || [],
       authorEmail: req.user.email,
       authorName: req.user.displayName,
       authorPhotoURL: req.user.photoURL || null,
     });
     res.json({ id, status: 'ok' });
+
+    // Fire-and-forget: queue notifications
+    try {
+      notifications.processImmediateNotifications({
+        bookPath, filePath,
+        actorEmail: req.user.email,
+        actorName: req.user.displayName || req.user.email,
+        action: 'reply',
+        text,
+        selectedText: null,
+        mentionedUsers: mentionedUsers || [],
+      }).catch(err => console.error('[NOTIFY] reply notification error:', err.message));
+    } catch (err) { console.error('[NOTIFY] reply notification error:', err.message); }
   } catch (err) {
     console.error('Create reply error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Edit a reply (author only)
+router.put('/replies/:id', async (req, res) => {
+  try {
+    const reply = await suggestions.getReply(req.params.id);
+    if (!reply) return res.status(404).json({ error: 'Not found' });
+    if (reply.authorEmail !== req.user.email) {
+      return res.status(403).json({ error: 'Only the author can edit this reply' });
+    }
+    const { text, mentionedUsers } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'text required' });
+    }
+    await suggestions.updateReply(req.params.id, { text: text.trim(), mentionedUsers });
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Edit reply error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

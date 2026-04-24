@@ -3136,6 +3136,112 @@ body.drawer-open {
 }
 
 /* ============================================================
+   Notification Preferences Page
+   ============================================================ */
+
+.notif-main {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 30px 24px 60px;
+  width: 100%;
+}
+.notif-prefs-container {
+  margin-top: 20px;
+}
+.notif-section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.notif-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px;
+}
+.notif-section-desc {
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 16px;
+}
+.notif-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+.notif-book-row {
+  border-top: 1px solid #f0f0f0;
+}
+.notif-book-row:first-child {
+  border-top: none;
+}
+.notif-toggle-info {
+  flex: 1;
+  min-width: 0;
+}
+.notif-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+.notif-toggle-desc {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+.notif-test-note {
+  color: #e67e22;
+  font-style: italic;
+}
+.notif-empty {
+  font-size: 13px;
+  color: #999;
+  font-style: italic;
+}
+/* CSS toggle switch */
+.notif-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.notif-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.notif-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc;
+  border-radius: 22px;
+  transition: background .2s;
+}
+.notif-slider::before {
+  content: '';
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+.notif-switch input:checked + .notif-slider {
+  background: #27ae60;
+}
+.notif-switch input:checked + .notif-slider::before {
+  transform: translateX(18px);
+}
+
+/* ============================================================
    Editor — Edit Toolbar + CodeMirror Container
    ============================================================ */
 
@@ -3973,12 +4079,147 @@ body.drawer-open {
   color: #333;
   line-height: 1.4;
 }
+/* Edit button + inline editing */
+.margin-action--edit {
+  color: #999;
+}
+.margin-action--edit:hover {
+  color: #555;
+}
+.margin-reply-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  padding: 0;
+  margin-left: auto;
+  float: right;
+}
+.margin-reply-edit-btn:hover {
+  color: #555;
+}
+.margin-card-edit-container {
+  margin-top: 4px;
+}
+.margin-card-edit-textarea {
+  width: 100%;
+  border: 1px solid #d7b44a;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.margin-card-edit-input {
+  width: 100%;
+  border: 1px solid #d7b44a;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  box-sizing: border-box;
+}
+.margin-card-edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+.margin-card-edit-save, .margin-card-edit-cancel {
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 3px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+  color: #555;
+}
+.margin-card-edit-save {
+  background: #27ae60;
+  color: #fff;
+  border-color: #27ae60;
+}
+.margin-card-edit-save:hover {
+  background: #219a52;
+}
+.margin-card-edit-cancel:hover {
+  background: #f5f5f5;
+}
+.margin-card-edit-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.margin-card-edited {
+  font-size: 9px;
+  color: #aaa;
+  font-style: italic;
+}
+
 .margin-action--resolve {
   color: #27ae60;
 }
 .margin-action--resolve:hover {
   background: #e8f5e9;
   border-color: #27ae60;
+}
+
+/* @-mention styling */
+.mention {
+  color: #27ae60;
+  font-weight: 600;
+  background: #e8f5e9;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Tribute.js autocomplete dropdown */
+.tribute-container {
+  position: absolute;
+  z-index: 10000;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 180px;
+  overflow-y: auto;
+  min-width: 200px;
+}
+.tribute-container ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.tribute-container li {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tribute-container li:hover,
+.tribute-container li.highlight {
+  background: #f5f5f5;
+}
+.tribute-container li.tribute-item--active {
+  background: #e8f5e9;
+}
+.tribute-container li small {
+  color: #888;
+  font-size: 10px;
+}
+.tribute-container li.no-match {
+  color: #999;
+  cursor: default;
 }
 
 /* Comment highlight in editor */

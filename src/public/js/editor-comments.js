@@ -3,11 +3,73 @@
 // Comments are tracked in the annotationRegistry StateField (in editor-suggestions.js).
 // This file only handles: tooltip UI, popup UI, and submitting to the API.
 // Decorations are built by the registry decoration plugin, not here.
-import { EditorView, keymap } from '/static/js/codemirror-bundle.js';
+import { EditorView, keymap, Tribute } from '/static/js/codemirror-bundle.js';
 import { originalDocField } from '/static/js/editor-suggestions.js';
 
 let editorViewRef = null;
 let onCommentAdded = null; // callback after new comment saved
+
+// --- @-mention autocomplete ---
+let taggableUsers = null; // cached user list for this session
+let pendingMentions = new Set(); // emails mentioned in the current comment/reply
+let tributeInstance = null;
+
+async function fetchTaggableUsers() {
+  if (taggableUsers) return taggableUsers;
+  const editorData = window.__EDITOR_DATA;
+  if (!editorData || !editorData.bookRepoPath) return [];
+  try {
+    const res = await fetch('/api/suggestions/taggable-users?bookPath=' + encodeURIComponent(editorData.bookRepoPath));
+    if (!res.ok) return [];
+    const data = await res.json();
+    taggableUsers = data.users || [];
+    return taggableUsers;
+  } catch { return []; }
+}
+
+function createTributeInstance() {
+  return new Tribute({
+    trigger: '@',
+    values: function(text, cb) {
+      fetchTaggableUsers().then(function(users) {
+        cb(users.filter(function(u) {
+          var q = text.toLowerCase();
+          return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+        }));
+      });
+    },
+    lookup: function(item) { return item.displayName + ' ' + item.email; },
+    fillAttr: 'displayName',
+    selectTemplate: function(item) {
+      if (!item || !item.original) return '';
+      pendingMentions.add(item.original.email);
+      return '@' + item.original.displayName;
+    },
+    menuItemTemplate: function(item) {
+      if (!item || !item.original) return '';
+      return '<span>' + item.original.displayName + '</span> <small style="color:#888">' + item.original.email + '</small>';
+    },
+    noMatchTemplate: function() { return '<li style="padding:4px 8px;color:#999;font-size:11px">No users found</li>'; },
+    containerClass: 'tribute-container',
+    itemClass: 'tribute-item',
+    selectClass: 'tribute-item--active',
+    menuShowMinLength: 1,
+  });
+}
+
+export function attachMentionToElement(el) {
+  if (!el) return;
+  if (!tributeInstance) tributeInstance = createTributeInstance();
+  try { tributeInstance.attach(el); } catch { /* already attached or error */ }
+}
+
+export function detachMentionFromElement(el) {
+  if (!el || !tributeInstance) return;
+  try { tributeInstance.detach(el); } catch { /* ignore */ }
+}
+
+export function getPendingMentions() { return [...pendingMentions]; }
+export function clearPendingMentions() { pendingMentions = new Set(); }
 
 // --- Bold/Italic toggle: wrap/unwrap selected text ---
 // Pending format groups: when bold/italic wraps text, the diff engine produces
@@ -165,9 +227,17 @@ export function initComments(view, callback) {
   editorViewRef = view;
   onCommentAdded = callback;
 
+  // Pre-fetch taggable users for autocomplete
+  fetchTaggableUsers();
+
+  // Attach @-mention autocomplete to comment popup textarea
+  var commentInput = document.getElementById('comment-popup-input');
+  if (commentInput) attachMentionToElement(commentInput);
+
   // Bind popup buttons
   document.getElementById('comment-popup-cancel')?.addEventListener('click', () => {
     document.getElementById('comment-popup').style.display = 'none';
+    clearPendingMentions();
   });
 
   document.getElementById('comment-popup-submit')?.addEventListener('click', () => {
@@ -176,6 +246,10 @@ export function initComments(view, callback) {
 
   document.getElementById('comment-popup-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      // Don't submit if Tribute autocomplete dropdown is open — Enter selects the mention
+      const tributeOpen = document.querySelector('.tribute-container') &&
+        document.querySelector('.tribute-container').style.display !== 'none';
+      if (tributeOpen) return;
       e.preventDefault();
       submitComment();
     }
@@ -201,6 +275,7 @@ async function submitComment() {
   submitBtn.textContent = 'Saving...';
 
   try {
+    const mentionedUsers = getPendingMentions();
     const res = await fetch('/api/suggestions/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -212,6 +287,7 @@ async function submitComment() {
         to: sel.to,
         selectedText,
         commentText,
+        mentionedUsers,
       }),
     });
 
@@ -240,6 +316,7 @@ async function submitComment() {
     }
 
     popup.style.display = 'none';
+    clearPendingMentions();
   } catch (err) {
     window.showToast('Error: ' + err.message, 'error');
   } finally {

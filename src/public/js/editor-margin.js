@@ -1,6 +1,6 @@
 // Noble Imprint — Margin Panel for Suggestions and Comments
 // Shows cards alongside the editor, positioned to align with document text.
-import { getPendingFormatGroups } from '/static/js/editor-comments.js';
+import { getPendingFormatGroups, attachMentionToElement, getPendingMentions, clearPendingMentions } from '/static/js/editor-comments.js';
 
 let marginEl = null;
 let editorView = null;
@@ -36,6 +36,18 @@ function renderAvatar(name, email, photoURL, small) {
   const color = avatarColor(email || name || '?');
   const cls = 'margin-card-avatar margin-card-avatar--initials' + (small ? ' margin-card-avatar--small' : '');
   return '<span class="' + cls + '" style="background:' + color + '">' + escapeHtml(initial) + '</span>';
+}
+
+// Highlight @mentions in text — wraps @Name in a styled span
+// Only highlights patterns that match known mentioned user display names
+function highlightMentions(text, mentionedUsers) {
+  if (!mentionedUsers || mentionedUsers.length === 0) return escapeHtml(text);
+  let html = escapeHtml(text);
+  // Replace any @word pattern with mention styling (conservative — mentioned users exist)
+  html = html.replace(/@([\w][\w\s]*[\w]|[\w]+)/g, function(match) {
+    return '<span class="mention">' + match + '</span>';
+  });
+  return html;
 }
 
 function truncate(str, len) {
@@ -101,12 +113,19 @@ function buildThreadHtml(parentId, parentType) {
     var rName = r.authorName || r.authorEmail || 'Unknown';
     var rInitial = rName[0].toUpperCase();
     var rTime = r.createdAt ? (r.createdAt._seconds ? new Date(r.createdAt._seconds * 1000) : new Date(r.createdAt)) : new Date();
+    var isReplyAuthor = userData && userData.email === r.authorEmail;
+    var editReplyBtn = isReplyAuthor
+      ? '<button class="margin-reply-edit-btn" data-action="edit-reply" data-reply-id="' + r.id + '" title="Edit">'
+        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+        + '</button>'
+      : '';
     html += '<div class="margin-card-reply">'
       + renderAvatar(rName, r.authorEmail, r.photoURL || r.authorPhotoURL || null, true)
       + '<div class="margin-card-reply-content">'
       + '<span class="margin-card-reply-author">' + escapeHtml(rName) + '</span>'
       + '<span class="margin-card-reply-time">' + timeAgo(rTime) + '</span>'
-      + '<div class="margin-card-reply-text">' + escapeHtml(r.text) + '</div>'
+      + editReplyBtn
+      + '<div class="margin-card-reply-text" data-reply-id="' + r.id + '">' + highlightMentions(r.text, r.mentionedUsers) + (r.editedAt ? ' <span class="margin-card-edited">(edited)</span>' : '') + '</div>'
       + '</div>'
       + '</div>';
   }
@@ -324,9 +343,15 @@ function renderAllCards() {
       var cTime = c.createdAt ? (c.createdAt._seconds ? new Date(c.createdAt._seconds * 1000) : new Date(c.createdAt)) : new Date();
       var canResolve = userData && (userData.editRole === 'admin' || userData.editRole === 'manuscript-owner' || userData.email === c.authorEmail);
 
+      var isCommentAuthor = userData && userData.email === c.authorEmail;
       var cActionsHtml = '';
+      if (isCommentAuthor) {
+        cActionsHtml += '<button class="margin-action margin-action--edit" data-action="edit-comment" data-comment-id="' + c.id + '" title="Edit">'
+          + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+          + '</button>';
+      }
       if (canResolve) {
-        cActionsHtml = '<button class="margin-action margin-action--resolve" data-action="resolve-comment" data-comment-id="' + c.id + '" title="Resolve">'
+        cActionsHtml += '<button class="margin-action margin-action--resolve" data-action="resolve-comment" data-comment-id="' + c.id + '" title="Resolve">'
           + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>'
           + '</button>';
       }
@@ -343,7 +368,7 @@ function renderAllCards() {
         + '</div>'
         + '<div class="margin-card-body">'
         + '<span class="margin-card-quote">"' + escapeHtml(truncate(c.selectedText, 60)) + '"</span>'
-        + '<p class="margin-card-comment-text">' + escapeHtml(c.commentText) + '</p>'
+        + '<p class="margin-card-comment-text" data-comment-id="' + c.id + '">' + highlightMentions(c.commentText, c.mentionedUsers) + (c.editedAt ? ' <span class="margin-card-edited">(edited)</span>' : '') + '</p>'
         + '</div>'
         + cThreadHtml
         + '<div class="margin-card-time">' + timeAgo(cTime) + '</div>'
@@ -403,6 +428,12 @@ function renderAllCards() {
       } else if (action === 'resolve-comment') {
         var commentId = btn.getAttribute('data-comment-id');
         if (onResolveComment) onResolveComment(commentId);
+      } else if (action === 'edit-comment') {
+        var commentId = btn.getAttribute('data-comment-id');
+        startEditComment(commentId);
+      } else if (action === 'edit-reply') {
+        var replyId = btn.getAttribute('data-reply-id');
+        startEditReply(replyId);
       } else if (action === 'dismiss-stale') {
         var hunkId = btn.getAttribute('data-hunk-id');
         var sd = staleCards.get(hunkId);
@@ -426,7 +457,9 @@ function renderAllCards() {
       var text = input ? input.value.trim() : '';
       if (!text || !onPostReply) return;
       btn.disabled = true;
-      onPostReply(parentId, parentType, text).then(function(reply) {
+      var mentions = getPendingMentions();
+      clearPendingMentions();
+      onPostReply(parentId, parentType, text, mentions).then(function(reply) {
         currentReplies.push(reply);
         renderAllCards();
       }).catch(function() {
@@ -435,9 +468,12 @@ function renderAllCards() {
     });
   });
 
-  // Bind reply input Enter key
+  // Bind reply input Enter key + @-mention autocomplete
   marginEl.querySelectorAll('.margin-reply-field').forEach(function(input) {
+    attachMentionToElement(input);
     input.addEventListener('keydown', function(e) {
+      // Don't submit if Tribute dropdown is open
+      if (document.querySelector('.tribute-container:not([style*="display: none"])')) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         var sendBtn = input.nextElementSibling;
@@ -492,6 +528,120 @@ function renderAllCards() {
   } catch (err) {
     console.error('[MARGIN] renderAllCards ERROR:', err.message, err.stack);
   }
+}
+
+// --- Inline editing for comments ---
+function startEditComment(commentId) {
+  var textEl = marginEl.querySelector('.margin-card-comment-text[data-comment-id="' + commentId + '"]');
+  if (!textEl) return;
+  var comment = currentComments.find(function(c) { return c.id === commentId; });
+  if (!comment) return;
+  var card = textEl.closest('.margin-card');
+  if (!card) return;
+
+  // Replace text paragraph with textarea + buttons
+  var currentText = comment.commentText;
+  var editContainer = document.createElement('div');
+  editContainer.className = 'margin-card-edit-container';
+  editContainer.innerHTML = '<textarea class="margin-card-edit-textarea" rows="3">' + escapeHtml(currentText) + '</textarea>'
+    + '<div class="margin-card-edit-actions">'
+    + '<button class="margin-card-edit-save" data-comment-id="' + commentId + '">Save</button>'
+    + '<button class="margin-card-edit-cancel">Cancel</button>'
+    + '</div>';
+  textEl.replaceWith(editContainer);
+
+  var textarea = editContainer.querySelector('textarea');
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+  editContainer.querySelector('.margin-card-edit-cancel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    renderAllCards();
+  });
+
+  editContainer.querySelector('.margin-card-edit-save').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var newText = textarea.value.trim();
+    if (!newText || newText === currentText) { renderAllCards(); return; }
+    var saveBtn = editContainer.querySelector('.margin-card-edit-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    fetch('/api/suggestions/comments/' + commentId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commentText: newText }),
+    }).then(function(res) {
+      if (!res.ok) throw new Error('Failed to save');
+      comment.commentText = newText;
+      comment.editedAt = { _seconds: Date.now() / 1000 };
+      renderAllCards();
+    }).catch(function(err) {
+      window.showToast && window.showToast('Error saving comment: ' + err.message, 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    });
+  });
+}
+
+// --- Inline editing for replies ---
+function startEditReply(replyId) {
+  var textEl = marginEl.querySelector('.margin-card-reply-text[data-reply-id="' + replyId + '"]');
+  if (!textEl) return;
+  var reply = currentReplies.find(function(r) { return r.id === replyId; });
+  if (!reply) return;
+
+  var currentText = reply.text;
+  var editContainer = document.createElement('div');
+  editContainer.className = 'margin-card-edit-container margin-card-edit-container--reply';
+  editContainer.innerHTML = '<input type="text" class="margin-card-edit-input" value="' + escapeHtml(currentText) + '">'
+    + '<div class="margin-card-edit-actions">'
+    + '<button class="margin-card-edit-save" data-reply-id="' + replyId + '">Save</button>'
+    + '<button class="margin-card-edit-cancel">Cancel</button>'
+    + '</div>';
+  textEl.replaceWith(editContainer);
+
+  var input = editContainer.querySelector('input');
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+
+  editContainer.querySelector('.margin-card-edit-cancel').addEventListener('click', function(e) {
+    e.stopPropagation();
+    renderAllCards();
+  });
+
+  editContainer.querySelector('.margin-card-edit-save').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var newText = input.value.trim();
+    if (!newText || newText === currentText) { renderAllCards(); return; }
+    var saveBtn = editContainer.querySelector('.margin-card-edit-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    fetch('/api/suggestions/replies/' + replyId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: newText }),
+    }).then(function(res) {
+      if (!res.ok) throw new Error('Failed to save');
+      reply.text = newText;
+      reply.editedAt = { _seconds: Date.now() / 1000 };
+      renderAllCards();
+    }).catch(function(err) {
+      window.showToast && window.showToast('Error saving reply: ' + err.message, 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    });
+  });
+
+  // Enter key saves
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      editContainer.querySelector('.margin-card-edit-save').click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      renderAllCards();
+    }
+  });
 }
 
 function resolveOverlaps() {

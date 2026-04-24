@@ -5,6 +5,7 @@ const github = require('./github');
 const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
 const suggestions = require('./suggestions');
+const notifications = require('./notifications');
 
 // --- Page routes ---
 const page = express.Router();
@@ -92,6 +93,16 @@ api.put('/users/:email/role', async (req, res) => {
     cache.del(`admin-check:${email.toLowerCase()}`);
 
     res.json({ status: 'ok' });
+
+    // Fire-and-forget: notify the user if they were granted admin
+    if (role === 'admin') {
+      try {
+        notifications.sendAdminRoleEmail({
+          recipientEmail: email,
+          assignedByName: req.user.displayName || req.user.email,
+        }).catch(err => console.error('[NOTIFY] admin role error:', err.message));
+      } catch (err) { console.error('[NOTIFY] admin role error:', err.message); }
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -126,6 +137,21 @@ api.put('/users/:email/books', async (req, res) => {
 
     await firestore.setBookRole(email, bookPath, role);
     res.json({ status: 'ok' });
+
+    // Fire-and-forget: notify the user about their new role
+    try {
+      const tree = await content.buildContentTree();
+      const allBooks = content.getAllBooks(tree);
+      const book = allBooks.find(b => b.repoPath === bookPath);
+      const bookTitle = book ? book.title : bookPath;
+      notifications.sendRoleChangeEmail({
+        recipientEmail: email,
+        bookPath,
+        bookTitle,
+        role,
+        assignedByName: req.user.displayName || req.user.email,
+      }).catch(err => console.error('[NOTIFY] role change error:', err.message));
+    } catch (err) { console.error('[NOTIFY] role change error:', err.message); }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

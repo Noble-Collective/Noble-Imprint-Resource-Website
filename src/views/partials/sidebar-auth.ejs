@@ -11,6 +11,7 @@
             <div class="sidebar-auth-email"><%= user.email %></div>
           </div>
         </div>
+        <a href="/notifications" class="sidebar-auth-link">Notifications</a>
         <% if (user.isAdmin) { %>
           <a href="/admin" class="sidebar-auth-link">Admin Console</a>
         <% } %>

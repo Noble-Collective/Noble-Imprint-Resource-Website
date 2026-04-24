@@ -11,3 +11,6 @@ export { markdown } from '@codemirror/lang-markdown';
 
 // Diff library
 export { diffWords, diffChars } from 'diff';
+
+// @-mention autocomplete
+export { default as Tribute } from 'tributejs';

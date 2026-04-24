@@ -1,3 +1,584 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// node_modules/tributejs/dist/tribute.min.js
+var require_tribute_min = __commonJS({
+  "node_modules/tributejs/dist/tribute.min.js"(exports, module) {
+    !(function(e, t2) {
+      "object" == typeof exports && "undefined" != typeof module ? module.exports = t2() : "function" == typeof define && define.amd ? define(t2) : (e = e || self).Tribute = t2();
+    })(exports, (function() {
+      "use strict";
+      function e(e2, t3) {
+        if (!(e2 instanceof t3)) throw new TypeError("Cannot call a class as a function");
+      }
+      function t2(e2, t3) {
+        for (var n2 = 0; n2 < t3.length; n2++) {
+          var i2 = t3[n2];
+          i2.enumerable = i2.enumerable || false, i2.configurable = true, "value" in i2 && (i2.writable = true), Object.defineProperty(e2, i2.key, i2);
+        }
+      }
+      function n(e2, n2, i2) {
+        return n2 && t2(e2.prototype, n2), i2 && t2(e2, i2), e2;
+      }
+      function i(e2, t3) {
+        return (function(e3) {
+          if (Array.isArray(e3)) return e3;
+        })(e2) || (function(e3, t4) {
+          if (!(Symbol.iterator in Object(e3) || "[object Arguments]" === Object.prototype.toString.call(e3))) return;
+          var n2 = [], i2 = true, r2 = false, o2 = void 0;
+          try {
+            for (var u2, l2 = e3[Symbol.iterator](); !(i2 = (u2 = l2.next()).done) && (n2.push(u2.value), !t4 || n2.length !== t4); i2 = true) ;
+          } catch (e4) {
+            r2 = true, o2 = e4;
+          } finally {
+            try {
+              i2 || null == l2.return || l2.return();
+            } finally {
+              if (r2) throw o2;
+            }
+          }
+          return n2;
+        })(e2, t3) || (function() {
+          throw new TypeError("Invalid attempt to destructure non-iterable instance");
+        })();
+      }
+      if (Array.prototype.find || (Array.prototype.find = function(e2) {
+        if (null === this) throw new TypeError("Array.prototype.find called on null or undefined");
+        if ("function" != typeof e2) throw new TypeError("predicate must be a function");
+        for (var t3, n2 = Object(this), i2 = n2.length >>> 0, r2 = arguments[1], o2 = 0; o2 < i2; o2++) if (t3 = n2[o2], e2.call(r2, t3, o2, n2)) return t3;
+      }), window && "function" != typeof window.CustomEvent) {
+        var r = function(e2, t3) {
+          t3 = t3 || { bubbles: false, cancelable: false, detail: void 0 };
+          var n2 = document.createEvent("CustomEvent");
+          return n2.initCustomEvent(e2, t3.bubbles, t3.cancelable, t3.detail), n2;
+        };
+        void 0 !== window.Event && (r.prototype = window.Event.prototype), window.CustomEvent = r;
+      }
+      var o = (function() {
+        function t3(n2) {
+          e(this, t3), this.tribute = n2, this.tribute.events = this;
+        }
+        return n(t3, [{ key: "bind", value: function(e2) {
+          e2.boundKeydown = this.keydown.bind(e2, this), e2.boundKeyup = this.keyup.bind(e2, this), e2.boundInput = this.input.bind(e2, this), e2.addEventListener("keydown", e2.boundKeydown, false), e2.addEventListener("keyup", e2.boundKeyup, false), e2.addEventListener("input", e2.boundInput, false);
+        } }, { key: "unbind", value: function(e2) {
+          e2.removeEventListener("keydown", e2.boundKeydown, false), e2.removeEventListener("keyup", e2.boundKeyup, false), e2.removeEventListener("input", e2.boundInput, false), delete e2.boundKeydown, delete e2.boundKeyup, delete e2.boundInput;
+        } }, { key: "keydown", value: function(e2, n2) {
+          e2.shouldDeactivate(n2) && (e2.tribute.isActive = false, e2.tribute.hideMenu());
+          var i2 = this;
+          e2.commandEvent = false, t3.keys().forEach((function(t4) {
+            t4.key === n2.keyCode && (e2.commandEvent = true, e2.callbacks()[t4.value.toLowerCase()](n2, i2));
+          }));
+        } }, { key: "input", value: function(e2, t4) {
+          e2.inputEvent = true, e2.keyup.call(this, e2, t4);
+        } }, { key: "click", value: function(e2, t4) {
+          var n2 = e2.tribute;
+          if (n2.menu && n2.menu.contains(t4.target)) {
+            var i2 = t4.target;
+            for (t4.preventDefault(), t4.stopPropagation(); "li" !== i2.nodeName.toLowerCase(); ) if (!(i2 = i2.parentNode) || i2 === n2.menu) throw new Error("cannot find the <li> container for the click");
+            n2.selectItemAtIndex(i2.getAttribute("data-index"), t4), n2.hideMenu();
+          } else n2.current.element && !n2.current.externalTrigger && (n2.current.externalTrigger = false, setTimeout((function() {
+            return n2.hideMenu();
+          })));
+        } }, { key: "keyup", value: function(e2, t4) {
+          if (e2.inputEvent && (e2.inputEvent = false), e2.updateSelection(this), 27 !== t4.keyCode) {
+            if (!e2.tribute.allowSpaces && e2.tribute.hasTrailingSpace) return e2.tribute.hasTrailingSpace = false, e2.commandEvent = true, void e2.callbacks().space(t4, this);
+            if (!e2.tribute.isActive) if (e2.tribute.autocompleteMode) e2.callbacks().triggerChar(t4, this, "");
+            else {
+              var n2 = e2.getKeyCode(e2, this, t4);
+              if (isNaN(n2) || !n2) return;
+              var i2 = e2.tribute.triggers().find((function(e3) {
+                return e3.charCodeAt(0) === n2;
+              }));
+              void 0 !== i2 && e2.callbacks().triggerChar(t4, this, i2);
+            }
+            e2.tribute.current.mentionText.length < e2.tribute.current.collection.menuShowMinLength || ((e2.tribute.current.trigger || e2.tribute.autocompleteMode) && false === e2.commandEvent || e2.tribute.isActive && 8 === t4.keyCode) && e2.tribute.showMenuFor(this, true);
+          }
+        } }, { key: "shouldDeactivate", value: function(e2) {
+          if (!this.tribute.isActive) return false;
+          if (0 === this.tribute.current.mentionText.length) {
+            var n2 = false;
+            return t3.keys().forEach((function(t4) {
+              e2.keyCode === t4.key && (n2 = true);
+            })), !n2;
+          }
+          return false;
+        } }, { key: "getKeyCode", value: function(e2, t4, n2) {
+          var i2 = e2.tribute, r2 = i2.range.getTriggerInfo(false, i2.hasTrailingSpace, true, i2.allowSpaces, i2.autocompleteMode);
+          return !!r2 && r2.mentionTriggerChar.charCodeAt(0);
+        } }, { key: "updateSelection", value: function(e2) {
+          this.tribute.current.element = e2;
+          var t4 = this.tribute.range.getTriggerInfo(false, this.tribute.hasTrailingSpace, true, this.tribute.allowSpaces, this.tribute.autocompleteMode);
+          t4 && (this.tribute.current.selectedPath = t4.mentionSelectedPath, this.tribute.current.mentionText = t4.mentionText, this.tribute.current.selectedOffset = t4.mentionSelectedOffset);
+        } }, { key: "callbacks", value: function() {
+          var e2 = this;
+          return { triggerChar: function(t4, n2, i2) {
+            var r2 = e2.tribute;
+            r2.current.trigger = i2;
+            var o2 = r2.collection.find((function(e3) {
+              return e3.trigger === i2;
+            }));
+            r2.current.collection = o2, r2.current.mentionText.length >= r2.current.collection.menuShowMinLength && r2.inputEvent && r2.showMenuFor(n2, true);
+          }, enter: function(t4, n2) {
+            e2.tribute.isActive && e2.tribute.current.filteredItems && (t4.preventDefault(), t4.stopPropagation(), setTimeout((function() {
+              e2.tribute.selectItemAtIndex(e2.tribute.menuSelected, t4), e2.tribute.hideMenu();
+            }), 0));
+          }, escape: function(t4, n2) {
+            e2.tribute.isActive && (t4.preventDefault(), t4.stopPropagation(), e2.tribute.isActive = false, e2.tribute.hideMenu());
+          }, tab: function(t4, n2) {
+            e2.callbacks().enter(t4, n2);
+          }, space: function(t4, n2) {
+            e2.tribute.isActive && (e2.tribute.spaceSelectsMatch ? e2.callbacks().enter(t4, n2) : e2.tribute.allowSpaces || (t4.stopPropagation(), setTimeout((function() {
+              e2.tribute.hideMenu(), e2.tribute.isActive = false;
+            }), 0)));
+          }, up: function(t4, n2) {
+            if (e2.tribute.isActive && e2.tribute.current.filteredItems) {
+              t4.preventDefault(), t4.stopPropagation();
+              var i2 = e2.tribute.current.filteredItems.length, r2 = e2.tribute.menuSelected;
+              i2 > r2 && r2 > 0 ? (e2.tribute.menuSelected--, e2.setActiveLi()) : 0 === r2 && (e2.tribute.menuSelected = i2 - 1, e2.setActiveLi(), e2.tribute.menu.scrollTop = e2.tribute.menu.scrollHeight);
+            }
+          }, down: function(t4, n2) {
+            if (e2.tribute.isActive && e2.tribute.current.filteredItems) {
+              t4.preventDefault(), t4.stopPropagation();
+              var i2 = e2.tribute.current.filteredItems.length - 1, r2 = e2.tribute.menuSelected;
+              i2 > r2 ? (e2.tribute.menuSelected++, e2.setActiveLi()) : i2 === r2 && (e2.tribute.menuSelected = 0, e2.setActiveLi(), e2.tribute.menu.scrollTop = 0);
+            }
+          }, delete: function(t4, n2) {
+            e2.tribute.isActive && e2.tribute.current.mentionText.length < 1 ? e2.tribute.hideMenu() : e2.tribute.isActive && e2.tribute.showMenuFor(n2);
+          } };
+        } }, { key: "setActiveLi", value: function(e2) {
+          var t4 = this.tribute.menu.querySelectorAll("li"), n2 = t4.length >>> 0;
+          e2 && (this.tribute.menuSelected = parseInt(e2));
+          for (var i2 = 0; i2 < n2; i2++) {
+            var r2 = t4[i2];
+            if (i2 === this.tribute.menuSelected) {
+              r2.classList.add(this.tribute.current.collection.selectClass);
+              var o2 = r2.getBoundingClientRect(), u2 = this.tribute.menu.getBoundingClientRect();
+              if (o2.bottom > u2.bottom) {
+                var l2 = o2.bottom - u2.bottom;
+                this.tribute.menu.scrollTop += l2;
+              } else if (o2.top < u2.top) {
+                var s2 = u2.top - o2.top;
+                this.tribute.menu.scrollTop -= s2;
+              }
+            } else r2.classList.remove(this.tribute.current.collection.selectClass);
+          }
+        } }, { key: "getFullHeight", value: function(e2, t4) {
+          var n2 = e2.getBoundingClientRect().height;
+          if (t4) {
+            var i2 = e2.currentStyle || window.getComputedStyle(e2);
+            return n2 + parseFloat(i2.marginTop) + parseFloat(i2.marginBottom);
+          }
+          return n2;
+        } }], [{ key: "keys", value: function() {
+          return [{ key: 9, value: "TAB" }, { key: 8, value: "DELETE" }, { key: 13, value: "ENTER" }, { key: 27, value: "ESCAPE" }, { key: 32, value: "SPACE" }, { key: 38, value: "UP" }, { key: 40, value: "DOWN" }];
+        } }]), t3;
+      })(), u = (function() {
+        function t3(n2) {
+          e(this, t3), this.tribute = n2, this.tribute.menuEvents = this, this.menu = this.tribute.menu;
+        }
+        return n(t3, [{ key: "bind", value: function(e2) {
+          var t4 = this;
+          this.menuClickEvent = this.tribute.events.click.bind(null, this), this.menuContainerScrollEvent = this.debounce((function() {
+            t4.tribute.isActive && t4.tribute.showMenuFor(t4.tribute.current.element, false);
+          }), 300, false), this.windowResizeEvent = this.debounce((function() {
+            t4.tribute.isActive && t4.tribute.range.positionMenuAtCaret(true);
+          }), 300, false), this.tribute.range.getDocument().addEventListener("MSPointerDown", this.menuClickEvent, false), this.tribute.range.getDocument().addEventListener("mousedown", this.menuClickEvent, false), window.addEventListener("resize", this.windowResizeEvent), this.menuContainer ? this.menuContainer.addEventListener("scroll", this.menuContainerScrollEvent, false) : window.addEventListener("scroll", this.menuContainerScrollEvent);
+        } }, { key: "unbind", value: function(e2) {
+          this.tribute.range.getDocument().removeEventListener("mousedown", this.menuClickEvent, false), this.tribute.range.getDocument().removeEventListener("MSPointerDown", this.menuClickEvent, false), window.removeEventListener("resize", this.windowResizeEvent), this.menuContainer ? this.menuContainer.removeEventListener("scroll", this.menuContainerScrollEvent, false) : window.removeEventListener("scroll", this.menuContainerScrollEvent);
+        } }, { key: "debounce", value: function(e2, t4, n2) {
+          var i2, r2 = arguments, o2 = this;
+          return function() {
+            var u2 = o2, l2 = r2, s2 = n2 && !i2;
+            clearTimeout(i2), i2 = setTimeout((function() {
+              i2 = null, n2 || e2.apply(u2, l2);
+            }), t4), s2 && e2.apply(u2, l2);
+          };
+        } }]), t3;
+      })(), l = (function() {
+        function t3(n2) {
+          e(this, t3), this.tribute = n2, this.tribute.range = this;
+        }
+        return n(t3, [{ key: "getDocument", value: function() {
+          var e2;
+          return this.tribute.current.collection && (e2 = this.tribute.current.collection.iframe), e2 ? e2.contentWindow.document : document;
+        } }, { key: "positionMenuAtCaret", value: function(e2) {
+          var t4, n2 = this, i2 = this.tribute.current, r2 = this.getTriggerInfo(false, this.tribute.hasTrailingSpace, true, this.tribute.allowSpaces, this.tribute.autocompleteMode);
+          if (void 0 !== r2) {
+            if (!this.tribute.positionMenu) return void (this.tribute.menu.style.cssText = "display: block;");
+            t4 = this.isContentEditable(i2.element) ? this.getContentEditableCaretPosition(r2.mentionPosition) : this.getTextAreaOrInputUnderlinePosition(this.tribute.current.element, r2.mentionPosition), this.tribute.menu.style.cssText = "top: ".concat(t4.top, "px;\n                                     left: ").concat(t4.left, "px;\n                                     right: ").concat(t4.right, "px;\n                                     bottom: ").concat(t4.bottom, "px;\n                                     position: absolute;\n                                     display: block;"), "auto" === t4.left && (this.tribute.menu.style.left = "auto"), "auto" === t4.top && (this.tribute.menu.style.top = "auto"), e2 && this.scrollIntoView(), window.setTimeout((function() {
+              var i3 = { width: n2.tribute.menu.offsetWidth, height: n2.tribute.menu.offsetHeight }, r3 = n2.isMenuOffScreen(t4, i3), o2 = window.innerWidth > i3.width && (r3.left || r3.right), u2 = window.innerHeight > i3.height && (r3.top || r3.bottom);
+              (o2 || u2) && (n2.tribute.menu.style.cssText = "display: none", n2.positionMenuAtCaret(e2));
+            }), 0);
+          } else this.tribute.menu.style.cssText = "display: none";
+        } }, { key: "selectElement", value: function(e2, t4, n2) {
+          var i2, r2 = e2;
+          if (t4) for (var o2 = 0; o2 < t4.length; o2++) {
+            if (void 0 === (r2 = r2.childNodes[t4[o2]])) return;
+            for (; r2.length < n2; ) n2 -= r2.length, r2 = r2.nextSibling;
+            0 !== r2.childNodes.length || r2.length || (r2 = r2.previousSibling);
+          }
+          var u2 = this.getWindowSelection();
+          (i2 = this.getDocument().createRange()).setStart(r2, n2), i2.setEnd(r2, n2), i2.collapse(true);
+          try {
+            u2.removeAllRanges();
+          } catch (e3) {
+          }
+          u2.addRange(i2), e2.focus();
+        } }, { key: "replaceTriggerText", value: function(e2, t4, n2, i2, r2) {
+          var o2 = this.getTriggerInfo(true, n2, t4, this.tribute.allowSpaces, this.tribute.autocompleteMode);
+          if (void 0 !== o2) {
+            var u2 = this.tribute.current, l2 = new CustomEvent("tribute-replaced", { detail: { item: r2, instance: u2, context: o2, event: i2 } });
+            if (this.isContentEditable(u2.element)) {
+              e2 += "string" == typeof this.tribute.replaceTextSuffix ? this.tribute.replaceTextSuffix : "\xA0";
+              var s2 = o2.mentionPosition + o2.mentionText.length;
+              this.tribute.autocompleteMode || (s2 += o2.mentionTriggerChar.length), this.pasteHtml(e2, o2.mentionPosition, s2);
+            } else {
+              var a = this.tribute.current.element, c = "string" == typeof this.tribute.replaceTextSuffix ? this.tribute.replaceTextSuffix : " ";
+              e2 += c;
+              var h = o2.mentionPosition, d = o2.mentionPosition + o2.mentionText.length + c.length;
+              this.tribute.autocompleteMode || (d += o2.mentionTriggerChar.length - 1), a.value = a.value.substring(0, h) + e2 + a.value.substring(d, a.value.length), a.selectionStart = h + e2.length, a.selectionEnd = h + e2.length;
+            }
+            u2.element.dispatchEvent(new CustomEvent("input", { bubbles: true })), u2.element.dispatchEvent(l2);
+          }
+        } }, { key: "pasteHtml", value: function(e2, t4, n2) {
+          var i2, r2;
+          r2 = this.getWindowSelection(), (i2 = this.getDocument().createRange()).setStart(r2.anchorNode, t4), i2.setEnd(r2.anchorNode, n2), i2.deleteContents();
+          var o2 = this.getDocument().createElement("div");
+          o2.innerHTML = e2;
+          for (var u2, l2, s2 = this.getDocument().createDocumentFragment(); u2 = o2.firstChild; ) l2 = s2.appendChild(u2);
+          i2.insertNode(s2), l2 && ((i2 = i2.cloneRange()).setStartAfter(l2), i2.collapse(true), r2.removeAllRanges(), r2.addRange(i2));
+        } }, { key: "getWindowSelection", value: function() {
+          return this.tribute.collection.iframe ? this.tribute.collection.iframe.contentWindow.getSelection() : window.getSelection();
+        } }, { key: "getNodePositionInParent", value: function(e2) {
+          if (null === e2.parentNode) return 0;
+          for (var t4 = 0; t4 < e2.parentNode.childNodes.length; t4++) {
+            if (e2.parentNode.childNodes[t4] === e2) return t4;
+          }
+        } }, { key: "getContentEditableSelectedPath", value: function(e2) {
+          var t4 = this.getWindowSelection(), n2 = t4.anchorNode, i2 = [];
+          if (null != n2) {
+            for (var r2, o2 = n2.contentEditable; null !== n2 && "true" !== o2; ) r2 = this.getNodePositionInParent(n2), i2.push(r2), null !== (n2 = n2.parentNode) && (o2 = n2.contentEditable);
+            return i2.reverse(), { selected: n2, path: i2, offset: t4.getRangeAt(0).startOffset };
+          }
+        } }, { key: "getTextPrecedingCurrentSelection", value: function() {
+          var e2 = this.tribute.current, t4 = "";
+          if (this.isContentEditable(e2.element)) {
+            var n2 = this.getWindowSelection().anchorNode;
+            if (null != n2) {
+              var i2 = n2.textContent, r2 = this.getWindowSelection().getRangeAt(0).startOffset;
+              i2 && r2 >= 0 && (t4 = i2.substring(0, r2));
+            }
+          } else {
+            var o2 = this.tribute.current.element;
+            if (o2) {
+              var u2 = o2.selectionStart;
+              o2.value && u2 >= 0 && (t4 = o2.value.substring(0, u2));
+            }
+          }
+          return t4;
+        } }, { key: "getLastWordInText", value: function(e2) {
+          var t4 = (e2 = e2.replace(/\u00A0/g, " ")).split(/\s+/);
+          return t4[t4.length - 1].trim();
+        } }, { key: "getTriggerInfo", value: function(e2, t4, n2, i2, r2) {
+          var o2, u2, l2, s2 = this, a = this.tribute.current;
+          if (this.isContentEditable(a.element)) {
+            var c = this.getContentEditableSelectedPath(a);
+            c && (o2 = c.selected, u2 = c.path, l2 = c.offset);
+          } else o2 = this.tribute.current.element;
+          var h = this.getTextPrecedingCurrentSelection(), d = this.getLastWordInText(h);
+          if (r2) return { mentionPosition: h.length - d.length, mentionText: d, mentionSelectedElement: o2, mentionSelectedPath: u2, mentionSelectedOffset: l2 };
+          if (null != h) {
+            var f, m = -1;
+            if (this.tribute.collection.forEach((function(e3) {
+              var t5 = e3.trigger, i3 = e3.requireLeadingSpace ? s2.lastIndexWithLeadingSpace(h, t5) : h.lastIndexOf(t5);
+              i3 > m && (m = i3, f = t5, n2 = e3.requireLeadingSpace);
+            })), m >= 0 && (0 === m || !n2 || /[\xA0\s]/g.test(h.substring(m - 1, m)))) {
+              var p = h.substring(m + f.length, h.length);
+              f = h.substring(m, m + f.length);
+              var v = p.substring(0, 1), g = p.length > 0 && (" " === v || "\xA0" === v);
+              t4 && (p = p.trim());
+              var b = i2 ? /[^\S ]/g : /[\xA0\s]/g;
+              if (this.tribute.hasTrailingSpace = b.test(p), !g && (e2 || !b.test(p))) return { mentionPosition: m, mentionText: p, mentionSelectedElement: o2, mentionSelectedPath: u2, mentionSelectedOffset: l2, mentionTriggerChar: f };
+            }
+          }
+        } }, { key: "lastIndexWithLeadingSpace", value: function(e2, t4) {
+          for (var n2 = e2.split("").reverse().join(""), i2 = -1, r2 = 0, o2 = e2.length; r2 < o2; r2++) {
+            for (var u2 = r2 === e2.length - 1, l2 = /\s/.test(n2[r2 + 1]), s2 = true, a = t4.length - 1; a >= 0; a--) if (t4[a] !== n2[r2 - a]) {
+              s2 = false;
+              break;
+            }
+            if (s2 && (u2 || l2)) {
+              i2 = e2.length - 1 - r2;
+              break;
+            }
+          }
+          return i2;
+        } }, { key: "isContentEditable", value: function(e2) {
+          return "INPUT" !== e2.nodeName && "TEXTAREA" !== e2.nodeName;
+        } }, { key: "isMenuOffScreen", value: function(e2, t4) {
+          var n2 = window.innerWidth, i2 = window.innerHeight, r2 = document.documentElement, o2 = (window.pageXOffset || r2.scrollLeft) - (r2.clientLeft || 0), u2 = (window.pageYOffset || r2.scrollTop) - (r2.clientTop || 0), l2 = "number" == typeof e2.top ? e2.top : u2 + i2 - e2.bottom - t4.height, s2 = "number" == typeof e2.right ? e2.right : e2.left + t4.width, a = "number" == typeof e2.bottom ? e2.bottom : e2.top + t4.height, c = "number" == typeof e2.left ? e2.left : o2 + n2 - e2.right - t4.width;
+          return { top: l2 < Math.floor(u2), right: s2 > Math.ceil(o2 + n2), bottom: a > Math.ceil(u2 + i2), left: c < Math.floor(o2) };
+        } }, { key: "getMenuDimensions", value: function() {
+          var e2 = { width: null, height: null };
+          return this.tribute.menu.style.cssText = "top: 0px;\n                                 left: 0px;\n                                 position: fixed;\n                                 display: block;\n                                 visibility; hidden;", e2.width = this.tribute.menu.offsetWidth, e2.height = this.tribute.menu.offsetHeight, this.tribute.menu.style.cssText = "display: none;", e2;
+        } }, { key: "getTextAreaOrInputUnderlinePosition", value: function(e2, t4, n2) {
+          var i2 = null !== window.mozInnerScreenX, r2 = this.getDocument().createElement("div");
+          r2.id = "input-textarea-caret-position-mirror-div", this.getDocument().body.appendChild(r2);
+          var o2 = r2.style, u2 = window.getComputedStyle ? getComputedStyle(e2) : e2.currentStyle;
+          o2.whiteSpace = "pre-wrap", "INPUT" !== e2.nodeName && (o2.wordWrap = "break-word"), o2.position = "absolute", o2.visibility = "hidden", ["direction", "boxSizing", "width", "height", "overflowX", "overflowY", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "fontStyle", "fontVariant", "fontWeight", "fontStretch", "fontSize", "fontSizeAdjust", "lineHeight", "fontFamily", "textAlign", "textTransform", "textIndent", "textDecoration", "letterSpacing", "wordSpacing"].forEach((function(e3) {
+            o2[e3] = u2[e3];
+          })), i2 ? (o2.width = "".concat(parseInt(u2.width) - 2, "px"), e2.scrollHeight > parseInt(u2.height) && (o2.overflowY = "scroll")) : o2.overflow = "hidden", r2.textContent = e2.value.substring(0, t4), "INPUT" === e2.nodeName && (r2.textContent = r2.textContent.replace(/\s/g, "\xA0"));
+          var l2 = this.getDocument().createElement("span");
+          l2.textContent = e2.value.substring(t4) || ".", r2.appendChild(l2);
+          var s2 = e2.getBoundingClientRect(), a = document.documentElement, c = (window.pageXOffset || a.scrollLeft) - (a.clientLeft || 0), h = (window.pageYOffset || a.scrollTop) - (a.clientTop || 0), d = 0, f = 0;
+          this.menuContainerIsBody && (d = s2.top, f = s2.left);
+          var m = { top: d + h + l2.offsetTop + parseInt(u2.borderTopWidth) + parseInt(u2.fontSize) - e2.scrollTop, left: f + c + l2.offsetLeft + parseInt(u2.borderLeftWidth) }, p = window.innerWidth, v = window.innerHeight, g = this.getMenuDimensions(), b = this.isMenuOffScreen(m, g);
+          b.right && (m.right = p - m.left, m.left = "auto");
+          var y = this.tribute.menuContainer ? this.tribute.menuContainer.offsetHeight : this.getDocument().body.offsetHeight;
+          if (b.bottom) {
+            var w = y - (v - (this.tribute.menuContainer ? this.tribute.menuContainer.getBoundingClientRect() : this.getDocument().body.getBoundingClientRect()).top);
+            m.bottom = w + (v - s2.top - l2.offsetTop), m.top = "auto";
+          }
+          return (b = this.isMenuOffScreen(m, g)).left && (m.left = p > g.width ? c + p - g.width : c, delete m.right), b.top && (m.top = v > g.height ? h + v - g.height : h, delete m.bottom), this.getDocument().body.removeChild(r2), m;
+        } }, { key: "getContentEditableCaretPosition", value: function(e2) {
+          var t4, n2 = this.getWindowSelection();
+          (t4 = this.getDocument().createRange()).setStart(n2.anchorNode, e2), t4.setEnd(n2.anchorNode, e2), t4.collapse(false);
+          var i2 = t4.getBoundingClientRect(), r2 = document.documentElement, o2 = (window.pageXOffset || r2.scrollLeft) - (r2.clientLeft || 0), u2 = (window.pageYOffset || r2.scrollTop) - (r2.clientTop || 0), l2 = { left: i2.left + o2, top: i2.top + i2.height + u2 }, s2 = window.innerWidth, a = window.innerHeight, c = this.getMenuDimensions(), h = this.isMenuOffScreen(l2, c);
+          h.right && (l2.left = "auto", l2.right = s2 - i2.left - o2);
+          var d = this.tribute.menuContainer ? this.tribute.menuContainer.offsetHeight : this.getDocument().body.offsetHeight;
+          if (h.bottom) {
+            var f = d - (a - (this.tribute.menuContainer ? this.tribute.menuContainer.getBoundingClientRect() : this.getDocument().body.getBoundingClientRect()).top);
+            l2.top = "auto", l2.bottom = f + (a - i2.top);
+          }
+          return (h = this.isMenuOffScreen(l2, c)).left && (l2.left = s2 > c.width ? o2 + s2 - c.width : o2, delete l2.right), h.top && (l2.top = a > c.height ? u2 + a - c.height : u2, delete l2.bottom), this.menuContainerIsBody || (l2.left = l2.left ? l2.left - this.tribute.menuContainer.offsetLeft : l2.left, l2.top = l2.top ? l2.top - this.tribute.menuContainer.offsetTop : l2.top), l2;
+        } }, { key: "scrollIntoView", value: function(e2) {
+          var t4, n2 = this.menu;
+          if (void 0 !== n2) {
+            for (; void 0 === t4 || 0 === t4.height; ) if (0 === (t4 = n2.getBoundingClientRect()).height && (void 0 === (n2 = n2.childNodes[0]) || !n2.getBoundingClientRect)) return;
+            var i2 = t4.top, r2 = i2 + t4.height;
+            if (i2 < 0) window.scrollTo(0, window.pageYOffset + t4.top - 20);
+            else if (r2 > window.innerHeight) {
+              var o2 = window.pageYOffset + t4.top - 20;
+              o2 - window.pageYOffset > 100 && (o2 = window.pageYOffset + 100);
+              var u2 = window.pageYOffset - (window.innerHeight - r2);
+              u2 > o2 && (u2 = o2), window.scrollTo(0, u2);
+            }
+          }
+        } }, { key: "menuContainerIsBody", get: function() {
+          return this.tribute.menuContainer === document.body || !this.tribute.menuContainer;
+        } }]), t3;
+      })(), s = (function() {
+        function t3(n2) {
+          e(this, t3), this.tribute = n2, this.tribute.search = this;
+        }
+        return n(t3, [{ key: "simpleFilter", value: function(e2, t4) {
+          var n2 = this;
+          return t4.filter((function(t5) {
+            return n2.test(e2, t5);
+          }));
+        } }, { key: "test", value: function(e2, t4) {
+          return null !== this.match(e2, t4);
+        } }, { key: "match", value: function(e2, t4, n2) {
+          n2 = n2 || {};
+          t4.length;
+          var i2 = n2.pre || "", r2 = n2.post || "", o2 = n2.caseSensitive && t4 || t4.toLowerCase();
+          if (n2.skip) return { rendered: t4, score: 0 };
+          e2 = n2.caseSensitive && e2 || e2.toLowerCase();
+          var u2 = this.traverse(o2, e2, 0, 0, []);
+          return u2 ? { rendered: this.render(t4, u2.cache, i2, r2), score: u2.score } : null;
+        } }, { key: "traverse", value: function(e2, t4, n2, i2, r2) {
+          if (t4.length === i2) return { score: this.calculateScore(r2), cache: r2.slice() };
+          if (!(e2.length === n2 || t4.length - i2 > e2.length - n2)) {
+            for (var o2, u2, l2 = t4[i2], s2 = e2.indexOf(l2, n2); s2 > -1; ) {
+              if (r2.push(s2), u2 = this.traverse(e2, t4, s2 + 1, i2 + 1, r2), r2.pop(), !u2) return o2;
+              (!o2 || o2.score < u2.score) && (o2 = u2), s2 = e2.indexOf(l2, s2 + 1);
+            }
+            return o2;
+          }
+        } }, { key: "calculateScore", value: function(e2) {
+          var t4 = 0, n2 = 1;
+          return e2.forEach((function(i2, r2) {
+            r2 > 0 && (e2[r2 - 1] + 1 === i2 ? n2 += n2 + 1 : n2 = 1), t4 += n2;
+          })), t4;
+        } }, { key: "render", value: function(e2, t4, n2, i2) {
+          var r2 = e2.substring(0, t4[0]);
+          return t4.forEach((function(o2, u2) {
+            r2 += n2 + e2[o2] + i2 + e2.substring(o2 + 1, t4[u2 + 1] ? t4[u2 + 1] : e2.length);
+          })), r2;
+        } }, { key: "filter", value: function(e2, t4, n2) {
+          var i2 = this;
+          return n2 = n2 || {}, t4.reduce((function(t5, r2, o2, u2) {
+            var l2 = r2;
+            n2.extract && ((l2 = n2.extract(r2)) || (l2 = ""));
+            var s2 = i2.match(e2, l2, n2);
+            return null != s2 && (t5[t5.length] = { string: s2.rendered, score: s2.score, index: o2, original: r2 }), t5;
+          }), []).sort((function(e3, t5) {
+            var n3 = t5.score - e3.score;
+            return n3 || e3.index - t5.index;
+          }));
+        } }]), t3;
+      })();
+      return (function() {
+        function t3(n2) {
+          var i2, r2 = this, a = n2.values, c = void 0 === a ? null : a, h = n2.iframe, d = void 0 === h ? null : h, f = n2.selectClass, m = void 0 === f ? "highlight" : f, p = n2.containerClass, v = void 0 === p ? "tribute-container" : p, g = n2.itemClass, b = void 0 === g ? "" : g, y = n2.trigger, w = void 0 === y ? "@" : y, T = n2.autocompleteMode, C2 = void 0 !== T && T, S2 = n2.selectTemplate, E = void 0 === S2 ? null : S2, k = n2.menuItemTemplate, x = void 0 === k ? null : k, M = n2.lookup, A = void 0 === M ? "key" : M, L = n2.fillAttr, I = void 0 === L ? "value" : L, N = n2.collection, O = void 0 === N ? null : N, D = n2.menuContainer, P = void 0 === D ? null : D, R = n2.noMatchTemplate, W = void 0 === R ? null : R, H = n2.requireLeadingSpace, B = void 0 === H || H, F = n2.allowSpaces, _ = void 0 !== F && F, j = n2.replaceTextSuffix, Y = void 0 === j ? null : j, z = n2.positionMenu, K = void 0 === z || z, q = n2.spaceSelectsMatch, U = void 0 !== q && q, X = n2.searchOpts, Q = void 0 === X ? {} : X, V = n2.menuItemLimit, G = void 0 === V ? null : V, J = n2.menuShowMinLength, Z = void 0 === J ? 0 : J;
+          if (e(this, t3), this.autocompleteMode = C2, this.menuSelected = 0, this.current = {}, this.inputEvent = false, this.isActive = false, this.menuContainer = P, this.allowSpaces = _, this.replaceTextSuffix = Y, this.positionMenu = K, this.hasTrailingSpace = false, this.spaceSelectsMatch = U, this.autocompleteMode && (w = "", _ = false), c) this.collection = [{ trigger: w, iframe: d, selectClass: m, containerClass: v, itemClass: b, selectTemplate: (E || t3.defaultSelectTemplate).bind(this), menuItemTemplate: (x || t3.defaultMenuItemTemplate).bind(this), noMatchTemplate: (i2 = W, "string" == typeof i2 ? "" === i2.trim() ? null : i2 : "function" == typeof i2 ? i2.bind(r2) : W || function() {
+            return "<li>No Match Found!</li>";
+          }.bind(r2)), lookup: A, fillAttr: I, values: c, requireLeadingSpace: B, searchOpts: Q, menuItemLimit: G, menuShowMinLength: Z }];
+          else {
+            if (!O) throw new Error("[Tribute] No collection specified.");
+            this.autocompleteMode && console.warn("Tribute in autocomplete mode does not work for collections"), this.collection = O.map((function(e2) {
+              return { trigger: e2.trigger || w, iframe: e2.iframe || d, selectClass: e2.selectClass || m, containerClass: e2.containerClass || v, itemClass: e2.itemClass || b, selectTemplate: (e2.selectTemplate || t3.defaultSelectTemplate).bind(r2), menuItemTemplate: (e2.menuItemTemplate || t3.defaultMenuItemTemplate).bind(r2), noMatchTemplate: (function(e3) {
+                return "string" == typeof e3 ? "" === e3.trim() ? null : e3 : "function" == typeof e3 ? e3.bind(r2) : W || function() {
+                  return "<li>No Match Found!</li>";
+                }.bind(r2);
+              })(W), lookup: e2.lookup || A, fillAttr: e2.fillAttr || I, values: e2.values, requireLeadingSpace: e2.requireLeadingSpace, searchOpts: e2.searchOpts || Q, menuItemLimit: e2.menuItemLimit || G, menuShowMinLength: e2.menuShowMinLength || Z };
+            }));
+          }
+          new l(this), new o(this), new u(this), new s(this);
+        }
+        return n(t3, [{ key: "triggers", value: function() {
+          return this.collection.map((function(e2) {
+            return e2.trigger;
+          }));
+        } }, { key: "attach", value: function(e2) {
+          if (!e2) throw new Error("[Tribute] Must pass in a DOM node or NodeList.");
+          if ("undefined" != typeof jQuery && e2 instanceof jQuery && (e2 = e2.get()), e2.constructor === NodeList || e2.constructor === HTMLCollection || e2.constructor === Array) for (var t4 = e2.length, n2 = 0; n2 < t4; ++n2) this._attach(e2[n2]);
+          else this._attach(e2);
+        } }, { key: "_attach", value: function(e2) {
+          e2.hasAttribute("data-tribute") && console.warn("Tribute was already bound to " + e2.nodeName), this.ensureEditable(e2), this.events.bind(e2), e2.setAttribute("data-tribute", true);
+        } }, { key: "ensureEditable", value: function(e2) {
+          if (-1 === t3.inputTypes().indexOf(e2.nodeName)) {
+            if (!e2.contentEditable) throw new Error("[Tribute] Cannot bind to " + e2.nodeName);
+            e2.contentEditable = true;
+          }
+        } }, { key: "createMenu", value: function(e2) {
+          var t4 = this.range.getDocument().createElement("div"), n2 = this.range.getDocument().createElement("ul");
+          return t4.className = e2, t4.appendChild(n2), this.menuContainer ? this.menuContainer.appendChild(t4) : this.range.getDocument().body.appendChild(t4);
+        } }, { key: "showMenuFor", value: function(e2, t4) {
+          var n2 = this;
+          if (!this.isActive || this.current.element !== e2 || this.current.mentionText !== this.currentMentionTextSnapshot) {
+            this.currentMentionTextSnapshot = this.current.mentionText, this.menu || (this.menu = this.createMenu(this.current.collection.containerClass), e2.tributeMenu = this.menu, this.menuEvents.bind(this.menu)), this.isActive = true, this.menuSelected = 0, this.current.mentionText || (this.current.mentionText = "");
+            var r2 = function(e3) {
+              if (n2.isActive) {
+                var r3 = n2.search.filter(n2.current.mentionText, e3, { pre: n2.current.collection.searchOpts.pre || "<span>", post: n2.current.collection.searchOpts.post || "</span>", skip: n2.current.collection.searchOpts.skip, extract: function(e4) {
+                  if ("string" == typeof n2.current.collection.lookup) return e4[n2.current.collection.lookup];
+                  if ("function" == typeof n2.current.collection.lookup) return n2.current.collection.lookup(e4, n2.current.mentionText);
+                  throw new Error("Invalid lookup attribute, lookup must be string or function.");
+                } });
+                n2.current.collection.menuItemLimit && (r3 = r3.slice(0, n2.current.collection.menuItemLimit)), n2.current.filteredItems = r3;
+                var o2 = n2.menu.querySelector("ul");
+                if (n2.range.positionMenuAtCaret(t4), !r3.length) {
+                  var u2 = new CustomEvent("tribute-no-match", { detail: n2.menu });
+                  return n2.current.element.dispatchEvent(u2), void ("function" == typeof n2.current.collection.noMatchTemplate && !n2.current.collection.noMatchTemplate() || !n2.current.collection.noMatchTemplate ? n2.hideMenu() : "function" == typeof n2.current.collection.noMatchTemplate ? o2.innerHTML = n2.current.collection.noMatchTemplate() : o2.innerHTML = n2.current.collection.noMatchTemplate);
+                }
+                o2.innerHTML = "";
+                var l2 = n2.range.getDocument().createDocumentFragment();
+                r3.forEach((function(e4, t5) {
+                  var r4 = n2.range.getDocument().createElement("li");
+                  r4.setAttribute("data-index", t5), r4.className = n2.current.collection.itemClass, r4.addEventListener("mousemove", (function(e5) {
+                    var t6 = i(n2._findLiTarget(e5.target), 2), r5 = (t6[0], t6[1]);
+                    0 !== e5.movementY && n2.events.setActiveLi(r5);
+                  })), n2.menuSelected === t5 && r4.classList.add(n2.current.collection.selectClass), r4.innerHTML = n2.current.collection.menuItemTemplate(e4), l2.appendChild(r4);
+                })), o2.appendChild(l2);
+              }
+            };
+            "function" == typeof this.current.collection.values ? this.current.collection.values(this.current.mentionText, r2) : r2(this.current.collection.values);
+          }
+        } }, { key: "_findLiTarget", value: function(e2) {
+          if (!e2) return [];
+          var t4 = e2.getAttribute("data-index");
+          return t4 ? [e2, t4] : this._findLiTarget(e2.parentNode);
+        } }, { key: "showMenuForCollection", value: function(e2, t4) {
+          e2 !== document.activeElement && this.placeCaretAtEnd(e2), this.current.collection = this.collection[t4 || 0], this.current.externalTrigger = true, this.current.element = e2, e2.isContentEditable ? this.insertTextAtCursor(this.current.collection.trigger) : this.insertAtCaret(e2, this.current.collection.trigger), this.showMenuFor(e2);
+        } }, { key: "placeCaretAtEnd", value: function(e2) {
+          if (e2.focus(), void 0 !== window.getSelection && void 0 !== document.createRange) {
+            var t4 = document.createRange();
+            t4.selectNodeContents(e2), t4.collapse(false);
+            var n2 = window.getSelection();
+            n2.removeAllRanges(), n2.addRange(t4);
+          } else if (void 0 !== document.body.createTextRange) {
+            var i2 = document.body.createTextRange();
+            i2.moveToElementText(e2), i2.collapse(false), i2.select();
+          }
+        } }, { key: "insertTextAtCursor", value: function(e2) {
+          var t4, n2;
+          (n2 = (t4 = window.getSelection()).getRangeAt(0)).deleteContents();
+          var i2 = document.createTextNode(e2);
+          n2.insertNode(i2), n2.selectNodeContents(i2), n2.collapse(false), t4.removeAllRanges(), t4.addRange(n2);
+        } }, { key: "insertAtCaret", value: function(e2, t4) {
+          var n2 = e2.scrollTop, i2 = e2.selectionStart, r2 = e2.value.substring(0, i2), o2 = e2.value.substring(e2.selectionEnd, e2.value.length);
+          e2.value = r2 + t4 + o2, i2 += t4.length, e2.selectionStart = i2, e2.selectionEnd = i2, e2.focus(), e2.scrollTop = n2;
+        } }, { key: "hideMenu", value: function() {
+          this.menu && (this.menu.style.cssText = "display: none;", this.isActive = false, this.menuSelected = 0, this.current = {});
+        } }, { key: "selectItemAtIndex", value: function(e2, t4) {
+          if ("number" == typeof (e2 = parseInt(e2)) && !isNaN(e2)) {
+            var n2 = this.current.filteredItems[e2], i2 = this.current.collection.selectTemplate(n2);
+            null !== i2 && this.replaceText(i2, t4, n2);
+          }
+        } }, { key: "replaceText", value: function(e2, t4, n2) {
+          this.range.replaceTriggerText(e2, true, true, t4, n2);
+        } }, { key: "_append", value: function(e2, t4, n2) {
+          if ("function" == typeof e2.values) throw new Error("Unable to append to values, as it is a function.");
+          e2.values = n2 ? t4 : e2.values.concat(t4);
+        } }, { key: "append", value: function(e2, t4, n2) {
+          var i2 = parseInt(e2);
+          if ("number" != typeof i2) throw new Error("please provide an index for the collection to update.");
+          var r2 = this.collection[i2];
+          this._append(r2, t4, n2);
+        } }, { key: "appendCurrent", value: function(e2, t4) {
+          if (!this.isActive) throw new Error("No active state. Please use append instead and pass an index.");
+          this._append(this.current.collection, e2, t4);
+        } }, { key: "detach", value: function(e2) {
+          if (!e2) throw new Error("[Tribute] Must pass in a DOM node or NodeList.");
+          if ("undefined" != typeof jQuery && e2 instanceof jQuery && (e2 = e2.get()), e2.constructor === NodeList || e2.constructor === HTMLCollection || e2.constructor === Array) for (var t4 = e2.length, n2 = 0; n2 < t4; ++n2) this._detach(e2[n2]);
+          else this._detach(e2);
+        } }, { key: "_detach", value: function(e2) {
+          var t4 = this;
+          this.events.unbind(e2), e2.tributeMenu && this.menuEvents.unbind(e2.tributeMenu), setTimeout((function() {
+            e2.removeAttribute("data-tribute"), t4.isActive = false, e2.tributeMenu && e2.tributeMenu.remove();
+          }));
+        } }, { key: "isActive", get: function() {
+          return this._isActive;
+        }, set: function(e2) {
+          if (this._isActive != e2 && (this._isActive = e2, this.current.element)) {
+            var t4 = new CustomEvent("tribute-active-".concat(e2));
+            this.current.element.dispatchEvent(t4);
+          }
+        } }], [{ key: "defaultSelectTemplate", value: function(e2) {
+          return void 0 === e2 ? "".concat(this.current.collection.trigger).concat(this.current.mentionText) : this.range.isContentEditable(this.current.element) ? '<span class="tribute-mention">' + (this.current.collection.trigger + e2.original[this.current.collection.fillAttr]) + "</span>" : this.current.collection.trigger + e2.original[this.current.collection.fillAttr];
+        } }, { key: "defaultMenuItemTemplate", value: function(e2) {
+          return e2.string;
+        } }, { key: "inputTypes", value: function() {
+          return ["TEXTAREA", "INPUT"];
+        } }]), t3;
+      })();
+    }));
+  }
+});
+
 // node_modules/@marijn/find-cluster-break/src/index.js
 var rangeFrom = [];
 var rangeTo = [];
@@ -21433,12 +22014,12 @@ function completionTooltip(stateField, applyCompletion2) {
 }
 function scrollIntoView2(container, element) {
   let parent = container.getBoundingClientRect();
-  let self = element.getBoundingClientRect();
+  let self2 = element.getBoundingClientRect();
   let scaleY = parent.height / container.offsetHeight;
-  if (self.top < parent.top)
-    container.scrollTop -= (parent.top - self.top) / scaleY;
-  else if (self.bottom > parent.bottom)
-    container.scrollTop += (self.bottom - parent.bottom) / scaleY;
+  if (self2.top < parent.top)
+    container.scrollTop -= (parent.top - self2.top) / scaleY;
+  else if (self2.bottom > parent.bottom)
+    container.scrollTop += (self2.bottom - parent.bottom) / scaleY;
 }
 function score(option) {
   return (option.boost || 0) * 100 + (option.apply ? 10 : 0) + (option.info ? 5 : 0) + (option.type ? 1 : 0);
@@ -24143,7 +24724,7 @@ var BlockContext = class {
   @internal
   */
   get buffer() {
-    return new Buffer(this.parser.nodeSet);
+    return new Buffer2(this.parser.nodeSet);
   }
 };
 function injectGaps(ranges, rangeI, tree, offset, dummies) {
@@ -24353,7 +24934,7 @@ for (let i = 1, name2; name2 = Type[i]; i++) {
   });
 }
 var none4 = [];
-var Buffer = class {
+var Buffer2 = class {
   constructor(nodeSet) {
     this.nodeSet = nodeSet;
     this.content = [];
@@ -24400,7 +24981,7 @@ var Element = class {
   @internal
   */
   toTree(nodeSet) {
-    return new Buffer(nodeSet).writeElements(this.children, -this.from).finish(this.type, this.to - this.from);
+    return new Buffer2(nodeSet).writeElements(this.children, -this.from).finish(this.type, this.to - this.from);
   }
 };
 var TreeElement = class {
@@ -30573,6 +31154,10 @@ var wordsWithSpaceDiff = new WordsWithSpaceDiff();
 function diffWordsWithSpace(oldStr, newStr, options) {
   return wordsWithSpaceDiff.diff(oldStr, newStr, options);
 }
+
+// src/editor-entry.js
+var import_tributejs = __toESM(require_tribute_min());
+var export_Tribute = import_tributejs.default;
 export {
   Annotation,
   Compartment,
@@ -30582,6 +31167,7 @@ export {
   EditorView,
   StateEffect,
   StateField,
+  export_Tribute as Tribute,
   ViewPlugin,
   WidgetType,
   basicSetup,

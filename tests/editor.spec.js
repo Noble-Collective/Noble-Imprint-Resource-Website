@@ -992,19 +992,22 @@ test.describe('Editor - Auto-Save', () => {
     expect(after).toBeLessThan(before);
   });
 
-  // Known issue: partial undo doesn't always clean up Firestore suggestion.
-  // After undo the editor state is restored but the suggestion doc remains.
-  test.fixme('undoing all edits removes suggestion from Firestore', async ({ page }) => {
+  test('undoing all edits removes suggestion from Firestore', async ({ page }) => {
     const word = await findUniqueWord(page, 'plain');
     await selectText(page, word);
     await replaceWith(page, 'UNDO');
     await waitForAutoSave(page);
+
+    const before = await getPendingSuggestionCount();
+    expect(before).toBeGreaterThan(0);
 
     // Undo until back to original
     for (let i = 0; i < 20; i++) {
       await page.keyboard.press('Control+z');
     }
     await waitForAutoSave(page);
+    // Extra wait for the DELETE round-trip to Firestore
+    await page.waitForTimeout(2000);
 
     const count = await getPendingSuggestionCount();
     expect(count).toBe(0);
@@ -1290,7 +1293,7 @@ test.describe('Editor - Accept/Reject Flow', () => {
     await expect(reviewBtn).toBeVisible({ timeout: 5000 });
   });
 
-  test('review mode is read-only', async ({ page }) => {
+  test('review mode routes through suggest mode', async ({ page }) => {
     await enterSuggestMode(page);
     const word = await findUniqueWord(page, 'plain');
     await selectText(page, word);
@@ -1301,12 +1304,13 @@ test.describe('Editor - Accept/Reject Flow', () => {
     await page.waitForURL('**/' + TEST_SESSION_PATH.split('/').pop() + '*', { timeout: 15000 });
     await page.waitForTimeout(1000);
 
+    // Review button now routes through suggest mode (unified in 2026-04-22)
     await page.click('#btn-review');
     await page.waitForSelector('.cm-editor');
     await page.waitForTimeout(500);
 
     const label = page.locator('#editor-mode-label');
-    await expect(label).toHaveText('Reviewing Suggestions');
+    await expect(label).toHaveText('Suggesting Edits');
   });
 });
 

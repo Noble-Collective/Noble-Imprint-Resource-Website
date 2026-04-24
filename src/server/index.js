@@ -284,6 +284,11 @@ app.use('/api/admin', auth.requireAdmin, adminRoutes.api);
 const suggestionRoutes = require('./suggestion-routes');
 app.use('/api/suggestions', suggestionRoutes);
 
+// --- Notification routes ---
+const notificationRoutes = require('./notification-routes');
+app.use('/notifications', notificationRoutes.page);
+app.use('/api/notifications', notificationRoutes.api);
+
 // Homepage
 app.get('/', async (req, res, next) => {
   try {

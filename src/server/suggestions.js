@@ -514,7 +514,7 @@ async function rejectHunk(id, resolverEmail, reason) {
 
 // --- Comment CRUD ---
 
-async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, authorEmail, authorName, authorPhotoURL, fileContent }) {
+async function createComment({ filePath, bookPath, baseCommitSha, from, to, selectedText, commentText, mentionedUsers, authorEmail, authorName, authorPhotoURL, fileContent }) {
   // Build enhanced anchor data if file content is available
   const anchorData = fileContent
     ? buildAnchorData(fileContent, from, to, selectedText || '')
@@ -538,12 +538,26 @@ async function createComment({ filePath, bookPath, baseCommitSha, from, to, sele
     authorEmail,
     authorName: authorName || authorEmail,
     authorPhotoURL: authorPhotoURL || null,
+    mentionedUsers: mentionedUsers || [],
     status: 'open',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     resolvedAt: null,
     resolvedBy: null,
   });
   return ref.id;
+}
+
+async function getComment(id) {
+  const doc = await commentsCollection().doc(id).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() };
+}
+
+async function updateComment(id, { commentText, mentionedUsers }) {
+  const updates = { editedAt: admin.firestore.FieldValue.serverTimestamp() };
+  if (commentText !== undefined) updates.commentText = commentText;
+  if (mentionedUsers !== undefined) updates.mentionedUsers = mentionedUsers;
+  await commentsCollection().doc(id).update(updates);
 }
 
 async function getCommentsForFile(filePath) {
@@ -581,18 +595,32 @@ async function resolveComment(id, resolverEmail) {
 
 // --- Reply CRUD ---
 
-async function createReply({ parentId, parentType, filePath, text, authorEmail, authorName, authorPhotoURL }) {
+async function createReply({ parentId, parentType, filePath, text, mentionedUsers, authorEmail, authorName, authorPhotoURL }) {
   const ref = await repliesCollection().add({
     parentId,
     parentType,
     filePath,
     text,
+    mentionedUsers: mentionedUsers || [],
     authorEmail,
     authorName: authorName || authorEmail,
     authorPhotoURL: authorPhotoURL || null,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return ref.id;
+}
+
+async function getReply(id) {
+  const doc = await repliesCollection().doc(id).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() };
+}
+
+async function updateReply(id, { text, mentionedUsers }) {
+  const updates = { editedAt: admin.firestore.FieldValue.serverTimestamp() };
+  if (text !== undefined) updates.text = text;
+  if (mentionedUsers !== undefined) updates.mentionedUsers = mentionedUsers;
+  await repliesCollection().doc(id).update(updates);
 }
 
 async function getRepliesForFile(filePath) {
@@ -728,9 +756,13 @@ module.exports = {
   acceptHunk,
   rejectHunk,
   createComment,
+  getComment,
+  updateComment,
   getCommentsForFile,
   resolveComment,
   createReply,
+  getReply,
+  updateReply,
   getRepliesForFile,
   deleteRepliesForParent,
   getResolvedSuggestions,

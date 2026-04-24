@@ -1,0 +1,87 @@
+<%- include('partials/header') %>
+
+  <main class="notif-main">
+    <a href="/" class="admin-back">&larr; Back to Resources</a>
+    <h1 class="admin-page-title">Notification Settings</h1>
+
+    <div class="notif-prefs-container">
+      <div class="notif-section">
+        <div class="notif-toggle-row">
+          <div class="notif-toggle-info">
+            <div class="notif-toggle-label">Email notifications</div>
+            <div class="notif-toggle-desc">Receive email notifications when you're mentioned, or when there's activity on books you have access to.</div>
+          </div>
+          <label class="notif-switch">
+            <input type="checkbox" id="global-opt-in" <%= prefs.globalOptIn ? 'checked' : '' %>>
+            <span class="notif-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="notif-section" id="book-prefs-section">
+        <h2 class="notif-section-title">Per-book notifications</h2>
+        <p class="notif-section-desc">Choose which books you want to receive notifications for.</p>
+
+        <% if (userBooks.length === 0) { %>
+          <p class="notif-empty">You don't have edit access to any books yet.</p>
+        <% } else { %>
+          <div class="notif-book-list">
+            <% for (const book of userBooks) { %>
+              <div class="notif-toggle-row notif-book-row">
+                <div class="notif-toggle-info">
+                  <div class="notif-toggle-label"><%= book.title %></div>
+                  <% if (book.seriesTitle) { %><div class="notif-toggle-desc"><%= book.seriesTitle %></div><% } %>
+                  <% if (book.isTestBook) { %><div class="notif-toggle-desc notif-test-note">Notifications off by default for test content</div><% } %>
+                </div>
+                <label class="notif-switch">
+                  <input type="checkbox" class="book-toggle" data-book-path="<%= book.encodedPath %>" <%= book.enabled ? 'checked' : '' %>>
+                  <span class="notif-slider"></span>
+                </label>
+              </div>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function() {
+      var globalToggle = document.getElementById('global-opt-in');
+      var bookSection = document.getElementById('book-prefs-section');
+
+      function updateBookSectionVisibility() {
+        bookSection.style.opacity = globalToggle.checked ? '1' : '0.4';
+        bookSection.style.pointerEvents = globalToggle.checked ? 'auto' : 'none';
+      }
+      updateBookSectionVisibility();
+
+      function savePrefs() {
+        var bookOverrides = {};
+        document.querySelectorAll('.book-toggle').forEach(function(input) {
+          bookOverrides[input.getAttribute('data-book-path')] = input.checked;
+        });
+        fetch('/api/notifications/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            globalOptIn: globalToggle.checked,
+            bookOverrides: bookOverrides,
+          }),
+        }).catch(function(err) {
+          console.error('Failed to save notification preferences:', err);
+        });
+      }
+
+      globalToggle.addEventListener('change', function() {
+        updateBookSectionVisibility();
+        savePrefs();
+      });
+
+      document.querySelectorAll('.book-toggle').forEach(function(input) {
+        input.addEventListener('change', savePrefs);
+      });
+    })();
+  </script>
+
+<%- include('partials/footer') %>
