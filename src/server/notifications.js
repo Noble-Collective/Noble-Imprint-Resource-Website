@@ -315,7 +315,7 @@ async function buildDeepLink(filePath, tree) {
     if (sessionsIdx < 0) return SITE;
     const bookPath = filePath.substring(0, sessionsIdx);
     const found = findBookInTree(tree, bookPath);
-    if (!found) return SITE;
+    if (!found) return buildDeepLinkFromPath(filePath);
 
     // Load sessions if not already loaded, then find the matching one
     if (!found.book.sessions || found.book.sessions.length === 0) {
@@ -329,6 +329,21 @@ async function buildDeepLink(filePath, tree) {
     // Fall back to book page
     return SITE + content.bookUrl(found.series, found.subseries, found.book);
   } catch { /* fallback */ }
+  return buildDeepLinkFromPath(filePath);
+}
+
+// Last-resort URL builder from raw file path when content tree is unavailable
+// e.g. "series/Passage Series/HomeStead/sessions/02-PartOne-Preparation.md"
+// -> /passage/homestead/02-partone-preparation
+function buildDeepLinkFromPath(filePath) {
+  try {
+    const parts = filePath.replace(/\.md$/, '').split('/');
+    // parts: ["series", "Series Name", ...subseries?, "Book Name", "sessions", "filename"]
+    const slugged = parts
+      .filter(p => p !== 'series' && p !== 'sessions')
+      .map(p => content.slugify(p));
+    return SITE + '/' + slugged.join('/');
+  } catch { /* ignore */ }
   return SITE;
 }
 

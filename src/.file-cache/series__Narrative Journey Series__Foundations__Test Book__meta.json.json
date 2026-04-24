@@ -1,0 +1,1 @@
+{"content":"{\n  \"title\": \"Test Book\",\n  \"subtitle\": \"A test book for development\",\n  \"order\": 3,\n  \"color\": {\n    \"##\": \"#000000\",\n    \"###\": \"#000000\",\n    \"####\": \"#000000\",\n    \"#####\": \"#000000\"\n  },\n  \"status\": \"hidden\"\n}\n","sha":"9135dc24c11363f55c6f7029556a03af5766f1f5"}
