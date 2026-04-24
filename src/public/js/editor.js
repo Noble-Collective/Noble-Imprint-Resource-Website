@@ -881,22 +881,34 @@ if (data) {
     } catch (err) {
       console.error('[REFRESH] error:', err.message, err.stack);
     }
-    // Restore scroll position after rebuild — find the text anchor in the new document
-    // and scroll to it, falling back to raw scrollTop if not found
-    if (editorView && scrollAnchorText) {
+    // Restore scroll position after rebuild.
+    // Primary: find the text anchor in the new document and compute the scrollTop
+    // delta so the same content stays at the same pixel position in the viewport.
+    // Fallback: raw scrollTop (works when document length doesn't change).
+    if (scroller) {
       requestAnimationFrame(() => {
-        try {
-          const newDoc = editorView.state.doc.toString();
-          const anchorPos = newDoc.indexOf(scrollAnchorText);
-          if (anchorPos >= 0) {
-            editorView.dispatch({ effects: EditorView.scrollIntoView(anchorPos, { y: 'center' }) });
-            return;
-          }
-        } catch { /* ignore */ }
-        if (scroller && savedScrollTop) scroller.scrollTop = savedScrollTop;
+        if (editorView && scrollAnchorText) {
+          try {
+            const newDoc = editorView.state.doc.toString();
+            const anchorPos = newDoc.indexOf(scrollAnchorText);
+            if (anchorPos >= 0) {
+              // Get the pixel position of the anchor in the new document
+              const newBlock = editorView.lineBlockAt(anchorPos);
+              if (newBlock) {
+                // The anchor was at scrollAnchorOffset in the old doc.
+                // Its old pixel top was approximately savedScrollTop + (viewport height / 2)
+                // since we sampled from the viewport center.
+                // In the new doc, it's at newBlock.top. Set scrollTop so it lands
+                // at the same viewport-relative position.
+                const viewportMid = scroller.clientHeight / 2;
+                scroller.scrollTop = newBlock.top - viewportMid;
+                return;
+              }
+            }
+          } catch { /* ignore */ }
+        }
+        scroller.scrollTop = savedScrollTop;
       });
-    } else if (scroller && savedScrollTop) {
-      requestAnimationFrame(() => { scroller.scrollTop = savedScrollTop; });
     }
     hideRefreshOverlay();
   }
