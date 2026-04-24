@@ -44,17 +44,22 @@ async function queueNotification({ recipientEmail, type, bookPath, filePath, tri
 }
 
 // --- Check if first activity email was sent today for this recipient+book ---
+// Uses a simple 2-field query (no composite index needed) and filters in code
 async function hasImmediateEmailToday(recipientEmail, bookPath) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayTimestamp = admin.firestore.Timestamp.fromDate(today);
   const snap = await notificationsCollection()
     .where('recipientEmail', '==', recipientEmail)
     .where('bookPath', '==', bookPath)
-    .where('immediateEmailSent', '==', true)
-    .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(today))
-    .limit(1)
     .get();
-  return !snap.empty;
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    if (!d.immediateEmailSent) continue;
+    const created = d.createdAt;
+    if (created && created.toMillis && created.toMillis() >= todayTimestamp.toMillis()) return true;
+  }
+  return false;
 }
 
 // --- Process immediate notifications after a comment/reply/suggestion is created ---

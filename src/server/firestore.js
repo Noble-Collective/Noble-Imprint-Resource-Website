@@ -23,12 +23,18 @@ async function createOrUpdateUser(email, displayName, photoURL) {
   const doc = await ref.get();
 
   if (doc.exists) {
-    // Update display info on each login
-    await ref.update({
-      displayName: displayName || doc.data().displayName,
-      photoURL: photoURL || doc.data().photoURL,
+    // Update photo on each login (may change), but keep existing displayName
+    // if already set (allows manual override via admin console / Firestore)
+    const existing = doc.data();
+    const updates = {
+      photoURL: photoURL || existing.photoURL,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    // Only set displayName if the user doesn't have one yet
+    if (!existing.displayName || existing.displayName === existing.email) {
+      updates.displayName = displayName || existing.displayName;
+    }
+    await ref.update(updates);
   } else {
     await ref.set({
       email: email.toLowerCase(),
