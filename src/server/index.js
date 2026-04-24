@@ -465,15 +465,18 @@ app.listen(PORT, () => {
   });
   // Warm up disk cache 30s after startup — gives the server time to handle
   // initial requests from the deploy health check before using API budget.
-  // Only runs if the disk cache is empty (no content-tree-cache.json).
-  const treeCachePath = require('path').join(__dirname, '..', '.content-tree-cache.json');
-  if (!require('fs').existsSync(treeCachePath)) {
+  // Only runs if .file-cache/ is empty or missing (committed to git, so
+  // Docker builds should include it — warm-up is only needed if cache was deleted).
+  const fileCacheDir = require('path').join(__dirname, '..', '.file-cache');
+  const fileCacheExists = require('fs').existsSync(fileCacheDir) &&
+    require('fs').readdirSync(fileCacheDir).length > 10;
+  if (!fileCacheExists) {
     setTimeout(() => {
       content.warmDiskCache().catch(err => {
         console.error('Disk cache warm-up error:', err.message);
       });
     }, 30000);
   } else {
-    console.log('Disk cache already exists — skipping warm-up');
+    console.log('Disk cache already populated (' + require('fs').readdirSync(fileCacheDir).length + ' files) — skipping warm-up');
   }
 });
