@@ -2757,8 +2757,8 @@ body.drawer-open {
   font-family: 'DM Sans', sans-serif;
 }
 .admin-actions-cell {
-  display: flex;
-  gap: 6px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* Book cell */
