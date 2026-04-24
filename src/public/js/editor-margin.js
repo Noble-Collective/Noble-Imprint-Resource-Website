@@ -116,7 +116,7 @@ function buildThreadHtml(parentId, parentType) {
     var isReplyAuthor = userData && userData.email === r.authorEmail;
     var editReplyBtn = isReplyAuthor
       ? '<button class="margin-reply-edit-btn" data-action="edit-reply" data-reply-id="' + r.id + '" title="Edit">'
-        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>'
         + '</button>'
       : '';
     html += '<div class="margin-card-reply">'
@@ -347,7 +347,7 @@ function renderAllCards() {
       var cActionsHtml = '';
       if (isCommentAuthor) {
         cActionsHtml += '<button class="margin-action margin-action--edit" data-action="edit-comment" data-comment-id="' + c.id + '" title="Edit">'
-          + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+          + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>'
           + '</button>';
       }
       if (canResolve) {
@@ -551,6 +551,7 @@ function startEditComment(commentId) {
   textEl.replaceWith(editContainer);
 
   var textarea = editContainer.querySelector('textarea');
+  attachMentionToElement(textarea);
   textarea.focus();
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 
@@ -593,14 +594,15 @@ function startEditReply(replyId) {
   var currentText = reply.text;
   var editContainer = document.createElement('div');
   editContainer.className = 'margin-card-edit-container margin-card-edit-container--reply';
-  editContainer.innerHTML = '<input type="text" class="margin-card-edit-input" value="' + escapeHtml(currentText) + '">'
+  editContainer.innerHTML = '<textarea class="margin-card-edit-textarea margin-card-edit-textarea--reply" rows="2">' + escapeHtml(currentText) + '</textarea>'
     + '<div class="margin-card-edit-actions">'
     + '<button class="margin-card-edit-save" data-reply-id="' + replyId + '">Save</button>'
     + '<button class="margin-card-edit-cancel">Cancel</button>'
     + '</div>';
   textEl.replaceWith(editContainer);
 
-  var input = editContainer.querySelector('input');
+  var input = editContainer.querySelector('textarea');
+  attachMentionToElement(input);
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 
@@ -632,9 +634,12 @@ function startEditReply(replyId) {
     });
   });
 
-  // Enter key saves
+  // Enter key saves (unless Tribute dropdown is open)
   input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      var tributeOpen = document.querySelector('.tribute-container') &&
+        document.querySelector('.tribute-container').style.display !== 'none';
+      if (tributeOpen) return;
       e.preventDefault();
       editContainer.querySelector('.margin-card-edit-save').click();
     } else if (e.key === 'Escape') {

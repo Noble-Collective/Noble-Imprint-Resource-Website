@@ -4101,7 +4101,7 @@ body.drawer-open {
   cursor: pointer;
   color: #bbb;
   padding: 0;
-  margin-left: auto;
+  margin-left: 8px;
   float: right;
 }
 .margin-reply-edit-btn:hover {
@@ -4109,6 +4109,11 @@ body.drawer-open {
 }
 .margin-card-edit-container {
   margin-top: 4px;
+}
+/* Bring the card being edited above overlapping neighbors */
+.margin-card:has(.margin-card-edit-container) {
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 .margin-card-edit-textarea {
   width: 100%;
@@ -4122,15 +4127,9 @@ body.drawer-open {
   outline: none;
   box-sizing: border-box;
 }
-.margin-card-edit-input {
-  width: 100%;
-  border: 1px solid #d7b44a;
-  border-radius: 4px;
-  padding: 3px 6px;
+.margin-card-edit-textarea--reply {
   font-size: 11px;
-  font-family: 'DM Sans', sans-serif;
-  outline: none;
-  box-sizing: border-box;
+  min-height: 36px;
 }
 .margin-card-edit-actions {
   display: flex;

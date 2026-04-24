@@ -800,9 +800,28 @@ if (data) {
   // --- Smart refresh: re-fetch from GitHub and rebuild editor state ---
   async function refreshFromGitHub() {
     showRefreshOverlay();
-    // Save scroll position to restore after rebuild
+    // Save a text anchor near the viewport top so we can scroll back to the same
+    // content after rebuild (raw scrollTop doesn't work because document length changes)
     const scroller = editorView?.scrollDOM;
     const savedScrollTop = scroller ? scroller.scrollTop : 0;
+    let scrollAnchorText = null;
+    let scrollAnchorOffset = 0;
+    if (editorView) {
+      try {
+        // Find the document position at the top of the visible content area.
+        // Use the middle of the viewport to avoid header/toolbar overlap issues.
+        const rect = editorView.dom.getBoundingClientRect();
+        const midY = rect.top + (rect.height / 2);
+        const topPos = editorView.posAtCoords({ x: rect.left + 20, y: midY });
+        if (topPos != null) {
+          // Grab ~60 chars around that position as a text anchor
+          const doc = editorView.state.doc.toString();
+          const anchorFrom = Math.max(0, topPos - 10);
+          scrollAnchorText = doc.substring(anchorFrom, anchorFrom + 60);
+          scrollAnchorOffset = anchorFrom;
+        }
+      } catch { /* ignore */ }
+    }
     try {
       const freshRes = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(data.sessionFilePath));
       if (!freshRes.ok) { hideRefreshOverlay(); return; }
@@ -862,8 +881,21 @@ if (data) {
     } catch (err) {
       console.error('[REFRESH] error:', err.message, err.stack);
     }
-    // Restore scroll position after rebuild
-    if (scroller && savedScrollTop) {
+    // Restore scroll position after rebuild — find the text anchor in the new document
+    // and scroll to it, falling back to raw scrollTop if not found
+    if (editorView && scrollAnchorText) {
+      requestAnimationFrame(() => {
+        try {
+          const newDoc = editorView.state.doc.toString();
+          const anchorPos = newDoc.indexOf(scrollAnchorText);
+          if (anchorPos >= 0) {
+            editorView.dispatch({ effects: EditorView.scrollIntoView(anchorPos, { y: 'center' }) });
+            return;
+          }
+        } catch { /* ignore */ }
+        if (scroller && savedScrollTop) scroller.scrollTop = savedScrollTop;
+      });
+    } else if (scroller && savedScrollTop) {
       requestAnimationFrame(() => { scroller.scrollTop = savedScrollTop; });
     }
     hideRefreshOverlay();
