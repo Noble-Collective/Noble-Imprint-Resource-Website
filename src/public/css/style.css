@@ -2728,11 +2728,17 @@ body.drawer-open {
   padding: 8px 10px;
 }
 
-/* User cell */
+/* User cell — use inline layout instead of flex on <td> to avoid row height misalignment */
 .admin-user-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  white-space: nowrap;
+}
+.admin-user-cell > * {
+  vertical-align: middle;
+  display: inline-block;
+}
+.admin-user-cell .admin-avatar,
+.admin-user-cell .admin-avatar--initials {
+  margin-right: 10px;
 }
 .admin-avatar {
   width: 28px;
