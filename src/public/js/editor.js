@@ -1858,7 +1858,6 @@ if (data) {
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
 
   // Navigate between suggestion/comment cards
-  let currentCardIndex = -1;
   function navigateCards(direction) {
     if (!editorView) return;
     const registry = editorView.state.field(annotationRegistry);
@@ -1866,16 +1865,30 @@ if (data) {
     for (const [id, a] of registry) {
       if (a.currentFrom != null) positions.push({ id, pos: a.currentFrom, kind: a.kind });
     }
+    // Also include draft hunks not yet in registry
+    const draftHunks = getCurrentHunks();
+    for (const h of draftHunks) {
+      const pos = h.type === 'deletion' ? (h.currentPos || 0) : (h.currentFrom || 0);
+      if (!positions.some(p => Math.abs(p.pos - pos) < 3)) {
+        positions.push({ id: h.id, pos, kind: 'suggestion' });
+      }
+    }
     positions.sort((a, b) => a.pos - b.pos);
     if (positions.length === 0) return;
 
-    // Find the next/prev relative to current scroll position
+    // Find next/prev relative to the current cursor position (not a stored index)
+    const cursor = editorView.state.selection.main.anchor;
+    let target;
     if (direction === 'next') {
-      currentCardIndex = (currentCardIndex + 1) % positions.length;
+      target = positions.find(p => p.pos > cursor + 1);
+      if (!target) target = positions[0]; // wrap to first
     } else {
-      currentCardIndex = currentCardIndex <= 0 ? positions.length - 1 : currentCardIndex - 1;
+      // Find last item before cursor
+      for (let i = positions.length - 1; i >= 0; i--) {
+        if (positions[i].pos < cursor - 1) { target = positions[i]; break; }
+      }
+      if (!target) target = positions[positions.length - 1]; // wrap to last
     }
-    const target = positions[currentCardIndex];
     editorView.dispatch({
       selection: { anchor: target.pos },
       effects: EditorView.scrollIntoView(target.pos, { y: 'start', yMargin: 150 }),
