@@ -39,12 +39,12 @@ function renderAvatar(name, email, photoURL, small) {
 }
 
 // Highlight @mentions in text — wraps @Name in a styled span
-// Only highlights patterns that match known mentioned user display names
+// Matches @FirstName LastName (1-3 words after @, stop at punctuation or end)
 function highlightMentions(text, mentionedUsers) {
   if (!mentionedUsers || mentionedUsers.length === 0) return escapeHtml(text);
   let html = escapeHtml(text);
-  // Replace any @word pattern with mention styling (conservative — mentioned users exist)
-  html = html.replace(/@([\w][\w\s]*[\w]|[\w]+)/g, function(match) {
+  // Match @ followed by 1-3 capitalized words (names), stop before lowercase continuation
+  html = html.replace(/@([A-Z][\w]*(?:\s+[A-Z][\w]*){0,2})/g, function(match) {
     return '<span class="mention">' + match + '</span>';
   });
   return html;

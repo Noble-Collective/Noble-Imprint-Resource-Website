@@ -306,6 +306,7 @@ async function submitComment() {
         kind: 'comment',
         selectedText,
         commentText,
+        mentionedUsers,
         currentFrom: sel.from,
         currentTo: sel.to,
         authorEmail: editorData.user ? editorData.user.email : '',
