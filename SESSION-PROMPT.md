@@ -1,97 +1,49 @@
-# Session Prompt for New Context Window
+# Session Prompt — Noble Imprint Resource Website
 
-## Project
+## Context
 
-Noble Imprint Resource Website — Express/EJS app serving discipleship resources with a collaborative CodeMirror 6 editor. GitHub is the content store, Firestore for suggestions/comments/replies/presence, Firebase Auth with Google sign-in.
+Noble Imprint Resource Website — a collaborative discipleship resource editor with a Google Docs-style suggestion system. CodeMirror 6 editor with `diffChars` (from the `diff` npm package) as the diff engine.
 
-**Live site:** https://resources.noblecollective.org  
-**Repo:** Noble-Collective/Noble-Imprint-Resource-Website
+Read `SESSION.md` (gitignored, in repo root) for full project context.
 
-## What was completed (April 18-19, 2026)
+## Recent Work (2026-04-23)
 
-### Multi-User Concurrent Editing (all deployed)
+**Direct edit locking** — `mode` field on presence heartbeats. Block entering direct edit if another user already has active direct edit session. Block accepting suggestions server-side (423) + client-side (disabled buttons, lock banner). Fail-open on network errors.
 
-Full real-time collaborative editing safety across 3 batches:
+**Rate limit resilience** — disk cache fallback for content tree, file content, covers, SVGs. `fromDiskCache` flag disables editing when serving cached content. Rate limit message replaces edit buttons. Runtime warm-up (~500 API calls) fills disk cache 30s after startup. Image Cache-Control `public` → `private` (no CDN caching of errors). Deploy refresh step removed (redundant on new containers).
 
-**Batch 1 — Safety Net:** Auto-save error surfacing (2-failure threshold), file version check before saves (3s timeout fallback), server-side suggestion deduplication (±5 chars).
+**Suggestion history** — replies preserved on accept/reject/resolve (only discard deletes). Location context (line number + heading) stored at resolution time. `GET /api/suggestions/history` endpoint returns resolved items with reply threads. Active/History toggle in editor toolbar. Claude bot prompt updated to use history for learning editorial patterns.
 
-**Batch 2 — Real-Time Awareness:**
-- Split polling: 10s Firestore-only for suggestion/comment/reply counts, 30s GitHub SHA for file changes, 30s presence heartbeat
-- Auto-load: new suggestions, comments, and replies from other users appear within ~10s without page reload. Removals (discards by others) also sync automatically.
-- Auto-refresh on file SHA change (accept by another user) when no unsaved edits — uses fresh GitHub content, updates originalDocField + contentSha. Shows stale banner only when user has unsaved drafts.
-- Presence: Firestore editingSessions with heartbeat + photoURL, 90s expiry, Google profile photos or colored initials per user
-- Own suggestions do NOT trigger "new suggestions" notification (lastKnownSuggestionCount synced after auto-save)
+## Earlier Work (2026-04-21–22)
 
-**Batch 3 — Graceful Conflict Handling:**
-- Draft preservation on reload: forceSaveUnsavedDrafts() before stale banner reload
-- Accept retry: "Try again" button on 409 stale cards
-- Stale card rendering via module-level staleCards Map (replaced fragile DOM injection)
+**Edit region tracking** — replaced threshold-based diffChars merge heuristics with CM6 transaction-based edit region tracking. Separate user edits stay separate, single replacements stay unified. Hunk text precision via before/after document matching. Same-word character merge workaround. 10 TDD tests.
 
-**Profile Photos:** Google profile photos on suggestion cards, comment cards, reply cards, and presence toolbar. authorPhotoURL stored in Firestore. Colored initials fallback (10-color palette hashed from email).
+**Visual improvements** — `*italic*` masking, `<sup>` tag masking, h6 heading support, heading hierarchy rebalanced (h1 2rem → h2 1.6rem → h3 1.35rem → h4 1.15rem → h5/h6 1rem), table styling, search scroll offset.
 
-**Suggestion Badges:** Amber badge pills on book detail page session cards showing pending suggestion count (for users with suggest+ access).
+**UX fixes** — Review button routes through suggest mode, stale-at-load suggestions show amber cards, polling loop fix for unresolvable suggestions, dismiss deletes from Firestore, JSON body limit increased for large files.
 
-## What was completed (April 20, 2026)
+## Key Files
 
-### Polling Race Condition Fixes
-- `autoLoadNewSuggestions()` now guards against concurrent execution with `isDiscarding`, `acceptingInProgress`, and `autoLoadInProgress` flags — prevents document corruption from overlapping `setAnnotations` dispatches
-- `pollForFileChanges` fetch has a 5s `AbortController` timeout — prevents indefinite hang on slow GitHub API
+- `src/public/js/editor-suggestions.js` — `computeHunks` + edit region tracking + `mergeHunksByEditRegion` + draftPlugin
+- `src/public/js/editor.js` — auto-save, accept/reject, format groups, same-word merge, buildMarginHunks, polling, presence heartbeat with mode, direct edit lock check, history toggle
+- `src/public/js/editor-margin.js` — margin card rendering, `renderHistoryCards`, `isHistoryMode` guards on scroll/polling
+- `src/public/js/editor-masking.js` — inline syntax masking (bold, italic, sup, headings)
+- `src/public/js/editor-constraints.js` — selection clamping zones
+- `src/server/suggestions.js` — presence with `mode`, `getLocationContext`, `getResolvedSuggestions`/`getResolvedComments`, reply preservation
+- `src/server/suggestion-routes.js` — direct edit lock on accept (423), `GET /history` endpoint
+- `src/server/github.js` — disk cache fallback (`getFileContent`, `getFileBinary`, `getFileRaw`), `getRateLimitReset`
+- `src/server/content.js` — `buildContentTree` disk fallback, `warmDiskCache`
+- `src/public/css/style.css` — heading hierarchy, table styles, history cards, lock banner, rate limit message
+- `docs/claude-editor-prompt.md` — Claude AI bot instructions including history API
+- `tests/multi-user.spec.js` — edit region tracking tests, presence tests, accept tests
 
-### Stale Card Persistence Fix
-- "Cannot re-apply" state (from retry when original text was deleted) now stored in the `staleCards` Map via `updateStaleCard()` instead of fragile DOM manipulation — survives margin re-renders triggered by background polls
+## Important Constraints
 
-### Draft Author Attribution Fix
-- Draft suggestion cards no longer flash the wrong author name when another user has a pending suggestion on the same file. The `loadedSuggestions.find()` content matching was too loose (all insertions have empty `originalText`, matching any other insertion). Fixed to use ID-only matching.
-
-### Cross-User Suggestion Removal Fix
-- Suggestions discarded by another user now correctly disappear from the author's screen. The `autoLoadNewSuggestions` removal check previously required `loadedFromServer: true`, but session-created suggestions have `loadedFromServer: false`. Removed the flag guard.
-
-### Bold/Italic Card Splitting Fix
-- Multi-word italic/bold formatting no longer splits into 2 cards after auto-save. `buildMarginHunks` now includes `linkedGroup`/`linkedLabel` from registry entries, and `buildShiftedRegistryEntries` preserves `resolvedFrom`/`resolvedTo`/`linkedGroup`/`linkedLabel`.
-
-### Ghost Suggestion Cards Fix (API-Submitted)
-- API-submitted replacements (e.g., from Claude AI) no longer generate ghost "Saving..." draft cards. Added positional containment filter in the draftPlugin: if a draft hunk falls within any registry entry's position range, it's a fragment of that entry's change and is filtered out.
-
-### Line Ending Normalization
-- Files with Windows-style `\r\n` line endings no longer generate dozens of ghost deletion suggestions. Normalization applied server-side in `getFileContent()` (github.js) so all code paths receive clean `\n` line endings.
-
-### Editor Exit UX
-- "Done" button now shows a blurred loading overlay with spinner and "Loading latest content..." during the page reload, instead of a frozen-looking tab.
-
-### Draft Card "Saving..." Indicator
-- Draft suggestion cards show a spinner with "Saving..." instead of accept/discard buttons until auto-save completes. Prevents confusing error toast when clicking accept before the draft is saved to Firestore.
-
-### Claude AI Bot API Improvements
-- New `GET /api/content-tree` endpoint — returns all books and session file paths for bot file path discovery. Claude no longer needs to guess file paths.
-- Updated Claude editor prompt (docs/claude-editor-prompt.md) to call content-tree first.
-
-### Test Suite Improvements
-- **New tests:** Comment auto-load, comment-reply auto-load, discard stays discarded through polling, accept completes despite polling, presence expiry (90s), draft author attribution, multi-word italic card, discarding API suggestions, session-created suggestion removal by another user
-- **Flaky test fixes:** Retry tests now clear server cache before login; "save error clears" assertion timeout increased; `waitForAutoSave` now waits for "Saved" indicator instead of fixed 3s timeout; integration test word-finding searches original document instead of working document
-- **~120 total tests** across 7 files. Full suite needs ~4900 GitHub API calls (5000/hr limit).
-
-## Current Test Suite
-
-**32 multi-user tests** in tests/multi-user.spec.js:
-- 3 auto-save error, 3 version check, 3 dedup, 8 polling/sync, 3 presence, 2 draft preservation, 2 accept retry, 5 cross-user integrity, 1 accept auto-refresh, 5 polling safety + coverage gaps (comment auto-load, reply auto-load, discard safety, accept safety, presence expiry)
-
-**~120 total tests** across 7 files. Full suite needs ~4900 GitHub API calls (5000/hr limit). The soak test alone uses ~1000.
-
-## Key Architecture Notes
-
-- Server: `src/server/index.js` (Express + all routes), `src/server/suggestions.js` (Firestore CRUD), `src/server/github.js` (GitHub API + 30s file cache + `\r\n` normalization)
-- Client: `src/public/js/editor.js` (orchestration), `src/public/js/editor-suggestions.js` (annotationRegistry StateField + draftPlugin + computeHunks + positional containment filter), `src/public/js/editor-margin.js` (margin cards + staleCards Map + updateStaleCard)
-- Endpoints: `GET /api/suggestions/suggestion-count` (Firestore-only fast polling), `GET /api/content-tree` (book/session discovery for bots)
-- Combined dispatches: document replacement + setAnnotations must be in ONE dispatch to avoid mapPos corruption
-- File cache: test process and server process have separate cache instances — test utilities must call cache.del before getFileContent
-- Registry entries: must include `resolvedFrom`/`resolvedTo` (for API suggestions with originalFrom:0), `linkedGroup`/`linkedLabel` (for italic/bold card merging)
-- autoLoadNewSuggestions: guarded by `isDiscarding`, `acceptingInProgress`, `autoLoadInProgress` to prevent race conditions
-- Draft filtering: positional containment check ensures API-submitted replacement fragments don't leak as ghost cards
-- Admin Console: Diff Reports tab compares book content between git refs (tags/branches) with word-level highlighting. Uses `getFileContentAtRef`, `getDirectoryContentsAtRef`, `listTags` in github.js. Endpoints: `GET /api/admin/tags`, `GET /api/admin/diff-report?bookPath=...&from=...&to=...`. ~13 GitHub API calls per report.
-
-## What's Next
-
-- Mobile editing: responsive margin panel, touch interactions
-- Notification system: when suggestions are submitted/accepted/rejected
-- SEO meta tags / Open Graph
-- Content search across all sessions
+- **Never push/deploy without Steve's explicit approval** (unless told otherwise)
+- **Kill server by specific PID only, never by process name**
+- **TDD**: write failing test first, verify fail, fix code, verify pass
+- Rebuild CodeMirror bundle with `npm run build:editor` after changes to editor-masking.js
+- Server runs on port 8080, started with `npm start`
+- GitHub API rate limit: 5000/hr shared between tests and production
+- Test Book Session 1 is reserved for automated tests — don't modify manually
+- Test Book Session 4 is a large file (370K chars) from HomeStead for testing
