@@ -358,7 +358,12 @@ function renderAllCards() {
 
       var cThreadHtml = buildThreadHtml(c.id || ('comment-' + Math.random()), 'comment');
 
-      html += '<div class="margin-card margin-card--comment" data-comment-id="' + c.id + '" style="top:' + top + 'px">'
+      var anchorLostClass = c.anchorLost ? ' margin-card--anchor-lost' : '';
+      var anchorLostHtml = c.anchorLost
+        ? '<div class="margin-card-anchor-lost">Original text not found' + (c.anchorLostLine ? ' (was line ' + c.anchorLostLine + ')' : '') + '</div>'
+        : '';
+
+      html += '<div class="margin-card margin-card--comment' + anchorLostClass + '" data-comment-id="' + c.id + '" style="top:' + top + 'px">'
         + '<div class="margin-card-header">'
         + '<div class="margin-card-user">'
         + renderAvatar(cAuthorName, c.authorEmail, c.photoURL || c.authorPhotoURL || null, false)
@@ -366,6 +371,7 @@ function renderAllCards() {
         + '</div>'
         + '<div class="margin-card-actions">' + cActionsHtml + '</div>'
         + '</div>'
+        + anchorLostHtml
         + '<div class="margin-card-body">'
         + '<span class="margin-card-quote">"' + escapeHtml(truncate(c.selectedText, 60)) + '"</span>'
         + '<p class="margin-card-comment-text" data-comment-id="' + c.id + '">' + highlightMentions(c.commentText, c.mentionedUsers) + (c.editedAt ? ' <span class="margin-card-edited">(edited)</span>' : '') + '</p>'

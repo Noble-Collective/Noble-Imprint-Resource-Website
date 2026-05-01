@@ -171,10 +171,22 @@ async function reanchorAnnotations(filePath, newContent) {
   for (const c of comments) {
     const resolved = resolveAnchor(c, newContent);
     if (resolved.stale) {
+      // Instead of auto-resolving, place the comment approximately using
+      // the line number stored at creation time. The comment stays open
+      // with anchorLost=true so the user can see it and decide to resolve.
+      const lineNum = c.structure && c.structure.lineNumber ? c.structure.lineNumber : 0;
+      const lines = newContent.split('\n');
+      const clampedLine = Math.min(lineNum, lines.length) - 1;
+      let approxPos = 0;
+      for (let i = 0; i < Math.max(0, clampedLine); i++) approxPos += lines[i].length + 1;
       batch.update(commentsCollection().doc(c.id), {
-        status: 'resolved',
-        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        resolvedBy: 'system:stale',
+        from: approxPos,
+        to: approxPos,
+        'position.from': approxPos,
+        'position.to': approxPos,
+        'position.contentHash': newHash,
+        anchorLost: true,
+        anchorLostLine: lineNum,
       });
     } else {
       // Update positions AND context

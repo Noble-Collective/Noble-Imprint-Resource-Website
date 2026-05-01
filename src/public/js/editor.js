@@ -1318,7 +1318,9 @@ if (data) {
     }
 
     for (const c of (comments || [])) {
-      if (c.resolvedStale) continue;
+      // Stale suggestions are skipped (handled as stale cards in the margin),
+      // but stale comments should be shown as anchor-lost instead of hidden.
+      const isStale = c.resolvedStale;
       const from = c.resolvedFrom != null ? c.resolvedFrom : (c.from != null ? c.from : c.originalFrom);
       const to = c.resolvedTo != null ? c.resolvedTo : (c.to != null ? c.to : c.originalTo);
 
@@ -1327,6 +1329,7 @@ if (data) {
       // suggestions interact. Direct text search is more reliable for comments.
       let curFrom = toWorkingPos(from);
       let curTo = toWorkingPos(to);
+      let detectedAnchorLost = c.anchorLost || isStale || false;
       if (workingDocContent && c.selectedText) {
         // Use context to find the correct occurrence if text appears multiple times
         const shiftedPos = curFrom;
@@ -1342,6 +1345,10 @@ if (data) {
           if (globalIdx >= 0) {
             curFrom = globalIdx;
             curTo = globalIdx + c.selectedText.length;
+          } else {
+            // Text not found anywhere — mark as anchor-lost even if Firestore
+            // doesn't have the flag yet (pre-existing orphaned comments)
+            detectedAnchorLost = true;
           }
         }
       }
@@ -1354,6 +1361,8 @@ if (data) {
         authorEmail: c.authorEmail, authorName: c.authorName,
         authorPhotoURL: c.authorPhotoURL || null,
         firestoreId: c.id, loadedFromServer: true,
+        anchorLost: detectedAnchorLost,
+        anchorLostLine: c.anchorLostLine || (c.structure && c.structure.lineNumber) || null,
       });
     }
 
