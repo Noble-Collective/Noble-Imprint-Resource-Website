@@ -226,7 +226,30 @@ function repliesCollection() {
 
 // --- Suggestion Hunk CRUD ---
 
-async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, authorEmail, authorName, authorPhotoURL, fileContent, linkedGroup, linkedLabel }) {
+async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, lineNumber, authorEmail, authorName, authorPhotoURL, fileContent, linkedGroup, linkedLabel }) {
+  // Position resolution: when lineNumber and fileContent are provided, resolve
+  // the correct position of originalText near that line. This prevents repeated
+  // template text (e.g., identical instructions across sessions) from collapsing
+  // to the first occurrence via naive indexOf.
+  if (lineNumber != null && fileContent && originalText) {
+    const lines = fileContent.split('\n');
+    const clampedLine = Math.min(lineNumber, lines.length);
+    // Convert line number to character offset
+    let lineStartPos = 0;
+    for (let i = 0; i < clampedLine - 1; i++) lineStartPos += lines[i].length + 1;
+    const lineEndPos = lineStartPos + (lines[clampedLine - 1] || '').length;
+
+    // Search for originalText near this line (within ±500 chars of the line)
+    const searchStart = Math.max(0, lineStartPos - 500);
+    const searchEnd = Math.min(fileContent.length, lineEndPos + 500);
+    const nearbyIdx = fileContent.indexOf(originalText, searchStart);
+    if (nearbyIdx >= 0 && nearbyIdx < searchEnd) {
+      originalFrom = nearbyIdx;
+      originalTo = nearbyIdx + originalText.length;
+      console.log('[LINE-RESOLVE] Resolved originalText to position', originalFrom, 'from lineNumber', lineNumber);
+    }
+  }
+
   // Deduplication: check for an existing pending suggestion with the same text
   // at an overlapping position (±5 chars). Prevents duplicates from rapid auto-save
   // cycles or two users making the exact same edit.
@@ -240,7 +263,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     const d = doc.data();
     if (Math.abs((d.originalFrom || 0) - (originalFrom || 0)) <= 5) {
       console.log('[DEDUP] Found existing suggestion', doc.id, 'at', d.originalFrom, '— skipping create');
-      return doc.id;
+      return { id: doc.id, deduped: true };
     }
   }
 
@@ -276,7 +299,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     resolvedBy: null,
     ...(linkedGroup ? { linkedGroup, linkedLabel: linkedLabel || '' } : {}),
   });
-  return ref.id;
+  return { id: ref.id, deduped: false };
 }
 
 async function updateHunk(id, { originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, type }) {
@@ -654,6 +677,14 @@ async function getRepliesForFile(filePath) {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
+async function getRepliesForParent(parentId) {
+  const snapshot = await repliesCollection()
+    .where('parentId', '==', parentId)
+    .orderBy('createdAt', 'asc')
+    .get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
 async function deleteRepliesForParent(parentId) {
   const snapshot = await repliesCollection()
     .where('parentId', '==', parentId)
@@ -786,6 +817,7 @@ module.exports = {
   getReply,
   updateReply,
   getRepliesForFile,
+  getRepliesForParent,
   deleteRepliesForParent,
   getResolvedSuggestions,
   getResolvedComments,

@@ -138,9 +138,10 @@ if (data) {
       // the current originalDocField, so context must come from the same version.
       const currentOriginal = editorView.state.field(originalDocField);
       const ctx = extractContext(currentOriginal, hunk.originalFrom, hunk.originalTo);
+      const lineNumber = currentOriginal.substring(0, hunk.originalFrom).split('\n').length;
       const hunkData = {
         type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
-        originalText: hunk.originalText, newText: hunk.newText, ...ctx,
+        originalText: hunk.originalText, newText: hunk.newText, lineNumber, ...ctx,
       };
 
       // Tag formatting hunks with a linkedGroup so they're treated as one change.
@@ -364,6 +365,7 @@ if (data) {
 
       const currentOriginal = editorView.state.field(originalDocField);
       const ctx = extractContext(currentOriginal, hunk.originalFrom, hunk.originalTo);
+      const fmtLineNumber = currentOriginal.substring(0, hunk.originalFrom).split('\n').length;
       try {
         const res = await fetch('/api/suggestions/hunk', {
           method: 'POST',
@@ -372,7 +374,7 @@ if (data) {
             filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
             baseCommitSha: data.contentSha,
             type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
-            originalText: hunk.originalText, newText: hunk.newText, ...ctx,
+            originalText: hunk.originalText, newText: hunk.newText, lineNumber: fmtLineNumber, ...ctx,
           }),
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);

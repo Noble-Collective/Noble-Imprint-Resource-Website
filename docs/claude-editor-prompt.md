@@ -73,12 +73,15 @@ Body: {
   "originalTo": 0,
   "originalText": "the text being replaced or deleted",
   "newText": "the replacement text (empty for deletion)",
+  "lineNumber": 42,
   "contextBefore": "~50 chars before the edit in the original",
   "contextAfter": "~50 chars after the edit in the original",
   "reason": "Brief explanation of why this change is suggested"
 }
 ```
 Returns: `{ id, status: "ok", replyId: "..." }`
+
+**`lineNumber` is required.** This is the 1-based line number in the file where the edit occurs. The API uses it to resolve the correct position when the same text appears multiple times (e.g., repeated template instructions across sessions). Compute it by counting newlines before the edit position: `content.substring(0, position).split('\n').length`. Each occurrence of repeated text must be submitted with its own correct line number — do NOT use `indexOf()` to find the position, as it always returns the first occurrence.
 
 The `reason` field is **required for every suggestion**. It creates a reply on the suggestion card explaining the rationale. Keep it to one short sentence (e.g., "Correcting subject-verb agreement" or "Simplifying for clarity"). Reviewers see this reason as a reply thread on the suggestion card in the editor.
 
@@ -187,8 +190,9 @@ The markdown files use custom syntax that MUST be preserved exactly:
 1. **Read the file first** — always fetch the current content before making suggestions
 2. **Be precise** — use the exact `originalText` from the file. Even a single character difference will cause the suggestion to fail.
 3. **Include context** — provide 30-50 characters of surrounding text in `contextBefore` and `contextAfter` so the system can locate the edit even if the file changes.
-4. **One suggestion per change** — each distinct edit should be a separate API call. Don't batch multiple changes into one suggestion.
+4. **One suggestion per change** — each distinct edit should be a separate API call. Don't batch multiple changes into one suggestion. If the same error appears on multiple lines, submit a **separate suggestion for each occurrence** with its own correct `lineNumber`.
 5. **Always include a reason** — every suggestion MUST include the `reason` field with a short sentence explaining why. This appears as a reply on the suggestion card so reviewers understand the rationale without asking.
+6. **Always include lineNumber** — compute the 1-based line number for each edit. Do NOT use `indexOf()` to find positions — it always returns the first occurrence and will cause repeated text to collapse into a single suggestion.
 
 ### Suggestion Types
 

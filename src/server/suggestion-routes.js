@@ -205,36 +205,58 @@ async function canReview(email, bookPath) {
 // Create a suggestion hunk (auto-save from editor)
 router.post('/hunk', async (req, res) => {
   try {
-    const { filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, linkedGroup, linkedLabel, reason } = req.body;
-    if (!filePath || !bookPath || !type) {
-      return res.status(400).json({ error: 'filePath, bookPath, and type required' });
+    const { filePath, bookPath, baseCommitSha, type, originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, lineNumber, linkedGroup, linkedLabel, reason } = req.body;
+    if (!filePath || !bookPath || !type || lineNumber == null) {
+      return res.status(400).json({ error: 'filePath, bookPath, type, and lineNumber required' });
     }
     if (!(await canEdit(req.user.email, bookPath))) {
       return res.status(403).json({ error: 'No edit permission on this book' });
     }
 
-    const id = await suggestions.createHunk({
+    // Fetch file content for line-number position resolution and anchor data
+    let fileContent = null;
+    try { fileContent = (await github.getFileContent(filePath)).content; } catch { /* fallback */ }
+
+    const result = await suggestions.createHunk({
       filePath, bookPath, baseCommitSha,
       type, originalFrom, originalTo, originalText, newText,
-      contextBefore, contextAfter,
+      contextBefore, contextAfter, lineNumber,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
       authorPhotoURL: req.user.photoURL || null,
+      fileContent,
       ...(linkedGroup ? { linkedGroup, linkedLabel } : {}),
     });
+    const id = result.id;
 
-    // If a reason is provided, create a reply on the suggestion explaining the change
+    // If a reason is provided, create a reply — but skip if the suggestion was
+    // deduped and an identical reply already exists (prevents duplicate replies
+    // when the bot re-submits the same suggestion for repeated template text).
     let replyId = null;
-    if (reason) {
+    if (reason && !result.deduped) {
       replyId = await suggestions.createReply({
         parentId: id, parentType: 'suggestion', filePath, text: reason,
         authorEmail: req.user.email,
         authorName: req.user.displayName,
-      authorPhotoURL: req.user.photoURL || null,
+        authorPhotoURL: req.user.photoURL || null,
       });
+    } else if (reason && result.deduped) {
+      // Check if this exact reason text already exists as a reply
+      const existingReplies = await suggestions.getRepliesForParent(id);
+      const alreadyExists = existingReplies.some(r => r.text === reason && r.authorEmail === req.user.email);
+      if (!alreadyExists) {
+        replyId = await suggestions.createReply({
+          parentId: id, parentType: 'suggestion', filePath, text: reason,
+          authorEmail: req.user.email,
+          authorName: req.user.displayName,
+          authorPhotoURL: req.user.photoURL || null,
+        });
+      } else {
+        console.log('[DEDUP] Skipping duplicate reason reply on', id);
+      }
     }
 
-    res.json({ id, status: 'ok', ...(replyId ? { replyId } : {}) });
+    res.json({ id, status: 'ok', ...(replyId ? { replyId } : {}), ...(result.deduped ? { deduped: true } : {}) });
 
     // Fire-and-forget: notify manuscript owners/admins about new suggestion
     try {
