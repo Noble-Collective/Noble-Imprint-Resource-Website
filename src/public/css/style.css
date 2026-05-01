@@ -1096,6 +1096,16 @@ body.text-mode .home-text {
 .reading-content tbody tr:nth-child(even) {
   background: #fafaf8;
 }
+.table-heading-row {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  padding: 12px 14px;
+  background: #eae6df;
+  color: var(--color-charcoal);
+  border: 1px solid #ddd;
+}
 
 .session-content p,
 .reading-content p {

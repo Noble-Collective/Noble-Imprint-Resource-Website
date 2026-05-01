@@ -297,6 +297,29 @@ function renderMarkdown(content, options = {}) {
     html = html.substring(0, r.start) + link + html.substring(r.end);
   }
 
+  // Merge 1-cell heading tables with the body table that follows.
+  // Pattern: <table> with a single <th> immediately followed by another <table>.
+  // The heading cell becomes a colspan row at the top of the body table.
+  html = html.replace(
+    /<table>\s*<thead>\s*<tr>\s*<th[^>]*>([\s\S]*?)<\/th>\s*<\/tr>\s*<\/thead>\s*<\/table>\s*(<table>[\s\S]*?<\/table>)/g,
+    (match, headingText, bodyTable) => {
+      // Count columns from the body table's first <tr>
+      const firstRow = bodyTable.match(/<tr>([\s\S]*?)<\/tr>/);
+      const colCount = firstRow ? (firstRow[1].match(/<t[hd][^>]*>/g) || []).length : 2;
+      return bodyTable.replace(
+        /<table>\s*<thead>/,
+        `<table>\n<thead><tr><th colspan="${colCount}" class="table-heading-row">${headingText}</th></tr>`
+      );
+    }
+  );
+
+  // Remove the empty header row from the merged body table (the row with empty <th> cells
+  // that was the original body table's header). It's now redundant since we added the heading row.
+  html = html.replace(
+    /(class="table-heading-row"[^>]*>[\s\S]*?<\/th><\/tr>)\s*\n?\s*<tr>\s*(\s*<th[^>]*>\s*<\/th>\s*)+<\/tr>\s*\n?\s*<\/thead>/g,
+    '$1\n</thead>'
+  );
+
   return html;
 }
 
