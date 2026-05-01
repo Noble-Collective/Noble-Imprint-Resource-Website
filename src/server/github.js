@@ -34,12 +34,32 @@ function getOctokit() {
   return octokit;
 }
 
+// Centralized GitHub API call logging. Every call logs to stdout (→ Cloud Logging)
+// with method, path, and remaining rate limit budget from response headers.
+async function loggedApiCall(label, fn) {
+  const start = Date.now();
+  try {
+    const result = await fn();
+    const remaining = result.headers?.['x-ratelimit-remaining'];
+    const limit = result.headers?.['x-ratelimit-limit'];
+    const ms = Date.now() - start;
+    console.log(`[GITHUB] ${label} — ${ms}ms — budget: ${remaining}/${limit}`);
+    if (remaining != null && parseInt(remaining, 10) < 500) {
+      console.warn(`[GITHUB] WARNING: rate limit budget low (${remaining} remaining)`);
+    }
+    return result;
+  } catch (err) {
+    const remaining = err.response?.headers?.['x-ratelimit-remaining'];
+    const ms = Date.now() - start;
+    console.error(`[GITHUB] ${label} — FAILED ${ms}ms — status: ${err.status || 'unknown'} remaining: ${remaining ?? 'unknown'}`);
+    throw err;
+  }
+}
+
 async function getDirectoryContents(path) {
-  const { data } = await getOctokit().rest.repos.getContent({
-    owner: OWNER,
-    repo: REPO,
-    path,
-  });
+  const { data } = await loggedApiCall(`GET dir ${path}`, () =>
+    getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path })
+  );
   if (!Array.isArray(data)) throw new Error(`Expected directory at ${path}`);
   return data;
 }
@@ -51,14 +71,15 @@ function diskCachePath(filePath) {
 async function getFileContent(path) {
   const cacheKey = 'file:' + path;
   const cached = cache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    console.log(`[GITHUB] CACHE HIT ${path}${cached.fromDiskCache ? ' (disk)' : ''}`);
+    return cached;
+  }
 
   try {
-    const { data } = await getOctokit().rest.repos.getContent({
-      owner: OWNER,
-      repo: REPO,
-      path,
-    });
+    const { data } = await loggedApiCall(`GET file ${path}`, () =>
+      getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path })
+    );
     if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
     const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const result = { content, sha: data.sha };
@@ -87,11 +108,9 @@ async function getFileContent(path) {
 
 async function getFileBinary(path) {
   try {
-    const { data } = await getOctokit().rest.repos.getContent({
-      owner: OWNER,
-      repo: REPO,
-      path,
-    });
+    const { data } = await loggedApiCall(`GET binary ${path}`, () =>
+      getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path })
+    );
     if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
     const buf = Buffer.from(data.content, 'base64');
     // Persist to disk for rate limit fallback
@@ -112,12 +131,12 @@ async function getFileBinary(path) {
 
 async function getFileRaw(path) {
   try {
-    const { data } = await getOctokit().request('GET /repos/{owner}/{repo}/contents/{path}', {
-      owner: OWNER,
-      repo: REPO,
-      path,
-      headers: { accept: 'application/vnd.github.raw+json' },
-    });
+    const { data } = await loggedApiCall(`GET raw ${path}`, () =>
+      getOctokit().request('GET /repos/{owner}/{repo}/contents/{path}', {
+        owner: OWNER, repo: REPO, path,
+        headers: { accept: 'application/vnd.github.raw+json' },
+      })
+    );
     try {
       fs.mkdirSync(DISK_CACHE_DIR, { recursive: true });
       fs.writeFileSync(diskCachePath(path + '.raw'), typeof data === 'string' ? data : Buffer.from(data));
@@ -136,18 +155,18 @@ async function getFileRaw(path) {
 }
 
 async function getFileContentAtRef(path, ref) {
-  const { data } = await getOctokit().rest.repos.getContent({
-    owner: OWNER, repo: REPO, path, ref,
-  });
+  const { data } = await loggedApiCall(`GET file ${path} @${ref}`, () =>
+    getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path, ref })
+  );
   if (Array.isArray(data)) throw new Error(`Expected file at ${path}`);
   const content = Buffer.from(data.content, 'base64').toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   return { content, sha: data.sha };
 }
 
 async function getDirectoryContentsAtRef(path, ref) {
-  const { data } = await getOctokit().rest.repos.getContent({
-    owner: OWNER, repo: REPO, path, ref,
-  });
+  const { data } = await loggedApiCall(`GET dir ${path} @${ref}`, () =>
+    getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path, ref })
+  );
   if (!Array.isArray(data)) throw new Error(`Expected directory at ${path}`);
   return data;
 }
@@ -156,23 +175,21 @@ async function listTags() {
   const cacheKey = 'repo-tags';
   const cached = cache.get(cacheKey);
   if (cached) return cached;
-  const { data } = await getOctokit().rest.repos.listTags({
-    owner: OWNER, repo: REPO, per_page: 100,
-  });
+  const { data } = await loggedApiCall('GET tags', () =>
+    getOctokit().rest.repos.listTags({ owner: OWNER, repo: REPO, per_page: 100 })
+  );
   const tags = data.map(t => ({ name: t.name, sha: t.commit.sha }));
   cache.set(cacheKey, tags, 5 * 60 * 1000);
   return tags;
 }
 
 async function updateFileContent(filePath, content, sha, message) {
-  await getOctokit().rest.repos.createOrUpdateFileContents({
-    owner: OWNER,
-    repo: REPO,
-    path: filePath,
-    message,
-    content: Buffer.from(content).toString('base64'),
-    sha,
-  });
+  await loggedApiCall(`PUT file ${filePath}`, () =>
+    getOctokit().rest.repos.createOrUpdateFileContents({
+      owner: OWNER, repo: REPO, path: filePath, message,
+      content: Buffer.from(content).toString('base64'), sha,
+    })
+  );
   cache.del('file:' + filePath);
 }
 
