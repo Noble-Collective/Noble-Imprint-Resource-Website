@@ -78,9 +78,17 @@
         <% if (editRole === 'admin' || editRole === 'manuscript-owner') { %>
           <button class="edit-btn edit-btn--primary" id="btn-direct-edit">Direct Edit</button>
         <% } %>
-        <% if (pendingSuggestions && pendingSuggestions.length > 0) { %>
+        <%
+          const sugCount = pendingSuggestions ? pendingSuggestions.length : 0;
+          const comCount = pendingComments ? pendingComments.length : 0;
+          const totalAnnotations = sugCount + comCount;
+        %>
+        <% if (totalAnnotations > 0) { %>
           <button class="edit-btn edit-btn--review" id="btn-review">
-            Review <%= pendingSuggestions.length %> suggestion<%= pendingSuggestions.length === 1 ? '' : 's' %>
+            Review
+            <% if (sugCount > 0) { %><%= sugCount %> suggestion<%= sugCount === 1 ? '' : 's' %><% } %>
+            <% if (sugCount > 0 && comCount > 0) { %>, <% } %>
+            <% if (comCount > 0) { %><%= comCount %> comment<%= comCount === 1 ? '' : 's' %><% } %>
           </button>
         <% } %>
       </div>
