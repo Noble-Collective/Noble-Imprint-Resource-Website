@@ -309,12 +309,22 @@ async function getSuggestionsForFile(filePath) {
 }
 
 async function getSuggestionCountsByBook(bookPath) {
-  const snapshot = await suggestionsCollection()
-    .where('bookPath', '==', bookPath)
-    .where('status', '==', 'pending')
-    .get();
+  const [sugSnap, comSnap] = await Promise.all([
+    suggestionsCollection()
+      .where('bookPath', '==', bookPath)
+      .where('status', '==', 'pending')
+      .get(),
+    commentsCollection()
+      .where('bookPath', '==', bookPath)
+      .where('status', '==', 'open')
+      .get(),
+  ]);
   const counts = {};
-  for (const doc of snapshot.docs) {
+  for (const doc of sugSnap.docs) {
+    const fp = doc.data().filePath;
+    counts[fp] = (counts[fp] || 0) + 1;
+  }
+  for (const doc of comSnap.docs) {
     const fp = doc.data().filePath;
     counts[fp] = (counts[fp] || 0) + 1;
   }
