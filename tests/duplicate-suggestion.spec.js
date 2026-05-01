@@ -403,6 +403,13 @@ test('Scenario 6: accept shifts positions — savedHunks keys must stay in sync'
     console.log('S6 accept:', result.stale ? 'STALE' : 'OK');
     expect(result.stale).toBeFalsy();
 
+    // Invalidate the SERVER's file cache. acceptHunk ran in the test process
+    // (via require), so it only cleared the test process's cache. The server
+    // (separate Node process) still has the old file content cached for up to 30s.
+    // Without this, the client gets stale content and savedHunks keys mismatch.
+    await page.request.post(BASE_URL + '/api/refresh');
+    await page.waitForTimeout(2000);
+
     // Verify the position mismatch exists (this is the bug condition)
     r = await countFirestoreSuggestions();
     expect(r.count).toBe(2);

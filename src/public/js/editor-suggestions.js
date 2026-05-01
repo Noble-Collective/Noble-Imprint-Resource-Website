@@ -449,6 +449,10 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     const region = regions.find(r => h.currentFrom >= r.from && h.currentFrom <= r.to);
     if (!region) continue;
 
+    // Save pre-trim values so we can fall back if context matching goes wrong
+    const savedOrigFrom = h.originalFrom;
+    const savedOrigTo = h.originalTo;
+
     // Derive exact originalText by matching text BEFORE and AFTER the edit in both
     // documents. This finds the precise original range that was selected, regardless
     // of where computeHunks placed the hunk boundaries.
@@ -456,10 +460,14 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
     h.currentFrom = region.from;
     h.currentTo = region.to;
 
-    // Find originalFrom: match text before the edit
+    // Find originalFrom: match text before the edit.
+    // Search forward from near the hunk's computed position — NOT lastIndexOf,
+    // which searches from the end and can match a wrong occurrence in documents
+    // with repeated structure (e.g., "##### Introduction\n\n> " appearing 14x).
     const beforeEdit = current.substring(Math.max(0, region.from - 80), region.from);
     if (beforeEdit.length > 0) {
-      const beforeMatch = original.lastIndexOf(beforeEdit);
+      const searchFrom = Math.max(0, savedOrigFrom - beforeEdit.length - 500);
+      const beforeMatch = original.indexOf(beforeEdit, searchFrom);
       if (beforeMatch >= 0) {
         h.originalFrom = beforeMatch + beforeEdit.length;
       }
@@ -471,6 +479,11 @@ function mergeHunksByEditRegion(hunks, regions, original, current) {
       if (afterMatch >= 0 && afterMatch >= h.originalFrom) {
         h.originalTo = afterMatch;
       }
+    }
+    // Sanity check: if context matching produced an inverted range, fall back
+    if (h.originalFrom > h.originalTo) {
+      h.originalFrom = savedOrigFrom;
+      h.originalTo = savedOrigTo;
     }
     h.originalText = original.substring(h.originalFrom, h.originalTo);
     // Recompute type after trimming
