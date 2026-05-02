@@ -11,10 +11,16 @@ function preprocess(raw) {
   // <Question id=TheCallSes1-Q1>text</Question>
   // → placeholder div that markdown-it will pass through as html_block
   text = text.replace(
-    /<Question\s+id=([^>]+)>([\s\S]*?)<\/Question>/g,
+    /<Question\s+id="?([^">]+)"?>([\s\S]*?)<\/Question>/g,
     (_, id, content) => {
-      // Render inline markdown manually for bold/italic inside questions
       const inner = content.trim();
+      // If the content is a heading (e.g., "###### Record Your Thoughts Below"),
+      // render it as a heading element instead of wrapping in <p>
+      const headingMatch = inner.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        return `\n<div class="question-block" data-question-id="${id.trim()}"><h${level}>${headingMatch[2]}</h${level}></div>\n`;
+      }
       return `\n<div class="question-block" data-question-id="${id.trim()}"><p>${inner}</p></div>\n`;
     }
   );
