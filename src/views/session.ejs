@@ -85,10 +85,7 @@
         %>
         <% if (totalAnnotations > 0) { %>
           <button class="edit-btn edit-btn--review" id="btn-review">
-            Review
-            <% if (sugCount > 0) { %><%= sugCount %> suggestion<%= sugCount === 1 ? '' : 's' %><% } %>
-            <% if (sugCount > 0 && comCount > 0) { %>, <% } %>
-            <% if (comCount > 0) { %><%= comCount %> comment<%= comCount === 1 ? '' : 's' %><% } %>
+            Review <%= sugCount > 0 ? sugCount + ' suggestion' + (sugCount === 1 ? '' : 's') : '' %><%= (sugCount > 0 && comCount > 0) ? ', ' : '' %><%= comCount > 0 ? comCount + ' comment' + (comCount === 1 ? '' : 's') : '' %>
           </button>
         <% } %>
       </div>
