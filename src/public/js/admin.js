@@ -621,10 +621,10 @@
             cleanText = toText;
           }
 
-          contentHtml += '<div class="admin-diff-row">';
-          contentHtml += '<div class="admin-diff-row-diff">' + diffHtml + '</div>';
+          contentHtml += '<div class="admin-diff-change-row">';
+          contentHtml += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
           if (cleanText) {
-            contentHtml += '<div class="admin-diff-row-clean">' + formatCleanText(cleanText) + '</div>';
+            contentHtml += '<div class="admin-diff-change-row-clean">' + formatCleanText(cleanText) + '</div>';
           }
           contentHtml += '</div>';
         }
