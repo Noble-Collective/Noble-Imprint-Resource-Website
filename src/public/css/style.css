@@ -3183,6 +3183,17 @@ body.drawer-open {
   font-weight: 400;
   flex-shrink: 0;
 }
+/* Collapsible depth 3-4 sections */
+.admin-diff-sidebar-expand { display: none; }
+.admin-diff-sidebar-expand--open { display: block; }
+.admin-diff-sidebar-arrow {
+  font-size: 8px;
+  color: #999;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  margin-right: 2px;
+}
+.admin-diff-sidebar-arrow--open { transform: rotate(90deg); }
 .admin-diff-content {
   flex: 1;
   min-width: 0;

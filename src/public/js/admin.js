@@ -579,8 +579,10 @@
     var sidebarHtml = '<div class="admin-diff-sidebar-title">Changes</div>';
 
     report.files.forEach(function (file, idx) {
-      // Group changes by their breadcrumb section
+      // Group changes by their breadcrumb section (capped at depth 4)
       var fileEntries = sidebarEntries.filter(function (e) { return e.fileIdx === idx; });
+      var MAX_SIDEBAR_DEPTH = 4;
+      var DEFAULT_DEPTH = 2;
 
       // Count top-of-file changes (empty breadcrumb) to show on the file name row
       var topOfFileCount = 0;
@@ -590,18 +592,19 @@
 
       fileEntries.forEach(function (entry) {
         var bc = entry.breadcrumb;
-        var sectionKey = bc.length > 0 ? bc.join(' > ') : '(top)';
-        if (sectionKey === '(top)') {
+        if (bc.length === 0) {
           topOfFileCount++;
           if (!topOfFileId) topOfFileId = entry.id;
-          return; // Don't create a sidebar section for top-of-file
+          return;
         }
+        var truncated = bc.slice(0, MAX_SIDEBAR_DEPTH);
+        var sectionKey = truncated.join(' > ');
         if (sectionKey !== (currentSection._key || null)) {
           if (currentSection.changeCount > 0) sections.push(currentSection);
           currentSection = {
-            heading: bc[bc.length - 1],
-            breadcrumb: bc,
-            level: bc.length,
+            heading: truncated[truncated.length - 1],
+            breadcrumb: truncated,
+            level: truncated.length,
             firstChangeId: entry.id,
             changeCount: 1,
             _key: sectionKey
@@ -611,6 +614,44 @@
         }
       });
       if (currentSection.changeCount > 0) sections.push(currentSection);
+
+      // Ensure parent entries exist at depth 1 and 2 for all deeper sections.
+      // If "Session One > Seeking God's Wisdom > Core Principle" exists at depth 3
+      // but no section at depth 2 for "Session One", insert one.
+      var seenKeys = {};
+      sections.forEach(function (s) { seenKeys[s._key] = true; });
+      var extraSections = [];
+      sections.forEach(function (sec) {
+        for (var d = 1; d < sec.level; d++) {
+          var parentBc = sec.breadcrumb.slice(0, d);
+          var parentKey = parentBc.join(' > ');
+          if (!seenKeys[parentKey]) {
+            seenKeys[parentKey] = true;
+            extraSections.push({
+              heading: parentBc[parentBc.length - 1],
+              breadcrumb: parentBc,
+              level: d,
+              firstChangeId: sec.firstChangeId,
+              changeCount: 0, // navigation-only parent
+              _key: parentKey
+            });
+          }
+        }
+      });
+      // Merge extras and sort by first appearance order (by firstChangeId index in sidebarEntries)
+      sections = sections.concat(extraSections);
+      sections.sort(function (a, b) {
+        // Sort by breadcrumb path to maintain tree order
+        var aPath = a._key;
+        var bPath = b._key;
+        // If one is a prefix of the other, the shorter one comes first
+        if (bPath.indexOf(aPath) === 0) return -1;
+        if (aPath.indexOf(bPath) === 0) return 1;
+        // Otherwise sort by the first change ID (numeric suffix)
+        var aId = parseInt((a.firstChangeId || '').replace('diff-change-', ''), 10) || 0;
+        var bId = parseInt((b.firstChangeId || '').replace('diff-change-', ''), 10) || 0;
+        return aId - bId;
+      });
 
       // File name row — includes top-of-file count if any
       sidebarHtml += '<div class="admin-diff-sidebar-file">';
@@ -623,14 +664,52 @@
       }
       sidebarHtml += '</div>';
 
-      sections.forEach(function (sec) {
-        var indent = Math.min(sec.level, 4);
-        var countLabel = '' + sec.changeCount;
-        sidebarHtml += '<a class="admin-diff-sidebar-link" href="#' + sec.firstChangeId + '" style="padding-left:' + (8 + indent * 12) + 'px">';
-        sidebarHtml += '<span class="admin-diff-sidebar-heading">' + escapeHtml(sec.heading) + '</span>';
-        sidebarHtml += ' <span class="admin-diff-sidebar-count">' + countLabel + '</span>';
-        sidebarHtml += '</a>';
+      // Render sections — depth 1-2 always visible, depth 3-4 in collapsible groups
+      var inExpandable = false;
+      var expandGroupId = 0;
+
+      // Pre-scan: count depth 3-4 children per depth-2 parent
+      var parentIdx = -1;
+      var deepCount = 0;
+      sections.forEach(function (sec, si) {
+        if (sec.level <= DEFAULT_DEPTH) {
+          if (parentIdx >= 0 && deepCount > 0) sections[parentIdx]._deepCount = deepCount;
+          parentIdx = si;
+          deepCount = 0;
+        } else {
+          deepCount++;
+        }
       });
+      if (parentIdx >= 0 && deepCount > 0) sections[parentIdx]._deepCount = deepCount;
+
+      sections.forEach(function (sec) {
+        if (sec.level <= DEFAULT_DEPTH) {
+          if (inExpandable) { sidebarHtml += '</div>'; inExpandable = false; }
+
+          var indent = Math.min(sec.level, 4);
+          var hasChildren = sec._deepCount > 0;
+          sidebarHtml += '<a class="admin-diff-sidebar-link' + (hasChildren ? ' admin-diff-sidebar-link--expandable' : '') + '" href="#' + sec.firstChangeId + '" style="padding-left:' + (8 + indent * 12) + 'px"';
+          if (hasChildren) sidebarHtml += ' data-sidebar-expand="expand-' + idx + '-' + expandGroupId + '"';
+          sidebarHtml += '>';
+          if (hasChildren) sidebarHtml += '<span class="admin-diff-sidebar-arrow">&#9654;</span>';
+          sidebarHtml += '<span class="admin-diff-sidebar-heading">' + escapeHtml(sec.heading) + '</span>';
+          if (sec.changeCount > 0) sidebarHtml += ' <span class="admin-diff-sidebar-count">' + sec.changeCount + '</span>';
+          sidebarHtml += '</a>';
+
+          if (hasChildren) {
+            sidebarHtml += '<div class="admin-diff-sidebar-expand" id="expand-' + idx + '-' + expandGroupId + '">';
+            inExpandable = true;
+            expandGroupId++;
+          }
+        } else {
+          var indent = Math.min(sec.level, 4);
+          sidebarHtml += '<a class="admin-diff-sidebar-link" href="#' + sec.firstChangeId + '" style="padding-left:' + (8 + indent * 12) + 'px">';
+          sidebarHtml += '<span class="admin-diff-sidebar-heading">' + escapeHtml(sec.heading) + '</span>';
+          if (sec.changeCount > 0) sidebarHtml += ' <span class="admin-diff-sidebar-count">' + sec.changeCount + '</span>';
+          sidebarHtml += '</a>';
+        }
+      });
+      if (inExpandable) { sidebarHtml += '</div>'; }
 
       sidebarHtml += '</div>';
     });
@@ -657,6 +736,20 @@
         if (target) {
           target.style.display = '';
           toggle.style.display = 'none';
+        }
+      });
+    });
+
+    // Sidebar expand/collapse for depth 3-4 sections
+    diffOutput.querySelectorAll('[data-sidebar-expand]').forEach(function (link) {
+      var arrow = link.querySelector('.admin-diff-sidebar-arrow');
+      link.addEventListener('click', function (e) {
+        // Toggle the expandable group (don't prevent the scroll)
+        var groupId = link.getAttribute('data-sidebar-expand');
+        var group = document.getElementById(groupId);
+        if (group) {
+          var isOpen = group.classList.toggle('admin-diff-sidebar-expand--open');
+          if (arrow) arrow.classList.toggle('admin-diff-sidebar-arrow--open', isOpen);
         }
       });
     });
