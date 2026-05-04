@@ -3083,6 +3083,23 @@ body.drawer-open {
 .admin-diff-chunk--changed { background: #fff8e1; padding: 4px 14px; }
 .admin-diff-word--added { background: #a6f1b0; border-radius: 2px; padding: 0 1px; }
 .admin-diff-word--removed { background: #f5a5a5; border-radius: 2px; padding: 0 1px; text-decoration: line-through; }
+/* Diff + clean copy two-column rows */
+.admin-diff-row { display: flex; gap: 0; }
+.admin-diff-row-diff { flex: 1; min-width: 0; }
+.admin-diff-row-clean {
+  width: 340px;
+  min-width: 340px;
+  padding: 6px 14px;
+  border-left: 1px solid #e0e0e0;
+  background: #fff;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #222;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  user-select: text;
+}
 .admin-diff-context-toggle {
   display: block;
   padding: 6px 14px;

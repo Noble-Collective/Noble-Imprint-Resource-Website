@@ -379,6 +379,47 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // Convert markdown text to clean formatted HTML for copy-paste into Affinity
+  function formatCleanText(text) {
+    // Strip <sup>...</sup> verse numbers
+    text = text.replace(/<sup>[^<]*<\/sup>/g, '');
+    // Strip <Question ...> and </Question> tags, keep inner content
+    text = text.replace(/<Question[^>]*>/g, '');
+    text = text.replace(/<\/Question>/g, '');
+    // Strip << Reference >> markers
+    text = text.replace(/<<\s*/g, '');
+    text = text.replace(/\s*>>/g, '');
+    // Strip heading markers (# through ######)
+    text = text.replace(/^#{1,6}\s+/gm, '');
+    // Strip blockquote markers
+    text = text.replace(/^>\s?/gm, '');
+    // Bold **text** → <b>text</b>
+    text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    // Italic *text* or _text_ → <i>text</i>
+    text = text.replace(/\*(.+?)\*/g, '<i>$1</i>');
+    text = text.replace(/\b_(.+?)_\b/g, '<i>$1</i>');
+    // Escape HTML for the remaining text (but preserve our <b>/<i> tags)
+    // Do this by splitting on our tags, escaping the text parts, then rejoining
+    var parts = text.split(/(<\/?[bi]>)/);
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] !== '<b>' && parts[i] !== '</b>' && parts[i] !== '<i>' && parts[i] !== '</i>') {
+        parts[i] = escapeHtml(parts[i]);
+      }
+    }
+    text = parts.join('');
+    // Curly quotes — straight double quotes
+    text = text.replace(/"(\S)/g, '\u201c$1');  // opening "
+    text = text.replace(/(\S)"/g, '$1\u201d');   // closing "
+    text = text.replace(/"/g, '\u201d');          // remaining " → closing
+    // Curly quotes — straight single quotes / apostrophes
+    text = text.replace(/'(\S)/g, '\u2018$1');    // opening '
+    text = text.replace(/(\S)'/g, '$1\u2019');    // closing / apostrophe
+    text = text.replace(/'/g, '\u2019');           // remaining ' → closing
+    // Convert newlines to <br> for display
+    text = text.replace(/\n/g, '<br>');
+    return text;
+  }
+
   function fileNameFromPath(path) {
     var parts = path.split('/');
     return parts[parts.length - 1];
@@ -552,23 +593,40 @@
             type: chunk.type
           });
 
+          // Build diff column + clean copy column side by side
+          var diffHtml = '';
+          var cleanText = '';
+
           if (chunk.type === 'added') {
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+            cleanText = chunk.text;
           } else if (chunk.type === 'removed') {
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+            cleanText = ''; // nothing to copy for removals
           } else if (chunk.type === 'changed') {
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+            var toText = '';
             chunk.words.forEach(function (w) {
               if (w.type === 'added') {
-                contentHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+                diffHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+                toText += w.text;
               } else if (w.type === 'removed') {
-                contentHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
+                diffHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
               } else {
-                contentHtml += escapeHtml(w.text);
+                diffHtml += escapeHtml(w.text);
+                toText += w.text;
               }
             });
-            contentHtml += '</div>';
+            diffHtml += '</div>';
+            cleanText = toText;
           }
+
+          contentHtml += '<div class="admin-diff-row">';
+          contentHtml += '<div class="admin-diff-row-diff">' + diffHtml + '</div>';
+          if (cleanText) {
+            contentHtml += '<div class="admin-diff-row-clean">' + formatCleanText(cleanText) + '</div>';
+          }
+          contentHtml += '</div>';
         }
       });
 
