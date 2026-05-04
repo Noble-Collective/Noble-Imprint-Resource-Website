@@ -510,8 +510,6 @@
       contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
 
-      var lastBcStr = null;
-
       file.chunks.forEach(function (chunk, ci) {
         if (chunk.type === 'equal') {
           var lines = chunk.text.split('\n');
@@ -529,22 +527,19 @@
         } else {
           var cid = 'diff-change-' + changeId++;
           var bc = chunk.breadcrumb || [];
-          var bcStr = bc.join(' > ');
           var lineNum = chunk.toLine || null;
 
-          // Show breadcrumb bar when heading context changes, or line-only bar when same heading
-          var headingChanged = bcStr !== lastBcStr;
-          lastBcStr = bcStr;
-
-          contentHtml += '<div class="admin-diff-breadcrumb' + (headingChanged && bc.length > 0 ? '' : ' admin-diff-breadcrumb--line-only') + '" id="' + cid + '">';
-          if (headingChanged && bc.length > 0) {
+          // Every change gets a full breadcrumb bar with line number + heading trail
+          contentHtml += '<div class="admin-diff-breadcrumb" id="' + cid + '">';
+          if (lineNum) {
+            contentHtml += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+          }
+          if (bc.length > 0) {
+            if (lineNum) contentHtml += '<span class="admin-diff-breadcrumb-sep"> &mdash; </span>';
             bc.forEach(function (part, pi) {
               if (pi > 0) contentHtml += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
               contentHtml += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
             });
-          }
-          if (lineNum) {
-            contentHtml += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
           }
           contentHtml += '</div>';
 

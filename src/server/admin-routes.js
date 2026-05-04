@@ -291,17 +291,17 @@ api.get('/diff-report', async (req, res) => {
 
       // Walk chunks in "to" line order, tracking current position and heading stack
       let toLinePos = 0;
+      let lastHeadingIdx = 0; // track which headings have been processed
       const headingStack = []; // [{level, text}] — maintains deepest active breadcrumb trail
       function updateStack(upToLine) {
-        for (const h of headings) {
-          if (h.line > upToLine) break;
-          if (h.line >= toLinePos) {
-            // Pop headings at same or deeper level
-            while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
-              headingStack.pop();
-            }
-            headingStack.push({ level: h.level, text: h.text });
+        while (lastHeadingIdx < headings.length && headings[lastHeadingIdx].line <= upToLine) {
+          const h = headings[lastHeadingIdx];
+          // Pop headings at same or deeper level
+          while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
+            headingStack.pop();
           }
+          headingStack.push({ level: h.level, text: h.text });
+          lastHeadingIdx++;
         }
       }
 

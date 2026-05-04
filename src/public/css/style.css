@@ -3204,18 +3204,10 @@ body.drawer-open {
   font-weight: 500;
   scroll-margin-top: 100px;
 }
-/* Line-only breadcrumb — subtle divider when heading context hasn't changed */
-.admin-diff-breadcrumb--line-only {
-  background: transparent;
-  border-left-color: #e0e0e0;
-  padding: 3px 14px;
-  margin-top: 8px;
-}
 .admin-diff-breadcrumb-sep { color: #bbb; margin: 0 4px; }
 .admin-diff-breadcrumb-part { color: #555; }
 .admin-diff-breadcrumb-part:last-child { color: #333; font-weight: 600; }
-.admin-diff-breadcrumb-line { color: #999; margin-left: auto; font-weight: 400; font-size: 11px; white-space: nowrap; }
-.admin-diff-breadcrumb--line-only .admin-diff-breadcrumb-line { margin-left: 0; }
+.admin-diff-breadcrumb-line { color: #999; font-weight: 400; font-size: 11px; white-space: nowrap; }
 .admin-diff-file-header { scroll-margin-top: 100px; }
 
 /* Review meta */
