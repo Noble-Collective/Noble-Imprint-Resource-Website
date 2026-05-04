@@ -3081,15 +3081,24 @@ body.drawer-open {
 .admin-diff-chunk--changed { background: #fff8e1; padding: 4px 14px; }
 .admin-diff-word--added { background: #a6f1b0; border-radius: 2px; padding: 0 1px; }
 .admin-diff-word--removed { background: #f5a5a5; border-radius: 2px; padding: 0 1px; text-decoration: line-through; }
-/* Diff + clean copy two-column rows */
-.admin-diff-change-row { display: flex; gap: 0; }
-.admin-diff-row-diff { flex: 1 1 58%; max-width: 58%; min-width: 0; }
-.admin-diff-row-clean {
-  flex: 1 1 42%;
-  max-width: 42%;
-  padding: 6px 14px;
+/* Diff + clean copy: fixed two-column grid on file body */
+.admin-diff-file-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   border-left: 1px solid #e0e0e0;
+}
+/* Elements that span both columns in the grid */
+.admin-diff-file-body > .admin-diff-chunk--equal,
+.admin-diff-file-body > .admin-diff-chunk--removed,
+.admin-diff-file-body > .admin-diff-breadcrumb,
+.admin-diff-file-body > .admin-diff-context-toggle { grid-column: 1 / -1; }
+/* Change rows: diff in col 1, clean in col 2 */
+.admin-diff-change-row { display: contents; }
+.admin-diff-change-row-diff { min-width: 0; }
+.admin-diff-change-row-clean {
+  padding: 6px 20px;
   background: #fff;
+  border-left: 1px solid #ddd;
   font-family: 'Lora', Georgia, serif;
   font-size: 13px;
   line-height: 1.5;
@@ -3098,6 +3107,12 @@ body.drawer-open {
   overflow-wrap: break-word;
   user-select: text;
 }
+/* Visual separation between change blocks */
+.admin-diff-change-row-diff,
+.admin-diff-change-row-clean { padding-bottom: 10px; margin-bottom: 2px; }
+/* Removed-only changes span full width (no clean column) */
+.admin-diff-change-row--removed-only { grid-column: 1 / -1; }
+.admin-diff-change-row--removed-only .admin-diff-chunk--removed { grid-column: 1 / -1; }
 .admin-diff-context-toggle {
   display: block;
   padding: 6px 14px;

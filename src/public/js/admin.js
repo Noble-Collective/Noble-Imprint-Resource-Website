@@ -621,12 +621,16 @@
             cleanText = toText;
           }
 
-          contentHtml += '<div class="admin-diff-change-row">';
-          contentHtml += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
           if (cleanText) {
+            // Two-column: diff left, clean copy right (grid via display:contents)
+            contentHtml += '<div class="admin-diff-change-row">';
+            contentHtml += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
             contentHtml += '<div class="admin-diff-change-row-clean">' + formatCleanText(cleanText) + '</div>';
+            contentHtml += '</div>';
+          } else {
+            // Removed-only: spans full width
+            contentHtml += diffHtml;
           }
-          contentHtml += '</div>';
         }
       });
 
