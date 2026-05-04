@@ -3154,15 +3154,14 @@ body.drawer-open {
 }
 .admin-diff-sidebar-file-name:hover { color: #000; }
 .admin-diff-sidebar-link {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   padding: 3px 12px;
   color: #555;
   text-decoration: none;
   border-left: 3px solid transparent;
   line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .admin-diff-sidebar-link:hover { background: #f0f0f0; color: #222; }
 .admin-diff-sidebar-link--active {
@@ -3171,11 +3170,18 @@ body.drawer-open {
   color: #333;
   font-weight: 600;
 }
-.admin-diff-sidebar-heading { font-weight: 500; }
+.admin-diff-sidebar-heading {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 .admin-diff-sidebar-count {
   font-size: 10px;
   color: #999;
   font-weight: 400;
+  flex-shrink: 0;
 }
 .admin-diff-content {
   flex: 1;
@@ -3198,11 +3204,18 @@ body.drawer-open {
   font-weight: 500;
   scroll-margin-top: 100px;
 }
+/* Line-only breadcrumb — subtle divider when heading context hasn't changed */
+.admin-diff-breadcrumb--line-only {
+  background: transparent;
+  border-left-color: #e0e0e0;
+  padding: 3px 14px;
+  margin-top: 8px;
+}
 .admin-diff-breadcrumb-sep { color: #bbb; margin: 0 4px; }
 .admin-diff-breadcrumb-part { color: #555; }
 .admin-diff-breadcrumb-part:last-child { color: #333; font-weight: 600; }
-/* Scroll anchors for changes without visible breadcrumb bar */
-a[id^="diff-change-"] { scroll-margin-top: 100px; }
+.admin-diff-breadcrumb-line { color: #999; margin-left: auto; font-weight: 400; font-size: 11px; white-space: nowrap; }
+.admin-diff-breadcrumb--line-only .admin-diff-breadcrumb-line { margin-left: 0; }
 .admin-diff-file-header { scroll-margin-top: 100px; }
 
 /* Review meta */

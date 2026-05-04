@@ -510,7 +510,7 @@
       contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
 
-      var lastBreadcrumb = null;
+      var lastBcStr = null;
 
       file.chunks.forEach(function (chunk, ci) {
         if (chunk.type === 'equal') {
@@ -530,25 +530,23 @@
           var cid = 'diff-change-' + changeId++;
           var bc = chunk.breadcrumb || [];
           var bcStr = bc.join(' > ');
+          var lineNum = chunk.toLine || null;
 
-          // Only show breadcrumb if it differs from the previous change's breadcrumb
-          var showBreadcrumb = bc.length > 0 && bcStr !== lastBreadcrumb;
-          if (bc.length > 0) lastBreadcrumb = bcStr;
+          // Show breadcrumb bar when heading context changes, or line-only bar when same heading
+          var headingChanged = bcStr !== lastBcStr;
+          lastBcStr = bcStr;
 
-          if (showBreadcrumb) {
-            contentHtml += '<div class="admin-diff-breadcrumb" id="' + cid + '">';
+          contentHtml += '<div class="admin-diff-breadcrumb' + (headingChanged && bc.length > 0 ? '' : ' admin-diff-breadcrumb--line-only') + '" id="' + cid + '">';
+          if (headingChanged && bc.length > 0) {
             bc.forEach(function (part, pi) {
               if (pi > 0) contentHtml += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
               contentHtml += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
             });
-            contentHtml += '</div>';
-          } else if (bc.length === 0) {
-            // No heading context — anchor the change itself
-            contentHtml += '<a id="' + cid + '"></a>';
-          } else {
-            // Same breadcrumb as previous — just add an anchor
-            contentHtml += '<a id="' + cid + '"></a>';
           }
+          if (lineNum) {
+            contentHtml += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+          }
+          contentHtml += '</div>';
 
           // Track for sidebar
           sidebarEntries.push({
@@ -586,28 +584,27 @@
     var sidebarHtml = '<div class="admin-diff-sidebar-title">Changes</div>';
 
     report.files.forEach(function (file, idx) {
-      sidebarHtml += '<div class="admin-diff-sidebar-file">';
-      sidebarHtml += '<div class="admin-diff-sidebar-file-name" data-sidebar-file="' + idx + '">' + escapeHtml(file.displayName || file.filename) + '</div>';
-
       // Group changes by their breadcrumb section
       var fileEntries = sidebarEntries.filter(function (e) { return e.fileIdx === idx; });
-      if (fileEntries.length === 0) { sidebarHtml += '</div>'; return; }
 
-      // Build heading tree from the file's outline, annotated with change anchors
-      var outline = file.outline || [];
-      // For each heading, find the first change whose breadcrumb ends with that heading text
-      // Build a flat list of sidebar items: headings (as section headers) + "N changes" links
-      var sections = []; // {heading, level, firstChangeId, changeCount}
+      // Count top-of-file changes (empty breadcrumb) to show on the file name row
+      var topOfFileCount = 0;
+      var topOfFileId = null;
+      var sections = [];
       var currentSection = { heading: null, level: 0, firstChangeId: null, changeCount: 0 };
 
       fileEntries.forEach(function (entry) {
         var bc = entry.breadcrumb;
         var sectionKey = bc.length > 0 ? bc.join(' > ') : '(top)';
+        if (sectionKey === '(top)') {
+          topOfFileCount++;
+          if (!topOfFileId) topOfFileId = entry.id;
+          return; // Don't create a sidebar section for top-of-file
+        }
         if (sectionKey !== (currentSection._key || null)) {
-          // Flush previous section
           if (currentSection.changeCount > 0) sections.push(currentSection);
           currentSection = {
-            heading: bc.length > 0 ? bc[bc.length - 1] : '(top of file)',
+            heading: bc[bc.length - 1],
             breadcrumb: bc,
             level: bc.length,
             firstChangeId: entry.id,
@@ -620,9 +617,20 @@
       });
       if (currentSection.changeCount > 0) sections.push(currentSection);
 
+      // File name row — includes top-of-file count if any
+      sidebarHtml += '<div class="admin-diff-sidebar-file">';
+      sidebarHtml += '<div class="admin-diff-sidebar-file-name" data-sidebar-file="' + idx + '"';
+      if (topOfFileId) sidebarHtml += ' data-sidebar-jump="' + topOfFileId + '"';
+      sidebarHtml += '>';
+      sidebarHtml += escapeHtml(file.displayName || file.filename);
+      if (topOfFileCount > 0) {
+        sidebarHtml += ' <span class="admin-diff-sidebar-count">' + topOfFileCount + '</span>';
+      }
+      sidebarHtml += '</div>';
+
       sections.forEach(function (sec) {
         var indent = Math.min(sec.level, 4);
-        var countLabel = sec.changeCount === 1 ? '1 change' : sec.changeCount + ' changes';
+        var countLabel = '' + sec.changeCount;
         sidebarHtml += '<a class="admin-diff-sidebar-link" href="#' + sec.firstChangeId + '" style="padding-left:' + (8 + indent * 12) + 'px">';
         sidebarHtml += '<span class="admin-diff-sidebar-heading">' + escapeHtml(sec.heading) + '</span>';
         sidebarHtml += ' <span class="admin-diff-sidebar-count">' + countLabel + '</span>';
@@ -658,11 +666,12 @@
       });
     });
 
-    // Sidebar file name clicks jump to file header
+    // Sidebar file name clicks jump to file header (or first top-of-file change)
     diffOutput.querySelectorAll('[data-sidebar-file]').forEach(function (el) {
       el.addEventListener('click', function () {
-        var fileEl = document.getElementById('diff-file-' + el.getAttribute('data-sidebar-file'));
-        if (fileEl) fileEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var jumpId = el.getAttribute('data-sidebar-jump');
+        var target = jumpId ? document.getElementById(jumpId) : document.getElementById('diff-file-' + el.getAttribute('data-sidebar-file'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
 

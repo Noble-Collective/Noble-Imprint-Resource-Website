@@ -1,4 +1,0 @@
-# PART TWO: Challenge
-
-In **Part Two** of this rite of passage, you and your community of parents will venture into the outdoors in order to apply the principles you have learned in the previous session. Together with church leaders and mentors you will engage in a two-day family camp experience. During this time, you will commune with God through a series of spiritual exercises. You will also engage in a variety of camp experiences to try to reflect on the work of establishing your home, exploring what these experiences teach you about your duty as a parent. Additionally, you and your parenting community will enjoy outdoor bonding activities to help your community develop and grow beyond this rite of passage. In the end, the second part of this process will give you outdoor challenges that will help you understand the sacred and noble calling of building Christian hearth and home.
-

@@ -306,19 +306,17 @@ api.get('/diff-report', async (req, res) => {
       }
 
       for (const chunk of chunks) {
-        const chunkLines = chunk.type === 'changed'
-          ? chunk.words.map(w => w.text).join('').split('\n').length
-          : (chunk.text || '').split('\n').length;
-
         if (chunk.type !== 'equal') {
-          // Compute breadcrumb at the start of this chunk
+          // Compute breadcrumb and line number at the start of this chunk
           updateStack(toLinePos);
           chunk.breadcrumb = headingStack.map(h => h.text);
+          chunk.toLine = toLinePos + 1; // 1-based line number in "to" content
         }
 
         // Advance toLinePos for chunks that appear in the "to" content
         if (chunk.type === 'equal' || chunk.type === 'added') {
-          toLinePos += chunkLines - 1; // split gives N parts for N-1 newlines
+          const lines = (chunk.text || '').split('\n').length;
+          toLinePos += lines - 1;
         } else if (chunk.type === 'changed') {
           // changed chunks have both removed + added content; advance by the added portion
           const addedText = chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('');
