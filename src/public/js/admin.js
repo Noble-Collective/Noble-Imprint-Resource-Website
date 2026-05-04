@@ -381,11 +381,21 @@
 
   // Convert markdown text to clean formatted HTML for copy-paste into Affinity
   function formatCleanText(text) {
-    // Strip <sup>...</sup> verse numbers
-    text = text.replace(/<sup>[^<]*<\/sup>/g, '');
-    // Strip <Question ...> and </Question> tags, keep inner content
-    text = text.replace(/<Question[^>]*>/g, '');
-    text = text.replace(/<\/Question>/g, '');
+    // Curly quotes FIRST (before any HTML escaping)
+    // Double quotes
+    text = text.replace(/"(\S)/g, '\u201c$1');   // opening "
+    text = text.replace(/(\S)"/g, '$1\u201d');    // closing "
+    text = text.replace(/"/g, '\u201d');           // remaining " → closing
+    // Single quotes / apostrophes
+    text = text.replace(/'(\S)/g, '\u2018$1');    // opening '
+    text = text.replace(/(\S)'/g, '$1\u2019');    // closing / apostrophe
+    text = text.replace(/'/g, '\u2019');           // remaining ' → closing
+
+    // Convert <sup>...</sup> to placeholder to preserve through escaping
+    text = text.replace(/<sup>([^<]*)<\/sup>/g, '{{SUP:$1}}');
+    // Strip <Question ...>, </Question>, <Callout ...>, </Callout> tags — keep inner content
+    text = text.replace(/<(Question|Callout)[^>]*>/gi, '');
+    text = text.replace(/<\/(Question|Callout)>/gi, '');
     // Strip << Reference >> markers
     text = text.replace(/<<\s*/g, '');
     text = text.replace(/\s*>>/g, '');
@@ -394,27 +404,19 @@
     // Strip blockquote markers
     text = text.replace(/^>\s?/gm, '');
     // Bold **text** → <b>text</b>
-    text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    text = text.replace(/\*\*(.+?)\*\*/g, '{{B:$1}}');
     // Italic *text* or _text_ → <i>text</i>
-    text = text.replace(/\*(.+?)\*/g, '<i>$1</i>');
-    text = text.replace(/\b_(.+?)_\b/g, '<i>$1</i>');
-    // Escape HTML for the remaining text (but preserve our <b>/<i> tags)
-    // Do this by splitting on our tags, escaping the text parts, then rejoining
-    var parts = text.split(/(<\/?[bi]>)/);
-    for (var i = 0; i < parts.length; i++) {
-      if (parts[i] !== '<b>' && parts[i] !== '</b>' && parts[i] !== '<i>' && parts[i] !== '</i>') {
-        parts[i] = escapeHtml(parts[i]);
-      }
-    }
-    text = parts.join('');
-    // Curly quotes — straight double quotes
-    text = text.replace(/"(\S)/g, '\u201c$1');  // opening "
-    text = text.replace(/(\S)"/g, '$1\u201d');   // closing "
-    text = text.replace(/"/g, '\u201d');          // remaining " → closing
-    // Curly quotes — straight single quotes / apostrophes
-    text = text.replace(/'(\S)/g, '\u2018$1');    // opening '
-    text = text.replace(/(\S)'/g, '$1\u2019');    // closing / apostrophe
-    text = text.replace(/'/g, '\u2019');           // remaining ' → closing
+    text = text.replace(/\*(.+?)\*/g, '{{I:$1}}');
+    text = text.replace(/\b_(.+?)_\b/g, '{{I:$1}}');
+
+    // Escape all remaining HTML
+    text = escapeHtml(text);
+
+    // Restore formatted tags from placeholders
+    text = text.replace(/\{\{B:(.*?)\}\}/g, '<b>$1</b>');
+    text = text.replace(/\{\{I:(.*?)\}\}/g, '<i>$1</i>');
+    text = text.replace(/\{\{SUP:(.*?)\}\}/g, '<sup>$1</sup>');
+
     // Convert newlines to <br> for display
     text = text.replace(/\n/g, '<br>');
     return text;

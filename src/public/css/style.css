@@ -3107,6 +3107,7 @@ body.drawer-open {
   overflow-wrap: break-word;
   user-select: text;
 }
+.admin-diff-change-row-clean sup { font-size: 0.7em; color: #888; vertical-align: super; }
 /* Visual separation between change blocks */
 .admin-diff-change-row-diff,
 .admin-diff-change-row-clean { padding-bottom: 10px; margin-bottom: 2px; }
