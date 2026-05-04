@@ -494,55 +494,150 @@
       return;
     }
 
-    var html = '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
+    // Track change IDs for sidebar links
+    var changeId = 0;
+    var sidebarEntries = []; // {id, fileIdx, displayName, breadcrumb, type}
+
+    // --- Build main diff content ---
+    var contentHtml = '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
 
     report.files.forEach(function (file, idx) {
       var statusClass = 'admin-badge--' + file.status;
-      html += '<div class="admin-diff-file">';
-      html += '<div class="admin-diff-file-header" data-diff-toggle="' + idx + '">';
-      html += '<span>' + escapeHtml(file.displayName || file.filename) + '</span>';
-      html += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
-      html += '</div>';
-      html += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
+      contentHtml += '<div class="admin-diff-file" id="diff-file-' + idx + '">';
+      contentHtml += '<div class="admin-diff-file-header" data-diff-toggle="' + idx + '">';
+      contentHtml += '<span>' + escapeHtml(file.displayName || file.filename) + '</span>';
+      contentHtml += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
+      contentHtml += '</div>';
+      contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
+
+      var lastBreadcrumb = null;
 
       file.chunks.forEach(function (chunk, ci) {
         if (chunk.type === 'equal') {
           var lines = chunk.text.split('\n');
           if (lines.length > 7) {
-            // Show first 3 and last 3, collapse the rest
             var first = lines.slice(0, 3).join('\n');
             var last = lines.slice(-3).join('\n');
             var hidden = lines.slice(3, -3).join('\n');
-            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(first) + '\n</div>';
-            html += '<div class="admin-diff-context-toggle" data-expand="ctx-' + idx + '-' + ci + '">... ' + (lines.length - 6) + ' unchanged lines ...</div>';
-            html += '<div class="admin-diff-chunk admin-diff-chunk--equal" id="ctx-' + idx + '-' + ci + '" style="display:none">' + escapeHtml(hidden) + '\n</div>';
-            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(last) + '</div>';
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(first) + '\n</div>';
+            contentHtml += '<div class="admin-diff-context-toggle" data-expand="ctx-' + idx + '-' + ci + '">... ' + (lines.length - 6) + ' unchanged lines ...</div>';
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal" id="ctx-' + idx + '-' + ci + '" style="display:none">' + escapeHtml(hidden) + '\n</div>';
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(last) + '</div>';
           } else {
-            html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(chunk.text) + '</div>';
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(chunk.text) + '</div>';
           }
-        } else if (chunk.type === 'added') {
-          html += '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
-        } else if (chunk.type === 'removed') {
-          html += '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
-        } else if (chunk.type === 'changed') {
-          html += '<div class="admin-diff-chunk admin-diff-chunk--changed">';
-          chunk.words.forEach(function (w) {
-            if (w.type === 'added') {
-              html += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
-            } else if (w.type === 'removed') {
-              html += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
-            } else {
-              html += escapeHtml(w.text);
-            }
+        } else {
+          var cid = 'diff-change-' + changeId++;
+          var bc = chunk.breadcrumb || [];
+          var bcStr = bc.join(' > ');
+
+          // Only show breadcrumb if it differs from the previous change's breadcrumb
+          var showBreadcrumb = bc.length > 0 && bcStr !== lastBreadcrumb;
+          if (bc.length > 0) lastBreadcrumb = bcStr;
+
+          if (showBreadcrumb) {
+            contentHtml += '<div class="admin-diff-breadcrumb" id="' + cid + '">';
+            bc.forEach(function (part, pi) {
+              if (pi > 0) contentHtml += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
+              contentHtml += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
+            });
+            contentHtml += '</div>';
+          } else if (bc.length === 0) {
+            // No heading context — anchor the change itself
+            contentHtml += '<a id="' + cid + '"></a>';
+          } else {
+            // Same breadcrumb as previous — just add an anchor
+            contentHtml += '<a id="' + cid + '"></a>';
+          }
+
+          // Track for sidebar
+          sidebarEntries.push({
+            id: cid,
+            fileIdx: idx,
+            displayName: file.displayName || file.filename,
+            breadcrumb: bc,
+            type: chunk.type
           });
-          html += '</div>';
+
+          if (chunk.type === 'added') {
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+          } else if (chunk.type === 'removed') {
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+          } else if (chunk.type === 'changed') {
+            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+            chunk.words.forEach(function (w) {
+              if (w.type === 'added') {
+                contentHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+              } else if (w.type === 'removed') {
+                contentHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
+              } else {
+                contentHtml += escapeHtml(w.text);
+              }
+            });
+            contentHtml += '</div>';
+          }
         }
       });
 
-      html += '</div></div>';
+      contentHtml += '</div></div>';
     });
 
-    diffOutput.innerHTML = html;
+    // --- Build sidebar TOC from heading outline + change locations ---
+    var sidebarHtml = '<div class="admin-diff-sidebar-title">Changes</div>';
+
+    report.files.forEach(function (file, idx) {
+      sidebarHtml += '<div class="admin-diff-sidebar-file">';
+      sidebarHtml += '<div class="admin-diff-sidebar-file-name" data-sidebar-file="' + idx + '">' + escapeHtml(file.displayName || file.filename) + '</div>';
+
+      // Group changes by their breadcrumb section
+      var fileEntries = sidebarEntries.filter(function (e) { return e.fileIdx === idx; });
+      if (fileEntries.length === 0) { sidebarHtml += '</div>'; return; }
+
+      // Build heading tree from the file's outline, annotated with change anchors
+      var outline = file.outline || [];
+      // For each heading, find the first change whose breadcrumb ends with that heading text
+      // Build a flat list of sidebar items: headings (as section headers) + "N changes" links
+      var sections = []; // {heading, level, firstChangeId, changeCount}
+      var currentSection = { heading: null, level: 0, firstChangeId: null, changeCount: 0 };
+
+      fileEntries.forEach(function (entry) {
+        var bc = entry.breadcrumb;
+        var sectionKey = bc.length > 0 ? bc.join(' > ') : '(top)';
+        if (sectionKey !== (currentSection._key || null)) {
+          // Flush previous section
+          if (currentSection.changeCount > 0) sections.push(currentSection);
+          currentSection = {
+            heading: bc.length > 0 ? bc[bc.length - 1] : '(top of file)',
+            breadcrumb: bc,
+            level: bc.length,
+            firstChangeId: entry.id,
+            changeCount: 1,
+            _key: sectionKey
+          };
+        } else {
+          currentSection.changeCount++;
+        }
+      });
+      if (currentSection.changeCount > 0) sections.push(currentSection);
+
+      sections.forEach(function (sec) {
+        var indent = Math.min(sec.level, 4);
+        var countLabel = sec.changeCount === 1 ? '1 change' : sec.changeCount + ' changes';
+        sidebarHtml += '<a class="admin-diff-sidebar-link" href="#' + sec.firstChangeId + '" style="padding-left:' + (8 + indent * 12) + 'px">';
+        sidebarHtml += '<span class="admin-diff-sidebar-heading">' + escapeHtml(sec.heading) + '</span>';
+        sidebarHtml += ' <span class="admin-diff-sidebar-count">' + countLabel + '</span>';
+        sidebarHtml += '</a>';
+      });
+
+      sidebarHtml += '</div>';
+    });
+
+    // --- Render two-column layout ---
+    diffOutput.innerHTML =
+      '<div class="admin-diff-layout">' +
+        '<nav class="admin-diff-sidebar">' + sidebarHtml + '</nav>' +
+        '<div class="admin-diff-content">' + contentHtml + '</div>' +
+      '</div>';
 
     // Bind toggle listeners for collapsible file sections
     diffOutput.querySelectorAll('[data-diff-toggle]').forEach(function (header) {
@@ -562,6 +657,51 @@
         }
       });
     });
+
+    // Sidebar file name clicks jump to file header
+    diffOutput.querySelectorAll('[data-sidebar-file]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var fileEl = document.getElementById('diff-file-' + el.getAttribute('data-sidebar-file'));
+        if (fileEl) fileEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Smooth scroll for sidebar links
+    diffOutput.querySelectorAll('.admin-diff-sidebar-link').forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        var target = document.getElementById(link.getAttribute('href').slice(1));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Highlight active sidebar link on scroll
+    var sidebarLinks = diffOutput.querySelectorAll('.admin-diff-sidebar-link');
+    var changeAnchors = [];
+    sidebarLinks.forEach(function (link) {
+      var id = link.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) changeAnchors.push({ el: el, link: link });
+    });
+
+    var scrollTimeout;
+    function updateActiveSidebarLink() {
+      var scrollTop = window.scrollY || document.documentElement.scrollTop;
+      var active = null;
+      for (var i = 0; i < changeAnchors.length; i++) {
+        if (changeAnchors[i].el.getBoundingClientRect().top <= 100) {
+          active = changeAnchors[i].link;
+        }
+      }
+      sidebarLinks.forEach(function (l) { l.classList.remove('admin-diff-sidebar-link--active'); });
+      if (active) active.classList.add('admin-diff-sidebar-link--active');
+    }
+
+    window.addEventListener('scroll', function () {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(updateActiveSidebarLink, 50);
+    });
+    updateActiveSidebarLink();
   }
 
 })();

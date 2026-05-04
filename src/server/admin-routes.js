@@ -280,9 +280,59 @@ api.get('/diff-report', async (req, res) => {
         }
       }
 
+      // Extract heading hierarchy from the "to" content for breadcrumbs
+      // Build a list of { line, level, text } from newContent
+      const newLines = newContent.split('\n');
+      const headings = [];
+      for (let li = 0; li < newLines.length; li++) {
+        const m = newLines[li].match(/^(#{1,6})\s+(.+)/);
+        if (m) headings.push({ line: li, level: m[1].length, text: m[2].trim() });
+      }
+
+      // Walk chunks in "to" line order, tracking current position and heading stack
+      let toLinePos = 0;
+      const headingStack = []; // [{level, text}] — maintains deepest active breadcrumb trail
+      function updateStack(upToLine) {
+        for (const h of headings) {
+          if (h.line > upToLine) break;
+          if (h.line >= toLinePos) {
+            // Pop headings at same or deeper level
+            while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
+              headingStack.pop();
+            }
+            headingStack.push({ level: h.level, text: h.text });
+          }
+        }
+      }
+
+      for (const chunk of chunks) {
+        const chunkLines = chunk.type === 'changed'
+          ? chunk.words.map(w => w.text).join('').split('\n').length
+          : (chunk.text || '').split('\n').length;
+
+        if (chunk.type !== 'equal') {
+          // Compute breadcrumb at the start of this chunk
+          updateStack(toLinePos);
+          chunk.breadcrumb = headingStack.map(h => h.text);
+        }
+
+        // Advance toLinePos for chunks that appear in the "to" content
+        if (chunk.type === 'equal' || chunk.type === 'added') {
+          toLinePos += chunkLines - 1; // split gives N parts for N-1 newlines
+        } else if (chunk.type === 'changed') {
+          // changed chunks have both removed + added content; advance by the added portion
+          const addedText = chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('');
+          toLinePos += addedText.split('\n').length - 1;
+        }
+        // 'removed' chunks don't advance toLinePos (they're not in the "to" content)
+      }
+
+      // Also include the full heading outline for the sidebar navigation
+      const outline = headings.map(h => ({ level: h.level, text: h.text }));
+
       // Derive display name from filename
       const displayName = name.replace(/\.md$/, '').replace(/^\d+-/, '').replace(/([A-Z])/g, ' $1').trim();
-      files.push({ filename: name, displayName, status, chunks });
+      files.push({ filename: name, displayName, status, chunks, outline });
     }
 
     res.json({ bookPath, from, to: toRef, files });
