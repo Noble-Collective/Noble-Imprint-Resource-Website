@@ -3108,6 +3108,19 @@ body.drawer-open {
   user-select: text;
 }
 .admin-diff-change-row-clean sup { font-size: 0.7em; color: #888; vertical-align: super; }
+.admin-diff-copy-btn {
+  float: right;
+  padding: 2px 10px;
+  font-size: 11px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #666;
+  margin-left: 8px;
+}
+.admin-diff-copy-btn:hover { background: #e8e8e8; color: #333; }
+.admin-diff-copy-btn--done { background: #d4edda; border-color: #a6d9b0; color: #155724; }
 /* Visual separation between change blocks */
 .admin-diff-change-row-diff,
 .admin-diff-change-row-clean { padding-bottom: 10px; margin-bottom: 2px; }

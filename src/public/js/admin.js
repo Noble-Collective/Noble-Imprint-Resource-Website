@@ -624,10 +624,13 @@
           }
 
           if (cleanText) {
-            // Two-column: diff left, clean copy right (grid via display:contents)
+            var formattedClean = formatCleanText(cleanText);
             contentHtml += '<div class="admin-diff-change-row">';
             contentHtml += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
-            contentHtml += '<div class="admin-diff-change-row-clean">' + formatCleanText(cleanText) + '</div>';
+            contentHtml += '<div class="admin-diff-change-row-clean">';
+            contentHtml += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
+            contentHtml += '<div class="admin-diff-clean-text">' + formattedClean + '</div>';
+            contentHtml += '</div>';
             contentHtml += '</div>';
           } else {
             // Removed-only: spans full width
@@ -790,6 +793,31 @@
       header.addEventListener('click', function () {
         var body = document.getElementById('diff-body-' + header.getAttribute('data-diff-toggle'));
         if (body) body.classList.toggle('admin-diff-file-body--collapsed');
+      });
+    });
+
+    // Copy for Affinity buttons — write HTML to clipboard, then trigger macOS Shortcut
+    diffOutput.querySelectorAll('.admin-diff-copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var cleanEl = btn.parentElement.querySelector('.admin-diff-clean-text');
+        if (!cleanEl) return;
+        var html = cleanEl.innerHTML.replace(/<br>/g, '\n');
+        var blob = new Blob([html], { type: 'text/html' });
+        var textBlob = new Blob([cleanEl.textContent], { type: 'text/plain' });
+        navigator.clipboard.write([
+          new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob })
+        ]).then(function () {
+          // Trigger macOS Shortcut to convert HTML→RTF on clipboard
+          window.location.href = 'shortcuts://run-shortcut?name=ClipboardToRTF';
+          btn.textContent = 'Copied';
+          btn.classList.add('admin-diff-copy-btn--done');
+          setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('admin-diff-copy-btn--done'); }, 2000);
+        }).catch(function () {
+          // Fallback: just copy plain text
+          navigator.clipboard.writeText(cleanEl.textContent);
+          btn.textContent = 'Copied (plain)';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+        });
       });
     });
 
