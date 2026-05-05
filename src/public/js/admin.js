@@ -763,15 +763,37 @@
       // Helper: render a breadcrumb bar
       function renderBreadcrumb(cid, chunk) {
         var bc = chunk.breadcrumb || [];
+        var fromBc = chunk.fromBreadcrumb || [];
         var lineNum = chunk.toLine || null;
+        var fromLineNum = chunk.fromLine || null;
+        var bcStr = bc.join(' > ');
+        var fromBcStr = fromBc.join(' > ');
+        var showFromBc = fromBc.length > 0 && fromBcStr !== bcStr;
+
         var html = '<div class="admin-diff-breadcrumb" id="' + cid + '">';
-        if (lineNum) html += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+        // Line numbers
+        if (lineNum && fromLineNum && fromLineNum !== lineNum) {
+          html += '<span class="admin-diff-breadcrumb-line">Lines ' + fromLineNum + ' / ' + lineNum + '</span>';
+        } else if (lineNum) {
+          html += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+        }
+        // "To" breadcrumb
         if (bc.length > 0) {
           if (lineNum) html += '<span class="admin-diff-breadcrumb-sep"> &mdash; </span>';
           bc.forEach(function (part, pi) {
             if (pi > 0) html += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
             html += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
           });
+        }
+        // Show "from" breadcrumb if it differs
+        if (showFromBc) {
+          html += '<div class="admin-diff-breadcrumb-from">';
+          html += '<span class="admin-diff-breadcrumb-from-label">From: </span>';
+          fromBc.forEach(function (part, pi) {
+            if (pi > 0) html += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
+            html += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
+          });
+          html += '</div>';
         }
         html += '</div>';
         return html;

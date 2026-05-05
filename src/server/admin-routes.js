@@ -277,17 +277,73 @@ api.get('/diff-report', async (req, res) => {
               words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
             });
           } else {
-            // Phantom diff — word-level shows no difference, treat as equal
             chunks.push({ type: 'equal', text: rawChunks[i + 1].text });
           }
-          i++; // skip the paired 'added'
+          i++;
         } else {
           chunks.push(rawChunks[i]);
         }
       }
 
-      // Extract heading hierarchy from the "to" content for breadcrumbs
-      // Build a list of { line, level, text } from newContent
+      // Fuzzy pairing: find unpaired removed/added blocks with similar content
+      // and convert them to 'changed' blocks with word-level detail
+      function textSimilarity(a, b) {
+        if (!a || !b) return 0;
+        const wordsA = a.replace(/\s+/g, ' ').trim();
+        const wordsB = b.replace(/\s+/g, ' ').trim();
+        if (wordsA === wordsB) return 1;
+        // Use longest common subsequence ratio as similarity
+        const shorter = wordsA.length < wordsB.length ? wordsA : wordsB;
+        const longer = wordsA.length < wordsB.length ? wordsB : wordsA;
+        if (longer.length === 0) return 1;
+        // Quick check: count shared words
+        const setA = new Set(wordsA.split(' '));
+        const setB = new Set(wordsB.split(' '));
+        let shared = 0;
+        for (const w of setA) { if (setB.has(w)) shared++; }
+        return shared / Math.max(setA.size, setB.size);
+      }
+
+      const SIMILARITY_THRESHOLD = 0.5;
+      // Collect indices of unpaired removed and added chunks
+      const unpairedRemoved = [];
+      const unpairedAdded = [];
+      chunks.forEach((c, i) => {
+        if (c.type === 'removed') unpairedRemoved.push(i);
+        else if (c.type === 'added') unpairedAdded.push(i);
+      });
+
+      // Try to pair each removed with the most similar added
+      const pairedIndices = new Set();
+      for (const ri of unpairedRemoved) {
+        let bestIdx = -1, bestSim = SIMILARITY_THRESHOLD;
+        for (const ai of unpairedAdded) {
+          if (pairedIndices.has(ai)) continue;
+          const sim = textSimilarity(chunks[ri].text, chunks[ai].text);
+          if (sim > bestSim) { bestSim = sim; bestIdx = ai; }
+        }
+        if (bestIdx >= 0) {
+          // Pair them: replace both with a changed chunk at the added position,
+          // mark the removed position for deletion
+          const wordDiffs = Diff.diffWords(chunks[ri].text, chunks[bestIdx].text);
+          const hasRealDiff = wordDiffs.some(w => w.added || w.removed);
+          if (hasRealDiff) {
+            chunks[bestIdx] = {
+              type: 'changed',
+              words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
+            };
+            chunks[ri] = null; // mark for removal
+            pairedIndices.add(bestIdx);
+          }
+        }
+      }
+      // Remove nulled-out chunks
+      const finalChunks = chunks.filter(c => c !== null);
+      // Replace chunks array (used below)
+      chunks.length = 0;
+      finalChunks.forEach(c => chunks.push(c));
+
+      // Extract heading hierarchy from BOTH contents for breadcrumbs
       const newLines = newContent.split('\n');
       const headings = [];
       for (let li = 0; li < newLines.length; li++) {
@@ -295,40 +351,64 @@ api.get('/diff-report', async (req, res) => {
         if (m) headings.push({ line: li, level: m[1].length, text: m[2].trim() });
       }
 
-      // Walk chunks in "to" line order, tracking current position and heading stack
+      // Also parse headings from the "from" content for fromBreadcrumb
+      const oldLines = oldContent.split('\n');
+      const oldHeadings = [];
+      for (let li = 0; li < oldLines.length; li++) {
+        const m = oldLines[li].match(/^(#{1,6})\s+(.+)/);
+        if (m) oldHeadings.push({ line: li, level: m[1].length, text: m[2].trim() });
+      }
+
+      // Walk chunks tracking positions in BOTH documents
       let toLinePos = 0;
-      let lastHeadingIdx = 0; // track which headings have been processed
-      const headingStack = []; // [{level, text}] — maintains deepest active breadcrumb trail
+      let fromLinePos = 0;
+      let lastHeadingIdx = 0;
+      let lastOldHeadingIdx = 0;
+      const headingStack = [];
+      const oldHeadingStack = [];
+
       function updateStack(upToLine) {
         while (lastHeadingIdx < headings.length && headings[lastHeadingIdx].line <= upToLine) {
           const h = headings[lastHeadingIdx];
-          // Pop headings at same or deeper level
-          while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
-            headingStack.pop();
-          }
+          while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) headingStack.pop();
           headingStack.push({ level: h.level, text: h.text });
           lastHeadingIdx++;
+        }
+      }
+      function updateOldStack(upToLine) {
+        while (lastOldHeadingIdx < oldHeadings.length && oldHeadings[lastOldHeadingIdx].line <= upToLine) {
+          const h = oldHeadings[lastOldHeadingIdx];
+          while (oldHeadingStack.length > 0 && oldHeadingStack[oldHeadingStack.length - 1].level >= h.level) oldHeadingStack.pop();
+          oldHeadingStack.push({ level: h.level, text: h.text });
+          lastOldHeadingIdx++;
         }
       }
 
       for (const chunk of chunks) {
         if (chunk.type !== 'equal') {
-          // Compute breadcrumb and line number at the start of this chunk
           updateStack(toLinePos);
+          updateOldStack(fromLinePos);
           chunk.breadcrumb = headingStack.map(h => h.text);
-          chunk.toLine = toLinePos + 1; // 1-based line number in "to" content
+          chunk.fromBreadcrumb = oldHeadingStack.map(h => h.text);
+          chunk.toLine = toLinePos + 1;
+          chunk.fromLine = fromLinePos + 1;
         }
 
-        // Advance toLinePos for chunks that appear in the "to" content
+        // Advance toLinePos for chunks in the "to" content
         if (chunk.type === 'equal' || chunk.type === 'added') {
-          const lines = (chunk.text || '').split('\n').length;
-          toLinePos += lines - 1;
+          toLinePos += (chunk.text || '').split('\n').length - 1;
         } else if (chunk.type === 'changed') {
-          // changed chunks have both removed + added content; advance by the added portion
           const addedText = chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('');
           toLinePos += addedText.split('\n').length - 1;
         }
-        // 'removed' chunks don't advance toLinePos (they're not in the "to" content)
+
+        // Advance fromLinePos for chunks in the "from" content
+        if (chunk.type === 'equal' || chunk.type === 'removed') {
+          fromLinePos += (chunk.text || '').split('\n').length - 1;
+        } else if (chunk.type === 'changed') {
+          const removedText = chunk.words.filter(w => w.type !== 'added').map(w => w.text).join('');
+          fromLinePos += removedText.split('\n').length - 1;
+        }
       }
 
       // Also include the full heading outline for the sidebar navigation
@@ -380,16 +460,14 @@ api.post('/diff-report-upload', async (req, res) => {
       text: part.value,
     }));
 
+    // Adjacent pairing
     const chunks = [];
     for (let i = 0; i < rawChunks.length; i++) {
       if (rawChunks[i].type === 'removed' && i + 1 < rawChunks.length && rawChunks[i + 1].type === 'added') {
         const wordDiffs = Diff.diffWords(rawChunks[i].text, rawChunks[i + 1].text);
         const hasRealDiff = wordDiffs.some(w => w.added || w.removed);
         if (hasRealDiff) {
-          chunks.push({
-            type: 'changed',
-            words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
-          });
+          chunks.push({ type: 'changed', words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })) });
         } else {
           chunks.push({ type: 'equal', text: rawChunks[i + 1].text });
         }
@@ -399,39 +477,94 @@ api.post('/diff-report-upload', async (req, res) => {
       }
     }
 
-    // Extract heading hierarchy from the "to" content for breadcrumbs
+    // Fuzzy pairing of similar removed/added blocks
+    function textSimilarity(a, b) {
+      if (!a || !b) return 0;
+      const setA = new Set(a.replace(/\s+/g, ' ').trim().split(' '));
+      const setB = new Set(b.replace(/\s+/g, ' ').trim().split(' '));
+      let shared = 0;
+      for (const w of setA) { if (setB.has(w)) shared++; }
+      return shared / Math.max(setA.size, setB.size);
+    }
+    const unpairedRemoved = [], unpairedAdded = [];
+    chunks.forEach((c, i) => {
+      if (c.type === 'removed') unpairedRemoved.push(i);
+      else if (c.type === 'added') unpairedAdded.push(i);
+    });
+    const pairedIndices = new Set();
+    for (const ri of unpairedRemoved) {
+      let bestIdx = -1, bestSim = 0.5;
+      for (const ai of unpairedAdded) {
+        if (pairedIndices.has(ai)) continue;
+        const sim = textSimilarity(chunks[ri].text, chunks[ai].text);
+        if (sim > bestSim) { bestSim = sim; bestIdx = ai; }
+      }
+      if (bestIdx >= 0) {
+        const wordDiffs = Diff.diffWords(chunks[ri].text, chunks[bestIdx].text);
+        if (wordDiffs.some(w => w.added || w.removed)) {
+          chunks[bestIdx] = { type: 'changed', words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })) };
+          chunks[ri] = null;
+          pairedIndices.add(bestIdx);
+        }
+      }
+    }
+    const finalChunks = chunks.filter(c => c !== null);
+    chunks.length = 0;
+    finalChunks.forEach(c => chunks.push(c));
+
+    // Heading hierarchies from both contents
     const newLines = newContent.split('\n');
     const headings = [];
     for (let li = 0; li < newLines.length; li++) {
       const m = newLines[li].match(/^(#{1,6})\s+(.+)/);
       if (m) headings.push({ line: li, level: m[1].length, text: m[2].trim() });
     }
+    const oldLines = oldContent.split('\n');
+    const oldHeadings = [];
+    for (let li = 0; li < oldLines.length; li++) {
+      const m = oldLines[li].match(/^(#{1,6})\s+(.+)/);
+      if (m) oldHeadings.push({ line: li, level: m[1].length, text: m[2].trim() });
+    }
 
-    let toLinePos = 0;
-    let lastHeadingIdx = 0;
-    const headingStack = [];
+    // Track positions in both documents
+    let toLinePos = 0, fromLinePos = 0;
+    let lastHeadingIdx = 0, lastOldHeadingIdx = 0;
+    const headingStack = [], oldHeadingStack = [];
     function updateStack(upToLine) {
       while (lastHeadingIdx < headings.length && headings[lastHeadingIdx].line <= upToLine) {
         const h = headings[lastHeadingIdx];
-        while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
-          headingStack.pop();
-        }
+        while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) headingStack.pop();
         headingStack.push({ level: h.level, text: h.text });
         lastHeadingIdx++;
+      }
+    }
+    function updateOldStack(upToLine) {
+      while (lastOldHeadingIdx < oldHeadings.length && oldHeadings[lastOldHeadingIdx].line <= upToLine) {
+        const h = oldHeadings[lastOldHeadingIdx];
+        while (oldHeadingStack.length > 0 && oldHeadingStack[oldHeadingStack.length - 1].level >= h.level) oldHeadingStack.pop();
+        oldHeadingStack.push({ level: h.level, text: h.text });
+        lastOldHeadingIdx++;
       }
     }
 
     for (const chunk of chunks) {
       if (chunk.type !== 'equal') {
         updateStack(toLinePos);
+        updateOldStack(fromLinePos);
         chunk.breadcrumb = headingStack.map(h => h.text);
+        chunk.fromBreadcrumb = oldHeadingStack.map(h => h.text);
         chunk.toLine = toLinePos + 1;
+        chunk.fromLine = fromLinePos + 1;
       }
       if (chunk.type === 'equal' || chunk.type === 'added') {
         toLinePos += (chunk.text || '').split('\n').length - 1;
       } else if (chunk.type === 'changed') {
-        const addedText = chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('');
-        toLinePos += addedText.split('\n').length - 1;
+        toLinePos += chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('').split('\n').length - 1;
+      }
+      if (chunk.type === 'equal' || chunk.type === 'removed') {
+        fromLinePos += (chunk.text || '').split('\n').length - 1;
+      } else if (chunk.type === 'changed') {
+        fromLinePos += chunk.words.filter(w => w.type !== 'added').map(w => w.text).join('').split('\n').length - 1;
       }
     }
 

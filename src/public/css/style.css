@@ -3337,6 +3337,14 @@ body.drawer-open {
 .admin-diff-breadcrumb-part { color: #555; }
 .admin-diff-breadcrumb-part:last-child { color: #333; font-weight: 600; }
 .admin-diff-breadcrumb-line { color: #999; font-weight: 400; font-size: 11px; white-space: nowrap; }
+.admin-diff-breadcrumb-from {
+  width: 100%;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #a33;
+  font-weight: 400;
+}
+.admin-diff-breadcrumb-from-label { font-weight: 600; }
 .admin-diff-file-header { scroll-margin-top: 100px; }
 
 /* Review meta */
