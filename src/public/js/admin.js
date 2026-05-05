@@ -493,13 +493,16 @@
   var diffBookSelect = document.getElementById('diff-book-select');
   var diffGenerateBtn = document.getElementById('diff-generate-btn');
   var diffOutput = document.getElementById('diff-report-output');
+  var diffFileUpload = document.getElementById('diff-file-upload');
+  var diffFileName = document.getElementById('diff-file-name');
+  var uploadedFileContent = null;
 
   // Load tags when the tab is first shown
   document.querySelector('[data-admin-tab="diff-reports"]')?.addEventListener('click', function () {
     if (tagsLoaded) return;
     tagsLoaded = true;
     apiCall('GET', '/api/admin/tags').then(function (tags) {
-      diffFromSelect.innerHTML = '<option value="">Select a tag...</option>';
+      diffFromSelect.innerHTML = '<option value="">Select a tag...</option><option value="__upload__">Upload file...</option>';
       diffToSelect.innerHTML = '<option value="main">main (latest)</option>';
       tags.forEach(function (t) {
         diffFromSelect.innerHTML += '<option value="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + '</option>';
@@ -512,13 +515,45 @@
     });
   });
 
+  // Handle "Upload file..." selection
+  diffFromSelect?.addEventListener('change', function () {
+    if (diffFromSelect.value === '__upload__') {
+      diffFileUpload.click();
+    } else {
+      uploadedFileContent = null;
+      if (diffFileName) diffFileName.style.display = 'none';
+    }
+    updateDiffBtn();
+  });
+
+  diffFileUpload?.addEventListener('change', function () {
+    var file = diffFileUpload.files[0];
+    if (!file) {
+      diffFromSelect.value = '';
+      uploadedFileContent = null;
+      if (diffFileName) diffFileName.style.display = 'none';
+      updateDiffBtn();
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      uploadedFileContent = reader.result;
+      if (diffFileName) {
+        diffFileName.textContent = file.name;
+        diffFileName.style.display = 'inline';
+      }
+      updateDiffBtn();
+    };
+    reader.readAsText(file);
+  });
+
   function updateDiffBtn() {
     if (diffGenerateBtn) {
-      diffGenerateBtn.disabled = !diffBookSelect?.value || !diffFromSelect?.value;
+      var hasFrom = diffFromSelect?.value === '__upload__' ? !!uploadedFileContent : !!diffFromSelect?.value;
+      diffGenerateBtn.disabled = !diffBookSelect?.value || !hasFrom;
     }
   }
   diffBookSelect?.addEventListener('change', updateDiffBtn);
-  diffFromSelect?.addEventListener('change', updateDiffBtn);
 
   var lastDiffReport = null;
   var diffMergedMode = false;
@@ -527,10 +562,30 @@
     var bookPath = diffBookSelect.value;
     var from = diffFromSelect.value;
     var to = diffToSelect.value || 'main';
-    if (!bookPath || !from) return;
+    if (!bookPath || (!from && !uploadedFileContent)) return;
 
     diffOutput.innerHTML = '<div class="admin-diff-loading"><span class="margin-card-spinner" style="width:18px;height:18px;display:inline-block"></span> Generating diff report...</div>';
     diffGenerateBtn.disabled = true;
+
+    if (from === '__upload__' && uploadedFileContent) {
+      // POST uploaded file content for comparison
+      fetch('/api/admin/diff-report-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookPath: bookPath, to: to, uploadedContent: uploadedFileContent })
+      }).then(function (res) {
+        if (!res.ok) return res.json().then(function (d) { throw new Error(d.error || 'Request failed'); });
+        return res.json();
+      }).then(function (report) {
+        diffGenerateBtn.disabled = false;
+        lastDiffReport = report;
+        renderDiffReport(report, diffMergedMode);
+      }).catch(function (err) {
+        diffGenerateBtn.disabled = false;
+        diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed') + '</p>';
+      });
+      return;
+    }
 
     var url = '/api/admin/diff-report?bookPath=' + encodeURIComponent(bookPath) + '&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
     apiCall('GET', url).then(function (report) {

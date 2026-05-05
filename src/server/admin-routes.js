@@ -340,4 +340,104 @@ api.get('/diff-report', async (req, res) => {
   }
 });
 
+// Generate diff report comparing uploaded file against current book content
+api.post('/diff-report-upload', async (req, res) => {
+  try {
+    const { bookPath, to, uploadedContent } = req.body;
+    if (!bookPath || !uploadedContent) return res.status(400).json({ error: 'bookPath and uploadedContent are required' });
+    const toRef = to || 'main';
+    const sessionsPath = bookPath + '/sessions';
+    const Diff = require('diff');
+
+    // Fetch all session files from the "to" ref and concatenate into one
+    let toFiles = [];
+    try { toFiles = (await github.getDirectoryContentsAtRef(sessionsPath, toRef)).filter(f => f.name.endsWith('.md')); } catch { /* */ }
+    toFiles.sort((a, b) => a.name.localeCompare(b.name));
+
+    const toContents = await Promise.all(toFiles.map(async (f) => {
+      try {
+        const { content } = await github.getFileContentAtRef(sessionsPath + '/' + f.name, toRef);
+        return content;
+      } catch { return ''; }
+    }));
+    const newContent = toContents.join('\n\n');
+    const oldContent = uploadedContent;
+
+    if (oldContent === newContent) {
+      return res.json({ bookPath, from: 'uploaded file', to: toRef, files: [] });
+    }
+
+    // Two-pass diff: lines first, then words within changed pairs
+    const lineDiffs = Diff.diffLines(oldContent, newContent);
+    const rawChunks = lineDiffs.map(part => ({
+      type: part.added ? 'added' : part.removed ? 'removed' : 'equal',
+      text: part.value,
+    }));
+
+    const chunks = [];
+    for (let i = 0; i < rawChunks.length; i++) {
+      if (rawChunks[i].type === 'removed' && i + 1 < rawChunks.length && rawChunks[i + 1].type === 'added') {
+        const wordDiffs = Diff.diffWords(rawChunks[i].text, rawChunks[i + 1].text);
+        chunks.push({
+          type: 'changed',
+          words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
+        });
+        i++;
+      } else {
+        chunks.push(rawChunks[i]);
+      }
+    }
+
+    // Extract heading hierarchy from the "to" content for breadcrumbs
+    const newLines = newContent.split('\n');
+    const headings = [];
+    for (let li = 0; li < newLines.length; li++) {
+      const m = newLines[li].match(/^(#{1,6})\s+(.+)/);
+      if (m) headings.push({ line: li, level: m[1].length, text: m[2].trim() });
+    }
+
+    let toLinePos = 0;
+    let lastHeadingIdx = 0;
+    const headingStack = [];
+    function updateStack(upToLine) {
+      while (lastHeadingIdx < headings.length && headings[lastHeadingIdx].line <= upToLine) {
+        const h = headings[lastHeadingIdx];
+        while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= h.level) {
+          headingStack.pop();
+        }
+        headingStack.push({ level: h.level, text: h.text });
+        lastHeadingIdx++;
+      }
+    }
+
+    for (const chunk of chunks) {
+      if (chunk.type !== 'equal') {
+        updateStack(toLinePos);
+        chunk.breadcrumb = headingStack.map(h => h.text);
+        chunk.toLine = toLinePos + 1;
+      }
+      if (chunk.type === 'equal' || chunk.type === 'added') {
+        toLinePos += (chunk.text || '').split('\n').length - 1;
+      } else if (chunk.type === 'changed') {
+        const addedText = chunk.words.filter(w => w.type !== 'removed').map(w => w.text).join('');
+        toLinePos += addedText.split('\n').length - 1;
+      }
+    }
+
+    const outline = headings.map(h => ({ level: h.level, text: h.text }));
+    const files = [{
+      filename: 'uploaded-comparison',
+      displayName: 'Full Book Comparison',
+      status: 'modified',
+      chunks,
+      outline
+    }];
+
+    res.json({ bookPath, from: 'uploaded file', to: toRef, files });
+  } catch (err) {
+    console.error('Diff report upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = { page, api };
