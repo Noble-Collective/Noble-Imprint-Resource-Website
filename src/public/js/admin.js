@@ -797,16 +797,29 @@
       });
     });
 
-    // Copy for Affinity buttons — copy formatted HTML to clipboard
+    // Copy for Affinity buttons — copy formatted HTML, then trigger RTF conversion Shortcut
     diffOutput.querySelectorAll('.admin-diff-copy-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var cleanEl = btn.parentElement.querySelector('.admin-diff-clean-text');
         if (!cleanEl) return;
 
-        function showCopied() {
+        function onCopied() {
           btn.textContent = 'Copied';
           btn.classList.add('admin-diff-copy-btn--done');
-          setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('admin-diff-copy-btn--done'); }, 2000);
+          // After clipboard write settles, trigger macOS Shortcut to convert HTML→RTF
+          setTimeout(triggerRTFConversion, 300);
+          setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('admin-diff-copy-btn--done'); }, 2500);
+        }
+
+        function triggerRTFConversion() {
+          try {
+            var a = document.createElement('a');
+            a.href = 'shortcuts://run-shortcut?name=ClipboardToRTF';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { a.remove(); }, 1000);
+          } catch (e) { /* Shortcut not installed — clipboard still has HTML */ }
         }
 
         // Method 1: Clipboard API with HTML blob
@@ -817,7 +830,7 @@
               'text/html': new Blob([html], { type: 'text/html' }),
               'text/plain': new Blob([cleanEl.textContent], { type: 'text/plain' })
             })
-          ]).then(showCopied).catch(fallbackCopy);
+          ]).then(onCopied).catch(fallbackCopy);
         } else {
           fallbackCopy();
         }
@@ -831,7 +844,7 @@
           sel.addRange(range);
           try {
             document.execCommand('copy');
-            showCopied();
+            onCopied();
           } catch (e) {
             btn.textContent = 'Failed';
             setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
