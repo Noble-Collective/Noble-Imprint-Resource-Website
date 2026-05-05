@@ -700,7 +700,7 @@
         contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--to">To: ' + escapeHtml(report.to) + '</span>';
         if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
       } else {
-        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--diff">Diff</span>';
+        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--diff">Merged Diff</span>';
         if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
       }
       contentHtml += '</div>';
