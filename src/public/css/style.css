@@ -3101,7 +3101,8 @@ body.drawer-open {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 4px 14px;
+  padding: 6px 14px;
+  text-align: center;
 }
 .admin-diff-col-label--from { background: #fce4e4; color: #a33; }
 .admin-diff-col-label--to { background: #d4edda; color: #155724; }

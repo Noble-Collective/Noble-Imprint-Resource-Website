@@ -676,7 +676,7 @@
       contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
       contentHtml += '<div class="admin-diff-mode-toggles">';
       contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diff View</span><div class="admin-diff-mode-toggle">';
-      contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Individual</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Single Line</button>';
       contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
       contentHtml += '</div></div>';
       contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Columns</span><div class="admin-diff-mode-toggle">';
@@ -692,17 +692,19 @@
       contentHtml += '<button class="admin-diff-mode-btn' + (showClean ? ' admin-diff-mode-btn--active' : '') + '" data-diff-clean="on">On</button>';
       contentHtml += '</div></div>';
       contentHtml += '</div></div>';
-      // Row 2: colored column labels
-      var colCount = splitView ? (showClean ? 3 : 2) : (showClean ? 2 : 1);
-      contentHtml += '<div class="admin-diff-file-header-row admin-diff-file-header-row--cols" style="grid-template-columns: repeat(' + colCount + ', 1fr)">';
+      // Row 2: colored column labels — span full width of columns below
+      var colLabels = [];
       if (splitView) {
-        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--from">From: ' + escapeHtml(report.from) + '</span>';
-        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--to">To: ' + escapeHtml(report.to) + '</span>';
-        if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
+        colLabels.push({ cls: 'from', text: 'From: ' + escapeHtml(report.from) });
+        colLabels.push({ cls: 'to', text: 'To: ' + escapeHtml(report.to) });
       } else {
-        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--diff">Merged Diff</span>';
-        if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
+        colLabels.push({ cls: 'diff', text: 'From: ' + escapeHtml(report.from) + '  /  To: ' + escapeHtml(report.to) });
       }
+      if (showClean) colLabels.push({ cls: 'clean', text: 'Clean Copy' });
+      contentHtml += '<div class="admin-diff-file-header-row admin-diff-file-header-row--cols" style="grid-template-columns: repeat(' + colLabels.length + ', 1fr)">';
+      colLabels.forEach(function (l) {
+        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--' + l.cls + '">' + l.text + '</span>';
+      });
       contentHtml += '</div>';
       contentHtml += '</div>';
       var bodyClass = 'admin-diff-file-body';
