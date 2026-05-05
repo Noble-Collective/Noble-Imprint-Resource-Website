@@ -270,10 +270,16 @@ api.get('/diff-report', async (req, res) => {
       for (let i = 0; i < rawChunks.length; i++) {
         if (rawChunks[i].type === 'removed' && i + 1 < rawChunks.length && rawChunks[i + 1].type === 'added') {
           const wordDiffs = Diff.diffWords(rawChunks[i].text, rawChunks[i + 1].text);
-          chunks.push({
-            type: 'changed',
-            words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
-          });
+          const hasRealDiff = wordDiffs.some(w => w.added || w.removed);
+          if (hasRealDiff) {
+            chunks.push({
+              type: 'changed',
+              words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
+            });
+          } else {
+            // Phantom diff — word-level shows no difference, treat as equal
+            chunks.push({ type: 'equal', text: rawChunks[i + 1].text });
+          }
           i++; // skip the paired 'added'
         } else {
           chunks.push(rawChunks[i]);
@@ -378,10 +384,15 @@ api.post('/diff-report-upload', async (req, res) => {
     for (let i = 0; i < rawChunks.length; i++) {
       if (rawChunks[i].type === 'removed' && i + 1 < rawChunks.length && rawChunks[i + 1].type === 'added') {
         const wordDiffs = Diff.diffWords(rawChunks[i].text, rawChunks[i + 1].text);
-        chunks.push({
-          type: 'changed',
-          words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
-        });
+        const hasRealDiff = wordDiffs.some(w => w.added || w.removed);
+        if (hasRealDiff) {
+          chunks.push({
+            type: 'changed',
+            words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
+          });
+        } else {
+          chunks.push({ type: 'equal', text: rawChunks[i + 1].text });
+        }
         i++;
       } else {
         chunks.push(rawChunks[i]);
