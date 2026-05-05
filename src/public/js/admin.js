@@ -559,6 +559,7 @@
   var diffMergedMode = false;
   var diffTextOnly = false;
   var diffSplitView = false;
+  var diffShowClean = false;
 
   diffGenerateBtn?.addEventListener('click', function () {
     var bookPath = diffBookSelect.value;
@@ -581,7 +582,7 @@
       }).then(function (report) {
         diffGenerateBtn.disabled = false;
         lastDiffReport = report;
-        renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView);
+        renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
       }).catch(function (err) {
         diffGenerateBtn.disabled = false;
         diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed') + '</p>';
@@ -593,7 +594,7 @@
     apiCall('GET', url).then(function (report) {
       diffGenerateBtn.disabled = false;
       lastDiffReport = report;
-      renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView);
+      renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
     }).catch(function (err) {
       diffGenerateBtn.disabled = false;
       diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed to generate report') + '</p>';
@@ -639,7 +640,7 @@
     return normalize(oldText) === normalize(newText);
   }
 
-  function renderDiffReport(report, merged, textOnly, splitView) {
+  function renderDiffReport(report, merged, textOnly, splitView, showClean) {
     if (!report.files || report.files.length === 0) {
       diffOutput.innerHTML = '<div class="admin-diff-empty">No changes found between <strong>' + escapeHtml(report.from) + '</strong> and <strong>' + escapeHtml(report.to) + '</strong>.</div>';
       return;
@@ -660,41 +661,55 @@
     var changeId = 0;
     var sidebarEntries = []; // {id, fileIdx, displayName, breadcrumb, type}
 
+    // Save scroll position so toggles don't jump to top
+    var savedScrollTop = window.scrollY || document.documentElement.scrollTop;
+
     // --- Build main diff content ---
-    var contentHtml = '<div class="admin-diff-toolbar">';
-    contentHtml += '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + (textOnly ? textualChanges + ' text changes' : totalChanges + ' changes') + ')</span></h3>';
-    contentHtml += '<div class="admin-diff-mode-toggles">';
-    contentHtml += '<div class="admin-diff-mode-toggle">';
-    contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Individual</button>';
-    contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
-    contentHtml += '</div>';
-    contentHtml += '<div class="admin-diff-mode-toggle" style="margin-left:12px">';
-    contentHtml += '<button class="admin-diff-mode-btn' + (!splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="merged">Merged</button>';
-    contentHtml += '<button class="admin-diff-mode-btn' + (splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="split">Split</button>';
-    contentHtml += '</div>';
-    contentHtml += '<div class="admin-diff-mode-toggle" style="margin-left:12px">';
-    contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All Changes</button>';
-    contentHtml += '<button class="admin-diff-mode-btn' + (textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="text">Text Only</button>';
-    contentHtml += '</div>';
-    contentHtml += '</div></div>';
+    var contentHtml = '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + (textOnly ? textualChanges + ' text changes' : totalChanges + ' changes') + ')</span></h3>';
 
     report.files.forEach(function (file, idx) {
       var statusClass = 'admin-badge--' + file.status;
       contentHtml += '<div class="admin-diff-file" id="diff-file-' + idx + '">';
-      contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky" data-diff-toggle="' + idx + '">';
+      contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky">';
+      // Row 1: title + toggles
+      contentHtml += '<div class="admin-diff-file-header-row">';
       contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
-      contentHtml += '<div class="admin-diff-file-header-cols' + (splitView ? ' admin-diff-file-header-cols--split' : '') + '">';
+      contentHtml += '<div class="admin-diff-mode-toggles">';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diff View</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Individual</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
+      contentHtml += '</div></div>';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Columns</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="merged">Single</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="split">Split</button>';
+      contentHtml += '</div></div>';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Show</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="text">Text Only</button>';
+      contentHtml += '</div></div>';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Clean Copy</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!showClean ? ' admin-diff-mode-btn--active' : '') + '" data-diff-clean="off">Off</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (showClean ? ' admin-diff-mode-btn--active' : '') + '" data-diff-clean="on">On</button>';
+      contentHtml += '</div></div>';
+      contentHtml += '</div></div>';
+      // Row 2: colored column labels
+      var colCount = splitView ? (showClean ? 3 : 2) : (showClean ? 2 : 1);
+      contentHtml += '<div class="admin-diff-file-header-row admin-diff-file-header-row--cols" style="grid-template-columns: repeat(' + colCount + ', 1fr)">';
       if (splitView) {
-        contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
-        contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
-        contentHtml += '<span class="admin-diff-col-label">Clean Copy</span>';
+        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--from">From: ' + escapeHtml(report.from) + '</span>';
+        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--to">To: ' + escapeHtml(report.to) + '</span>';
+        if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
       } else {
-        contentHtml += '<span class="admin-diff-col-label">Diff</span>';
-        contentHtml += '<span class="admin-diff-col-label">Clean Copy</span>';
+        contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--diff">Diff</span>';
+        if (showClean) contentHtml += '<span class="admin-diff-col-label admin-diff-col-label--clean">Clean Copy</span>';
       }
       contentHtml += '</div>';
       contentHtml += '</div>';
-      contentHtml += '<div class="admin-diff-file-body' + (splitView ? ' admin-diff-file-body--split' : '') + '" id="diff-body-' + idx + '">';
+      var bodyClass = 'admin-diff-file-body';
+      if (splitView && showClean) bodyClass += ' admin-diff-file-body--split3';
+      else if (splitView) bodyClass += ' admin-diff-file-body--split2';
+      else if (showClean) bodyClass += ' admin-diff-file-body--clean';
+      contentHtml += '<div class="' + bodyClass + '" id="diff-body-' + idx + '">';
 
       // Helper: render a single change chunk's diff HTML and extract clean text
       function renderChunkDiff(chunk) {
@@ -775,39 +790,34 @@
       // Helper: render a change row (diff + clean copy with Copy button)
       function renderChangeRow(r, chunkType) {
         var html = '';
+        function cleanCol(text) {
+          if (!showClean) return '';
+          if (!text) return '<div class="admin-diff-change-row-clean"></div>';
+          return '<div class="admin-diff-change-row-clean">' +
+            '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>' +
+            '<div class="admin-diff-clean-text">' + formatCleanText(text) + '</div></div>';
+        }
         if (splitView) {
-          // Split view: left (from) | right (to) | clean copy
           html += '<div class="admin-diff-change-row admin-diff-change-row--split">';
           html += '<div class="admin-diff-change-row-from">' + (r.splitLeft || '') + '</div>';
           html += '<div class="admin-diff-change-row-to">' + (r.splitRight || '') + '</div>';
-          if (r.cleanText) {
-            html += '<div class="admin-diff-change-row-clean">';
-            html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
-            html += '<div class="admin-diff-clean-text">' + formatCleanText(r.cleanText) + '</div>';
-            html += '</div>';
-          } else {
-            html += '<div class="admin-diff-change-row-clean"></div>';
-          }
+          html += cleanCol(r.cleanText);
           html += '</div>';
         } else {
-          // Merged view: interleaved diff | clean copy
           if (r.cleanText) {
             html += '<div class="admin-diff-change-row">';
             html += '<div class="admin-diff-change-row-diff">' + r.diffHtml + '</div>';
-            html += '<div class="admin-diff-change-row-clean">';
-            html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
-            html += '<div class="admin-diff-clean-text">' + formatCleanText(r.cleanText) + '</div>';
-            html += '</div>';
+            html += cleanCol(r.cleanText);
             html += '</div>';
           } else if (chunkType === 'removed') {
             html += '<div class="admin-diff-change-row">';
             html += '<div class="admin-diff-change-row-diff">' + r.diffHtml + '</div>';
-            html += '<div class="admin-diff-change-row-clean"></div>';
+            if (showClean) html += '<div class="admin-diff-change-row-clean"></div>';
             html += '</div>';
           } else if (chunkType === 'added') {
             html += '<div class="admin-diff-change-row">';
-            html += '<div class="admin-diff-change-row-diff"></div>';
-            html += '<div class="admin-diff-change-row-clean">' + r.diffHtml + '</div>';
+            if (showClean) html += '<div class="admin-diff-change-row-diff"></div>';
+            html += '<div class="admin-diff-change-row-' + (showClean ? 'clean' : 'diff') + '">' + r.diffHtml + '</div>';
             html += '</div>';
           } else {
             html += r.diffHtml;
@@ -1069,20 +1079,23 @@
         '<div class="admin-diff-content">' + contentHtml + '</div>' +
       '</div>';
 
+    // Restore scroll position after re-render (toggle clicks)
+    requestAnimationFrame(function () { window.scrollTo(0, savedScrollTop); });
+
     // Bind mode toggle (Individual / Merged)
     diffOutput.querySelectorAll('[data-diff-mode]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var mode = btn.getAttribute('data-diff-mode');
         diffMergedMode = mode === 'merged';
-        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly);
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
       });
     });
 
-    // Bind view toggle (Merged / Split)
+    // Bind view toggle (Single / Split)
     diffOutput.querySelectorAll('[data-diff-view]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         diffSplitView = btn.getAttribute('data-diff-view') === 'split';
-        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView);
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
       });
     });
 
@@ -1090,7 +1103,15 @@
     diffOutput.querySelectorAll('[data-diff-filter]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         diffTextOnly = btn.getAttribute('data-diff-filter') === 'text';
-        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly);
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
+      });
+    });
+
+    // Bind clean copy toggle (On / Off)
+    diffOutput.querySelectorAll('[data-diff-clean]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        diffShowClean = btn.getAttribute('data-diff-clean') === 'on';
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView, diffShowClean);
       });
     });
 
