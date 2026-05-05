@@ -3093,8 +3093,10 @@ body.drawer-open {
 }
 .admin-diff-file-header-cols--split { grid-template-columns: 1fr 1fr 1fr; }
 .admin-diff-file-header-row--cols {
-  display: grid;
-  padding: 0;
+  display: grid !important;
+  padding: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
 }
 .admin-diff-col-label {
   font-size: 11px;
