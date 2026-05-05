@@ -676,9 +676,12 @@
     report.files.forEach(function (file, idx) {
       var statusClass = 'admin-badge--' + file.status;
       contentHtml += '<div class="admin-diff-file" id="diff-file-' + idx + '">';
-      contentHtml += '<div class="admin-diff-file-header" data-diff-toggle="' + idx + '">';
-      contentHtml += '<span>' + escapeHtml(file.displayName || file.filename) + '</span>';
-      contentHtml += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
+      contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky" data-diff-toggle="' + idx + '">';
+      contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
+      contentHtml += '<div class="admin-diff-file-header-cols">';
+      contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
+      contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
+      contentHtml += '</div>';
       contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
 
@@ -744,7 +747,7 @@
       }
 
       // Helper: render a change row (diff + clean copy with Copy button)
-      function renderChangeRow(diffHtml, cleanText) {
+      function renderChangeRow(diffHtml, cleanText, chunkType) {
         var html = '';
         if (cleanText) {
           html += '<div class="admin-diff-change-row">';
@@ -753,6 +756,18 @@
           html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
           html += '<div class="admin-diff-clean-text">' + formatCleanText(cleanText) + '</div>';
           html += '</div>';
+          html += '</div>';
+        } else if (chunkType === 'removed') {
+          // Removed text — left column only
+          html += '<div class="admin-diff-change-row">';
+          html += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
+          html += '<div class="admin-diff-change-row-clean"></div>';
+          html += '</div>';
+        } else if (chunkType === 'added') {
+          // Added text — right column only
+          html += '<div class="admin-diff-change-row">';
+          html += '<div class="admin-diff-change-row-diff"></div>';
+          html += '<div class="admin-diff-change-row-clean">' + diffHtml + '</div>';
           html += '</div>';
         } else {
           html += diffHtml;
@@ -771,7 +786,7 @@
             contentHtml += renderBreadcrumb(cid, chunk);
             sidebarEntries.push({ id: cid, fileIdx: idx, displayName: file.displayName || file.filename, breadcrumb: chunk.breadcrumb || [], type: chunk.type });
             var r = renderChunkDiff(chunk);
-            contentHtml += renderChangeRow(r.diffHtml, r.cleanText);
+            contentHtml += renderChangeRow(r.diffHtml, r.cleanText, chunk.type);
           }
         });
       } else {

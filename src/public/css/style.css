@@ -3060,10 +3060,28 @@ body.drawer-open {
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-weight: 600;
   font-size: 14px;
   user-select: none;
+}
+.admin-diff-file-header--sticky {
+  position: sticky;
+  top: 68px;
+  z-index: 5;
+  border-bottom: 1px solid #ddd;
+}
+.admin-diff-file-header-left { display: flex; align-items: center; gap: 8px; }
+.admin-diff-file-header-cols { display: flex; gap: 0; }
+.admin-diff-col-label {
+  width: 50%;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .admin-diff-file-header:hover { background: #ececec; }
 .admin-diff-file-body {
