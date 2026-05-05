@@ -3162,6 +3162,7 @@ body.drawer-open {
   color: #333;
   margin: 0;
 }
+.admin-diff-mode-toggles { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
 .admin-diff-mode-toggle { display: flex; gap: 0; }
 .admin-diff-mode-btn {
   padding: 4px 14px;

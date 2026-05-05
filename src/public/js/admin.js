@@ -557,6 +557,7 @@
 
   var lastDiffReport = null;
   var diffMergedMode = false;
+  var diffTextOnly = false;
 
   diffGenerateBtn?.addEventListener('click', function () {
     var bookPath = diffBookSelect.value;
@@ -579,7 +580,7 @@
       }).then(function (report) {
         diffGenerateBtn.disabled = false;
         lastDiffReport = report;
-        renderDiffReport(report, diffMergedMode);
+        renderDiffReport(report, diffMergedMode, diffTextOnly);
       }).catch(function (err) {
         diffGenerateBtn.disabled = false;
         diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed') + '</p>';
@@ -591,18 +592,68 @@
     apiCall('GET', url).then(function (report) {
       diffGenerateBtn.disabled = false;
       lastDiffReport = report;
-      renderDiffReport(report, diffMergedMode);
+      renderDiffReport(report, diffMergedMode, diffTextOnly);
     }).catch(function (err) {
       diffGenerateBtn.disabled = false;
       diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed to generate report') + '</p>';
     });
   });
 
-  function renderDiffReport(report, merged) {
+  // Classify whether a change is formatting-only (not textual content)
+  function isFormattingOnly(chunk) {
+    var oldText = '', newText = '';
+    if (chunk.type === 'changed') {
+      chunk.words.forEach(function (w) {
+        if (w.type === 'removed') oldText += w.text;
+        else if (w.type === 'added') newText += w.text;
+      });
+    } else if (chunk.type === 'added') { newText = chunk.text; }
+    else if (chunk.type === 'removed') { oldText = chunk.text; }
+
+    // Normalize both sides: strip markdown, tags, collapse whitespace
+    function normalize(t) {
+      // Strip markdown heading markers
+      t = t.replace(/^#{1,6}\s+/gm, '');
+      // Strip bold/italic markers
+      t = t.replace(/\*\*/g, '');
+      t = t.replace(/\*/g, '');
+      t = t.replace(/_/g, '');
+      // Strip HTML tags (Callout, Question, sup, etc.)
+      t = t.replace(/<[^>]+>/g, '');
+      // Strip << >> reference markers
+      t = t.replace(/<<\s*/g, '');
+      t = t.replace(/\s*>>/g, '');
+      // Strip blockquote markers
+      t = t.replace(/^>\s?/gm, '');
+      // Fix PDF hyphenation artifacts (word- continuation)
+      t = t.replace(/(\w)- (\w)/g, '$1$2');
+      t = t.replace(/(\w)-\n(\w)/g, '$1$2');
+      // Normalize dashes to plain hyphen
+      t = t.replace(/[\u2014\u2013]/g, '-');
+      // Collapse all whitespace
+      t = t.replace(/\s+/g, ' ').trim();
+      return t;
+    }
+
+    return normalize(oldText) === normalize(newText);
+  }
+
+  function renderDiffReport(report, merged, textOnly) {
     if (!report.files || report.files.length === 0) {
       diffOutput.innerHTML = '<div class="admin-diff-empty">No changes found between <strong>' + escapeHtml(report.from) + '</strong> and <strong>' + escapeHtml(report.to) + '</strong>.</div>';
       return;
     }
+
+    // Count textual vs formatting-only changes for the summary
+    var totalChanges = 0, textualChanges = 0;
+    report.files.forEach(function (f) {
+      f.chunks.forEach(function (c) {
+        if (c.type !== 'equal') {
+          totalChanges++;
+          if (!isFormattingOnly(c)) textualChanges++;
+        }
+      });
+    });
 
     // Track change IDs for sidebar links
     var changeId = 0;
@@ -610,10 +661,16 @@
 
     // --- Build main diff content ---
     var contentHtml = '<div class="admin-diff-toolbar">';
-    contentHtml += '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
+    contentHtml += '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + (textOnly ? textualChanges + ' text changes' : totalChanges + ' changes') + ')</span></h3>';
+    contentHtml += '<div class="admin-diff-mode-toggles">';
     contentHtml += '<div class="admin-diff-mode-toggle">';
     contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Individual</button>';
     contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
+    contentHtml += '</div>';
+    contentHtml += '<div class="admin-diff-mode-toggle" style="margin-left:12px">';
+    contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All Changes</button>';
+    contentHtml += '<button class="admin-diff-mode-btn' + (textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="text">Text Only</button>';
+    contentHtml += '</div>';
     contentHtml += '</div></div>';
 
     report.files.forEach(function (file, idx) {
@@ -709,6 +766,7 @@
           if (chunk.type === 'equal') {
             contentHtml += renderEqualChunk(chunk, idx, ci);
           } else {
+            if (textOnly && isFormattingOnly(chunk)) return; // skip formatting-only
             var cid = 'diff-change-' + changeId++;
             contentHtml += renderBreadcrumb(cid, chunk);
             sidebarEntries.push({ id: cid, fileIdx: idx, displayName: file.displayName || file.filename, breadcrumb: chunk.breadcrumb || [], type: chunk.type });
@@ -770,10 +828,9 @@
 
         file.chunks.forEach(function (chunk, ci) {
           if (chunk.type === 'equal') {
-            // Equal chunks between changes in the same section get absorbed
-            // We'll decide when we see the next change whether to absorb or flush
             groupItems.push({ chunk: chunk, ci: ci, isEqual: true });
           } else {
+            if (textOnly && isFormattingOnly(chunk)) return; // skip formatting-only
             var bc = (chunk.breadcrumb || []).join(' > ');
             if (currentBc !== null && bc !== currentBc) {
               // Heading changed — flush previous group, but don't include trailing equal chunks
@@ -954,7 +1011,15 @@
       btn.addEventListener('click', function () {
         var mode = btn.getAttribute('data-diff-mode');
         diffMergedMode = mode === 'merged';
-        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode);
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly);
+      });
+    });
+
+    // Bind filter toggle (All Changes / Text Only)
+    diffOutput.querySelectorAll('[data-diff-filter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        diffTextOnly = btn.getAttribute('data-diff-filter') === 'text';
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly);
       });
     });
 
