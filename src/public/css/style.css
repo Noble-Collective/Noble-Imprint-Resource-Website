@@ -3147,12 +3147,31 @@ body.drawer-open {
   padding: 40px;
   color: #888;
 }
+.admin-diff-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+}
 .admin-diff-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 16px;
   color: #333;
+  margin: 0;
 }
+.admin-diff-mode-toggle { display: flex; gap: 0; }
+.admin-diff-mode-btn {
+  padding: 4px 14px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  color: #666;
+  cursor: pointer;
+}
+.admin-diff-mode-btn:first-child { border-radius: 4px 0 0 4px; }
+.admin-diff-mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
+.admin-diff-mode-btn--active { background: #333; color: #fff; border-color: #333; }
 .admin-diff-empty {
   text-align: center;
   padding: 40px;

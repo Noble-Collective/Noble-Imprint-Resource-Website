@@ -513,6 +513,9 @@
   diffBookSelect?.addEventListener('change', updateDiffBtn);
   diffFromSelect?.addEventListener('change', updateDiffBtn);
 
+  var lastDiffReport = null;
+  var diffMergedMode = false;
+
   diffGenerateBtn?.addEventListener('click', function () {
     var bookPath = diffBookSelect.value;
     var from = diffFromSelect.value;
@@ -525,14 +528,15 @@
     var url = '/api/admin/diff-report?bookPath=' + encodeURIComponent(bookPath) + '&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
     apiCall('GET', url).then(function (report) {
       diffGenerateBtn.disabled = false;
-      renderDiffReport(report);
+      lastDiffReport = report;
+      renderDiffReport(report, diffMergedMode);
     }).catch(function (err) {
       diffGenerateBtn.disabled = false;
       diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed to generate report') + '</p>';
     });
   });
 
-  function renderDiffReport(report) {
+  function renderDiffReport(report, merged) {
     if (!report.files || report.files.length === 0) {
       diffOutput.innerHTML = '<div class="admin-diff-empty">No changes found between <strong>' + escapeHtml(report.from) + '</strong> and <strong>' + escapeHtml(report.to) + '</strong>.</div>';
       return;
@@ -543,7 +547,12 @@
     var sidebarEntries = []; // {id, fileIdx, displayName, breadcrumb, type}
 
     // --- Build main diff content ---
-    var contentHtml = '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
+    var contentHtml = '<div class="admin-diff-toolbar">';
+    contentHtml += '<h3 class="admin-diff-title">' + escapeHtml(report.from) + ' &rarr; ' + escapeHtml(report.to) + ' <span class="text-muted">(' + report.files.length + ' file' + (report.files.length === 1 ? '' : 's') + ' changed)</span></h3>';
+    contentHtml += '<div class="admin-diff-mode-toggle">';
+    contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Individual</button>';
+    contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
+    contentHtml += '</div></div>';
 
     report.files.forEach(function (file, idx) {
       var statusClass = 'admin-badge--' + file.status;
@@ -554,29 +563,121 @@
       contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
 
-      file.chunks.forEach(function (chunk, ci) {
-        if (chunk.type === 'equal') {
-          var lines = chunk.text.split('\n');
-          if (lines.length > 7) {
-            var first = lines.slice(0, 3).join('\n');
-            var last = lines.slice(-3).join('\n');
-            var hidden = lines.slice(3, -3).join('\n');
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(first) + '\n</div>';
-            contentHtml += '<div class="admin-diff-context-toggle" data-expand="ctx-' + idx + '-' + ci + '">... ' + (lines.length - 6) + ' unchanged lines ...</div>';
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal" id="ctx-' + idx + '-' + ci + '" style="display:none">' + escapeHtml(hidden) + '\n</div>';
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(last) + '</div>';
-          } else {
-            contentHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(chunk.text) + '</div>';
-          }
-        } else {
-          var cid = 'diff-change-' + changeId++;
-          var bc = chunk.breadcrumb || [];
-          var lineNum = chunk.toLine || null;
+      // Helper: render a single change chunk's diff HTML and extract clean text
+      function renderChunkDiff(chunk) {
+        var diffHtml = '';
+        var cleanText = '';
+        if (chunk.type === 'added') {
+          diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+          cleanText = chunk.text;
+        } else if (chunk.type === 'removed') {
+          diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+        } else if (chunk.type === 'changed') {
+          diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+          var toText = '';
+          chunk.words.forEach(function (w) {
+            if (w.type === 'added') {
+              diffHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+              toText += w.text;
+            } else if (w.type === 'removed') {
+              diffHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
+            } else {
+              diffHtml += escapeHtml(w.text);
+              toText += w.text;
+            }
+          });
+          diffHtml += '</div>';
+          cleanText = toText;
+        }
+        return { diffHtml: diffHtml, cleanText: cleanText };
+      }
 
-          // Every change gets a full breadcrumb bar with line number + heading trail
+      // Helper: render a breadcrumb bar
+      function renderBreadcrumb(cid, chunk) {
+        var bc = chunk.breadcrumb || [];
+        var lineNum = chunk.toLine || null;
+        var html = '<div class="admin-diff-breadcrumb" id="' + cid + '">';
+        if (lineNum) html += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+        if (bc.length > 0) {
+          if (lineNum) html += '<span class="admin-diff-breadcrumb-sep"> &mdash; </span>';
+          bc.forEach(function (part, pi) {
+            if (pi > 0) html += '<span class="admin-diff-breadcrumb-sep"> &rsaquo; </span>';
+            html += '<span class="admin-diff-breadcrumb-part">' + escapeHtml(part) + '</span>';
+          });
+        }
+        html += '</div>';
+        return html;
+      }
+
+      // Helper: render an equal chunk with context collapsing
+      function renderEqualChunk(chunk, idx, ci) {
+        var html = '';
+        var lines = chunk.text.split('\n');
+        if (lines.length > 7) {
+          html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(lines.slice(0, 3).join('\n')) + '\n</div>';
+          html += '<div class="admin-diff-context-toggle" data-expand="ctx-' + idx + '-' + ci + '">... ' + (lines.length - 6) + ' unchanged lines ...</div>';
+          html += '<div class="admin-diff-chunk admin-diff-chunk--equal" id="ctx-' + idx + '-' + ci + '" style="display:none">' + escapeHtml(lines.slice(3, -3).join('\n')) + '\n</div>';
+          html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(lines.slice(-3).join('\n')) + '</div>';
+        } else {
+          html += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(chunk.text) + '</div>';
+        }
+        return html;
+      }
+
+      // Helper: render a change row (diff + clean copy with Copy button)
+      function renderChangeRow(diffHtml, cleanText) {
+        var html = '';
+        if (cleanText) {
+          html += '<div class="admin-diff-change-row">';
+          html += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
+          html += '<div class="admin-diff-change-row-clean">';
+          html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
+          html += '<div class="admin-diff-clean-text">' + formatCleanText(cleanText) + '</div>';
+          html += '</div>';
+          html += '</div>';
+        } else {
+          html += diffHtml;
+        }
+        return html;
+      }
+
+      if (!merged) {
+        // --- INDIVIDUAL MODE: each change is its own row ---
+        file.chunks.forEach(function (chunk, ci) {
+          if (chunk.type === 'equal') {
+            contentHtml += renderEqualChunk(chunk, idx, ci);
+          } else {
+            var cid = 'diff-change-' + changeId++;
+            contentHtml += renderBreadcrumb(cid, chunk);
+            sidebarEntries.push({ id: cid, fileIdx: idx, displayName: file.displayName || file.filename, breadcrumb: chunk.breadcrumb || [], type: chunk.type });
+            var r = renderChunkDiff(chunk);
+            contentHtml += renderChangeRow(r.diffHtml, r.cleanText);
+          }
+        });
+      } else {
+        // --- MERGED MODE: all changes in the same heading section combined into one row ---
+        // Group all chunks by heading breadcrumb — changes that share a breadcrumb merge together,
+        // absorbing any equal chunks between them.
+        var currentBc = null;
+        var groupItems = []; // {chunk, ci, isEqual}
+
+        function flushMergedGroup() {
+          if (groupItems.length === 0) return;
+          // Find first and last non-equal chunks
+          var firstChange = null, lastChange = null;
+          for (var gi = 0; gi < groupItems.length; gi++) {
+            if (!groupItems[gi].isEqual) { if (!firstChange) firstChange = groupItems[gi]; lastChange = groupItems[gi]; }
+          }
+          if (!firstChange) { groupItems = []; return; }
+
+          var cid = 'diff-change-' + changeId++;
+          var lineNum = firstChange.chunk.toLine || null;
+          var endLine = lastChange.chunk.toLine || null;
+          var bc = firstChange.chunk.breadcrumb || [];
+
           contentHtml += '<div class="admin-diff-breadcrumb" id="' + cid + '">';
           if (lineNum) {
-            contentHtml += '<span class="admin-diff-breadcrumb-line">Line ' + lineNum + '</span>';
+            contentHtml += '<span class="admin-diff-breadcrumb-line">Lines ' + lineNum + (endLine && endLine !== lineNum ? '\u2013' + endLine : '') + '</span>';
           }
           if (bc.length > 0) {
             if (lineNum) contentHtml += '<span class="admin-diff-breadcrumb-sep"> &mdash; </span>';
@@ -587,58 +688,55 @@
           }
           contentHtml += '</div>';
 
-          // Track for sidebar
-          sidebarEntries.push({
-            id: cid,
-            fileIdx: idx,
-            displayName: file.displayName || file.filename,
-            breadcrumb: bc,
-            type: chunk.type
+          sidebarEntries.push({ id: cid, fileIdx: idx, displayName: file.displayName || file.filename, breadcrumb: bc, type: firstChange.chunk.type });
+
+          var combinedDiffHtml = '';
+          var combinedCleanText = '';
+          groupItems.forEach(function (g) {
+            if (g.isEqual) {
+              combinedDiffHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(g.chunk.text) + '</div>';
+              combinedCleanText += g.chunk.text;
+            } else {
+              var r = renderChunkDiff(g.chunk);
+              combinedDiffHtml += r.diffHtml;
+              if (r.cleanText) combinedCleanText += r.cleanText;
+            }
           });
-
-          // Build diff column + clean copy column side by side
-          var diffHtml = '';
-          var cleanText = '';
-
-          if (chunk.type === 'added') {
-            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
-            cleanText = chunk.text;
-          } else if (chunk.type === 'removed') {
-            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
-            cleanText = ''; // nothing to copy for removals
-          } else if (chunk.type === 'changed') {
-            diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
-            var toText = '';
-            chunk.words.forEach(function (w) {
-              if (w.type === 'added') {
-                diffHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
-                toText += w.text;
-              } else if (w.type === 'removed') {
-                diffHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
-              } else {
-                diffHtml += escapeHtml(w.text);
-                toText += w.text;
-              }
-            });
-            diffHtml += '</div>';
-            cleanText = toText;
-          }
-
-          if (cleanText) {
-            var formattedClean = formatCleanText(cleanText);
-            contentHtml += '<div class="admin-diff-change-row">';
-            contentHtml += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
-            contentHtml += '<div class="admin-diff-change-row-clean">';
-            contentHtml += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
-            contentHtml += '<div class="admin-diff-clean-text">' + formattedClean + '</div>';
-            contentHtml += '</div>';
-            contentHtml += '</div>';
-          } else {
-            // Removed-only: spans full width
-            contentHtml += diffHtml;
-          }
+          contentHtml += renderChangeRow(combinedDiffHtml, combinedCleanText);
+          groupItems = [];
         }
-      });
+
+        file.chunks.forEach(function (chunk, ci) {
+          if (chunk.type === 'equal') {
+            // Equal chunks between changes in the same section get absorbed
+            // We'll decide when we see the next change whether to absorb or flush
+            groupItems.push({ chunk: chunk, ci: ci, isEqual: true });
+          } else {
+            var bc = (chunk.breadcrumb || []).join(' > ');
+            if (currentBc !== null && bc !== currentBc) {
+              // Heading changed — flush previous group, but don't include trailing equal chunks
+              // Pull trailing equal chunks out of the group before flushing
+              var trailingEqual = [];
+              while (groupItems.length > 0 && groupItems[groupItems.length - 1].isEqual) {
+                trailingEqual.unshift(groupItems.pop());
+              }
+              flushMergedGroup();
+              // Render the trailing equal chunks normally
+              trailingEqual.forEach(function (g) {
+                contentHtml += renderEqualChunk(g.chunk, idx, g.ci);
+              });
+            }
+            currentBc = bc;
+            groupItems.push({ chunk: chunk, ci: ci, isEqual: false });
+          }
+        });
+        // Flush any remaining group (strip trailing equal chunks)
+        while (groupItems.length > 0 && groupItems[groupItems.length - 1].isEqual) {
+          var trailing = groupItems.pop();
+          contentHtml += renderEqualChunk(trailing.chunk, idx, trailing.ci);
+        }
+        flushMergedGroup();
+      }
 
       contentHtml += '</div></div>';
     });
@@ -788,6 +886,15 @@
         '<nav class="admin-diff-sidebar">' + sidebarHtml + '</nav>' +
         '<div class="admin-diff-content">' + contentHtml + '</div>' +
       '</div>';
+
+    // Bind mode toggle (Individual / Merged)
+    diffOutput.querySelectorAll('[data-diff-mode]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mode = btn.getAttribute('data-diff-mode');
+        diffMergedMode = mode === 'merged';
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode);
+      });
+    });
 
     // Bind toggle listeners for collapsible file sections
     diffOutput.querySelectorAll('[data-diff-toggle]').forEach(function (header) {
