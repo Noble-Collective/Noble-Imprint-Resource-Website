@@ -796,28 +796,47 @@
       });
     });
 
-    // Copy for Affinity buttons — write HTML to clipboard, then trigger macOS Shortcut
+    // Copy for Affinity buttons — copy formatted HTML to clipboard
     diffOutput.querySelectorAll('.admin-diff-copy-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var cleanEl = btn.parentElement.querySelector('.admin-diff-clean-text');
         if (!cleanEl) return;
-        var html = cleanEl.innerHTML.replace(/<br>/g, '\n');
-        var blob = new Blob([html], { type: 'text/html' });
-        var textBlob = new Blob([cleanEl.textContent], { type: 'text/plain' });
-        navigator.clipboard.write([
-          new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob })
-        ]).then(function () {
-          // Trigger macOS Shortcut to convert HTML→RTF on clipboard
-          window.location.href = 'shortcuts://run-shortcut?name=ClipboardToRTF';
+
+        function showCopied() {
           btn.textContent = 'Copied';
           btn.classList.add('admin-diff-copy-btn--done');
           setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('admin-diff-copy-btn--done'); }, 2000);
-        }).catch(function () {
-          // Fallback: just copy plain text
-          navigator.clipboard.writeText(cleanEl.textContent);
-          btn.textContent = 'Copied (plain)';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
-        });
+        }
+
+        // Method 1: Clipboard API with HTML blob
+        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+          var html = cleanEl.innerHTML.replace(/<br>/g, '\n');
+          navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([cleanEl.textContent], { type: 'text/plain' })
+            })
+          ]).then(showCopied).catch(fallbackCopy);
+        } else {
+          fallbackCopy();
+        }
+
+        // Method 2: Select the element and execCommand('copy') — works in Safari
+        function fallbackCopy() {
+          var range = document.createRange();
+          range.selectNodeContents(cleanEl);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          try {
+            document.execCommand('copy');
+            showCopied();
+          } catch (e) {
+            btn.textContent = 'Failed';
+            setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+          }
+          sel.removeAllRanges();
+        }
       });
     });
 
