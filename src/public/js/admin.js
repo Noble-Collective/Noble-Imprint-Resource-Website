@@ -686,7 +686,7 @@
       contentHtml += '<button class="admin-diff-mode-btn' + (!splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="merged">Single</button>';
       contentHtml += '<button class="admin-diff-mode-btn' + (splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="split">Split</button>';
       contentHtml += '</div></div>';
-      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Show</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diffs to Show</span><div class="admin-diff-mode-toggle">';
       contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All</button>';
       contentHtml += '<button class="admin-diff-mode-btn' + (textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="text">Text Only</button>';
       contentHtml += '</div></div>';
