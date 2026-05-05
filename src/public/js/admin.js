@@ -418,8 +418,12 @@
     text = text.replace(/\{\{I:(.*?)\}\}/g, '<i>$1</i>');
     text = text.replace(/\{\{SUP:(.*?)\}\}/g, '<sup>$1</sup>');
 
-    // Convert newlines to <br> for display
+    // Convert double newlines to paragraph breaks, single newlines to line breaks
+    text = text.replace(/\n\n+/g, '</p><p>');
     text = text.replace(/\n/g, '<br>');
+    text = '<p>' + text + '</p>';
+    // Clean up empty paragraphs
+    text = text.replace(/<p>\s*<\/p>/g, '');
     return text;
   }
 
@@ -931,7 +935,7 @@
 
         // Method 1: Clipboard API with HTML blob
         if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-          var html = cleanEl.innerHTML.replace(/<br>/g, '\n');
+          var html = cleanEl.innerHTML;
           navigator.clipboard.write([
             new ClipboardItem({
               'text/html': new Blob([html], { type: 'text/html' }),
