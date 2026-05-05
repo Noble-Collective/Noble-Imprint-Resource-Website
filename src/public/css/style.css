@@ -3105,7 +3105,9 @@ body.drawer-open {
   grid-template-columns: 1fr 1fr;
   border-left: 1px solid #e0e0e0;
 }
-/* Elements that span both columns in the grid */
+/* Split view: three-column grid */
+.admin-diff-file-body--split { grid-template-columns: 1fr 1fr 1fr; }
+/* Elements that span all columns in the grid */
 .admin-diff-file-body > .admin-diff-chunk--equal,
 .admin-diff-file-body > .admin-diff-chunk--removed,
 .admin-diff-file-body > .admin-diff-breadcrumb,
@@ -3113,6 +3115,9 @@ body.drawer-open {
 /* Change rows: diff in col 1, clean in col 2 */
 .admin-diff-change-row { display: contents; }
 .admin-diff-change-row-diff { min-width: 0; }
+/* Split view from/to columns */
+.admin-diff-change-row-from { min-width: 0; border-right: 1px solid #eee; }
+.admin-diff-change-row-to { min-width: 0; }
 .admin-diff-change-row-clean {
   padding: 6px 20px;
   background: #fff;

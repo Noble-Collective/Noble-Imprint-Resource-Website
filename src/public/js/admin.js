@@ -558,6 +558,7 @@
   var lastDiffReport = null;
   var diffMergedMode = false;
   var diffTextOnly = false;
+  var diffSplitView = false;
 
   diffGenerateBtn?.addEventListener('click', function () {
     var bookPath = diffBookSelect.value;
@@ -580,7 +581,7 @@
       }).then(function (report) {
         diffGenerateBtn.disabled = false;
         lastDiffReport = report;
-        renderDiffReport(report, diffMergedMode, diffTextOnly);
+        renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView);
       }).catch(function (err) {
         diffGenerateBtn.disabled = false;
         diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed') + '</p>';
@@ -592,7 +593,7 @@
     apiCall('GET', url).then(function (report) {
       diffGenerateBtn.disabled = false;
       lastDiffReport = report;
-      renderDiffReport(report, diffMergedMode, diffTextOnly);
+      renderDiffReport(report, diffMergedMode, diffTextOnly, diffSplitView);
     }).catch(function (err) {
       diffGenerateBtn.disabled = false;
       diffOutput.innerHTML = '<p class="text-muted">Error: ' + escapeHtml(err.message || 'Failed to generate report') + '</p>';
@@ -638,7 +639,7 @@
     return normalize(oldText) === normalize(newText);
   }
 
-  function renderDiffReport(report, merged, textOnly) {
+  function renderDiffReport(report, merged, textOnly, splitView) {
     if (!report.files || report.files.length === 0) {
       diffOutput.innerHTML = '<div class="admin-diff-empty">No changes found between <strong>' + escapeHtml(report.from) + '</strong> and <strong>' + escapeHtml(report.to) + '</strong>.</div>';
       return;
@@ -668,6 +669,10 @@
     contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
     contentHtml += '</div>';
     contentHtml += '<div class="admin-diff-mode-toggle" style="margin-left:12px">';
+    contentHtml += '<button class="admin-diff-mode-btn' + (!splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="merged">Merged</button>';
+    contentHtml += '<button class="admin-diff-mode-btn' + (splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="split">Split</button>';
+    contentHtml += '</div>';
+    contentHtml += '<div class="admin-diff-mode-toggle" style="margin-left:12px">';
     contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All Changes</button>';
     contentHtml += '<button class="admin-diff-mode-btn' + (textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="text">Text Only</button>';
     contentHtml += '</div>';
@@ -679,39 +684,60 @@
       contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky" data-diff-toggle="' + idx + '">';
       contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
       contentHtml += '<div class="admin-diff-file-header-cols">';
-      contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
-      contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
+      if (splitView) {
+        contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
+        contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
+        contentHtml += '<span class="admin-diff-col-label">Clean Copy</span>';
+      } else {
+        contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
+        contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
+      }
       contentHtml += '</div>';
       contentHtml += '</div>';
-      contentHtml += '<div class="admin-diff-file-body" id="diff-body-' + idx + '">';
+      contentHtml += '<div class="admin-diff-file-body' + (splitView ? ' admin-diff-file-body--split' : '') + '" id="diff-body-' + idx + '">';
 
       // Helper: render a single change chunk's diff HTML and extract clean text
       function renderChunkDiff(chunk) {
         var diffHtml = '';
         var cleanText = '';
+        var splitLeft = '', splitRight = '';
         if (chunk.type === 'added') {
           diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
+          splitLeft = '';
+          splitRight = '<div class="admin-diff-chunk admin-diff-chunk--added">' + escapeHtml(chunk.text) + '</div>';
           cleanText = chunk.text;
         } else if (chunk.type === 'removed') {
           diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+          splitLeft = '<div class="admin-diff-chunk admin-diff-chunk--removed">' + escapeHtml(chunk.text) + '</div>';
+          splitRight = '';
         } else if (chunk.type === 'changed') {
           diffHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+          var leftHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
+          var rightHtml = '<div class="admin-diff-chunk admin-diff-chunk--changed">';
           var toText = '';
           chunk.words.forEach(function (w) {
             if (w.type === 'added') {
               diffHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
+              rightHtml += '<span class="admin-diff-word--added">' + escapeHtml(w.text) + '</span>';
               toText += w.text;
             } else if (w.type === 'removed') {
               diffHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
+              leftHtml += '<span class="admin-diff-word--removed">' + escapeHtml(w.text) + '</span>';
             } else {
               diffHtml += escapeHtml(w.text);
+              leftHtml += escapeHtml(w.text);
+              rightHtml += escapeHtml(w.text);
               toText += w.text;
             }
           });
           diffHtml += '</div>';
+          leftHtml += '</div>';
+          rightHtml += '</div>';
+          splitLeft = leftHtml;
+          splitRight = rightHtml;
           cleanText = toText;
         }
-        return { diffHtml: diffHtml, cleanText: cleanText };
+        return { diffHtml: diffHtml, splitLeft: splitLeft, splitRight: splitRight, cleanText: cleanText };
       }
 
       // Helper: render a breadcrumb bar
@@ -747,30 +773,45 @@
       }
 
       // Helper: render a change row (diff + clean copy with Copy button)
-      function renderChangeRow(diffHtml, cleanText, chunkType) {
+      function renderChangeRow(r, chunkType) {
         var html = '';
-        if (cleanText) {
-          html += '<div class="admin-diff-change-row">';
-          html += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
-          html += '<div class="admin-diff-change-row-clean">';
-          html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
-          html += '<div class="admin-diff-clean-text">' + formatCleanText(cleanText) + '</div>';
-          html += '</div>';
-          html += '</div>';
-        } else if (chunkType === 'removed') {
-          // Removed text — left column only
-          html += '<div class="admin-diff-change-row">';
-          html += '<div class="admin-diff-change-row-diff">' + diffHtml + '</div>';
-          html += '<div class="admin-diff-change-row-clean"></div>';
-          html += '</div>';
-        } else if (chunkType === 'added') {
-          // Added text — right column only
-          html += '<div class="admin-diff-change-row">';
-          html += '<div class="admin-diff-change-row-diff"></div>';
-          html += '<div class="admin-diff-change-row-clean">' + diffHtml + '</div>';
+        if (splitView) {
+          // Split view: left (from) | right (to) | clean copy
+          html += '<div class="admin-diff-change-row admin-diff-change-row--split">';
+          html += '<div class="admin-diff-change-row-from">' + (r.splitLeft || '') + '</div>';
+          html += '<div class="admin-diff-change-row-to">' + (r.splitRight || '') + '</div>';
+          if (r.cleanText) {
+            html += '<div class="admin-diff-change-row-clean">';
+            html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
+            html += '<div class="admin-diff-clean-text">' + formatCleanText(r.cleanText) + '</div>';
+            html += '</div>';
+          } else {
+            html += '<div class="admin-diff-change-row-clean"></div>';
+          }
           html += '</div>';
         } else {
-          html += diffHtml;
+          // Merged view: interleaved diff | clean copy
+          if (r.cleanText) {
+            html += '<div class="admin-diff-change-row">';
+            html += '<div class="admin-diff-change-row-diff">' + r.diffHtml + '</div>';
+            html += '<div class="admin-diff-change-row-clean">';
+            html += '<button class="admin-diff-copy-btn" title="Copy for Affinity">Copy</button>';
+            html += '<div class="admin-diff-clean-text">' + formatCleanText(r.cleanText) + '</div>';
+            html += '</div>';
+            html += '</div>';
+          } else if (chunkType === 'removed') {
+            html += '<div class="admin-diff-change-row">';
+            html += '<div class="admin-diff-change-row-diff">' + r.diffHtml + '</div>';
+            html += '<div class="admin-diff-change-row-clean"></div>';
+            html += '</div>';
+          } else if (chunkType === 'added') {
+            html += '<div class="admin-diff-change-row">';
+            html += '<div class="admin-diff-change-row-diff"></div>';
+            html += '<div class="admin-diff-change-row-clean">' + r.diffHtml + '</div>';
+            html += '</div>';
+          } else {
+            html += r.diffHtml;
+          }
         }
         return html;
       }
@@ -786,7 +827,7 @@
             contentHtml += renderBreadcrumb(cid, chunk);
             sidebarEntries.push({ id: cid, fileIdx: idx, displayName: file.displayName || file.filename, breadcrumb: chunk.breadcrumb || [], type: chunk.type });
             var r = renderChunkDiff(chunk);
-            contentHtml += renderChangeRow(r.diffHtml, r.cleanText, chunk.type);
+            contentHtml += renderChangeRow(r, chunk.type);
           }
         });
       } else {
@@ -827,17 +868,24 @@
 
           var combinedDiffHtml = '';
           var combinedCleanText = '';
+          var combinedSplitLeft = '';
+          var combinedSplitRight = '';
           groupItems.forEach(function (g) {
             if (g.isEqual) {
-              combinedDiffHtml += '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(g.chunk.text) + '</div>';
+              var eqHtml = '<div class="admin-diff-chunk admin-diff-chunk--equal">' + escapeHtml(g.chunk.text) + '</div>';
+              combinedDiffHtml += eqHtml;
+              combinedSplitLeft += eqHtml;
+              combinedSplitRight += eqHtml;
               combinedCleanText += g.chunk.text;
             } else {
               var r = renderChunkDiff(g.chunk);
               combinedDiffHtml += r.diffHtml;
+              combinedSplitLeft += r.splitLeft || '';
+              combinedSplitRight += r.splitRight || '';
               if (r.cleanText) combinedCleanText += r.cleanText;
             }
           });
-          contentHtml += renderChangeRow(combinedDiffHtml, combinedCleanText);
+          contentHtml += renderChangeRow({ diffHtml: combinedDiffHtml, splitLeft: combinedSplitLeft, splitRight: combinedSplitRight, cleanText: combinedCleanText });
           groupItems = [];
         }
 
@@ -1027,6 +1075,14 @@
         var mode = btn.getAttribute('data-diff-mode');
         diffMergedMode = mode === 'merged';
         if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly);
+      });
+    });
+
+    // Bind view toggle (Merged / Split)
+    diffOutput.querySelectorAll('[data-diff-view]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        diffSplitView = btn.getAttribute('data-diff-view') === 'split';
+        if (lastDiffReport) renderDiffReport(lastDiffReport, diffMergedMode, diffTextOnly, diffSplitView);
       });
     });
 
