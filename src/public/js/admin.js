@@ -678,13 +678,13 @@
       if (showBadge) contentHtml += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
       contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-mode-toggles">';
-      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diff View</span><div class="admin-diff-mode-toggle">';
-      contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Single Line</button>';
-      contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
-      contentHtml += '</div></div>';
       contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Columns</span><div class="admin-diff-mode-toggle">';
       contentHtml += '<button class="admin-diff-mode-btn' + (!splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="merged">Single</button>';
       contentHtml += '<button class="admin-diff-mode-btn' + (splitView ? ' admin-diff-mode-btn--active' : '') + '" data-diff-view="split">Split</button>';
+      contentHtml += '</div></div>';
+      contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diff View</span><div class="admin-diff-mode-toggle">';
+      contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Single Line</button>';
+      contentHtml += '<button class="admin-diff-mode-btn' + (merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="merged">Merged</button>';
       contentHtml += '</div></div>';
       contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diffs to Show</span><div class="admin-diff-mode-toggle">';
       contentHtml += '<button class="admin-diff-mode-btn' + (!textOnly ? ' admin-diff-mode-btn--active' : '') + '" data-diff-filter="all">All</button>';
