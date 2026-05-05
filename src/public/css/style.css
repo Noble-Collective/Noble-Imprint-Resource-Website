@@ -3052,7 +3052,6 @@ body.drawer-open {
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   margin-bottom: 16px;
-  overflow: hidden;
 }
 .admin-diff-file-header {
   background: #f5f5f5;
@@ -3071,17 +3070,24 @@ body.drawer-open {
   top: 68px;
   z-index: 5;
   border-bottom: 1px solid #ddd;
+  display: grid;
+  grid-template-columns: auto 1fr;
 }
 .admin-diff-file-header-left { display: flex; align-items: center; gap: 8px; }
-.admin-diff-file-header-cols { display: flex; gap: 0; }
+.admin-diff-file-header-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.admin-diff-file-header-cols--split { grid-template-columns: 1fr 1fr 1fr; }
 .admin-diff-col-label {
-  width: 50%;
   text-align: center;
   font-size: 11px;
   font-weight: 500;
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  padding: 0 8px;
 }
 .admin-diff-file-header:hover { background: #ececec; }
 .admin-diff-file-body {

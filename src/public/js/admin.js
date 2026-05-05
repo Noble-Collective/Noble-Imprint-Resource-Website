@@ -683,14 +683,14 @@
       contentHtml += '<div class="admin-diff-file" id="diff-file-' + idx + '">';
       contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky" data-diff-toggle="' + idx + '">';
       contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
-      contentHtml += '<div class="admin-diff-file-header-cols">';
+      contentHtml += '<div class="admin-diff-file-header-cols' + (splitView ? ' admin-diff-file-header-cols--split' : '') + '">';
       if (splitView) {
         contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
         contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
         contentHtml += '<span class="admin-diff-col-label">Clean Copy</span>';
       } else {
-        contentHtml += '<span class="admin-diff-col-label">From: ' + escapeHtml(report.from) + '</span>';
-        contentHtml += '<span class="admin-diff-col-label">To: ' + escapeHtml(report.to) + '</span>';
+        contentHtml += '<span class="admin-diff-col-label">Diff</span>';
+        contentHtml += '<span class="admin-diff-col-label">Clean Copy</span>';
       }
       contentHtml += '</div>';
       contentHtml += '</div>';
