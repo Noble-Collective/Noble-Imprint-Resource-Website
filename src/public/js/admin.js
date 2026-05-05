@@ -418,9 +418,12 @@
     text = text.replace(/\{\{I:(.*?)\}\}/g, '<i>$1</i>');
     text = text.replace(/\{\{SUP:(.*?)\}\}/g, '<sup>$1</sup>');
 
-    // Convert double newlines to paragraph breaks, single newlines to line breaks
+    // Markdown line breaks: two trailing spaces + newline = <br>
+    text = text.replace(/  \n/g, '<br>');
+    // Double newlines = paragraph breaks
     text = text.replace(/\n\n+/g, '</p><p>');
-    text = text.replace(/\n/g, '<br>');
+    // Remaining single newlines = space (text flows)
+    text = text.replace(/\n/g, ' ');
     text = '<p>' + text + '</p>';
     // Clean up empty paragraphs
     text = text.replace(/<p>\s*<\/p>/g, '');
