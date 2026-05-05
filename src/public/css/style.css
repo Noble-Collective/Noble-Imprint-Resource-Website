@@ -3108,6 +3108,8 @@ body.drawer-open {
   user-select: text;
 }
 .admin-diff-change-row-clean sup { font-size: 0.7em; color: #888; vertical-align: super; }
+.admin-diff-clean-text p { margin: 0 0 0.8em 0; }
+.admin-diff-clean-text p:last-child { margin-bottom: 0; }
 .admin-diff-copy-btn {
   float: right;
   padding: 2px 10px;
