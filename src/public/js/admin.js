@@ -673,7 +673,10 @@
       contentHtml += '<div class="admin-diff-file-header admin-diff-file-header--sticky">';
       // Row 1: title + toggles
       contentHtml += '<div class="admin-diff-file-header-row">';
-      contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span> <span class="admin-badge ' + statusClass + '">' + file.status + '</span></div>';
+      var showBadge = report.files.length > 1;
+      contentHtml += '<div class="admin-diff-file-header-left"><span>' + escapeHtml(file.displayName || file.filename) + '</span>';
+      if (showBadge) contentHtml += ' <span class="admin-badge ' + statusClass + '">' + file.status + '</span>';
+      contentHtml += '</div>';
       contentHtml += '<div class="admin-diff-mode-toggles">';
       contentHtml += '<div class="admin-diff-mode-group"><span class="admin-diff-mode-label">Diff View</span><div class="admin-diff-mode-toggle">';
       contentHtml += '<button class="admin-diff-mode-btn' + (!merged ? ' admin-diff-mode-btn--active' : '') + '" data-diff-mode="individual">Single Line</button>';
