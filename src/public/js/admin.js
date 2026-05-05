@@ -383,12 +383,12 @@
   function formatCleanText(text) {
     // Curly quotes FIRST (before any HTML escaping)
     // Double quotes
-    text = text.replace(/(^|[\s(\[{])"(\S)/gm, '$1\u201c$2');  // opening " after whitespace/start
+    text = text.replace(/(^|[\s(\[{\u2014\u2013\-])"(\S)/gm, '$1\u201c$2');  // opening " after whitespace/start/dash
     text = text.replace(/(\S)"([\s,.\-;:!?\])}]|$)/gm, '$1\u201d$2');  // closing " before whitespace/punct/end
     text = text.replace(/"/g, '\u201d');           // remaining " → closing
     // Single quotes / apostrophes — do apostrophes FIRST (mid-word)
     text = text.replace(/(\w)'(\w)/g, '$1\u2019$2');  // apostrophe: it's, don't, God's → right curl
-    text = text.replace(/(^|[\s(\[{])'(\S)/gm, '$1\u2018$2');  // opening ' after whitespace/start
+    text = text.replace(/(^|[\s(\[{\u2014\u2013\-])'(\S)/gm, '$1\u2018$2');  // opening ' after whitespace/start/dash
     text = text.replace(/(\S)'([\s,.\-;:!?\])}]|$)/gm, '$1\u2019$2');  // closing ' before whitespace/punct/end
     text = text.replace(/'/g, '\u2019');           // remaining ' → right curl
 
