@@ -383,13 +383,14 @@
   function formatCleanText(text) {
     // Curly quotes FIRST (before any HTML escaping)
     // Double quotes
-    text = text.replace(/"(\S)/g, '\u201c$1');   // opening "
-    text = text.replace(/(\S)"/g, '$1\u201d');    // closing "
+    text = text.replace(/(^|[\s(\[{])"(\S)/gm, '$1\u201c$2');  // opening " after whitespace/start
+    text = text.replace(/(\S)"([\s,.\-;:!?\])}]|$)/gm, '$1\u201d$2');  // closing " before whitespace/punct/end
     text = text.replace(/"/g, '\u201d');           // remaining " → closing
-    // Single quotes / apostrophes
-    text = text.replace(/'(\S)/g, '\u2018$1');    // opening '
-    text = text.replace(/(\S)'/g, '$1\u2019');    // closing / apostrophe
-    text = text.replace(/'/g, '\u2019');           // remaining ' → closing
+    // Single quotes / apostrophes — do apostrophes FIRST (mid-word)
+    text = text.replace(/(\w)'(\w)/g, '$1\u2019$2');  // apostrophe: it's, don't, God's → right curl
+    text = text.replace(/(^|[\s(\[{])'(\S)/gm, '$1\u2018$2');  // opening ' after whitespace/start
+    text = text.replace(/(\S)'([\s,.\-;:!?\])}]|$)/gm, '$1\u2019$2');  // closing ' before whitespace/punct/end
+    text = text.replace(/'/g, '\u2019');           // remaining ' → right curl
 
     // Convert <sup>...</sup> to placeholder to preserve through escaping
     text = text.replace(/<sup>([^<]*)<\/sup>/g, '{{SUP:$1}}');
