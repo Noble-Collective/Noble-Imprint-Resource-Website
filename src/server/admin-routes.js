@@ -349,27 +349,22 @@ api.get('/diff-report', async (req, res) => {
         }
       }
       // Dedup pass: remove 'removed' or 'added' blocks whose text already appears
-      // as the added or removed portion of a nearby 'changed' block
+      // within a nearby 'changed' block (as either the equal+added or equal+removed portion)
       for (let i = 0; i < chunks.length; i++) {
         const c = chunks[i];
         if (!c || (c.type !== 'removed' && c.type !== 'added')) continue;
         if ((c.text || '').length < 80) continue;
-        const cNorm = (c.text || '').replace(/\s+/g, ' ').trim();
-        // Search nearby changed chunks (within 10 positions)
-        for (let j = Math.max(0, i - 10); j < Math.min(chunks.length, i + 10); j++) {
+        for (let j = 0; j < chunks.length; j++) {
           if (i === j || !chunks[j] || chunks[j].type !== 'changed') continue;
-          // Extract the added or removed text from the changed chunk
-          const targetText = chunks[j].words
-            .filter(w => c.type === 'removed' ? w.type !== 'removed' : w.type !== 'added')
-            .map(w => w.text).join('');
-          const tNorm = targetText.replace(/\s+/g, ' ').trim();
-          // Check if the texts are very similar (>80% of the shorter is in the longer)
-          if (cNorm.length > 0 && tNorm.length > 0) {
-            const sim = textSimilarity(c.text, targetText);
-            if (sim > 0.8) {
-              chunks[i] = null;
-              break;
-            }
+          // Check against the full "to" side (equal+added) and full "from" side (equal+removed)
+          const toText = chunks[j].words.filter(w => w.type !== 'removed').map(w => w.text).join('');
+          const fromText = chunks[j].words.filter(w => w.type !== 'added').map(w => w.text).join('');
+          const targetText = c.type === 'removed' ? toText : fromText;
+          if (targetText.length < 80) continue;
+          const sim = textSimilarity(c.text, targetText);
+          if (sim > 0.6) {
+            chunks[i] = null;
+            break;
           }
         }
       }
@@ -561,12 +556,13 @@ api.post('/diff-report-upload', async (req, res) => {
       const c = chunks[i];
       if (!c || (c.type !== 'removed' && c.type !== 'added')) continue;
       if ((c.text || '').length < 80) continue;
-      for (let j = Math.max(0, i - 10); j < Math.min(chunks.length, i + 10); j++) {
+      for (let j = 0; j < chunks.length; j++) {
         if (i === j || !chunks[j] || chunks[j].type !== 'changed') continue;
-        const targetText = chunks[j].words
-          .filter(w => c.type === 'removed' ? w.type !== 'removed' : w.type !== 'added')
-          .map(w => w.text).join('');
-        if (textSimilarity2(c.text, targetText) > 0.8) { chunks[i] = null; break; }
+        const toText = chunks[j].words.filter(w => w.type !== 'removed').map(w => w.text).join('');
+        const fromText = chunks[j].words.filter(w => w.type !== 'added').map(w => w.text).join('');
+        const targetText = c.type === 'removed' ? toText : fromText;
+        if (targetText.length < 80) continue;
+        if (textSimilarity2(c.text, targetText) > 0.6) { chunks[i] = null; break; }
       }
     }
     const finalChunks2 = chunks.filter(c => c !== null);
