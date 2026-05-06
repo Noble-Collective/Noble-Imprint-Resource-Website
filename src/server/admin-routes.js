@@ -6,6 +6,53 @@ const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
 const suggestions = require('./suggestions');
 const notifications = require('./notifications');
+const { patienceDiffPlus } = require('./patience-diff');
+
+// Convert patienceDiffPlus output to rawChunks format [{type, text}]
+function patienceToChunks(oldContent, newContent) {
+  const aLines = oldContent.split('\n');
+  const bLines = newContent.split('\n');
+  const result = patienceDiffPlus(aLines, bLines);
+
+  const rawChunks = [];
+  let currentType = null;
+  let currentLines = [];
+
+  function flush() {
+    if (currentLines.length === 0) return;
+    rawChunks.push({ type: currentType, text: currentLines.join('\n') + '\n' });
+    currentLines = [];
+    currentType = null;
+  }
+
+  for (const entry of result.lines) {
+    let type;
+    if (entry.aIndex >= 0 && entry.bIndex >= 0) {
+      type = 'equal';
+    } else if (entry.aIndex >= 0) {
+      type = 'removed';
+    } else {
+      type = 'added';
+    }
+
+    if (type !== currentType) {
+      flush();
+      currentType = type;
+    }
+    currentLines.push(entry.line);
+  }
+  flush();
+
+  // Fix trailing newline: if the last chunk ends with an extra \n, trim it
+  if (rawChunks.length > 0) {
+    const last = rawChunks[rawChunks.length - 1];
+    if (last.text.endsWith('\n\n') && !oldContent.endsWith('\n\n') && !newContent.endsWith('\n\n')) {
+      last.text = last.text.slice(0, -1);
+    }
+  }
+
+  return rawChunks;
+}
 
 // --- Page routes ---
 const page = express.Router();
@@ -258,12 +305,8 @@ api.get('/diff-report', async (req, res) => {
       if (!inFrom) status = 'added';
       else if (!inTo) status = 'removed';
 
-      // Two-pass diff: lines first, then words within changed pairs
-      const lineDiffs = Diff.diffLines(oldContent, newContent);
-      const rawChunks = lineDiffs.map(part => ({
-        type: part.added ? 'added' : part.removed ? 'removed' : 'equal',
-        text: part.value,
-      }));
+      // Two-pass diff: patience diff for lines, then words within changed pairs
+      const rawChunks = patienceToChunks(oldContent, newContent);
 
       // Pair adjacent removed+added chunks into 'changed' with word-level detail
       const chunks = [];
@@ -483,12 +526,8 @@ api.post('/diff-report-upload', async (req, res) => {
       return res.json({ bookPath, from: 'uploaded file', to: toRef, files: [] });
     }
 
-    // Two-pass diff: lines first, then words within changed pairs
-    const lineDiffs = Diff.diffLines(oldContent, newContent);
-    const rawChunks = lineDiffs.map(part => ({
-      type: part.added ? 'added' : part.removed ? 'removed' : 'equal',
-      text: part.value,
-    }));
+    // Two-pass diff: patience diff for lines, then words within changed pairs
+    const rawChunks = patienceToChunks(oldContent, newContent);
 
     // Adjacent pairing
     const chunks = [];
