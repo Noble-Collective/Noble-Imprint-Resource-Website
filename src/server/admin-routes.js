@@ -287,25 +287,29 @@ api.get('/diff-report', async (req, res) => {
 
       // Fuzzy pairing: find unpaired removed/added blocks with similar content
       // and convert them to 'changed' blocks with word-level detail
+      const STOP_WORDS = new Set(['the','a','an','and','or','but','in','on','of','to','for','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','shall','should','may','might','can','could','it','its','this','that','these','those','with','at','by','from','not','no','as','he','she','they','we','you','his','her','their','our','your']);
+
       function textSimilarity(a, b) {
         if (!a || !b) return 0;
-        const wordsA = a.replace(/\s+/g, ' ').trim();
-        const wordsB = b.replace(/\s+/g, ' ').trim();
-        if (wordsA === wordsB) return 1;
-        // Use longest common subsequence ratio as similarity
-        const shorter = wordsA.length < wordsB.length ? wordsA : wordsB;
-        const longer = wordsA.length < wordsB.length ? wordsB : wordsA;
-        if (longer.length === 0) return 1;
-        // Quick check: count shared words
-        const setA = new Set(wordsA.split(' '));
-        const setB = new Set(wordsB.split(' '));
+        // Extract meaningful words (skip stop words, min 3 chars)
+        function getWords(t) {
+          return t.replace(/[*#_<>[\]()\\]/g, '').replace(/\s+/g, ' ').trim()
+            .split(' ').filter(w => w.length >= 3 && !STOP_WORDS.has(w.toLowerCase()));
+        }
+        const wordsA = getWords(a);
+        const wordsB = getWords(b);
+        if (wordsA.length === 0 || wordsB.length === 0) return 0;
+        const setA = new Set(wordsA.map(w => w.toLowerCase()));
+        const setB = new Set(wordsB.map(w => w.toLowerCase()));
         let shared = 0;
         for (const w of setA) { if (setB.has(w)) shared++; }
         return shared / Math.max(setA.size, setB.size);
       }
 
-      const SIMILARITY_THRESHOLD = 0.5;
-      // Collect indices of unpaired removed and added chunks
+      const SIMILARITY_THRESHOLD = 0.65;
+      const MIN_TEXT_LENGTH = 80;
+      const MAX_SIZE_RATIO = 3;
+
       const unpairedRemoved = [];
       const unpairedAdded = [];
       chunks.forEach((c, i) => {
@@ -313,33 +317,64 @@ api.get('/diff-report', async (req, res) => {
         else if (c.type === 'added') unpairedAdded.push(i);
       });
 
-      // Try to pair each removed with the most similar added
-      const pairedIndices = new Set();
+      const pairedRemovedSet = new Set();
+      const pairedAddedSet = new Set();
       for (const ri of unpairedRemoved) {
+        const rText = chunks[ri].text || '';
+        if (rText.length < MIN_TEXT_LENGTH) continue; // skip short blocks
         let bestIdx = -1, bestSim = SIMILARITY_THRESHOLD;
         for (const ai of unpairedAdded) {
-          if (pairedIndices.has(ai)) continue;
-          const sim = textSimilarity(chunks[ri].text, chunks[ai].text);
+          if (pairedAddedSet.has(ai)) continue;
+          const aText = chunks[ai].text || '';
+          if (aText.length < MIN_TEXT_LENGTH) continue;
+          // Size ratio check — don't pair very different-sized blocks
+          const ratio = Math.max(rText.length, aText.length) / Math.min(rText.length, aText.length);
+          if (ratio > MAX_SIZE_RATIO) continue;
+          const sim = textSimilarity(rText, aText);
           if (sim > bestSim) { bestSim = sim; bestIdx = ai; }
         }
         if (bestIdx >= 0) {
-          // Pair them: replace both with a changed chunk at the added position,
-          // mark the removed position for deletion
           const wordDiffs = Diff.diffWords(chunks[ri].text, chunks[bestIdx].text);
           const hasRealDiff = wordDiffs.some(w => w.added || w.removed);
           if (hasRealDiff) {
+            // Replace the added chunk with a changed chunk, null the removed
             chunks[bestIdx] = {
               type: 'changed',
               words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })),
             };
-            chunks[ri] = null; // mark for removal
-            pairedIndices.add(bestIdx);
+            chunks[ri] = null;
+            pairedRemovedSet.add(ri);
+            pairedAddedSet.add(bestIdx);
           }
         }
       }
-      // Remove nulled-out chunks
+      // Dedup pass: remove 'removed' or 'added' blocks whose text already appears
+      // as the added or removed portion of a nearby 'changed' block
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i];
+        if (!c || (c.type !== 'removed' && c.type !== 'added')) continue;
+        if ((c.text || '').length < 80) continue;
+        const cNorm = (c.text || '').replace(/\s+/g, ' ').trim();
+        // Search nearby changed chunks (within 10 positions)
+        for (let j = Math.max(0, i - 10); j < Math.min(chunks.length, i + 10); j++) {
+          if (i === j || !chunks[j] || chunks[j].type !== 'changed') continue;
+          // Extract the added or removed text from the changed chunk
+          const targetText = chunks[j].words
+            .filter(w => c.type === 'removed' ? w.type !== 'removed' : w.type !== 'added')
+            .map(w => w.text).join('');
+          const tNorm = targetText.replace(/\s+/g, ' ').trim();
+          // Check if the texts are very similar (>80% of the shorter is in the longer)
+          if (cNorm.length > 0 && tNorm.length > 0) {
+            const sim = textSimilarity(c.text, targetText);
+            if (sim > 0.8) {
+              chunks[i] = null;
+              break;
+            }
+          }
+        }
+      }
+
       const finalChunks = chunks.filter(c => c !== null);
-      // Replace chunks array (used below)
       chunks.length = 0;
       finalChunks.forEach(c => chunks.push(c));
 
@@ -478,25 +513,38 @@ api.post('/diff-report-upload', async (req, res) => {
     }
 
     // Fuzzy pairing of similar removed/added blocks
-    function textSimilarity(a, b) {
+    const STOP_WORDS2 = new Set(['the','a','an','and','or','but','in','on','of','to','for','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','shall','should','may','might','can','could','it','its','this','that','these','those','with','at','by','from','not','no','as','he','she','they','we','you','his','her','their','our','your']);
+    function textSimilarity2(a, b) {
       if (!a || !b) return 0;
-      const setA = new Set(a.replace(/\s+/g, ' ').trim().split(' '));
-      const setB = new Set(b.replace(/\s+/g, ' ').trim().split(' '));
+      function getWords(t) {
+        return t.replace(/[*#_<>[\]()\\]/g, '').replace(/\s+/g, ' ').trim()
+          .split(' ').filter(w => w.length >= 3 && !STOP_WORDS2.has(w.toLowerCase()));
+      }
+      const wordsA = getWords(a), wordsB = getWords(b);
+      if (wordsA.length === 0 || wordsB.length === 0) return 0;
+      const setA = new Set(wordsA.map(w => w.toLowerCase()));
+      const setB = new Set(wordsB.map(w => w.toLowerCase()));
       let shared = 0;
       for (const w of setA) { if (setB.has(w)) shared++; }
       return shared / Math.max(setA.size, setB.size);
     }
-    const unpairedRemoved = [], unpairedAdded = [];
+    const unpairedRemoved2 = [], unpairedAdded2 = [];
     chunks.forEach((c, i) => {
-      if (c.type === 'removed') unpairedRemoved.push(i);
-      else if (c.type === 'added') unpairedAdded.push(i);
+      if (c.type === 'removed') unpairedRemoved2.push(i);
+      else if (c.type === 'added') unpairedAdded2.push(i);
     });
-    const pairedIndices = new Set();
-    for (const ri of unpairedRemoved) {
-      let bestIdx = -1, bestSim = 0.5;
-      for (const ai of unpairedAdded) {
-        if (pairedIndices.has(ai)) continue;
-        const sim = textSimilarity(chunks[ri].text, chunks[ai].text);
+    const pairedAddedSet2 = new Set();
+    for (const ri of unpairedRemoved2) {
+      const rText = chunks[ri].text || '';
+      if (rText.length < 80) continue;
+      let bestIdx = -1, bestSim = 0.65;
+      for (const ai of unpairedAdded2) {
+        if (pairedAddedSet2.has(ai)) continue;
+        const aText = chunks[ai].text || '';
+        if (aText.length < 80) continue;
+        const ratio = Math.max(rText.length, aText.length) / Math.min(rText.length, aText.length);
+        if (ratio > 3) continue;
+        const sim = textSimilarity2(rText, aText);
         if (sim > bestSim) { bestSim = sim; bestIdx = ai; }
       }
       if (bestIdx >= 0) {
@@ -504,13 +552,26 @@ api.post('/diff-report-upload', async (req, res) => {
         if (wordDiffs.some(w => w.added || w.removed)) {
           chunks[bestIdx] = { type: 'changed', words: wordDiffs.map(w => ({ type: w.added ? 'added' : w.removed ? 'removed' : 'equal', text: w.value })) };
           chunks[ri] = null;
-          pairedIndices.add(bestIdx);
+          pairedAddedSet2.add(bestIdx);
         }
       }
     }
-    const finalChunks = chunks.filter(c => c !== null);
+    // Dedup pass
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i];
+      if (!c || (c.type !== 'removed' && c.type !== 'added')) continue;
+      if ((c.text || '').length < 80) continue;
+      for (let j = Math.max(0, i - 10); j < Math.min(chunks.length, i + 10); j++) {
+        if (i === j || !chunks[j] || chunks[j].type !== 'changed') continue;
+        const targetText = chunks[j].words
+          .filter(w => c.type === 'removed' ? w.type !== 'removed' : w.type !== 'added')
+          .map(w => w.text).join('');
+        if (textSimilarity2(c.text, targetText) > 0.8) { chunks[i] = null; break; }
+      }
+    }
+    const finalChunks2 = chunks.filter(c => c !== null);
     chunks.length = 0;
-    finalChunks.forEach(c => chunks.push(c));
+    finalChunks2.forEach(c => chunks.push(c));
 
     // Heading hierarchies from both contents
     const newLines = newContent.split('\n');
