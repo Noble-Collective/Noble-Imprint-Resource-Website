@@ -71,6 +71,7 @@ if (data) {
   async function autoSave(hunks) {
     if (!data.sessionFilePath || !data.bookRepoPath || editMode !== 'suggest') return;
     if (fileStale) return; // file changed underneath us — don't save stale data
+    if (acceptingInProgress) return; // don't auto-save during accept — refresh will rebuild state
     let hadSaveError = false;
 
     // Check file version before saving — detect if the file changed on GitHub
@@ -920,6 +921,7 @@ if (data) {
   async function acceptHunk(hunkId) {
     if (acceptingInProgress) return;
     acceptingInProgress = true;
+    clearTimeout(saveTimer); // cancel any pending auto-save
 
     // Check for linked hunks (e.g., bold/italic formatting = 2 insertions)
     const card = document.querySelector('.margin-card[data-hunk-id="' + hunkId + '"]');
@@ -1467,7 +1469,7 @@ if (data) {
           }
           updateCommentCards(regComments);
         }
-        if (mode === 'suggest' && !isDiscarding) {
+        if (mode === 'suggest' && !isDiscarding && !acceptingInProgress) {
           clearTimeout(saveTimer);
           saveTimer = setTimeout(() => autoSave(hunks), 1500);
         }
