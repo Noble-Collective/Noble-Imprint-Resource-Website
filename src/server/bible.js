@@ -355,8 +355,25 @@ function getBookListGrouped(translationId) {
   return { ot, nt };
 }
 
+// Re-discover cover paths from GitHub (called on /api/refresh)
+async function refreshCoverPaths() {
+  const ids = Object.keys(translations);
+  for (const id of ids) {
+    try {
+      const items = await github.getDirectoryContents(`bibles/${id}`);
+      const coverFile = items.find(i => i.name.startsWith('cover.'));
+      const newPath = coverFile ? `bibles/${id}/${coverFile.name}` : null;
+      if (translations[id] && newPath !== translations[id].coverPath) {
+        console.log(`[BIBLE] Cover path updated: ${translations[id].coverPath} → ${newPath}`);
+        translations[id].coverPath = newPath;
+      }
+    } catch { /* ignore */ }
+  }
+}
+
 module.exports = {
   loadBibles,
+  refreshCoverPaths,
   getVerse,
   getVerses,
   getTranslation,

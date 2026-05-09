@@ -147,6 +147,8 @@ app.post('/api/refresh', async (req, res) => {
   github.clearDiskCache();
   // Proactively rebuild the content tree so the first visitor doesn't wait
   try { await content.buildContentTree(); } catch (e) { console.error('Content tree rebuild error:', e.message); }
+  // Re-discover bible cover paths in case covers were added/changed/renamed
+  try { await bible.refreshCoverPaths(); } catch (e) { console.error('Bible cover refresh error:', e.message); }
   res.json({ ok: true, message: 'Cache cleared, disk cache cleared, content tree rebuilt' });
 });
 
