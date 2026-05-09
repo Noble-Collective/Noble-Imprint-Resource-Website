@@ -144,9 +144,10 @@ app.get('/api/content-tree', async (req, res) => {
 app.post('/api/refresh', async (req, res) => {
   const cache = require('./cache');
   cache.invalidateAll();
+  github.clearDiskCache();
   // Proactively rebuild the content tree so the first visitor doesn't wait
   try { await content.buildContentTree(); } catch (e) { console.error('Content tree rebuild error:', e.message); }
-  res.json({ ok: true, message: 'Cache cleared, content tree rebuilt' });
+  res.json({ ok: true, message: 'Cache cleared, disk cache cleared, content tree rebuilt' });
 });
 
 // Clean up test book suggestions/comments/replies after deploy

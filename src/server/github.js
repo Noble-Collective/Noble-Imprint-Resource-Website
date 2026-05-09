@@ -193,4 +193,16 @@ async function updateFileContent(filePath, content, sha, message) {
   cache.del('file:' + filePath);
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getRateLimitReset, OWNER, REPO };
+function clearDiskCache() {
+  try {
+    if (fs.existsSync(DISK_CACHE_DIR)) {
+      const files = fs.readdirSync(DISK_CACHE_DIR);
+      for (const f of files) {
+        try { fs.unlinkSync(pathLib.join(DISK_CACHE_DIR, f)); } catch { /* ignore */ }
+      }
+      console.log(`[GITHUB] Cleared disk cache (${files.length} files)`);
+    }
+  } catch (err) { console.error('[GITHUB] Error clearing disk cache:', err.message); }
+}
+
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getRateLimitReset, clearDiskCache, OWNER, REPO };
