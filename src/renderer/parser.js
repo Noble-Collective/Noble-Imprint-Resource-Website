@@ -4,7 +4,7 @@ const MarkdownIt = require('markdown-it');
 // This is the most reliable approach since markdown-it's HTML parser
 // interferes with custom tags like <Question> and <Callout>.
 
-function preprocess(raw) {
+function preprocess(raw, options = {}) {
   let text = raw;
 
   // ── Question blocks ──
@@ -51,9 +51,30 @@ function preprocess(raw) {
   }
 
   // ── <image name> tags ──
+  const imagesPath = options.imagesPath || '';
+  function imageUrl(name) {
+    if (!imagesPath) return name;
+    return '/image/' + encodeURIComponent(imagesPath + '/' + name).replace(/%2F/g, '/');
+  }
+
   text = text.replace(
     /^<image\s+(.+?)>$/gm,
-    (_, name) => `<div class="image-placeholder">[Image: ${name.trim()}]</div>`
+    (_, name) => {
+      const imgName = name.trim();
+      const src = imageUrl(imgName);
+      return `<figure class="session-image"><img src="${src}" alt="${imgName}" loading="lazy"><figcaption>${imgName.replace(/_/g, ' ')}</figcaption></figure>`;
+    }
+  );
+
+  // ── Standard markdown images ![alt](name) — convert to <img> with proxy URL ──
+  text = text.replace(
+    /^!\[([^\]]*)\]\(([^)]+)\)\s*$/gm,
+    (_, alt, name) => {
+      const imgName = name.trim();
+      const src = imageUrl(imgName);
+      const caption = alt || imgName.replace(/_/g, ' ');
+      return `<figure class="session-image"><img src="${src}" alt="${caption}" loading="lazy"><figcaption>${caption}</figcaption></figure>`;
+    }
   );
 
   // ── Ensure <br> tags don't swallow adjacent markdown ──
@@ -100,7 +121,7 @@ function createRenderer(options = {}) {
 }
 
 function renderMarkdown(content, options = {}) {
-  const processed = preprocess(content);
+  const processed = preprocess(content, options);
   const md = createRenderer(options);
   let html = md.render(processed);
 

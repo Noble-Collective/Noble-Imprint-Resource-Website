@@ -1330,6 +1330,23 @@ body.text-mode .home-text {
   color: var(--color-text-light);
   margin: 1.5rem 0;
 }
+.session-image {
+  margin: 2rem 0;
+  text-align: center;
+}
+.session-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.session-image figcaption {
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+  font-style: italic;
+}
 
 /* Session prev/next nav */
 .session-nav {

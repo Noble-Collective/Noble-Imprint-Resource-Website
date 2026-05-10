@@ -4,6 +4,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
 const bible = require('./bible');
+const github = require('./github');
 const auth = require('./auth');
 const firestore = require('./firestore');
 const { renderMarkdown, renderCommonContent } = require('../renderer/parser');
@@ -80,20 +81,47 @@ app.get('/cover/*', async (req, res) => {
 });
 
 // Session image proxy — serves images from sessions/images/ folders
+// Supports extensionless requests by trying common image formats
 app.get('/image/*', async (req, res) => {
   try {
-    const repoPath = req.params[0];
-    const github = require('./github');
-    const response = await github.getFileRaw(repoPath);
+    let repoPath = req.params[0];
     const ext = path.extname(repoPath).toLowerCase();
-    const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
-    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-    res.set('Cache-Control', 'private, max-age=3600');
-    if (typeof response === 'string') {
-      res.send(response);
-    } else {
-      res.send(Buffer.from(response));
+    const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif' };
+
+    // For binary images, use getFileBinary which returns a proper Buffer.
+    // getFileRaw returns strings which corrupt binary data.
+    // For SVGs, use getFileRaw (they're text).
+    async function fetchImage(imgPath) {
+      const imgExt = path.extname(imgPath).toLowerCase();
+      if (imgExt === '.svg') return { data: await github.getFileRaw(imgPath), mime: 'image/svg+xml' };
+      return { data: await github.getFileBinary(imgPath), mime: mimeTypes[imgExt] || 'application/octet-stream' };
     }
+
+    // If no extension, try common formats
+    if (!ext) {
+      const tryExts = ['.webp', '.png', '.jpg', '.svg'];
+      let found = false;
+      for (const tryExt of tryExts) {
+        try {
+          const { data, mime } = await fetchImage(repoPath + tryExt);
+          res.set('Content-Type', mime);
+          res.set('Cache-Control', 'private, max-age=86400');
+          res.send(typeof data === 'string' ? data : Buffer.from(data));
+          found = true;
+          break;
+        } catch { /* try next extension */ }
+      }
+      if (!found) {
+        res.set('Cache-Control', 'no-store');
+        res.status(404).send('Image not found');
+      }
+      return;
+    }
+
+    const { data, mime } = await fetchImage(repoPath);
+    res.set('Content-Type', mime);
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.send(typeof data === 'string' ? data : Buffer.from(data));
   } catch (err) {
     res.set('Cache-Control', 'no-store');
     res.status(404).send('Image not found');
@@ -353,7 +381,10 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const sessionData = await content.loadSessionContent(session);
       const commonParts = content.gatherCommonContent(series, subseries || null, book);
       const commonHtml = renderCommonContent(commonParts);
-      const sessionHtml = renderMarkdown(sessionData.content, { color: book.color });
+      // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
+      const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
+      const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
+      const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath });
 
       // Extract h2 headings for sidebar table of contents
       const h2s = [];
