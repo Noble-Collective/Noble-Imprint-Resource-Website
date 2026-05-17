@@ -155,6 +155,9 @@ async function loadSubseriesOrBooks(parentPath) {
 
       books.sort((a, b) => a.order - b.order);
 
+      // Skip empty subseries (no books yet)
+      if (books.length === 0) continue;
+
       results.push({
         type: 'subseries',
         dirName: dir.name,
