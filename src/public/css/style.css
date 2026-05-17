@@ -4701,9 +4701,9 @@ body.drawer-open {
 .audiobook-badge svg { flex-shrink: 0; }
 
 /* ElevenLabs footer logo */
-.footer-elevenlabs { display: inline-flex; align-items: center; margin-left: auto; opacity: 0.6; transition: opacity 0.2s; }
+.footer-elevenlabs { display: inline-flex; align-items: center; margin-left: auto; opacity: 0.8; transition: opacity 0.2s; }
 .footer-elevenlabs:hover { opacity: 1; }
-.footer-elevenlabs-logo { height: 18px; width: auto; }
+.footer-elevenlabs-logo { height: 22px; width: auto; }
 
 /* ============================================================
    Audio Player — Floating icon + sticky bottom bar
