@@ -62,7 +62,29 @@ npx playwright test tests/editor.spec.js -g "H1 heading"
 Noble-Imprint-Resources (GitHub) ──GitHub API──> Express Server ──render──> HTML
 ```
 
-The server reads markdown files on demand via the GitHub API (Octokit). An in-memory cache with TTL prevents excessive API calls. The navigation tree (series > sub-series > books > sessions) is built from directory structure and `meta.json` files. When content is pushed to the resources repo, a `repository_dispatch` triggers a website rebuild.
+The server reads markdown files on demand via the GitHub API (Octokit). An in-memory cache with TTL prevents excessive API calls. The navigation tree (series > sub-series > books > sessions) is built from directory structure and `meta.json` files. Sub-series with no books are automatically hidden from the tree. When content is pushed to the resources repo, a `repository_dispatch` triggers a website rebuild.
+
+Content repo structure (`Noble-Imprint-Resources`):
+```
+series/
+  <Series Name>/
+    meta.json                    {title, subtitle, order}
+    commonSeries.md              Optional shared content
+    <Book Name>/                 Direct book (has sessions/ dir)
+      meta.json                  {title, subtitle, order, status, color, banner}
+      cover.svg|png              Book cover image
+      commonBook.md              Optional shared content
+      sessions/
+        01-FrontMatter.md
+        02-ChapterOne.md
+        ...
+    <Sub-Series Name>/           Sub-series (no sessions/ dir)
+      meta.json                  {title, subtitle, order}
+      commonSubseries.md         Optional shared content
+      <Book Name>/
+        meta.json
+        sessions/...
+```
 
 ### The Masked Editor
 
@@ -185,7 +207,8 @@ src/
     github.js                        GitHub API client (Octokit): read files,
                                      read directories, commit file updates
     content.js                       Content tree builder from GitHub directory
-                                     structure, book visibility filtering
+                                     structure, book visibility filtering,
+                                     empty subseries hidden automatically
     bible.js                         Bible loader (KJV + BSB from USFM), disk
                                      caching, verse lookup API
     cache.js                         In-memory cache with TTL, delete, invalidateAll
