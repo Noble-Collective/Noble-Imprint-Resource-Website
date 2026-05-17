@@ -115,25 +115,26 @@
 
   // --- Highlight + scroll loop ---
   function syncLoop() {
-    if (!audioEl || audioEl.paused || !segmentElements || segmentElements.length === 0) return;
+    if (!audioEl || audioEl.paused) return;
 
-    const t = audioEl.currentTime;
-    let active = null;
+    // Keep looping even if segments aren't loaded yet — they arrive async
+    if (segmentElements && segmentElements.length > 0) {
+      const t = audioEl.currentTime;
+      let active = null;
 
-    // Binary-ish search for active segment
-    for (const seg of segmentElements) {
-      if (t >= seg.start && t < seg.end) { active = seg; break; }
-      // Also match if we're past the start but before next segment
-      if (t >= seg.start) active = seg;
-    }
+      for (const seg of segmentElements) {
+        if (t >= seg.start && t < seg.end) { active = seg; break; }
+        if (t >= seg.start) active = seg;
+      }
 
-    if (active && active.el !== currentHighlight) {
-      if (currentHighlight) currentHighlight.classList.remove('audio-highlight');
-      active.el.classList.add('audio-highlight');
-      currentHighlight = active.el;
+      if (active && active.el !== currentHighlight) {
+        if (currentHighlight) currentHighlight.classList.remove('audio-highlight');
+        active.el.classList.add('audio-highlight');
+        currentHighlight = active.el;
 
-      if (!userScrolledRecently) {
-        active.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!userScrolledRecently) {
+          active.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       }
     }
 
