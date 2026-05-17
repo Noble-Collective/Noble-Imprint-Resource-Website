@@ -4701,9 +4701,11 @@ body.drawer-open {
 .audiobook-badge svg { flex-shrink: 0; }
 
 /* ElevenLabs footer logo */
-.footer-elevenlabs { display: inline-flex; align-items: center; margin-left: auto; opacity: 0.8; transition: opacity 0.2s; }
-.footer-elevenlabs:hover { opacity: 1; }
-.footer-elevenlabs-logo { height: 22px; width: auto; }
+.footer-elevenlabs { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: #888; font-size: 11px; }
+.footer-elevenlabs a { color: #666; text-decoration: none; }
+.footer-elevenlabs a:hover { color: #333; text-decoration: underline; }
+.footer-elevenlabs-logo { height: 12px; width: auto; vertical-align: middle; opacity: 0.7; }
+.footer-elevenlabs-logo:hover { opacity: 1; }
 
 /* ============================================================
    Audio Player — Floating icon + sticky bottom bar
