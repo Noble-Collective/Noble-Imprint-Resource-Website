@@ -4686,6 +4686,20 @@ body.drawer-open {
   }
 }
 
+/* Audiobook badge on book detail page */
+.audiobook-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #2d5a27;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.audiobook-badge svg { flex-shrink: 0; }
+
 /* ElevenLabs footer logo */
 .footer-elevenlabs { display: inline-flex; align-items: center; margin-left: auto; opacity: 0.6; transition: opacity 0.2s; }
 .footer-elevenlabs:hover { opacity: 1; }
