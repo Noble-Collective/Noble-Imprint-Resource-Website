@@ -9,6 +9,7 @@
     "build:editor": "esbuild src/editor-entry.js --bundle --format=esm --outfile=src/public/js/codemirror-bundle.js"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "cookie-parser": "^1.4.7",
     "diff": "^8.0.4",
     "dotenv": "^17.4.2",

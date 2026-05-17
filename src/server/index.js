@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const content = require('./content');
 const bible = require('./bible');
 const github = require('./github');
+const audio = require('./audio');
 const auth = require('./auth');
 const firestore = require('./firestore');
 const { renderMarkdown, renderCommonContent } = require('../renderer/parser');
@@ -178,6 +179,40 @@ app.post('/api/refresh', async (req, res) => {
   // Re-discover bible cover paths in case covers were added/changed/renamed
   try { await bible.refreshCoverPaths(); } catch (e) { console.error('Bible cover refresh error:', e.message); }
   res.json({ ok: true, message: 'Cache cleared, disk cache cleared, content tree rebuilt' });
+});
+
+// Audio manifest endpoint
+app.get('/api/audio/manifest/*', async (req, res) => {
+  try {
+    const bookRepoPath = 'series/' + req.params[0];
+    const manifest = await audio.getAudioManifest(bookRepoPath);
+    if (!manifest) return res.status(404).json({ error: 'No audiobook found' });
+    res.json(manifest);
+  } catch (err) {
+    console.error('[audio] Manifest error:', err.message);
+    res.status(500).json({ error: 'Failed to load audio manifest' });
+  }
+});
+
+// Audio signed URL endpoint
+app.get('/api/audio/url/*', async (req, res) => {
+  try {
+    const parts = req.params[0];
+    const lastSlash = parts.lastIndexOf('/');
+    const bookRepoPath = 'series/' + parts.substring(0, lastSlash);
+    const filename = parts.substring(lastSlash + 1);
+    const url = await audio.getSignedUrl(bookRepoPath, filename);
+    res.json({ url });
+  } catch (err) {
+    console.error('[audio] Signed URL error:', err.message);
+    res.status(500).json({ error: 'Failed to generate audio URL' });
+  }
+});
+
+// Audio cache refresh — called by audiobook generation workflow
+app.post('/api/refresh-audio', (req, res) => {
+  audio.clearCache();
+  res.json({ ok: true, message: 'Audio cache cleared' });
 });
 
 // Clean up test book suggestions/comments/replies after deploy
@@ -367,6 +402,12 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         }
       }
 
+      // Audio manifest for audiobook badge
+      let audioManifest = null;
+      if (book.audiobook && book.audiobook.enabled) {
+        try { audioManifest = await audio.getAudioManifest(book.repoPath); } catch { /* no audio */ }
+      }
+
       res.render('book', {
         series,
         subseries: subseries || null,
@@ -374,6 +415,8 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         content,
         title: book.title,
         suggestionCounts,
+        audioManifest,
+        audioFormatDuration: audio.formatDuration,
       });
     } else if (resolved.type === 'session') {
       const { series, subseries, book, session } = resolved;
@@ -448,6 +491,14 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
       const editUnavailable = sessionData.fromDiskCache && req.user ? true : false;
       const rateLimitReset = editUnavailable ? github.getRateLimitReset() : null;
 
+      // Audio data — load if audiobook is enabled for this book
+      let audioSession = null;
+      if (book.audiobook && book.audiobook.enabled) {
+        try {
+          audioSession = await audio.getAudioSession(book.repoPath, session.filename);
+        } catch { /* degrade gracefully — no audio */ }
+      }
+
       res.render('session', {
         series,
         subseries: subseries || null,
@@ -471,6 +522,8 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         bookRepoPath: canEdit ? book.repoPath : null,
         editUnavailable,
         rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
+        audioSession,
+        audioFormatDuration: audio.formatDuration,
       });
     }
   } catch (err) {
