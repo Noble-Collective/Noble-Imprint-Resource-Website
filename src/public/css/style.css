@@ -4814,6 +4814,18 @@ body.drawer-open {
 }
 .audio-skip-btn:hover { color: #fff; border-color: #888; }
 
+.audio-close-btn {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  margin-left: 4px;
+}
+.audio-close-btn:hover { color: #fff; }
+
 /* Text sync highlight */
 .audio-highlight {
   background: rgba(255, 213, 79, 0.2);

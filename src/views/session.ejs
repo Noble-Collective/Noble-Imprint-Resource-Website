@@ -113,6 +113,7 @@
         </select>
         <button class="audio-skip-btn" id="audio-skip-back" aria-label="Back 15s" title="Back 15s">-15</button>
         <button class="audio-skip-btn" id="audio-skip-fwd" aria-label="Forward 15s" title="Forward 15s">+15</button>
+        <button class="audio-close-btn" id="audio-close-btn" aria-label="Close player" title="Close player">&times;</button>
       </div>
     <% } %>
 
@@ -252,7 +253,7 @@
 <% } %>
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
-<script src="/static/js/audio-player.js?v=1"></script>
+<script src="/static/js/audio-player.js?v=2"></script>
 <% } %>
 
 <%- include('partials/footer') %>

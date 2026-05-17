@@ -1,8 +1,8 @@
 /**
  * audio-player.js — Floating icon + sticky bottom bar audio player with text sync.
  *
- * Idle: floating music icon in bottom-right corner.
- * Playing: expands to sticky bottom bar with play/pause, scrubber, speed, skip.
+ * Idle: floating headphones icon in bottom-right corner.
+ * Playing: icon hides, sticky bottom bar appears with controls.
  * Text sync: highlights current sentence and smooth-scrolls to it.
  */
 
@@ -29,13 +29,11 @@
   let audioEl = null;
   let signedUrl = null;
   let timestamps = null;
-  let segmentElements = null; // { start, end, el }[]
+  let segmentElements = null;
   let currentHighlight = null;
   let userScrolledRecently = false;
   let userScrollTimer = null;
-  let collapseTimer = null;
 
-  // --- Storage key for resume ---
   const storageKey = `audio-pos:${bookPath}/${audioFile}`;
 
   function formatTime(s) {
@@ -48,8 +46,7 @@
   // --- Fetch signed URL on demand ---
   async function ensureAudioUrl() {
     if (signedUrl) return signedUrl;
-    const urlPath = `${bookPath}/${audioFile}`;
-    const res = await fetch(`/api/audio/url/${urlPath}`);
+    const res = await fetch(`/api/audio/url/${bookPath}/${audioFile}`);
     if (!res.ok) throw new Error('Failed to get audio URL');
     const data = await res.json();
     signedUrl = data.url;
@@ -60,15 +57,16 @@
   async function loadTimestamps() {
     if (timestamps || !timestampsFile) return;
     try {
-      const urlPath = `${bookPath}/${timestampsFile}`;
-      const res = await fetch(`/api/audio/url/${urlPath}`);
+      const res = await fetch(`/api/audio/url/${bookPath}/${timestampsFile}`);
       if (!res.ok) return;
       const { url } = await res.json();
       const tsRes = await fetch(url);
       if (!tsRes.ok) return;
       timestamps = await tsRes.json();
       buildSegmentMap();
-    } catch { /* timestamps unavailable — audio still works */ }
+    } catch (err) {
+      console.warn('[audio] Failed to load timestamps:', err);
+    }
   }
 
   // --- Match timestamp segments to DOM elements ---
@@ -78,40 +76,55 @@
     if (!contentEl) return;
 
     segmentElements = [];
-    const textNodes = getTextElements(contentEl);
+    const textEls = contentEl.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, blockquote > p, blockquote');
+
+    // Normalize text for matching: collapse whitespace, strip quotes
+    function norm(s) {
+      return s.replace(/[\u201c\u201d\u2018\u2019""'']/g, '"')
+              .replace(/[\u2014\u2013]/g, '-')
+              .replace(/\s+/g, ' ')
+              .trim();
+    }
 
     for (const seg of timestamps.segments) {
-      const needle = seg.text.trim().substring(0, 60); // match on first 60 chars
-      if (!needle) continue;
+      const needle = norm(seg.text).substring(0, 50);
+      if (!needle || needle.length < 10) continue;
 
       let bestEl = null;
-      for (const el of textNodes) {
-        if (el.textContent && el.textContent.includes(needle)) {
-          bestEl = el;
-          break;
+      let bestScore = 0;
+
+      for (const el of textEls) {
+        const elText = norm(el.textContent || '');
+        if (elText.includes(needle)) {
+          // Prefer longer matches (more specific elements)
+          const score = needle.length;
+          if (score > bestScore) {
+            bestEl = el;
+            bestScore = score;
+          }
         }
       }
+
       if (bestEl) {
         segmentElements.push({ start: seg.start, end: seg.end, el: bestEl });
       }
     }
-  }
 
-  function getTextElements(root) {
-    const els = [];
-    const walker = root.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, blockquote, td');
-    walker.forEach(el => els.push(el));
-    return els;
+    console.log(`[audio] Mapped ${segmentElements.length}/${timestamps.segments.length} segments to DOM`);
   }
 
   // --- Highlight + scroll loop ---
   function syncLoop() {
-    if (!audioEl || audioEl.paused || !segmentElements) return;
+    if (!audioEl || audioEl.paused || !segmentElements || segmentElements.length === 0) return;
 
     const t = audioEl.currentTime;
     let active = null;
+
+    // Binary-ish search for active segment
     for (const seg of segmentElements) {
       if (t >= seg.start && t < seg.end) { active = seg; break; }
+      // Also match if we're past the start but before next segment
+      if (t >= seg.start) active = seg;
     }
 
     if (active && active.el !== currentHighlight) {
@@ -119,7 +132,6 @@
       active.el.classList.add('audio-highlight');
       currentHighlight = active.el;
 
-      // Smooth scroll if user hasn't manually scrolled recently
       if (!userScrolledRecently) {
         active.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -128,7 +140,7 @@
     requestAnimationFrame(syncLoop);
   }
 
-  // --- Detect manual scroll (pause auto-scroll for 5s) ---
+  // --- Detect manual scroll ---
   function onUserScroll() {
     userScrolledRecently = true;
     clearTimeout(userScrollTimer);
@@ -140,7 +152,6 @@
     audioEl = new Audio(url);
     audioEl.preload = 'auto';
 
-    // Restore saved position
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       const pos = parseFloat(saved);
@@ -152,7 +163,6 @@
         scrubber.value = (audioEl.currentTime / audioEl.duration) * 1000;
         currentTimeEl.textContent = formatTime(audioEl.currentTime);
       }
-      // Save position periodically
       localStorage.setItem(storageKey, audioEl.currentTime.toFixed(1));
     });
 
@@ -163,7 +173,6 @@
     audioEl.addEventListener('ended', () => {
       showPaused();
       localStorage.removeItem(storageKey);
-      scheduleCollapse();
     });
 
     return audioEl;
@@ -173,9 +182,8 @@
   function showPlaying() {
     iconPlay.style.display = 'none';
     iconPause.style.display = '';
-    player.style.display = '';
-    fab.classList.add('audio-fab--playing');
-    clearTimeout(collapseTimer);
+    player.style.display = 'flex';
+    fab.style.display = 'none'; // Hide FAB when player bar is visible
     window.addEventListener('scroll', onUserScroll, { passive: true });
     requestAnimationFrame(syncLoop);
   }
@@ -183,21 +191,23 @@
   function showPaused() {
     iconPlay.style.display = '';
     iconPause.style.display = 'none';
-    fab.classList.remove('audio-fab--playing');
+    // Keep player bar visible when paused — don't auto-collapse
+    // User can see where they are and resume easily
+  }
+
+  function showPlayerBar() {
+    player.style.display = 'flex';
+    fab.style.display = 'none';
+  }
+
+  function hidePlayerBar() {
+    player.style.display = 'none';
+    fab.style.display = '';
     if (currentHighlight) {
       currentHighlight.classList.remove('audio-highlight');
       currentHighlight = null;
     }
     window.removeEventListener('scroll', onUserScroll);
-  }
-
-  function scheduleCollapse() {
-    clearTimeout(collapseTimer);
-    collapseTimer = setTimeout(() => {
-      if (audioEl && audioEl.paused) {
-        player.style.display = 'none';
-      }
-    }, 3000);
   }
 
   // --- Play/pause ---
@@ -207,13 +217,13 @@
       try {
         const url = await ensureAudioUrl();
         createAudio(url);
-        loadTimestamps(); // async, don't await
+        loadTimestamps(); // async, don't await — sync starts when timestamps arrive
         await audioEl.play();
         fab.classList.remove('audio-fab--loading');
         showPlaying();
       } catch (err) {
         fab.classList.remove('audio-fab--loading');
-        console.error('Audio playback failed:', err);
+        console.error('[audio] Playback failed:', err);
         return;
       }
     } else if (audioEl.paused) {
@@ -222,8 +232,18 @@
     } else {
       audioEl.pause();
       showPaused();
-      scheduleCollapse();
     }
+  }
+
+  // --- Close button (X) to dismiss player bar and go back to FAB ---
+  const closeBtn = document.getElementById('audio-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (audioEl && !audioEl.paused) audioEl.pause();
+      showPaused();
+      hidePlayerBar();
+    });
   }
 
   // --- Event handlers ---
