@@ -187,6 +187,7 @@ src/
                                      verse popups, user menu
     auth.js                          Firebase Auth client (Google sign-in/out)
     admin.js                         Admin console client JS
+    audio-player.js                  Audio player controls + sentence-level text sync
 
   renderer/
     parser.js                        Markdown-it renderer + custom syntax plugins
@@ -212,6 +213,7 @@ src/
     bible.js                         Bible loader (KJV + BSB from USFM), disk
                                      caching, verse lookup API
     cache.js                         In-memory cache with TTL, delete, invalidateAll
+    audio.js                         GCS audio manifest + signed URL generation
 
   views/
     partials/header.ejs              Site header + mobile hamburger drawer
@@ -320,6 +322,32 @@ Cards are absolutely positioned in a 260px sidebar, aligned vertically with the 
 
 Reply threads are rendered between the card body and timestamp, with an always-visible input field at the bottom.
 
+### Audiobook Player
+
+The site serves audiobook versions of books that have been processed through the ElevenLabs text-to-speech pipeline. Audio files and manifests are stored in the GCS bucket `noble-imprint-audiobooks`.
+
+**Audio serving** (`src/server/audio.js`): Reads JSON manifests from GCS, generates 1-hour signed URLs for audio files, and caches manifests in memory. The `content.js` module passes the `audiobook` field from each book's `meta.json` through to templates, so the book detail page can display an audiobook badge with total duration.
+
+**Three API routes:**
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/audio/manifest/*` | Returns the audio manifest for a book (chapter list, durations) |
+| `GET` | `/api/audio/url/*` | Returns a signed URL for a specific audio asset |
+| `POST` | `/api/refresh-audio` | Clears the cached audio manifest |
+
+**Player UI** (`src/public/js/audio-player.js`): A floating headphones icon appears on audiobook-enabled sessions. Clicking it opens a sticky bottom bar with play/pause, a scrubber, playback speed control, skip forward/back 15 seconds, and a close button.
+
+**Sentence-level text sync**: Timestamp data is fetched from GCS alongside the audio manifest. Timestamps are mapped to DOM text nodes via normalized string matching. Active sentences are highlighted using the Range API, which wraps matched text in `<mark>` elements. The view smooth-scrolls to keep the highlighted sentence visible.
+
+**Auto-advance**: When a chapter's audio ends, playback automatically advances to the next chapter.
+
+**Resume**: Playback position is persisted to `localStorage` so users can pick up where they left off.
+
+**Dependencies**: Requires `@google-cloud/storage`. The GCS bucket must have CORS configured for the website domain.
+
+**Attribution**: ElevenLabs logo appears in the site footer per the ElevenLabs Impact Program requirements.
+
 ---
 
 ## Deployment
@@ -421,6 +449,14 @@ All editing API routes require authentication (session cookie or API key). Mount
 | Method | Endpoint | Purpose | Auth |
 |--------|----------|---------|------|
 | `POST` | `/direct-edit` | Commit content directly (bypass suggestions) | Admin only |
+
+### Audio
+
+| Method | Endpoint | Purpose | Auth |
+|--------|----------|---------|------|
+| `GET` | `/api/audio/manifest/*` | Audio manifest for a book | Public |
+| `GET` | `/api/audio/url/*` | Signed URL for audio asset | Public |
+| `POST` | `/api/refresh-audio` | Clear audio manifest cache | Public |
 
 ### Claude AI Bot
 
