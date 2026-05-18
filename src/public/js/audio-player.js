@@ -30,6 +30,7 @@
   let activeSegIdx = -1;
   let highlightSpan = null;
   let userScrolledAway = false;
+  let programmaticScroll = false;
 
   const storageKey = `audio-pos:${bookPath}/${audioFile}`;
 
@@ -228,6 +229,7 @@
   });
 
   function scrollToHighlight() {
+    programmaticScroll = true;
     const firstOverlay = overlayContainer.firstChild;
     if (firstOverlay) {
       const overlayTop = parseFloat(firstOverlay.style.top);
@@ -243,6 +245,8 @@
       const targetY = window.scrollY + rect.top - visTop - 20;
       window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
     }
+    // Clear flag after smooth scroll settles
+    setTimeout(function () { programmaticScroll = false; }, 600);
   }
 
   function isHighlightVisible() {
@@ -310,6 +314,7 @@
   }
 
   function onUserScroll() {
+    if (programmaticScroll) return;
     // Mark as scrolled away if the highlight is no longer visible
     if (activeSegIdx >= 0 && !isHighlightVisible()) {
       userScrolledAway = true;
