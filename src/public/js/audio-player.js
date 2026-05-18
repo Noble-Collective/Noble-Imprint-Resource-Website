@@ -108,81 +108,20 @@
     console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments`);
   }
 
-  // --- Highlight a specific sentence within its parent element ---
+  // --- Highlight the element containing the current sentence ---
+  let highlightedEl = null;
+
   function clearHighlight() {
-    if (highlightSpan && highlightSpan.parentNode) {
-      const parent = highlightSpan.parentNode;
-      const text = document.createTextNode(highlightSpan.textContent);
-      parent.replaceChild(text, highlightSpan);
-      parent.normalize();
+    if (highlightedEl) {
+      highlightedEl.classList.remove('audio-highlight');
+      highlightedEl = null;
     }
-    highlightSpan = null;
   }
 
   function applySentenceHighlight(seg) {
     clearHighlight();
-
-    const el = seg.el;
-    // For short segments (section numbers like "103."), just highlight parent
-    if (seg.needle.length < 15) {
-      el.classList.add('audio-highlight-block');
-      return;
-    }
-
-    // Walk text nodes in this element to find our sentence
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let textNode;
-    while ((textNode = walker.nextNode())) {
-      const raw = textNode.textContent;
-      const tnNorm = norm(raw);
-      const normIdx = tnNorm.indexOf(seg.matchStr);
-      if (normIdx < 0) continue;
-
-      try {
-        const needleLen = Math.min(seg.needle.length, tnNorm.length - normIdx);
-
-        // Direct search: find the raw text that matches
-        // Use the first word of the needle to anchor the search
-        const firstWord = seg.matchStr.split(' ')[0];
-        let rawStart = -1;
-        for (let ri = 0; ri < raw.length - firstWord.length; ri++) {
-          if (norm(raw.substring(ri, ri + firstWord.length + 5)).startsWith(firstWord)) {
-            rawStart = ri;
-            // Skip leading whitespace
-            while (rawStart < raw.length && /\s/.test(raw[rawStart])) rawStart++;
-            break;
-          }
-        }
-        if (rawStart < 0) continue;
-
-        // Find the end by walking forward through the raw text
-        let rawEnd = rawStart;
-        let normCovered = 0;
-        while (normCovered < needleLen && rawEnd < raw.length) {
-          rawEnd++;
-          normCovered = norm(raw.substring(rawStart, rawEnd)).length;
-        }
-
-        const range = document.createRange();
-        range.setStart(textNode, rawStart);
-        range.setEnd(textNode, Math.min(rawEnd, raw.length));
-
-        highlightSpan = document.createElement('mark');
-        highlightSpan.className = 'audio-highlight';
-        range.surroundContents(highlightSpan);
-        return;
-      } catch {
-        el.classList.add('audio-highlight-block');
-        return;
-      }
-    }
-
-    // Fallback: highlight the whole element
-    el.classList.add('audio-highlight-block');
-  }
-
-  function clearBlockHighlights() {
-    document.querySelectorAll('.audio-highlight-block').forEach(el => el.classList.remove('audio-highlight-block'));
+    seg.el.classList.add('audio-highlight');
+    highlightedEl = seg.el;
   }
 
   // --- Sync loop ---
@@ -199,13 +138,11 @@
       }
 
       if (newIdx !== activeSegIdx && newIdx >= 0) {
-        clearBlockHighlights();
         applySentenceHighlight(segmentMap[newIdx]);
         activeSegIdx = newIdx;
 
-        const scrollTarget = highlightSpan || segmentMap[newIdx].el;
-        if (!userScrolledRecently && scrollTarget) {
-          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!userScrolledRecently && segmentMap[newIdx].el) {
+          segmentMap[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }
@@ -271,7 +208,6 @@
     player.style.display = 'none';
     fab.style.display = '';
     clearHighlight();
-    clearBlockHighlights();
     activeSegIdx = -1;
     window.removeEventListener('scroll', onUserScroll);
   }
