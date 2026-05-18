@@ -252,9 +252,7 @@
     var toggle = document.querySelector('[data-mobile-toc-toggle]');
     if (!bar || !toggle) return;
 
-    var panel = document.querySelector('[data-mobile-toc-panel]');
     var lastScroll = window.scrollY;
-    var scrolling = false;
 
     // Position below header
     var header = document.querySelector('.site-header');
@@ -266,27 +264,77 @@
     positionBar();
     window.addEventListener('resize', positionBar);
 
+    // Create dropdown from sidebar content
+    var sidebar = document.querySelector('.sidebar');
+    var dropdown = null;
+    if (sidebar) {
+      dropdown = document.createElement('div');
+      dropdown.className = 'mobile-toc-sidebar-dropdown';
+      // Clone sidebar content into dropdown
+      dropdown.innerHTML = sidebar.innerHTML;
+      document.body.appendChild(dropdown);
+
+      // Prevent scrolling inside dropdown from triggering page scroll hide
+      dropdown.addEventListener('scroll', function (e) {
+        e.stopPropagation();
+      }, { passive: true });
+
+      // Position dropdown below bar
+      function positionDropdown() {
+        if (header) {
+          dropdown.style.top = (header.offsetHeight + bar.offsetHeight) + 'px';
+        }
+      }
+      positionDropdown();
+      window.addEventListener('resize', positionDropdown);
+    }
+
+    function openPanel() {
+      bar.classList.add('is-open');
+      if (dropdown) {
+        dropdown.classList.add('is-visible');
+        // Scroll to current chapter
+        var active = dropdown.querySelector('.nav-session-item.active');
+        if (active) {
+          active.scrollIntoView({ block: 'center' });
+        }
+      }
+    }
+
+    function closePanel() {
+      bar.classList.remove('is-open');
+      if (dropdown) dropdown.classList.remove('is-visible');
+    }
+
     toggle.addEventListener('click', function () {
-      bar.classList.toggle('is-open');
+      if (bar.classList.contains('is-open')) {
+        closePanel();
+      } else {
+        openPanel();
+      }
     });
 
-    // Tap anywhere on page to toggle bar visibility
+    // Close when clicking outside the bar and dropdown
     document.addEventListener('click', function (e) {
-      // Don't toggle if clicking inside the bar itself, a link, or a popup
+      if (!bar.classList.contains('is-open')) return;
       if (bar.contains(e.target)) return;
-      if (e.target.closest('a, button, .verse-popup-overlay')) return;
-      bar.classList.toggle('is-hidden');
-      if (bar.classList.contains('is-open')) {
-        bar.classList.remove('is-open');
-      }
+      if (dropdown && dropdown.contains(e.target)) return;
+      closePanel();
     });
 
-    // Hide bar when scrolling down, show when scrolling up
+    // Close when a link inside the dropdown is tapped
+    if (dropdown) {
+      dropdown.addEventListener('click', function (e) {
+        if (e.target.closest('a')) {
+          closePanel();
+        }
+      });
+    }
+
+    // Hide/show bar on scroll — but never while the panel is open
     window.addEventListener('scroll', function () {
+      if (bar.classList.contains('is-open')) return;
       var current = window.scrollY;
-      if (bar.classList.contains('is-open')) {
-        bar.classList.remove('is-open');
-      }
       if (current > lastScroll && current > 100) {
         bar.classList.add('is-hidden');
       } else {
@@ -294,15 +342,6 @@
       }
       lastScroll = current;
     }, { passive: true });
-
-    // Close when a TOC link is tapped
-    if (panel) {
-      panel.addEventListener('click', function (e) {
-        if (e.target.classList.contains('mobile-toc-link')) {
-          bar.classList.remove('is-open');
-        }
-      });
-    }
   }
 
   /* ----- User Avatar Dropdown ----- */

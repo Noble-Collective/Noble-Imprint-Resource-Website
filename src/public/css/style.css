@@ -2143,17 +2143,29 @@ body.drawer-open {
     transform: rotate(-135deg);
   }
 
-  /* Book/session sidebar — hidden on mobile, replaced by mobile-toc-bar */
-  .sidebar .sidebar-back,
-  .sidebar .sidebar-book-info,
-  .sidebar .sidebar-sessions-title,
-  .sidebar .nav-session-list {
-    display: none;
+  /* Book/session sidebar — hidden on mobile, shown as dropdown from TOC bar */
+  .sidebar {
+    display: none !important;
   }
-
-  /* Hide breadcrumbs on mobile — chapter name is in the TOC bar */
-  .reading-top {
+  .mobile-toc-bar.is-open ~ .main {
+    /* dim content behind dropdown */
+  }
+  .mobile-toc-sidebar-dropdown {
     display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 99;
+    background: var(--color-bg-sidebar);
+    border-bottom: 1px solid var(--color-border);
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 0.5rem 0;
+  }
+  .mobile-toc-sidebar-dropdown.is-visible {
+    display: block;
   }
 
   .main {
@@ -2280,7 +2292,7 @@ body.drawer-open {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 100;
+    z-index: 99;
     background: var(--color-bg-warm);
     border-bottom: 1px solid var(--color-border);
     transition: transform 200ms ease;
@@ -2366,61 +2378,6 @@ body.drawer-open {
 
   .mobile-toc-nav-next {
     margin-left: auto;
-  }
-
-  .mobile-toc-chapters {
-    border-top: 1px solid var(--color-border);
-    padding-top: 0.5rem;
-  }
-
-  .mobile-toc-book-link {
-    display: block;
-    font-family: var(--font-sans);
-    font-size: 0.72rem;
-    color: var(--color-green);
-    text-decoration: none;
-    padding: 0.3rem 0 0.4rem;
-  }
-
-  .mobile-toc-chapter-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .mobile-toc-chapter-link {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0;
-    font-family: var(--font-sans);
-    font-size: 0.78rem;
-    color: var(--color-text);
-    text-decoration: none;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-  }
-
-  .mobile-toc-chapter-link.is-current {
-    font-weight: 600;
-    color: var(--color-green);
-  }
-
-  .mobile-toc-chapter-num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.06);
-    font-size: 0.65rem;
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-
-  .mobile-toc-chapter-link.is-current .mobile-toc-chapter-num {
-    background: var(--color-green);
-    color: #fff;
   }
 
   /* H2 sub-nav mobile */
