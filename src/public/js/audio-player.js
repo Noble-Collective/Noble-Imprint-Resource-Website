@@ -33,6 +33,7 @@
   let currentHighlight = null;
   let userScrolledRecently = false;
   let userScrollTimer = null;
+  const nextUrl = fab.dataset.nextUrl || '';
 
   const storageKey = `audio-pos:${bookPath}/${audioFile}`;
 
@@ -174,6 +175,12 @@
     audioEl.addEventListener('ended', () => {
       showPaused();
       localStorage.removeItem(storageKey);
+      // Auto-advance to next chapter if available
+      if (nextUrl) {
+        // Store a flag so the next page auto-plays
+        localStorage.setItem('audio-autoplay', 'true');
+        window.location.href = nextUrl;
+      }
     });
 
     return audioEl;
@@ -245,6 +252,13 @@
       showPaused();
       hidePlayerBar();
     });
+  }
+
+  // --- Auto-play if arriving from previous chapter ---
+  if (localStorage.getItem('audio-autoplay') === 'true') {
+    localStorage.removeItem('audio-autoplay');
+    // Small delay to let page render
+    setTimeout(() => togglePlay(), 500);
   }
 
   // --- Event handlers ---

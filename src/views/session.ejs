@@ -93,7 +93,7 @@
 
     <% if (typeof audioSession !== 'undefined' && audioSession) { %>
       <!-- Floating audio icon — expands to player when playing -->
-      <div class="audio-fab" id="audio-fab" data-book-path="<%= book.repoPath.replace(/^series\//, '') %>" data-audio-file="<%= audioSession.audioFile %>" data-timestamps-file="<%= audioSession.timestampsFile || '' %>" data-duration="<%= audioSession.durationSeconds || 0 %>">
+      <div class="audio-fab" id="audio-fab" data-book-path="<%= book.repoPath.replace(/^series\//, '') %>" data-audio-file="<%= audioSession.audioFile %>" data-timestamps-file="<%= audioSession.timestampsFile || '' %>" data-duration="<%= audioSession.durationSeconds || 0 %>" data-next-url="<%= nextSession ? content.sessionUrl(series, subseries, book, nextSession) : '' %>">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
       </div>
       <!-- Sticky bottom player bar (hidden until play) -->
@@ -253,7 +253,7 @@
 <% } %>
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
-<script src="/static/js/audio-player.js?v=3"></script>
+<script src="/static/js/audio-player.js?v=4"></script>
 <% } %>
 
 <%- include('partials/footer') %>
