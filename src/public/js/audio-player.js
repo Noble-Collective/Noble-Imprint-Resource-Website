@@ -302,7 +302,7 @@
   function showPlaying() {
     iconPlay.style.display = 'none';
     iconPause.style.display = '';
-    player.style.display = 'flex';
+    player.style.display = '';
     fab.style.display = 'none';
     window.addEventListener('scroll', onUserScroll, { passive: true });
     requestAnimationFrame(syncLoop);

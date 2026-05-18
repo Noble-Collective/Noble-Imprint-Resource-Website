@@ -4856,7 +4856,7 @@ body.drawer-open {
     display: block;
     height: auto;
     padding: 0;
-    bottom: env(safe-area-inset-bottom, 0px);
+    bottom: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     /* Prevent jitter when mobile browser toolbar hides/shows */
     transform: translateZ(0);
