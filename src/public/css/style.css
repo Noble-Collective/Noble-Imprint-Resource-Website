@@ -4852,6 +4852,22 @@ body.drawer-open {
   display: none;
 }
 
+.audio-jump-link {
+  position: fixed;
+  bottom: 56px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 6px 0;
+  background: rgba(45, 90, 39, 0.92);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-decoration: none;
+  z-index: 998;
+  cursor: pointer;
+}
+
 .audio-close-btn {
   background: none;
   border: none;
@@ -4885,6 +4901,9 @@ body.drawer-open {
     height: 48px;
     gap: 6px;
     padding: 0 10px;
+  }
+  .audio-jump-link {
+    bottom: 48px;
   }
   .audio-player-extra {
     display: none;

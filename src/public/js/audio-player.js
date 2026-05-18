@@ -213,7 +213,56 @@
     return { top, bottom };
   }
 
-  // --- Update highlight and scroll for a given time ---
+  // --- "Jump to audio" link above the player ---
+  const jumpLink = document.createElement('a');
+  jumpLink.className = 'audio-jump-link';
+  jumpLink.textContent = 'Jump to audio location';
+  jumpLink.href = '#';
+  jumpLink.style.display = 'none';
+  player.parentElement.insertBefore(jumpLink, player);
+
+  jumpLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    userScrolledRecently = false;
+    scrollToHighlight();
+    jumpLink.style.display = 'none';
+  });
+
+  function scrollToHighlight() {
+    const firstOverlay = overlayContainer.firstChild;
+    if (firstOverlay) {
+      const overlayTop = parseFloat(firstOverlay.style.top);
+      const cp = overlayContainer.parentElement;
+      const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
+      const { top: visTop, bottom: visBottom } = getVisibleBounds();
+      const visHeight = visBottom - visTop;
+      const targetY = docTop - visTop - visHeight * 0.33;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+    } else if (activeSegIdx >= 0 && segmentMap[activeSegIdx]) {
+      const rect = segmentMap[activeSegIdx].el.getBoundingClientRect();
+      const { top: visTop } = getVisibleBounds();
+      const targetY = window.scrollY + rect.top - visTop - 20;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+    }
+  }
+
+  function isHighlightVisible() {
+    if (activeSegIdx < 0 || !segmentMap[activeSegIdx]) return true;
+    const el = segmentMap[activeSegIdx].el;
+    const rect = el.getBoundingClientRect();
+    const { top: visTop, bottom: visBottom } = getVisibleBounds();
+    return rect.bottom > visTop && rect.top < visBottom;
+  }
+
+  function updateJumpLink() {
+    if (!audioEl || audioEl.paused || activeSegIdx < 0) {
+      jumpLink.style.display = 'none';
+      return;
+    }
+    jumpLink.style.display = isHighlightVisible() ? 'none' : '';
+  }
+
+  // --- Update highlight for a given time ---
   function updateHighlight(forceScroll) {
     if (!segmentMap || segmentMap.length === 0) return;
     const t = audioEl.currentTime;
@@ -229,6 +278,7 @@
       if (activeSegIdx >= 0) {
         clearHighlight();
         activeSegIdx = -1;
+        updateJumpLink();
       }
       return;
     }
@@ -237,27 +287,13 @@
       applySentenceHighlight(segmentMap[newIdx]);
       activeSegIdx = newIdx;
 
-      // Scroll the highlighted sentence into the visible reading area
+      // Auto-scroll unless user has manually scrolled away
       if (forceScroll || !userScrolledRecently) {
-        const firstOverlay = overlayContainer.firstChild;
-        if (firstOverlay) {
-          const overlayTop = parseFloat(firstOverlay.style.top);
-          const cp = overlayContainer.parentElement;
-          const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
-          const { top: visTop, bottom: visBottom } = getVisibleBounds();
-          const visHeight = visBottom - visTop;
-          const targetY = docTop - visTop - visHeight * 0.33;
-          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-        } else {
-          const rect = segmentMap[newIdx].el.getBoundingClientRect();
-          const { top: visTop } = getVisibleBounds();
-          if (rect.top < visTop || rect.bottom > window.innerHeight) {
-            const targetY = window.scrollY + rect.top - visTop - 20;
-            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-          }
-        }
+        scrollToHighlight();
       }
     }
+
+    updateJumpLink();
   }
 
   // --- Sync loop ---
@@ -270,7 +306,6 @@
   // Force highlight recalculation after skip/scrub
   function forceHighlightUpdate() {
     activeSegIdx = -1;
-    userScrolledRecently = false;
     if (audioEl) updateHighlight(true);
   }
 
