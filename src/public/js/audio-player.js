@@ -108,20 +108,100 @@
     console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments`);
   }
 
-  // --- Highlight the element containing the current sentence ---
-  let highlightedEl = null;
+  // --- Highlight via positioned overlay (no DOM modification) ---
+  const overlayContainer = document.createElement('div');
+  overlayContainer.id = 'audio-highlight-overlays';
+  overlayContainer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
+  document.querySelector('.session-content')?.appendChild(overlayContainer);
 
   function clearHighlight() {
-    if (highlightedEl) {
-      highlightedEl.classList.remove('audio-highlight');
-      highlightedEl = null;
-    }
+    overlayContainer.innerHTML = '';
   }
 
   function applySentenceHighlight(seg) {
     clearHighlight();
-    seg.el.classList.add('audio-highlight');
-    highlightedEl = seg.el;
+
+    const el = seg.el;
+    const matchStr = seg.matchStr;
+    const needle = seg.needle;
+
+    // For short segments, highlight the whole element
+    if (needle.length < 15) {
+      const rect = el.getBoundingClientRect();
+      const containerRect = overlayContainer.parentElement.getBoundingClientRect();
+      addOverlayRect(rect.left - containerRect.left, rect.top - containerRect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
+      return;
+    }
+
+    // Find the text range for this sentence
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+      const raw = textNode.textContent;
+      const tnNorm = norm(raw);
+      const idx = tnNorm.indexOf(matchStr);
+      if (idx < 0) continue;
+
+      // Find raw start position using multi-word anchor for uniqueness
+      const anchorWords = matchStr.split(' ').slice(0, 4).join(' ');
+      let rawStart = -1;
+      for (let ri = 0; ri < raw.length; ri++) {
+        const slice = norm(raw.substring(ri, ri + anchorWords.length + 20));
+        if (slice.startsWith(anchorWords)) {
+          rawStart = ri;
+          while (rawStart < raw.length && /\s/.test(raw[rawStart])) rawStart++;
+          break;
+        }
+      }
+      if (rawStart < 0) continue;
+
+      // Find raw end
+      let rawEnd = rawStart, normCov = 0;
+      while (normCov < needle.length && rawEnd < raw.length) {
+        rawEnd++;
+        normCov = norm(raw.substring(rawStart, rawEnd)).length;
+      }
+
+      try {
+        const range = document.createRange();
+        range.setStart(textNode, rawStart);
+        range.setEnd(textNode, Math.min(rawEnd, raw.length));
+
+        // Get pixel rectangles for this range (handles line wrapping)
+        const rects = range.getClientRects();
+        const containerRect = overlayContainer.parentElement.getBoundingClientRect();
+        const offsetTop = overlayContainer.parentElement.offsetTop;
+
+        for (const rect of rects) {
+          if (rect.width > 0 && rect.height > 0) {
+            addOverlayRect(
+              rect.left - containerRect.left,
+              rect.top + window.scrollY - offsetTop,
+              rect.width,
+              rect.height
+            );
+          }
+        }
+        return;
+      } catch {
+        // Fallback: highlight whole element
+        const rect = el.getBoundingClientRect();
+        const containerRect = overlayContainer.parentElement.getBoundingClientRect();
+        addOverlayRect(rect.left - containerRect.left, rect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
+        return;
+      }
+    }
+
+    // Final fallback: highlight whole element
+    const rect = el.getBoundingClientRect();
+    const containerRect = overlayContainer.parentElement.getBoundingClientRect();
+    addOverlayRect(rect.left - containerRect.left, rect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
+  }
+
+  function addOverlayRect(left, top, width, height) {
+    const div = document.createElement('div');
+    div.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(100,160,220,0.15);border-radius:3px;pointer-events:none;`;
+    overlayContainer.appendChild(div);
   }
 
   // --- Sync loop ---
@@ -141,8 +221,11 @@
         applySentenceHighlight(segmentMap[newIdx]);
         activeSegIdx = newIdx;
 
-        if (!userScrolledRecently && segmentMap[newIdx].el) {
-          segmentMap[newIdx].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Scroll to the first overlay rect or the element
+        const firstOverlay = overlayContainer.firstChild;
+        const scrollTarget = firstOverlay || segmentMap[newIdx].el;
+        if (!userScrolledRecently && scrollTarget) {
+          (segmentMap[newIdx].el).scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }

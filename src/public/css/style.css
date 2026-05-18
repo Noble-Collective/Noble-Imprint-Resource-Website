@@ -4827,12 +4827,9 @@ body.drawer-open {
 }
 .audio-close-btn:hover { color: #fff; }
 
-/* Text sync highlight */
-.audio-highlight {
-  background: rgba(100, 160, 220, 0.15);
-  border-radius: 3px;
-  transition: background 0.2s ease;
-}
+/* Text sync: highlight overlays are positioned absolutely via JS.
+   The session-content container needs relative positioning. */
+.session-content { position: relative; }
 
 /* Mobile: compact player */
 @media (max-width: 768px) {
