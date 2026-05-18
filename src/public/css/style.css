@@ -2143,12 +2143,17 @@ body.drawer-open {
     transform: rotate(-135deg);
   }
 
-  /* Book/session sidebar (not homepage) — keep visible */
+  /* Book/session sidebar — hidden on mobile, replaced by mobile-toc-bar */
   .sidebar .sidebar-back,
   .sidebar .sidebar-book-info,
   .sidebar .sidebar-sessions-title,
   .sidebar .nav-session-list {
-    display: block;
+    display: none;
+  }
+
+  /* Hide breadcrumbs on mobile — chapter name is in the TOC bar */
+  .reading-top {
+    display: none;
   }
 
   .main {
@@ -2275,7 +2280,7 @@ body.drawer-open {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 95;
+    z-index: 100;
     background: var(--color-bg-warm);
     border-bottom: 1px solid var(--color-border);
     transition: transform 200ms ease;
@@ -2312,6 +2317,8 @@ body.drawer-open {
   .mobile-toc-panel {
     display: none;
     padding: 0 1rem 0.75rem;
+    max-height: 70vh;
+    overflow-y: auto;
   }
 
   .mobile-toc-bar.is-open .mobile-toc-panel {
@@ -2359,6 +2366,61 @@ body.drawer-open {
 
   .mobile-toc-nav-next {
     margin-left: auto;
+  }
+
+  .mobile-toc-chapters {
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.5rem;
+  }
+
+  .mobile-toc-book-link {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--color-green);
+    text-decoration: none;
+    padding: 0.3rem 0 0.4rem;
+  }
+
+  .mobile-toc-chapter-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .mobile-toc-chapter-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    color: var(--color-text);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+
+  .mobile-toc-chapter-link.is-current {
+    font-weight: 600;
+    color: var(--color-green);
+  }
+
+  .mobile-toc-chapter-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.06);
+    font-size: 0.65rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .mobile-toc-chapter-link.is-current .mobile-toc-chapter-num {
+    background: var(--color-green);
+    color: #fff;
   }
 
   /* H2 sub-nav mobile */

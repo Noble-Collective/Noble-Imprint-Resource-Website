@@ -40,13 +40,13 @@
           <% }); %>
         </ul>
       <% } %>
-      <div class="mobile-toc-nav">
-        <% if (prevSession) { %>
-          <a href="<%= content.sessionUrl(series, subseries, book, prevSession) %>" class="mobile-toc-nav-link">&larr; <%= prevSession.displayName %></a>
-        <% } %>
-        <% if (nextSession) { %>
-          <a href="<%= content.sessionUrl(series, subseries, book, nextSession) %>" class="mobile-toc-nav-link mobile-toc-nav-next"><%= nextSession.displayName %> &rarr;</a>
-        <% } %>
+      <div class="mobile-toc-chapters">
+        <a href="<%= content.bookUrl(series, subseries, book) %>" class="mobile-toc-book-link">&larr; <%= book.title %></a>
+        <ul class="mobile-toc-chapter-list">
+          <% book.sessions.forEach(function(s, i) { %>
+            <li><a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="mobile-toc-chapter-link<%= s.slug === session.slug ? ' is-current' : '' %>"><span class="mobile-toc-chapter-num"><%= i + 1 %></span> <%= s.displayName %></a></li>
+          <% }); %>
+        </ul>
       </div>
     </div>
   </div>
