@@ -78,34 +78,30 @@
     const contentEl = document.querySelector('.session-content');
     if (!contentEl) return;
 
-    // Get all text-bearing elements
-    const els = contentEl.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, blockquote, td, strong, em');
+    // Build ordered list of block elements (h1-h6, p) — index matches blockIndex
+    const blockEls = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6, p'));
     segmentMap = [];
 
     for (const seg of timestamps.segments) {
-      // Strip trailing period that TTS preprocessor added to headings
-      let segText = seg.text;
-      const needle = norm(segText).replace(/\.\s*$/, '');
-      if (needle.length < 8) continue;
+      const bi = seg.blockIndex;
+      const si = seg.sentenceIndex;
 
-      // Use first 40 chars for matching to handle sentence fragments
-      const matchStr = needle.substring(0, 40);
+      if (bi === undefined || bi >= blockEls.length) continue;
 
-      for (const el of els) {
-        const elText = norm(el.textContent || '');
-        if (elText.includes(matchStr)) {
-          segmentMap.push({
-            start: seg.start,
-            end: seg.end,
-            needle: needle,
-            matchStr: matchStr,
-            el: el,
-          });
-          break;
-        }
-      }
+      const el = blockEls[bi];
+      const text = seg.text;
+      const needle = norm(text).replace(/\.\s*$/, '');
+
+      segmentMap.push({
+        start: seg.start,
+        end: seg.end,
+        el: el,
+        sentenceIndex: si,
+        needle: needle,
+        matchStr: needle.substring(0, 40),
+      });
     }
-    console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments`);
+    console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments to ${blockEls.length} block elements`);
   }
 
   // --- Highlight via positioned overlay (no DOM modification) ---
@@ -122,80 +118,80 @@
     clearHighlight();
 
     const el = seg.el;
-    const matchStr = seg.matchStr;
-    const needle = seg.needle;
+    if (!el) return;
+    const cp = overlayContainer.parentElement;
+    if (!cp) return;
 
-    // For short segments, highlight the whole element
-    if (needle.length < 15) {
-      const rect = el.getBoundingClientRect();
-      const containerRect = overlayContainer.parentElement.getBoundingClientRect();
-      addOverlayRect(rect.left - containerRect.left, rect.top - containerRect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
+    // Step 1: element found by blockIndex (no text matching needed)
+    // Step 2: split element text into sentences, find sentenceIndex
+    const fullText = el.textContent || '';
+    const elSentences = fullText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+
+    // Single sentence or no sentenceIndex — highlight whole element
+    if (elSentences.length <= 1 || seg.sentenceIndex === undefined) {
+      highlightWholeElement(el, cp);
       return;
     }
 
-    // Find the text range for this sentence
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let textNode;
-    while ((textNode = walker.nextNode())) {
-      const raw = textNode.textContent;
-      const tnNorm = norm(raw);
-      const idx = tnNorm.indexOf(matchStr);
-      if (idx < 0) continue;
-
-      // Find raw start position using multi-word anchor for uniqueness
-      const anchorWords = matchStr.split(' ').slice(0, 4).join(' ');
-      let rawStart = -1;
-      for (let ri = 0; ri < raw.length; ri++) {
-        const slice = norm(raw.substring(ri, ri + anchorWords.length + 20));
-        if (slice.startsWith(anchorWords)) {
-          rawStart = ri;
-          while (rawStart < raw.length && /\s/.test(raw[rawStart])) rawStart++;
-          break;
-        }
-      }
-      if (rawStart < 0) continue;
-
-      // Find raw end
-      let rawEnd = rawStart, normCov = 0;
-      while (normCov < needle.length && rawEnd < raw.length) {
-        rawEnd++;
-        normCov = norm(raw.substring(rawStart, rawEnd)).length;
-      }
-
-      try {
-        const range = document.createRange();
-        range.setStart(textNode, rawStart);
-        range.setEnd(textNode, Math.min(rawEnd, raw.length));
-
-        // Get pixel rectangles for this range (handles line wrapping)
-        const rects = range.getClientRects();
-        const containerRect = overlayContainer.parentElement.getBoundingClientRect();
-        const offsetTop = overlayContainer.parentElement.offsetTop;
-
-        for (const rect of rects) {
-          if (rect.width > 0 && rect.height > 0) {
-            addOverlayRect(
-              rect.left - containerRect.left,
-              rect.top + window.scrollY - offsetTop,
-              rect.width,
-              rect.height
-            );
-          }
-        }
-        return;
-      } catch {
-        // Fallback: highlight whole element
-        const rect = el.getBoundingClientRect();
-        const containerRect = overlayContainer.parentElement.getBoundingClientRect();
-        addOverlayRect(rect.left - containerRect.left, rect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
-        return;
-      }
+    const target = elSentences[seg.sentenceIndex];
+    if (!target) {
+      highlightWholeElement(el, cp);
+      return;
     }
 
-    // Final fallback: highlight whole element
-    const rect = el.getBoundingClientRect();
-    const containerRect = overlayContainer.parentElement.getBoundingClientRect();
-    addOverlayRect(rect.left - containerRect.left, rect.top + window.scrollY - overlayContainer.parentElement.offsetTop, rect.width, rect.height);
+    // Step 3: find sentence position in element text (reliable — correct element)
+    const sentStart = fullText.indexOf(target);
+    if (sentStart < 0) {
+      highlightWholeElement(el, cp);
+      return;
+    }
+    const sentEnd = sentStart + target.length;
+
+    // Step 4: walk text nodes to build Range spanning the sentence
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let charsSeen = 0;
+    let startNode = null, startOff = 0, endNode = null, endOff = 0;
+    let tn;
+    while ((tn = walker.nextNode())) {
+      const len = tn.textContent.length;
+      if (!startNode && charsSeen + len > sentStart) {
+        startNode = tn;
+        startOff = sentStart - charsSeen;
+      }
+      if (charsSeen + len >= sentEnd) {
+        endNode = tn;
+        endOff = sentEnd - charsSeen;
+        break;
+      }
+      charsSeen += len;
+    }
+
+    if (!startNode || !endNode) {
+      highlightWholeElement(el, cp);
+      return;
+    }
+
+    try {
+      const range = document.createRange();
+      range.setStart(startNode, Math.max(0, startOff));
+      range.setEnd(endNode, Math.min(endOff, endNode.textContent.length));
+
+      const rects = range.getClientRects();
+      const cRect = cp.getBoundingClientRect();
+      for (const r of rects) {
+        if (r.width > 0 && r.height > 0) {
+          addOverlayRect(r.left - cRect.left, r.top + window.scrollY - cp.offsetTop, r.width, r.height);
+        }
+      }
+    } catch {
+      highlightWholeElement(el, cp);
+    }
+  }
+
+  function highlightWholeElement(el, cp) {
+    const r = el.getBoundingClientRect();
+    const cRect = cp.getBoundingClientRect();
+    addOverlayRect(r.left - cRect.left, r.top + window.scrollY - cp.offsetTop, r.width, r.height);
   }
 
   function addOverlayRect(left, top, width, height) {
