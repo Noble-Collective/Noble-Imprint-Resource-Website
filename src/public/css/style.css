@@ -4854,18 +4854,21 @@ body.drawer-open {
 
 .audio-jump-link {
   position: fixed;
-  bottom: 56px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  padding: 6px 0;
-  background: rgba(45, 90, 39, 0.92);
-  color: #fff;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  background: none;
+  color: var(--color-green);
   font-family: var(--font-sans);
   font-size: 12px;
   text-decoration: none;
   z-index: 998;
   cursor: pointer;
+  opacity: 0.7;
+}
+.audio-jump-link:hover {
+  opacity: 1;
 }
 
 .audio-close-btn {
@@ -4903,7 +4906,7 @@ body.drawer-open {
     padding: 0 10px;
   }
   .audio-jump-link {
-    bottom: 48px;
+    bottom: 56px;
   }
   .audio-player-extra {
     display: none;

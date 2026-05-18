@@ -29,8 +29,7 @@
   let segmentMap = null; // [{start, end, needle, parentEl}]
   let activeSegIdx = -1;
   let highlightSpan = null;
-  let userScrolledRecently = false;
-  let userScrollTimer = null;
+  let userScrolledAway = false;
 
   const storageKey = `audio-pos:${bookPath}/${audioFile}`;
 
@@ -223,7 +222,7 @@
 
   jumpLink.addEventListener('click', function (e) {
     e.preventDefault();
-    userScrolledRecently = false;
+    userScrolledAway = false;
     scrollToHighlight();
     jumpLink.style.display = 'none';
   });
@@ -255,11 +254,11 @@
   }
 
   function updateJumpLink() {
-    if (!audioEl || audioEl.paused || activeSegIdx < 0) {
+    if (!audioEl || audioEl.paused || activeSegIdx < 0 || !userScrolledAway) {
       jumpLink.style.display = 'none';
       return;
     }
-    jumpLink.style.display = isHighlightVisible() ? 'none' : '';
+    jumpLink.style.display = '';
   }
 
   // --- Update highlight for a given time ---
@@ -287,8 +286,8 @@
       applySentenceHighlight(segmentMap[newIdx]);
       activeSegIdx = newIdx;
 
-      // Auto-scroll unless user has manually scrolled away
-      if (forceScroll || !userScrolledRecently) {
+      // Auto-scroll unless user has scrolled away
+      if (forceScroll || !userScrolledAway) {
         scrollToHighlight();
       }
     }
@@ -306,13 +305,15 @@
   // Force highlight recalculation after skip/scrub
   function forceHighlightUpdate() {
     activeSegIdx = -1;
+    userScrolledAway = false;
     if (audioEl) updateHighlight(true);
   }
 
   function onUserScroll() {
-    userScrolledRecently = true;
-    clearTimeout(userScrollTimer);
-    userScrollTimer = setTimeout(() => { userScrolledRecently = false; }, 5000);
+    // Mark as scrolled away if the highlight is no longer visible
+    if (activeSegIdx >= 0 && !isHighlightVisible()) {
+      userScrolledAway = true;
+    }
   }
 
   // --- Audio element ---
