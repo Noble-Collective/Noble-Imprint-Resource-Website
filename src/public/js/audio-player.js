@@ -219,12 +219,21 @@
     const t = audioEl.currentTime;
     let newIdx = -1;
 
+    // Find the segment that contains the current time (strict match only)
     for (let i = 0; i < segmentMap.length; i++) {
       if (t >= segmentMap[i].start && t < segmentMap[i].end) { newIdx = i; break; }
-      if (t >= segmentMap[i].start) newIdx = i;
     }
 
-    if (newIdx !== activeSegIdx && newIdx >= 0) {
+    // If we're in a gap between segments, clear the highlight
+    if (newIdx < 0) {
+      if (activeSegIdx >= 0) {
+        clearHighlight();
+        activeSegIdx = -1;
+      }
+      return;
+    }
+
+    if (newIdx !== activeSegIdx) {
       applySentenceHighlight(segmentMap[newIdx]);
       activeSegIdx = newIdx;
 
