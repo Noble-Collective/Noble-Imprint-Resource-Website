@@ -314,20 +314,22 @@
       }
     });
 
-    // Tap anywhere on reading content to toggle the bar and dropdown
+    // Tap anywhere on reading content to show/hide the collapsed bar
     document.addEventListener('click', function (e) {
-      // Ignore taps on the bar itself, dropdown, links, buttons, or popups
+      // Don't interfere when dropdown is open
+      if (bar.classList.contains('is-open')) {
+        // Close if tapping outside bar and dropdown
+        if (!bar.contains(e.target) && !(dropdown && dropdown.contains(e.target))) {
+          closePanel();
+        }
+        return;
+      }
+      // Ignore taps on interactive elements
       if (bar.contains(e.target)) return;
-      if (dropdown && dropdown.contains(e.target)) return;
       if (e.target.closest('a, button, select, input, .verse-popup-overlay, .audio-player, .audio-fab, .edit-toolbar')) return;
 
-      if (bar.classList.contains('is-open')) {
-        closePanel();
-      } else {
-        // Show bar if hidden, then open dropdown
-        bar.classList.remove('is-hidden');
-        openPanel();
-      }
+      // Toggle the collapsed bar visibility
+      bar.classList.toggle('is-hidden');
     });
 
     // Close when a link inside the dropdown is tapped
