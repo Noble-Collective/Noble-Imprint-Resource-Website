@@ -314,12 +314,20 @@
       }
     });
 
-    // Close when clicking outside the bar and dropdown
+    // Tap anywhere on reading content to toggle the bar and dropdown
     document.addEventListener('click', function (e) {
-      if (!bar.classList.contains('is-open')) return;
+      // Ignore taps on the bar itself, dropdown, links, buttons, or popups
       if (bar.contains(e.target)) return;
       if (dropdown && dropdown.contains(e.target)) return;
-      closePanel();
+      if (e.target.closest('a, button, select, input, .verse-popup-overlay, .audio-player, .audio-fab, .edit-toolbar')) return;
+
+      if (bar.classList.contains('is-open')) {
+        closePanel();
+      } else {
+        // Show bar if hidden, then open dropdown
+        bar.classList.remove('is-hidden');
+        openPanel();
+      }
     });
 
     // Close when a link inside the dropdown is tapped
