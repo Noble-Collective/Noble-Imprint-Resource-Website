@@ -213,50 +213,56 @@
     return { top, bottom };
   }
 
-  // --- Sync loop ---
-  function syncLoop() {
-    if (!audioEl || audioEl.paused) return;
+  // --- Update highlight and scroll for a given time ---
+  function updateHighlight(forceScroll) {
+    if (!segmentMap || segmentMap.length === 0) return;
+    const t = audioEl.currentTime;
+    let newIdx = -1;
 
-    if (segmentMap && segmentMap.length > 0) {
-      const t = audioEl.currentTime;
-      let newIdx = -1;
+    for (let i = 0; i < segmentMap.length; i++) {
+      if (t >= segmentMap[i].start && t < segmentMap[i].end) { newIdx = i; break; }
+      if (t >= segmentMap[i].start) newIdx = i;
+    }
 
-      for (let i = 0; i < segmentMap.length; i++) {
-        if (t >= segmentMap[i].start && t < segmentMap[i].end) { newIdx = i; break; }
-        if (t >= segmentMap[i].start) newIdx = i;
-      }
+    if (newIdx !== activeSegIdx && newIdx >= 0) {
+      applySentenceHighlight(segmentMap[newIdx]);
+      activeSegIdx = newIdx;
 
-      if (newIdx !== activeSegIdx && newIdx >= 0) {
-        applySentenceHighlight(segmentMap[newIdx]);
-        activeSegIdx = newIdx;
-
-        // Scroll the highlighted sentence into the visible reading area
-        if (!userScrolledRecently) {
-          const firstOverlay = overlayContainer.firstChild;
-          if (firstOverlay) {
-            // Use the overlay's document position for precise scrolling
-            const overlayTop = parseFloat(firstOverlay.style.top);
-            const cp = overlayContainer.parentElement;
-            const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
-            const { top: visTop, bottom: visBottom } = getVisibleBounds();
-            const visHeight = visBottom - visTop;
-            // Place the sentence 1/3 down the visible area for comfortable reading
-            const targetY = docTop - visTop - visHeight * 0.33;
+      // Scroll the highlighted sentence into the visible reading area
+      if (forceScroll || !userScrolledRecently) {
+        const firstOverlay = overlayContainer.firstChild;
+        if (firstOverlay) {
+          const overlayTop = parseFloat(firstOverlay.style.top);
+          const cp = overlayContainer.parentElement;
+          const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
+          const { top: visTop, bottom: visBottom } = getVisibleBounds();
+          const visHeight = visBottom - visTop;
+          const targetY = docTop - visTop - visHeight * 0.33;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+        } else {
+          const rect = segmentMap[newIdx].el.getBoundingClientRect();
+          const { top: visTop } = getVisibleBounds();
+          if (rect.top < visTop || rect.bottom > window.innerHeight) {
+            const targetY = window.scrollY + rect.top - visTop - 20;
             window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-          } else {
-            // Fallback: scroll element into view with offset
-            const rect = segmentMap[newIdx].el.getBoundingClientRect();
-            const { top: visTop } = getVisibleBounds();
-            if (rect.top < visTop || rect.bottom > window.innerHeight) {
-              const targetY = window.scrollY + rect.top - visTop - 20;
-              window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-            }
           }
         }
       }
     }
+  }
 
+  // --- Sync loop ---
+  function syncLoop() {
+    if (!audioEl || audioEl.paused) return;
+    updateHighlight(false);
     requestAnimationFrame(syncLoop);
+  }
+
+  // Force highlight recalculation after skip/scrub
+  function forceHighlightUpdate() {
+    activeSegIdx = -1;
+    userScrolledRecently = false;
+    if (audioEl) updateHighlight(true);
   }
 
   function onUserScroll() {
@@ -380,7 +386,10 @@
   });
   scrubber.addEventListener('change', () => {
     scrubber._dragging = false;
-    if (audioEl) audioEl.currentTime = (scrubber.value / 1000) * audioEl.duration;
+    if (audioEl) {
+      audioEl.currentTime = (scrubber.value / 1000) * audioEl.duration;
+      forceHighlightUpdate();
+    }
   });
 
   speedSelect.addEventListener('change', () => {
@@ -388,9 +397,15 @@
   });
 
   skipBack.addEventListener('click', () => {
-    if (audioEl) audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
+    if (audioEl) {
+      audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
+      forceHighlightUpdate();
+    }
   });
   skipFwd.addEventListener('click', () => {
-    if (audioEl) audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
+    if (audioEl) {
+      audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
+      forceHighlightUpdate();
+    }
   });
 })();
