@@ -127,29 +127,36 @@
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let textNode;
     while ((textNode = walker.nextNode())) {
-      const tnNorm = norm(textNode.textContent);
-      const idx = tnNorm.indexOf(seg.matchStr);
-      if (idx < 0) continue;
+      const raw = textNode.textContent;
+      const tnNorm = norm(raw);
+      const normIdx = tnNorm.indexOf(seg.matchStr);
+      if (normIdx < 0) continue;
 
       try {
-        // Map normalized index back to raw index
-        let rawIdx = 0, normIdx = 0;
-        while (normIdx < idx && rawIdx < textNode.textContent.length) {
-          rawIdx++;
-          normIdx = norm(textNode.textContent.substring(0, rawIdx)).length;
-        }
+        // Find how much of the needle matches in the normalized text
+        const needleLen = Math.min(seg.needle.length, tnNorm.length - normIdx);
 
-        // Find raw end
-        const needleLen = Math.min(seg.needle.length, tnNorm.length - idx);
-        let rawEnd = rawIdx;
-        let coveredNorm = 0;
-        while (coveredNorm < needleLen && rawEnd < textNode.textContent.length) {
-          rawEnd++;
-          coveredNorm = norm(textNode.textContent.substring(rawIdx, rawEnd)).length;
+        // Map normalized start/end back to raw positions.
+        // Build a mapping: for each char in norm'd text, track its raw position.
+        const normToRaw = [];
+        let ni = 0;
+        for (let ri = 0; ri < raw.length; ri++) {
+          if (/\s/.test(raw[ri]) && ri > 0 && /\s/.test(raw[ri - 1])) continue;
+          normToRaw[ni] = ri;
+          ni++;
         }
+        normToRaw[ni] = raw.length; // sentinel for end
+
+        let rawStart = normToRaw[normIdx];
+        let rawEnd = normToRaw[Math.min(normIdx + needleLen, ni)];
+        if (rawStart === undefined) continue;
+        if (rawEnd === undefined) rawEnd = raw.length;
+
+        // Trim leading whitespace from raw range
+        while (rawStart < rawEnd && /\s/.test(raw[rawStart])) rawStart++;
 
         const range = document.createRange();
-        range.setStart(textNode, rawIdx);
+        range.setStart(textNode, rawStart);
         range.setEnd(textNode, rawEnd);
 
         highlightSpan = document.createElement('mark');
@@ -157,8 +164,6 @@
         range.surroundContents(highlightSpan);
         return;
       } catch {
-        // surroundContents can fail if range crosses element boundaries
-        // Fallback: highlight parent element
         el.classList.add('audio-highlight-block');
         return;
       }

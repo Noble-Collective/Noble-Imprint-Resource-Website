@@ -4840,19 +4840,24 @@ body.drawer-open {
 
 /* Mobile: compact player */
 @media (max-width: 768px) {
-  .audio-fab { bottom: 16px; right: 16px; width: 42px; height: 42px; }
-  .audio-player { height: 48px; gap: 6px; padding: 0 10px; }
-  .audio-speed, .audio-skip-btn { display: none; }
-
-  /* Pad reading content so player doesn't cover text */
-  body:has(.audio-player[style*="display: flex"]) .reading-content,
-  body:has(.audio-player:not([style*="display:none"])) .reading-content {
-    padding-bottom: 60px;
+  .audio-fab { bottom: 80px; right: 16px; width: 42px; height: 42px; }
+  .audio-player {
+    height: 48px;
+    gap: 6px;
+    padding: 0 10px;
+    bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  .audio-speed, .audio-skip-btn { display: none; }
 }
 
 /* Pad reading content when player is visible */
 .reading-content { transition: padding-bottom 0.3s; }
 body:has(.audio-player:not([style*="none"])) .reading-content {
   padding-bottom: 70px;
+}
+@media (max-width: 768px) {
+  body:has(.audio-player:not([style*="none"])) .reading-content {
+    padding-bottom: 80px;
+  }
 }
