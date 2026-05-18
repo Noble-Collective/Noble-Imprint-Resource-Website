@@ -123,6 +123,12 @@
     clearHighlight();
 
     const el = seg.el;
+    // For short segments (section numbers like "103."), just highlight parent
+    if (seg.needle.length < 15) {
+      el.classList.add('audio-highlight-block');
+      return;
+    }
+
     // Walk text nodes in this element to find our sentence
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let textNode;
@@ -133,31 +139,33 @@
       if (normIdx < 0) continue;
 
       try {
-        // Find how much of the needle matches in the normalized text
         const needleLen = Math.min(seg.needle.length, tnNorm.length - normIdx);
 
-        // Map normalized start/end back to raw positions.
-        // Build a mapping: for each char in norm'd text, track its raw position.
-        const normToRaw = [];
-        let ni = 0;
-        for (let ri = 0; ri < raw.length; ri++) {
-          if (/\s/.test(raw[ri]) && ri > 0 && /\s/.test(raw[ri - 1])) continue;
-          normToRaw[ni] = ri;
-          ni++;
+        // Direct search: find the raw text that matches
+        // Use the first word of the needle to anchor the search
+        const firstWord = seg.matchStr.split(' ')[0];
+        let rawStart = -1;
+        for (let ri = 0; ri < raw.length - firstWord.length; ri++) {
+          if (norm(raw.substring(ri, ri + firstWord.length + 5)).startsWith(firstWord)) {
+            rawStart = ri;
+            // Skip leading whitespace
+            while (rawStart < raw.length && /\s/.test(raw[rawStart])) rawStart++;
+            break;
+          }
         }
-        normToRaw[ni] = raw.length; // sentinel for end
+        if (rawStart < 0) continue;
 
-        let rawStart = normToRaw[normIdx];
-        let rawEnd = normToRaw[Math.min(normIdx + needleLen, ni)];
-        if (rawStart === undefined) continue;
-        if (rawEnd === undefined) rawEnd = raw.length;
-
-        // Trim leading whitespace from raw range
-        while (rawStart < rawEnd && /\s/.test(raw[rawStart])) rawStart++;
+        // Find the end by walking forward through the raw text
+        let rawEnd = rawStart;
+        let normCovered = 0;
+        while (normCovered < needleLen && rawEnd < raw.length) {
+          rawEnd++;
+          normCovered = norm(raw.substring(rawStart, rawEnd)).length;
+        }
 
         const range = document.createRange();
         range.setStart(textNode, rawStart);
-        range.setEnd(textNode, rawEnd);
+        range.setEnd(textNode, Math.min(rawEnd, raw.length));
 
         highlightSpan = document.createElement('mark');
         highlightSpan.className = 'audio-highlight';
