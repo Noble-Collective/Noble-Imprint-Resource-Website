@@ -200,6 +200,19 @@
     overlayContainer.appendChild(div);
   }
 
+  // --- Compute the visible reading area (between header/TOC and player) ---
+  function getVisibleBounds() {
+    const header = document.querySelector('.site-header');
+    const tocBar = document.querySelector('.mobile-toc-bar');
+    let top = header ? header.getBoundingClientRect().bottom : 0;
+    if (tocBar && !tocBar.classList.contains('is-hidden')) {
+      top = Math.max(top, tocBar.getBoundingClientRect().bottom);
+    }
+    const playerRect = player.style.display !== 'none' ? player.getBoundingClientRect() : null;
+    const bottom = playerRect ? playerRect.top : window.innerHeight;
+    return { top, bottom };
+  }
+
   // --- Sync loop ---
   function syncLoop() {
     if (!audioEl || audioEl.paused) return;
@@ -217,11 +230,28 @@
         applySentenceHighlight(segmentMap[newIdx]);
         activeSegIdx = newIdx;
 
-        // Scroll to the first overlay rect or the element
-        const firstOverlay = overlayContainer.firstChild;
-        const scrollTarget = firstOverlay || segmentMap[newIdx].el;
-        if (!userScrolledRecently && scrollTarget) {
-          (segmentMap[newIdx].el).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Scroll the highlighted sentence into the visible reading area
+        if (!userScrolledRecently) {
+          const firstOverlay = overlayContainer.firstChild;
+          if (firstOverlay) {
+            // Use the overlay's document position for precise scrolling
+            const overlayTop = parseFloat(firstOverlay.style.top);
+            const cp = overlayContainer.parentElement;
+            const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
+            const { top: visTop, bottom: visBottom } = getVisibleBounds();
+            const visHeight = visBottom - visTop;
+            // Place the sentence 1/3 down the visible area for comfortable reading
+            const targetY = docTop - visTop - visHeight * 0.33;
+            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          } else {
+            // Fallback: scroll element into view with offset
+            const rect = segmentMap[newIdx].el.getBoundingClientRect();
+            const { top: visTop } = getVisibleBounds();
+            if (rect.top < visTop || rect.bottom > window.innerHeight) {
+              const targetY = window.scrollY + rect.top - visTop - 20;
+              window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+            }
+          }
         }
       }
     }
@@ -285,6 +315,7 @@
 
   function hidePlayerBar() {
     player.style.display = 'none';
+    player.classList.remove('is-expanded');
     fab.style.display = '';
     clearHighlight();
     activeSegIdx = -1;
@@ -331,6 +362,14 @@
       if (audioEl && !audioEl.paused) audioEl.pause();
       showPaused();
       hidePlayerBar();
+    });
+  }
+
+  const expandBtn = document.getElementById('audio-expand-btn');
+  if (expandBtn) {
+    expandBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      player.classList.toggle('is-expanded');
     });
   }
 

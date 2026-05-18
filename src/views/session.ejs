@@ -98,22 +98,27 @@
       </div>
       <!-- Sticky bottom player bar (hidden until play) -->
       <div class="audio-player" id="audio-player" style="display:none">
-        <button class="audio-play-btn" id="audio-play-btn" aria-label="Play">
-          <svg class="icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-          <svg class="icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-        </button>
-        <span class="audio-time" id="audio-current-time">0:00</span>
-        <input type="range" class="audio-scrubber" id="audio-scrubber" min="0" max="1000" value="0" step="1">
-        <span class="audio-time" id="audio-duration"><%= audioFormatDuration(audioSession.durationSeconds) %></span>
-        <select class="audio-speed" id="audio-speed">
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-        </select>
-        <button class="audio-skip-btn" id="audio-skip-back" aria-label="Back 15s" title="Back 15s">-15</button>
-        <button class="audio-skip-btn" id="audio-skip-fwd" aria-label="Forward 15s" title="Forward 15s">+15</button>
-        <button class="audio-close-btn" id="audio-close-btn" aria-label="Close player" title="Close player">&times;</button>
+        <div class="audio-player-main">
+          <button class="audio-play-btn" id="audio-play-btn" aria-label="Play">
+            <svg class="icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            <svg class="icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          </button>
+          <span class="audio-time" id="audio-current-time">0:00</span>
+          <input type="range" class="audio-scrubber" id="audio-scrubber" min="0" max="1000" value="0" step="1">
+          <span class="audio-time" id="audio-duration"><%= audioFormatDuration(audioSession.durationSeconds) %></span>
+          <button class="audio-expand-btn" id="audio-expand-btn" aria-label="More controls"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></button>
+          <button class="audio-close-btn" id="audio-close-btn" aria-label="Close player" title="Close player">&times;</button>
+        </div>
+        <div class="audio-player-extra">
+          <button class="audio-skip-btn" id="audio-skip-back" aria-label="Back 15s" title="Back 15s">-15s</button>
+          <select class="audio-speed" id="audio-speed">
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+          </select>
+          <button class="audio-skip-btn" id="audio-skip-fwd" aria-label="Forward 15s" title="Forward 15s">+15s</button>
+        </div>
       </div>
     <% } %>
 
@@ -253,7 +258,7 @@
 <% } %>
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
-<script src="/static/js/audio-player.js?v=10"></script>
+<script src="/static/js/audio-player.js?v=11"></script>
 <% } %>
 
 <%- include('partials/footer') %>

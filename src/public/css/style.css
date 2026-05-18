@@ -4736,16 +4736,30 @@ body.drawer-open {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 56px;
   background: #1e1e1e;
   color: #d4d4d4;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
   z-index: 999;
   box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 16px;
+}
+
+.audio-player-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.audio-player-extra {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: 10px;
 }
 
 .audio-play-btn {
@@ -4815,6 +4829,10 @@ body.drawer-open {
 }
 .audio-skip-btn:hover { color: #fff; border-color: #888; }
 
+.audio-expand-btn {
+  display: none;
+}
+
 .audio-close-btn {
   background: none;
   border: none;
@@ -4831,17 +4849,57 @@ body.drawer-open {
    The session-content container needs relative positioning. */
 .session-content { position: relative; }
 
-/* Mobile: compact player */
+/* Mobile: compact player with expandable extra controls */
 @media (max-width: 768px) {
   .audio-fab { bottom: 80px; right: 16px; width: 42px; height: 42px; }
   .audio-player {
+    display: block;
+    height: auto;
+    padding: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Prevent jitter when mobile browser toolbar hides/shows */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+  .audio-player-main {
     height: 48px;
     gap: 6px;
     padding: 0 10px;
-    bottom: env(safe-area-inset-bottom, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  .audio-speed, .audio-skip-btn { display: none; }
+  .audio-player-extra {
+    display: none;
+    border-top: 1px solid #333;
+    padding: 8px 10px;
+    gap: 12px;
+    margin-left: 0;
+    justify-content: center;
+  }
+  .audio-player.is-expanded .audio-player-extra {
+    display: flex;
+  }
+  .audio-expand-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.2s;
+  }
+  .audio-player.is-expanded .audio-expand-btn {
+    transform: rotate(180deg);
+  }
+  .audio-skip-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+  .audio-speed {
+    padding: 4px 8px;
+    font-size: 13px;
+  }
 }
 
 /* Pad reading content when player is visible */
@@ -4852,5 +4910,8 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 @media (max-width: 768px) {
   body:has(.audio-player:not([style*="none"])) .reading-content {
     padding-bottom: 80px;
+  }
+  body:has(.audio-player.is-expanded:not([style*="none"])) .reading-content {
+    padding-bottom: 120px;
   }
 }
