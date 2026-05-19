@@ -523,14 +523,14 @@ img {
   margin: 0 6px;
 }
 .session-list .session-num.session-num--no-number {
-  width: 10px;
-  height: 10px;
-  min-width: 10px;
-  min-height: 10px;
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  min-height: 6px;
   background: var(--color-border);
   border-radius: 50%;
   font-size: 0;
-  margin: 0 calc((1.5rem - 10px) / 2);
+  margin: 0 calc((1.5rem - 6px) / 2);
 }
 
 .nav-session-name {
