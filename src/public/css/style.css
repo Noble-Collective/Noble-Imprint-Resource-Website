@@ -520,7 +520,9 @@ img {
   min-height: 8px;
   background: var(--color-border);
   font-size: 0;
-  margin: 0 7px;
+}
+.session-list .session-num.session-num--no-number {
+  margin: 0 calc((1.5rem - 8px) / 2);
 }
 
 .nav-session-name {
@@ -973,7 +975,11 @@ body.text-mode .home-text {
   font-family: var(--font-sans);
   font-size: 0.75rem;
   color: var(--color-text-light);
-  min-width: 1.5rem;
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .session-name {
