@@ -512,16 +512,22 @@ img {
   background: var(--color-green);
   color: var(--color-white);
 }
-.nav-session-item .session-num.session-num--no-number,
-.session-num.session-num--no-number {
+.nav-session-item .session-num.session-num--no-number {
   width: 8px;
   height: 8px;
   min-width: 8px;
   min-height: 8px;
   background: var(--color-border);
   font-size: 0;
+  margin: 0 7px;
 }
 .session-list .session-num.session-num--no-number {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  background: var(--color-border);
+  font-size: 0;
   margin: 0 calc((1.5rem - 8px) / 2);
 }
 
