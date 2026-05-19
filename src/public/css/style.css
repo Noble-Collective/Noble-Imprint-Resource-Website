@@ -512,6 +512,11 @@ img {
   background: var(--color-green);
   color: var(--color-white);
 }
+.session-num--no-number {
+  background: transparent;
+  color: var(--color-text-light);
+  font-size: 1rem;
+}
 
 .nav-session-name {
   font-family: var(--font-sans);
@@ -4881,9 +4886,10 @@ body.drawer-open {
   color: #666;
   font-size: 20px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 8px;
   line-height: 1;
-  margin-left: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .audio-close-btn:hover { color: #fff; }
 
@@ -4900,14 +4906,22 @@ body.drawer-open {
     padding: 0;
     bottom: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Prevent jitter when mobile browser toolbar hides/shows */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
+    position: fixed;
+  }
+  .audio-player > .audio-close-btn {
+    position: absolute;
+    top: 0;
+    right: 4px;
+    height: 48px;
+    display: flex;
+    align-items: center;
   }
   .audio-player-main {
     height: 48px;
     gap: 6px;
-    padding: 0 10px;
+    padding: 0 32px 0 10px;
   }
   .audio-jump-link {
     bottom: 56px;
