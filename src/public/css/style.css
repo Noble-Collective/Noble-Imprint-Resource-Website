@@ -513,22 +513,24 @@ img {
   color: var(--color-white);
 }
 .nav-session-item .session-num.session-num--no-number {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  min-height: 8px;
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  min-height: 10px;
   background: var(--color-border);
+  border-radius: 50%;
   font-size: 0;
-  margin: 0 7px;
+  margin: 0 6px;
 }
 .session-list .session-num.session-num--no-number {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  min-height: 8px;
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  min-height: 10px;
   background: var(--color-border);
+  border-radius: 50%;
   font-size: 0;
-  margin: 0 calc((1.5rem - 8px) / 2);
+  margin: 0 calc((1.5rem - 10px) / 2);
 }
 
 .nav-session-name {
