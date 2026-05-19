@@ -2045,6 +2045,9 @@ body.drawer-open {
 .mobile-toc-bar {
   display: none;
 }
+.mobile-toc-sidebar-dropdown {
+  display: none;
+}
 
 /* ============================================================
    RESPONSIVE
