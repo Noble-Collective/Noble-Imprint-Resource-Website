@@ -21,7 +21,7 @@
       %>
         <li>
           <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item">
-            <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum || '·' %></span>
+            <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
             <span class="nav-session-name"><%= s.displayName %></span>
             <% if (typeof suggestionCounts !== 'undefined' && suggestionCounts[s.path] > 0) { %>
               <span class="suggestion-badge"><%= suggestionCounts[s.path] %></span>
@@ -89,7 +89,7 @@
         %>
           <li>
             <a href="<%= content.sessionUrl(series, subseries, book, s) %>">
-              <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum || '·' %></span>
+              <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
               <span class="session-name"><%= s.displayName %></span>
               <% if (typeof suggestionCounts !== 'undefined' && suggestionCounts[s.path] > 0) { %>
                 <span class="suggestion-badge"><%= suggestionCounts[s.path] %></span>
