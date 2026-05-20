@@ -23,6 +23,12 @@
   const skipBack = document.getElementById('audio-skip-back');
   const skipFwd = document.getElementById('audio-skip-fwd');
 
+  // Wrap scrubber in a container for H2 markers
+  const scrubberContainer = document.createElement('div');
+  scrubberContainer.className = 'audio-scrubber-container';
+  scrubber.parentNode.insertBefore(scrubberContainer, scrubber);
+  scrubberContainer.appendChild(scrubber);
+
   let audioEl = null;
   let signedUrl = null;
   let timestamps = null;
@@ -102,6 +108,44 @@
       });
     }
     console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments to ${blockEls.length} block elements`);
+    renderH2Markers();
+  }
+
+  // --- H2 section markers on the scrubber ---
+  function renderH2Markers() {
+    if (!segmentMap || !totalDuration) return;
+
+    // Clear existing markers
+    scrubberContainer.querySelectorAll('.scrubber-h2-marker').forEach(m => m.remove());
+
+    // Collect unique H2 segments (first segment per H2 element)
+    const seen = new Set();
+    const h2Segments = [];
+    for (const seg of segmentMap) {
+      if (seg.el && seg.el.tagName === 'H2' && !seen.has(seg.el)) {
+        seen.add(seg.el);
+        h2Segments.push(seg);
+      }
+    }
+
+    if (h2Segments.length === 0) return;
+
+    for (const seg of h2Segments) {
+      const pct = (seg.start / totalDuration) * 100;
+      const marker = document.createElement('div');
+      marker.className = 'scrubber-h2-marker';
+      marker.style.left = pct + '%';
+      marker.title = seg.el.textContent.trim();
+      marker.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (audioEl) {
+          audioEl.currentTime = seg.start;
+          forceHighlightUpdate();
+        }
+      });
+      scrubberContainer.appendChild(marker);
+    }
+    console.log(`[audio] Rendered ${h2Segments.length} H2 markers on scrubber`);
   }
 
   // --- Highlight via positioned overlay (no DOM modification) ---
