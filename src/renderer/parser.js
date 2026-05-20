@@ -200,22 +200,19 @@ function renderMarkdown(content, options = {}) {
   const shorthandPat = new RegExp(`\\(((?:cf\\.\\s?)?(?:${shorthandVerseSpec})(?:;\\s?(?:cf\\.\\s?)?(?:${shorthandVerseSpec}))*)\\)`, 'g');
 
   // First pass: find all full references to build a context map.
-  // Only track current book from "Biblical Narrative (Book Ch:V)" section
-  // declarations — these set the primary book for the section.
-  // Other inline refs (cf., Psalm quotes, etc.) don't change context.
-  let currentBook = null;
-  const bookAtPosition = []; // [{pos, book}]
+  // Section declarations ("Biblical Narrative (Book Ch:V)") are authoritative.
+  // Inline refs only update context when no section declaration is active.
+  const bookAtPosition = []; // [{pos, book, isSection}]
 
   // Look for "Biblical Narrative (Book Ch:V)" pattern — the section declarations
   const sectionDeclPat = new RegExp(`Biblical Narrative \\((${bookNamePat})\\s${verseSpecPat}`, 'g');
   let sd;
   while ((sd = sectionDeclPat.exec(html)) !== null) {
-    currentBook = sd[1];
-    bookAtPosition.push({ pos: sd.index, book: currentBook });
+    bookAtPosition.push({ pos: sd.index, book: sd[1], isSection: true });
   }
+  const hasSectionDecls = bookAtPosition.length > 0;
 
-  // Also track from heading-level full refs and standalone primary citations
-  // that are NOT inside parentheses with cf. or semicolons (compound refs)
+  // Also track from standalone full references (not cf., not compound)
   let fm;
   fullRefPat.lastIndex = 0;
   while ((fm = fullRefPat.exec(html)) !== null) {
@@ -231,9 +228,11 @@ function renderMarkdown(content, options = {}) {
     // Skip if preceded by semicolon (part of a compound ref like "; Psalm 16:8-11")
     const precSemicolon = html.substring(Math.max(0, fm.index - 3), fm.index);
     if (/;\s?$/.test(precSemicolon)) continue;
-    // Update context — full standalone references (not cf., not compound)
-    // indicate the discussion has moved to this book
-    bookAtPosition.push({ pos: fm.index, book: fm[1] });
+    // If section declarations exist, inline refs don't change context —
+    // they're incidental quotes within a declared section
+    if (hasSectionDecls) continue;
+    // No section declarations (e.g., HomeStead) — inline refs set context
+    bookAtPosition.push({ pos: fm.index, book: fm[1], isSection: false });
   }
 
   function getBookAt(pos) {
