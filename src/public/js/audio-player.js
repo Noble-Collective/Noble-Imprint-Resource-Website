@@ -109,6 +109,7 @@
     }
     console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments to ${blockEls.length} block elements`);
     renderH2Markers();
+    renderHeadingAudioIcons();
   }
 
   // --- H2 section markers on the scrubber ---
@@ -146,6 +147,47 @@
       scrubberContainer.appendChild(marker);
     }
     console.log(`[audio] Rendered ${h2Segments.length} H2 markers on scrubber`);
+  }
+
+  // --- Heading audio icons (clickable jump-to-audio links) ---
+  function renderHeadingAudioIcons() {
+    if (!segmentMap || !totalDuration) return;
+
+    const headingTags = new Set(['H1', 'H2', 'H3', 'H4']);
+    const seen = new Set();
+
+    for (const seg of segmentMap) {
+      if (!seg.el || !headingTags.has(seg.el.tagName) || seen.has(seg.el)) continue;
+      seen.add(seg.el);
+
+      const icon = document.createElement('a');
+      icon.className = 'heading-audio-icon';
+      icon.href = '#';
+      icon.title = 'Jump to audio';
+      icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>';
+      const startTime = seg.start;
+      icon.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!audioEl) {
+          // Start audio and seek after it loads
+          togglePlay().then(function () {
+            if (audioEl) {
+              audioEl.currentTime = startTime;
+              forceHighlightUpdate();
+            }
+          });
+        } else {
+          audioEl.currentTime = startTime;
+          if (audioEl.paused) {
+            audioEl.play();
+            showPlaying();
+          }
+          forceHighlightUpdate();
+        }
+      });
+      seg.el.appendChild(icon);
+    }
   }
 
   // --- Highlight via positioned overlay (no DOM modification) ---

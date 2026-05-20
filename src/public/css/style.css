@@ -4962,6 +4962,33 @@ body.drawer-open {
    The session-content container needs relative positioning. */
 .session-content { position: relative; }
 
+.heading-audio-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  vertical-align: middle;
+  color: #aaa;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-decoration: none;
+}
+.heading-audio-icon:hover {
+  color: var(--color-green);
+  opacity: 1;
+}
+h1:hover .heading-audio-icon,
+h2:hover .heading-audio-icon,
+h3:hover .heading-audio-icon,
+h4:hover .heading-audio-icon {
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .heading-audio-icon {
+    opacity: 0.4;
+  }
+}
+
 /* Mobile: compact player with expandable extra controls */
 @media (max-width: 768px) {
   .audio-fab { bottom: 80px; right: 16px; width: 42px; height: 42px; }
