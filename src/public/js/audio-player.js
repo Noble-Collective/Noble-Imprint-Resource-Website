@@ -84,27 +84,53 @@
     const contentEl = document.querySelector('.session-content');
     if (!contentEl) return;
 
-    // Build ordered list of block elements (h1-h6, p) — index matches blockIndex
     const blockEls = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6, p'));
     segmentMap = [];
 
+    // Match segments to DOM elements by text content, not by blockIndex position.
+    // The preprocessor and renderer may produce different element counts (due to
+    // Question tags, list items, tables, etc.), so blockIndex is unreliable as
+    // a direct array index. Instead, search forward through DOM elements for each
+    // segment's text.
+    let searchFrom = 0;
+
     for (const seg of timestamps.segments) {
-      const bi = seg.blockIndex;
-      const si = seg.sentenceIndex;
-
-      if (bi === undefined || bi >= blockEls.length) continue;
-
-      const el = blockEls[bi];
       const text = seg.text;
       const needle = norm(text).replace(/\.\s*$/, '');
+      if (!needle) continue;
+
+      // Find the DOM element containing this text, searching forward from last match
+      let el = null;
+      const shortNeedle = needle.substring(0, 30);
+      for (let i = searchFrom; i < blockEls.length; i++) {
+        const elText = norm(blockEls[i].textContent);
+        if (elText.includes(shortNeedle)) {
+          el = blockEls[i];
+          searchFrom = i; // don't advance past — multiple sentences share one element
+          break;
+        }
+      }
+
+      // Fallback: search from the beginning if not found forward
+      if (!el) {
+        for (let i = 0; i < searchFrom; i++) {
+          const elText = norm(blockEls[i].textContent);
+          if (elText.includes(shortNeedle)) {
+            el = blockEls[i];
+            break;
+          }
+        }
+      }
+
+      if (!el) continue;
 
       segmentMap.push({
         start: seg.start,
         end: seg.end,
         el: el,
-        sentenceIndex: si,
+        sentenceIndex: seg.sentenceIndex,
         needle: needle,
-        matchStr: needle.substring(0, 40),
+        matchStr: shortNeedle,
       });
     }
     console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments to ${blockEls.length} block elements`);
