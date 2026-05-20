@@ -87,38 +87,24 @@
     const blockEls = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6, p'));
     segmentMap = [];
 
-    // Match segments to DOM elements by text content, not by blockIndex position.
-    // The preprocessor and renderer may produce different element counts (due to
-    // Question tags, list items, tables, etc.), so blockIndex is unreliable as
-    // a direct array index. Instead, search forward through DOM elements for each
-    // segment's text.
+    // Pre-compute normalized text for all DOM elements (once, not per-segment)
+    const blockTexts = blockEls.map(el => norm(el.textContent));
+
+    // Match segments to DOM elements by text content, searching forward.
     let searchFrom = 0;
 
     for (const seg of timestamps.segments) {
-      const text = seg.text;
-      const needle = norm(text).replace(/\.\s*$/, '');
+      const needle = norm(seg.text).replace(/\.\s*$/, '');
       if (!needle) continue;
 
-      // Find the DOM element containing this text, searching forward from last match
-      let el = null;
       const shortNeedle = needle.substring(0, 30);
-      for (let i = searchFrom; i < blockEls.length; i++) {
-        const elText = norm(blockEls[i].textContent);
-        if (elText.includes(shortNeedle)) {
-          el = blockEls[i];
-          searchFrom = i; // don't advance past — multiple sentences share one element
-          break;
-        }
-      }
+      let el = null;
 
-      // Fallback: search from the beginning if not found forward
-      if (!el) {
-        for (let i = 0; i < searchFrom; i++) {
-          const elText = norm(blockEls[i].textContent);
-          if (elText.includes(shortNeedle)) {
-            el = blockEls[i];
-            break;
-          }
+      for (let i = searchFrom; i < blockEls.length; i++) {
+        if (blockTexts[i].includes(shortNeedle)) {
+          el = blockEls[i];
+          searchFrom = i;
+          break;
         }
       }
 
