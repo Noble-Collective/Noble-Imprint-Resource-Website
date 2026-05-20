@@ -544,4 +544,8 @@
       forceHighlightUpdate();
     }
   });
+
+  // Load timestamps eagerly so heading icons and scrubber markers
+  // appear immediately, not after first play
+  loadTimestamps();
 })();
