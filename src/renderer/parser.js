@@ -231,12 +231,8 @@ function renderMarkdown(content, options = {}) {
     // Skip if preceded by semicolon (part of a compound ref like "; Psalm 16:8-11")
     const precSemicolon = html.substring(Math.max(0, fm.index - 3), fm.index);
     if (/;\s?$/.test(precSemicolon)) continue;
-    // Only update context if it's the same book already set, or if no context yet
-    // This prevents one-off quotes of other books from hijacking the context
-    if (bookAtPosition.length > 0) {
-      const lastBook = bookAtPosition[bookAtPosition.length - 1].book;
-      if (fm[1] !== lastBook) continue; // Different book — don't update context
-    }
+    // Update context — full standalone references (not cf., not compound)
+    // indicate the discussion has moved to this book
     bookAtPosition.push({ pos: fm.index, book: fm[1] });
   }
 
