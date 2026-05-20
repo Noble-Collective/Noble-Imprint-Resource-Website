@@ -87,28 +87,54 @@
     const blockEls = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6, p'));
     segmentMap = [];
 
-    // Pre-compute normalized text for all DOM elements (once, not per-segment)
+    // Pre-compute normalized text for all DOM elements once
     const blockTexts = blockEls.map(el => norm(el.textContent));
 
-    // Match segments to DOM elements by text content, searching forward.
-    let searchFrom = 0;
+    // Hybrid matching: use blockIndex as a starting hint, then search nearby
+    // for the element whose text matches. Track which elements are already
+    // matched to avoid duplicate assignments (e.g., "Conclusion" matching
+    // an H6 when the H2 is the correct target).
+    let offsetAdjust = 0;
+    const matchedEls = new Set();
 
     for (const seg of timestamps.segments) {
       const needle = norm(seg.text).replace(/\.\s*$/, '');
       if (!needle) continue;
 
       const shortNeedle = needle.substring(0, 30);
+      const hintIdx = (seg.blockIndex || 0) + offsetAdjust;
       let el = null;
+      let foundIdx = -1;
 
-      for (let i = searchFrom; i < blockEls.length; i++) {
+      // Search forward from hint, then backward if not found.
+      // Skip already-matched elements (unless sentenceIndex > 0).
+      const start = Math.max(0, Math.min(hintIdx, blockEls.length - 1));
+      for (let i = start; i < blockEls.length; i++) {
         if (blockTexts[i].includes(shortNeedle)) {
+          if (seg.sentenceIndex === 0 && matchedEls.has(i)) continue;
           el = blockEls[i];
-          searchFrom = i;
+          foundIdx = i;
           break;
+        }
+      }
+      if (!el) {
+        for (let i = start - 1; i >= 0; i--) {
+          if (blockTexts[i].includes(shortNeedle)) {
+            if (seg.sentenceIndex === 0 && matchedEls.has(i)) continue;
+            el = blockEls[i];
+            foundIdx = i;
+            break;
+          }
         }
       }
 
       if (!el) continue;
+
+      if (seg.sentenceIndex === 0) matchedEls.add(foundIdx);
+
+      // Update offset adjustment for future segments
+      const expectedIdx = seg.blockIndex || 0;
+      offsetAdjust = foundIdx - expectedIdx;
 
       segmentMap.push({
         start: seg.start,
