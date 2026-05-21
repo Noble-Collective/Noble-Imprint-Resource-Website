@@ -106,26 +106,20 @@
       let el = null;
       let foundIdx = -1;
 
-      // Search forward from hint, then backward if not found.
-      // Skip already-matched elements (unless sentenceIndex > 0).
-      const start = Math.max(0, Math.min(hintIdx, blockEls.length - 1));
-      for (let i = start; i < blockEls.length; i++) {
-        if (blockTexts[i].includes(shortNeedle)) {
+      // Search outward from hint in expanding distance — finds the CLOSEST
+      // matching element, not just the first forward or backward match.
+      // Critical for duplicate headings like "Core Principle", "Introduction".
+      const center = Math.max(0, Math.min(hintIdx, blockEls.length - 1));
+      for (let dist = 0; dist < blockEls.length; dist++) {
+        for (const i of (dist === 0 ? [center] : [center + dist, center - dist])) {
+          if (i < 0 || i >= blockEls.length) continue;
+          if (!blockTexts[i].includes(shortNeedle)) continue;
           if (seg.sentenceIndex === 0 && matchedEls.has(i)) continue;
           el = blockEls[i];
           foundIdx = i;
           break;
         }
-      }
-      if (!el) {
-        for (let i = start - 1; i >= 0; i--) {
-          if (blockTexts[i].includes(shortNeedle)) {
-            if (seg.sentenceIndex === 0 && matchedEls.has(i)) continue;
-            el = blockEls[i];
-            foundIdx = i;
-            break;
-          }
-        }
+        if (el) break;
       }
 
       if (!el) continue;
