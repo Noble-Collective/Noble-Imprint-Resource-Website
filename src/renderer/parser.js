@@ -33,6 +33,13 @@ function preprocess(raw, options = {}) {
     (_, content) => `${content}<!--PULLQUOTE:${content.trim()}:ENDPULLQUOTE-->`
   );
 
+  // ── ChapterNum → styled inline section number ──
+  // <ChapterNum>1</ChapterNum> → <span class="chapter-num">1</span>
+  text = text.replace(
+    /<ChapterNum>([\s\S]*?)<\/ChapterNum>/g,
+    (_, content) => `<span class="chapter-num">${content.trim()}</span>`
+  );
+
   // ── Attribution ──
   // << **1 Peter 2:24** → right-aligned div
   text = text.replace(
@@ -165,6 +172,13 @@ function renderMarkdown(content, options = {}) {
       ).join('');
       return `${open}${cleaned}${close}\n${pullquotes}`;
     }
+  );
+
+  // Sub-paragraph indentation: paragraphs starting with a bold number
+  // (e.g. **2** Some text...) get a class for first-line text-indent.
+  html = html.replace(
+    /<p><strong>(\d{1,2})<\/strong>/g,
+    '<p class="sub-para"><strong>$1</strong>'
   );
 
   // Detect Bible references and wrap in clickable links.

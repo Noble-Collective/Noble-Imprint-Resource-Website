@@ -1252,6 +1252,17 @@ body.text-mode .home-text {
   margin: 0;
 }
 
+/* Chapter section number (e.g. Seneca's original paragraph numbers) */
+.chapter-num {
+  font-weight: 700;
+  color: #1e2b3d;
+}
+
+/* Sub-paragraph indent (paragraphs starting with bold number) */
+.sub-para {
+  text-indent: 1.5em;
+}
+
 /* Question block */
 .question-block {
   border-left: 3px solid var(--color-gold);
