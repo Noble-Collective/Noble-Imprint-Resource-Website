@@ -191,7 +191,7 @@
   function renderHeadingAudioIcons() {
     if (!segmentMap || !totalDuration) return;
 
-    const headingTags = new Set(['H1', 'H2', 'H3', 'H4']);
+    const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
     const seen = new Set();
 
     for (const seg of segmentMap) {

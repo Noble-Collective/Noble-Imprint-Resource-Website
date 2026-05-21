@@ -4979,7 +4979,9 @@ body.drawer-open {
 h1:hover .heading-audio-icon,
 h2:hover .heading-audio-icon,
 h3:hover .heading-audio-icon,
-h4:hover .heading-audio-icon {
+h4:hover .heading-audio-icon,
+h5:hover .heading-audio-icon,
+h6:hover .heading-audio-icon {
   opacity: 0.5;
 }
 
