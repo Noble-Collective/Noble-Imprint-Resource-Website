@@ -250,6 +250,51 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
     }
   }
 
+  // Fallback: if position is still 0 and we have context + file content, try
+  // context-based resolution (same approach as resolveAnchor at accept time).
+  // This catches cases where the bot sends a wrong lineNumber but good context.
+  if (originalFrom === 0 && originalTo === 0 && fileContent && originalText) {
+    // Try contextBefore + originalText + contextAfter
+    if (contextBefore && contextAfter) {
+      const full = contextBefore + originalText + contextAfter;
+      const pos = fileContent.indexOf(full);
+      if (pos >= 0) {
+        originalFrom = pos + contextBefore.length;
+        originalTo = originalFrom + originalText.length;
+        console.log('[CONTEXT-RESOLVE] Full context match at position', originalFrom);
+      }
+    }
+    // Try contextBefore + originalText
+    if (originalFrom === 0 && contextBefore) {
+      const partial = contextBefore + originalText;
+      const pos = fileContent.indexOf(partial);
+      if (pos >= 0) {
+        originalFrom = pos + contextBefore.length;
+        originalTo = originalFrom + originalText.length;
+        console.log('[CONTEXT-RESOLVE] Prefix context match at position', originalFrom);
+      }
+    }
+    // Try originalText + contextAfter
+    if (originalFrom === 0 && contextAfter) {
+      const partial = originalText + contextAfter;
+      const pos = fileContent.indexOf(partial);
+      if (pos >= 0) {
+        originalFrom = pos;
+        originalTo = originalFrom + originalText.length;
+        console.log('[CONTEXT-RESOLVE] Suffix context match at position', originalFrom);
+      }
+    }
+    // Bare text search for unique long strings
+    if (originalFrom === 0 && originalText.length >= 20) {
+      const pos = fileContent.indexOf(originalText);
+      if (pos >= 0 && fileContent.indexOf(originalText, pos + 1) === -1) {
+        originalFrom = pos;
+        originalTo = pos + originalText.length;
+        console.log('[CONTEXT-RESOLVE] Unique bare text match at position', originalFrom);
+      }
+    }
+  }
+
   // Deduplication: check for an existing pending suggestion with the same text
   // at an overlapping position (±5 chars). Prevents duplicates from rapid auto-save
   // cycles or two users making the exact same edit.
