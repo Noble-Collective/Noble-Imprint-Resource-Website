@@ -69,19 +69,26 @@ Body: {
   "bookPath": "series/..../BookName",
   "baseCommitSha": "{sha from content read}",
   "type": "replacement" | "insertion" | "deletion",
-  "originalFrom": 0,
-  "originalTo": 0,
+  "originalFrom": 1234,
+  "originalTo": 1260,
   "originalText": "the text being replaced or deleted",
   "newText": "the replacement text (empty for deletion)",
   "lineNumber": 42,
-  "contextBefore": "~50 chars before the edit in the original",
-  "contextAfter": "~50 chars after the edit in the original",
+  "contextBefore": "80 chars immediately before originalText in the file",
+  "contextAfter": "80 chars immediately after originalText in the file",
   "reason": "Brief explanation of why this change is suggested"
 }
 ```
 Returns: `{ id, status: "ok", replyId: "..." }`
 
-**`lineNumber` is required.** This is the 1-based line number in the file where the edit occurs. The API uses it to resolve the correct position when the same text appears multiple times (e.g., repeated template instructions across sessions). Compute it by counting newlines before the edit position: `content.substring(0, position).split('\n').length`. Each occurrence of repeated text must be submitted with its own correct line number — do NOT use `indexOf()` to find the position, as it always returns the first occurrence.
+**Position fields are critical for correct rendering.** Compute them precisely:
+- **`originalFrom`**: The 0-based character offset where `originalText` starts in the file content. Compute with `content.indexOf(originalText)` — but if the text appears more than once, you MUST find the correct occurrence near `lineNumber` (see below).
+- **`originalTo`**: `originalFrom + originalText.length`
+- **`lineNumber`**: The 1-based line number where the edit occurs. Compute: `content.substring(0, originalFrom).split('\n').length`. This is used as a secondary resolver and for disambiguation when the same text appears multiple times.
+- **`contextBefore`**: The 80 characters immediately before `originalFrom` in the file: `content.substring(Math.max(0, originalFrom - 80), originalFrom)`. Must be the actual surrounding text, not text from elsewhere in the file.
+- **`contextAfter`**: The 80 characters immediately after `originalTo` in the file: `content.substring(originalTo, originalTo + 80)`. Must be the actual surrounding text.
+
+**Finding the correct position for repeated text:** If `originalText` appears more than once in the file, do NOT use bare `indexOf()` — it always returns the first occurrence. Instead, find the occurrence on the correct line: split the content into lines, compute the character offset of `lineNumber`, then search for `originalText` near that offset.
 
 The `reason` field is **required for every suggestion**. It creates a reply on the suggestion card explaining the rationale. Keep it to one short sentence (e.g., "Correcting subject-verb agreement" or "Simplifying for clarity"). Reviewers see this reason as a reply thread on the suggestion card in the editor.
 
