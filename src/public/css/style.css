@@ -1255,6 +1255,7 @@ body.text-mode .home-text {
 /* Chapter section number (e.g. Seneca's original paragraph numbers) */
 .chapter-num {
   font-weight: 700;
+  font-size: 1.5em;
   color: #1e2b3d;
 }
 
