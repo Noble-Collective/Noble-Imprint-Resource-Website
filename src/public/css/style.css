@@ -1272,7 +1272,6 @@ body.text-mode .home-text {
 
 .footnotes {
   font-family: var(--font-reading);
-  font-size: 0.7em;
   color: var(--color-text-light);
   line-height: 1.6;
 }
@@ -1282,11 +1281,15 @@ body.text-mode .home-text {
   margin: 0;
 }
 
-.footnotes li {
+.session-content .footnotes li,
+.reading-content .footnotes li {
+  font-size: 13px;
   margin-bottom: 0.5em;
 }
 
-.footnotes li p {
+.session-content .footnotes li p,
+.reading-content .footnotes li p {
+  font-size: 13px;
   margin: 0;
 }
 
