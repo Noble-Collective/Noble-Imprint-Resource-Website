@@ -6,7 +6,21 @@ Noble Imprint Resource Website — a collaborative discipleship resource editor 
 
 Read `SESSION.md` (gitignored, in repo root) for full project context.
 
-## Recent Work (2026-04-23)
+## Recent Work (2026-05-07 — 2026-05-10)
+
+**Accept bug fix** — Race condition when accepting two suggestions rapidly. Auto-save could fire during accept→refresh cycle, corrupting editor state. Three guards suppress auto-save during accepts.
+
+**Patience diff algorithm** — Replaced Myers with Patience diff for line-level comparison. Anchors on unique lines (headings, distinctive sentences), producing 25% fewer changes for prose. Fuzzy pairing with stop-word filtering, dedup pass, dual breadcrumbs from both files.
+
+**Image rendering** — Session pages render images from `sessions/images/` folders. Extensionless proxy auto-discovers `.webp`/`.png`/`.jpg`. Uses `getFileBinary` for binary data. Images must be under ~1MB for GitHub API.
+
+**Cover image refresh** — `/api/refresh` now clears disk cache and re-discovers bible cover paths. Cover changes take effect without redeploy.
+
+## Earlier Work (2026-05-04 — 2026-05-05)
+
+**Diff report overhaul** — Split/merged view toggles, collapsible sidebar, file upload comparison, clean copy column with Copy button + macOS RTF Shortcut, text-only filter, patience diff, sticky header with color-coded column labels. Key files: `src/server/admin-routes.js`, `src/server/patience-diff.js`, `src/public/js/admin.js`, `src/public/css/style.css`. Setup docs: `docs/diff-report-copy-paste.md`.
+
+## Earlier Work (2026-04-23)
 
 **Direct edit locking** — `mode` field on presence heartbeats. Block entering direct edit if another user already has active direct edit session. Block accepting suggestions server-side (423) + client-side (disabled buttons, lock banner). Fail-open on network errors.
 

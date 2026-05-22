@@ -351,7 +351,9 @@ api.get('/diff-report', async (req, res) => {
 
       const SIMILARITY_THRESHOLD = 0.65;
       const MIN_TEXT_LENGTH = 80;
-      const MAX_SIZE_RATIO = 3;
+      const MAX_SIZE_RATIO = 5;
+
+      // No pre-split needed — patience diff handles paragraph-level matching
 
       const unpairedRemoved = [];
       const unpairedAdded = [];
@@ -562,6 +564,8 @@ api.post('/diff-report-upload', async (req, res) => {
       for (const w of setA) { if (setB.has(w)) shared++; }
       return shared / Math.max(setA.size, setB.size);
     }
+      // No pre-split needed
+
     const unpairedRemoved2 = [], unpairedAdded2 = [];
     chunks.forEach((c, i) => {
       if (c.type === 'removed') unpairedRemoved2.push(i);
