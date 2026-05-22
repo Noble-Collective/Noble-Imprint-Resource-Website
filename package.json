@@ -20,6 +20,7 @@
     "js-yaml": "^4.1.0",
     "mailgun.js": "^13.0.0",
     "markdown-it": "^14.1.0",
+    "markdown-it-footnote": "^4.0.0",
     "mjml": "^5.1.0",
     "octokit": "^4.1.0"
   },

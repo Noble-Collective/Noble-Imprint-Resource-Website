@@ -1263,6 +1263,53 @@ body.text-mode .home-text {
   text-indent: 1.5em;
 }
 
+/* Footnotes */
+.footnotes-sep {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 3rem 0 1.5rem;
+}
+
+.footnotes {
+  font-family: var(--font-reading);
+  font-size: 0.85em;
+  color: var(--color-text-light);
+  line-height: 1.6;
+}
+
+.footnotes ol {
+  padding-left: 1.5em;
+  margin: 0;
+}
+
+.footnotes li {
+  margin-bottom: 0.5em;
+}
+
+.footnotes li p {
+  margin: 0;
+}
+
+.footnote-ref a {
+  color: var(--color-green);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+.footnote-backref {
+  color: var(--color-green);
+  text-decoration: none;
+  margin-left: 0.25em;
+}
+
+.footnote-backref:hover {
+  text-decoration: underline;
+}
+
 /* Question block */
 .question-block {
   border-left: 3px solid var(--color-gold);

@@ -1,4 +1,5 @@
 const MarkdownIt = require('markdown-it');
+const footnotePlugin = require('markdown-it-footnote');
 
 // Pre-process custom syntax in raw markdown BEFORE markdown-it sees it.
 // This is the most reliable approach since markdown-it's HTML parser
@@ -101,6 +102,8 @@ function createRenderer(options = {}) {
     linkify: true,
     typographer: true,
   });
+
+  md.use(footnotePlugin);
 
   // ── Heading colors + id slugs from meta.json ──
   const defaultOpen = md.renderer.rules.heading_open;
