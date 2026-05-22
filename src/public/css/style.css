@@ -1272,7 +1272,7 @@ body.text-mode .home-text {
 
 .footnotes {
   font-family: var(--font-reading);
-  font-size: 0.78em;
+  font-size: 0.7em;
   color: var(--color-text-light);
   line-height: 1.6;
 }
@@ -1295,7 +1295,7 @@ body.text-mode .home-text {
   scroll-margin-top: 100px;
 }
 
-.footnote-ref {
+.footnote-ref a[id] {
   scroll-margin-top: 100px;
 }
 
