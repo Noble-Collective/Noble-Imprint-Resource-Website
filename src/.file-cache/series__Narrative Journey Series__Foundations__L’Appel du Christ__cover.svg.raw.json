@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 396 612">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&amp;display=swap');
+    </style>
+    <clipPath id="clippath">
+      <rect width="396" height="612" style="fill: none;"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="396" height="198.72" style="fill: #768a93;"/>
+  <rect y="198.72" width="396" height="413.28" style="fill: #4a5960;"/>
+
+  <!-- Bordered box for main title -->
+  <rect x="38" y="42.89" width="320" height="113.31" style="fill: none; stroke: #4a5960; stroke-width: 4px;"/>
+
+  <!-- Top label bar: subtitle -->
+  <rect x="52.56" y="36" width="240" height="16.11" style="fill: #4a5960;"/>
+  <text x="172.56" y="47.5" text-anchor="middle" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 7.2px; letter-spacing: 1.2px;">UN VOYAGE NARRATIF DE LA FOI CHRÉTIENNE</text>
+
+  <!-- Main title: FOI -->
+  <text x="198" y="120" text-anchor="middle" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: 80px; letter-spacing: 18px;">FOI</text>
+
+  <!-- Bottom label bar: author -->
+  <rect x="220.46" y="146.61" width="122.98" height="16.11" style="fill: #4a5960;"/>
+  <text x="281.95" y="157.5" text-anchor="middle" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 7.2px; letter-spacing: 1.2px;">MATTHEW R. LYNSKEY</text>
+
+  <!-- Translator credit -->
+  <text x="281.95" y="175" text-anchor="middle" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 400; font-size: 6.5px; letter-spacing: 0.8px;">Traduit par Ibrahim Salifou</text>
+
+  <!-- Cross symbol with circle -->
+  <g style="clip-path: url(#clippath);">
+    <path d="M321.47,299.39c21.01,0,38.03-17.03,38.03-38.03s-17.03-38.04-38.03-38.04-38.03,17.03-38.03,38.04,17.03,38.03,38.03,38.03Z" style="fill: none; stroke: #768a93;"/>
+  </g>
+  <polygon points="339.79 248.64 325.15 248.64 325.15 233.44 317.78 233.44 317.78 248.64 303.14 248.64 303.14 256.01 317.78 256.01 317.78 290.13 325.15 290.13 325.15 256.01 339.79 256.01 339.79 248.64" style="fill: #768a93;"/>
+  <polygon points="341.59 246.94 326.87 246.94 326.87 231.74 316.06 231.74 316.06 246.94 301.34 246.94 301.34 257.71 316.06 257.71 316.06 291.83 326.87 291.83 326.87 257.71 341.59 257.71 341.59 246.94" style="fill: none; stroke: #768a93; stroke-miterlimit: 10; stroke-width: .5px;"/>
+
+  <!-- Bottom text: L'APPEL DU CHRIST -->
+  <text x="40" y="390" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: 55px; letter-spacing: 3px;">L'APPEL</text>
+  <text x="40" y="468" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: 55px; letter-spacing: 3px;">DU</text>
+  <text x="40" y="546" style="fill: #fff; font-family: 'Montserrat', sans-serif; font-weight: 300; font-size: 55px; letter-spacing: 3px;">CHRIST</text>
+</svg>
