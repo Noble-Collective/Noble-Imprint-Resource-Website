@@ -27,8 +27,8 @@
         </g>
         <g id="Layer-13" serif:id="Layer 1" transform="matrix(0.514363,0,0,0.514363,1163.657529,2194.254821)">
             <g transform="matrix(1.944152,0,0,1.944152,1275.258953,-2902.276758)">
-                <text x="207.748px" y="1621.521px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">MA<tspan x="305.348px 344.881px " y="1621.521px 1621.521px ">TT</tspan>HEW R. L<tspan x="670.881px 714.081px " y="1621.521px 1621.521px ">YN</tspan>SKEY</text>
-                <text x="207.748px" y="1698.267px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">BR<tspan x="299.148px 337.414px 381.881px " y="1698.267px 1698.267px 1698.267px ">YAN</tspan> D. PLA<tspan x="654.814px 688.214px 732.681px " y="1698.267px 1698.267px 1698.267px ">TAN</tspan>IA</text>
+                <text x="207.748px" y="1621.521px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">MA<tspan>TT</tspan>HEW R. L<tspan>YN</tspan>SKEY</text>
+                <text x="207.748px" y="1698.267px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">BR<tspan>YAN</tspan> D. PLA<tspan>TAN</tspan>IA</text>
             </g>
             <g transform="matrix(1.944152,0,0,1.944152,3086.246752,-2902.276758)">
                 <g transform="matrix(175,0,0,175,723.861244,1698.568805)">
@@ -71,10 +71,10 @@
             <path d="M3421.585,0L3486,0" style="fill:none;stroke:black;stroke-width:0.69px;"/>
         </g>
         <g transform="matrix(1,0,0,1,1824.122275,-946.244693)">
-            <text x="207.748px" y="1618.227px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">A RITE OF P<tspan x="584.548px 629.014px " y="1618.227px 1618.227px ">AS</tspan>SAGE INTO CHRISTIAN</text>
+            <text x="207.748px" y="1618.227px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">A RITE OF P<tspan>AS</tspan>SAGE INTO CHRISTIAN</text>
             <g transform="matrix(66.666667,0,0,66.666667,757.281149,1701.560471)">
             </g>
-            <text x="207.748px" y="1701.56px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">RISK AND V<tspan x="576.948px 621.414px " y="1701.56px 1701.56px ">AL</tspan>OR</text>
+            <text x="207.748px" y="1701.56px" style="font-family:'HelveticaNeue-Medium', 'Helvetica Neue', sans-serif;font-weight:500;font-size:66.667px;fill:rgb(249,243,217);">RISK AND V<tspan>AL</tspan>OR</text>
         </g>
         <g transform="matrix(0.146617,0,0,0.146617,3305.368181,253.851991)">
             <g transform="matrix(1,0,0,1,-1041.666667,-1041.666667)">
@@ -417,7 +417,7 @@
             </g>
         </g>
         <g id="BaseCamp-2.png" transform="matrix(0.377076,0,0,0.377076,2338.741846,813.73365)">
-            <use xlink:href="#_Image2" x="0" y="0" width="2115px" height="3375px"/>
+            
         </g>
     </g>
     <defs>
