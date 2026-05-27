@@ -2,33 +2,7 @@
 
   <!-- ===== SIDEBAR: Session Navigation ===== -->
   <aside class="sidebar">
-    <a href="<%= content.bookUrl(series, subseries, book) %>" class="sidebar-back">&larr; <%= book.title %></a>
-
-    <ul class="nav-session-list">
-      <% book.sessions.forEach(function(s, i) {
-        // Extract number from display name: "Chapter One" → 1, "Session 3" → 3
-        var wordNums = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
-        var numMatch = s.displayName.match(/\b(\d+)\b/) || s.displayName.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
-        var sessionNum = numMatch ? (wordNums[numMatch[1].toLowerCase()] || numMatch[1]) : '';
-      %>
-        <li>
-          <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item<%= s.slug === session.slug ? ' active' : '' %>">
-            <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
-            <span class="nav-session-name"><%= s.displayName %></span>
-          </a>
-          <% if (s.slug === session.slug && h2s && h2s.length > 0) { %>
-            <ul class="nav-h2-list">
-              <% h2s.forEach(function(h) { %>
-                <li>
-                  <a href="#<%= h.slug %>" class="nav-h2-item"><%= h.text %></a>
-                </li>
-              <% }); %>
-            </ul>
-          <% } %>
-        </li>
-      <% }); %>
-    </ul>
-    <%- include('partials/sidebar-auth') %>
+    <%- include('partials/session-sidebar') %>
   </aside>
 
   <!-- ===== MOBILE TOC BAR ===== -->
@@ -41,44 +15,14 @@
   </div>
 
   <!-- ===== MAIN CONTENT ===== -->
-  <main class="main">
+  <main class="main" data-book-url="<%= content.bookUrl(series, subseries, book) %>">
     <div class="reading-top">
       <div class="breadcrumb">
-        <a href="/">Resources</a> <span>&rsaquo;</span>
-        <a href="/#series-<%= series.slug %>"><%= series.title %></a>
-        <% if (subseries) { %>
-          <span>&rsaquo;</span>
-          <a href="/#series-<%= series.slug %>"><%= subseries.title %></a>
-        <% } %>
-        <span>&rsaquo;</span>
-        <a href="<%= content.bookUrl(series, subseries, book) %>"><%= book.title %></a>
-        <span>&rsaquo;</span>
-        <%= session.title || session.displayName %>
+        <%- include('partials/session-breadcrumb') %>
       </div>
     </div>
 
-    <% if (typeof editUnavailable !== 'undefined' && editUnavailable) { %>
-      <div class="edit-toolbar edit-toolbar--unavailable" id="edit-toolbar">
-        <span class="edit-unavailable-msg">Editing temporarily unavailable — GitHub API rate limit reached.<% if (typeof rateLimitReset !== 'undefined' && rateLimitReset) { %> Expected to resume at <strong><%= new Date(rateLimitReset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) %></strong>.<% } else { %> Please try again shortly.<% } %></span>
-      </div>
-    <% } else if (typeof editRole !== 'undefined' && editRole) { %>
-      <div class="edit-toolbar" id="edit-toolbar">
-        <button class="edit-btn" id="btn-suggest-edit">Suggest Edits</button>
-        <% if (editRole === 'admin' || editRole === 'manuscript-owner') { %>
-          <button class="edit-btn edit-btn--primary" id="btn-direct-edit">Direct Edit</button>
-        <% } %>
-        <%
-          const sugCount = pendingSuggestions ? pendingSuggestions.length : 0;
-          const comCount = pendingComments ? pendingComments.length : 0;
-          const totalAnnotations = sugCount + comCount;
-        %>
-        <% if (totalAnnotations > 0) { %>
-          <button class="edit-btn edit-btn--review" id="btn-review">
-            Review <%= sugCount > 0 ? sugCount + ' suggestion' + (sugCount === 1 ? '' : 's') : '' %><%= (sugCount > 0 && comCount > 0) ? ', ' : '' %><%= comCount > 0 ? comCount + ' comment' + (comCount === 1 ? '' : 's') : '' %>
-          </button>
-        <% } %>
-      </div>
-    <% } %>
+    <%- include('partials/session-edit-toolbar') %>
 
     <% if (typeof audioSession !== 'undefined' && audioSession) { %>
       <!-- Floating audio icon — expands to player when playing -->
@@ -117,22 +61,7 @@
       </div>
 
       <div class="session-nav">
-        <% if (prevSession) { %>
-          <a href="<%= content.sessionUrl(series, subseries, book, prevSession) %>" class="session-nav-link session-nav-prev">
-            <span class="session-nav-dir">&larr; Previous</span>
-            <span class="session-nav-name"><%= prevSession.displayName %></span>
-          </a>
-        <% } else { %>
-          <div class="session-nav-link session-nav-placeholder"></div>
-        <% } %>
-        <% if (nextSession) { %>
-          <a href="<%= content.sessionUrl(series, subseries, book, nextSession) %>" class="session-nav-link session-nav-next">
-            <span class="session-nav-dir">Next &rarr;</span>
-            <span class="session-nav-name"><%= nextSession.displayName %></span>
-          </a>
-        <% } else { %>
-          <div class="session-nav-link session-nav-placeholder"></div>
-        <% } %>
+        <%- include('partials/session-nav') %>
       </div>
     </div>
 
@@ -249,5 +178,7 @@
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
 <script src="/static/js/audio-player.js?v=26"></script>
 <% } %>
+
+<script src="/static/js/ajax-nav.js?v=1"></script>
 
 <%- include('partials/footer') %>

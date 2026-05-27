@@ -1,0 +1,16 @@
+        <% if (prevSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, prevSession) %>" class="session-nav-link session-nav-prev">
+            <span class="session-nav-dir">&larr; Previous</span>
+            <span class="session-nav-name"><%= prevSession.displayName %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>
+        <% if (nextSession) { %>
+          <a href="<%= content.sessionUrl(series, subseries, book, nextSession) %>" class="session-nav-link session-nav-next">
+            <span class="session-nav-dir">Next &rarr;</span>
+            <span class="session-nav-name"><%= nextSession.displayName %></span>
+          </a>
+        <% } else { %>
+          <div class="session-nav-link session-nav-placeholder"></div>
+        <% } %>

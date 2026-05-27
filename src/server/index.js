@@ -372,6 +372,178 @@ app.get('/', async (req, res, next) => {
   }
 });
 
+// Shared helper: gather all session page data for a resolved session route.
+// Used by both the catch-all page route and the /api/session-data JSON endpoint.
+async function getSessionPageData(req, resolvedRoute) {
+  const { series, subseries, book, session } = resolvedRoute;
+  await content.loadSessionTitles(book);
+  const sessionData = await content.loadSessionContent(session);
+  const commonParts = content.gatherCommonContent(series, subseries || null, book);
+  const commonHtml = renderCommonContent(commonParts);
+  // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
+  const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
+  const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
+  const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath });
+
+  // Extract h2 headings for sidebar table of contents
+  const h2s = [];
+  const h2Pattern = /^##\s+(.+)$/gm;
+  let h2Match;
+  while ((h2Match = h2Pattern.exec(sessionData.content)) !== null) {
+    const text = h2Match[1].trim();
+    const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    h2s.push({ text, slug });
+  }
+
+  // Find prev/next sessions
+  const idx = book.sessions.findIndex(s => s.slug === session.slug);
+  const prevSession = idx > 0 ? book.sessions[idx - 1] : null;
+  const nextSession = idx < book.sessions.length - 1 ? book.sessions[idx + 1] : null;
+
+  // Editor data — for users with edit/review permissions
+  // Disable editing when content came from disk cache (GitHub API unavailable) —
+  // editing must always start with the latest content to prevent stale edits
+  const suggestions = require('./suggestions');
+  let editRole = null;
+  let allPendingSuggestions = [];
+  if (req.user && !sessionData.fromDiskCache) {
+    editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
+  }
+  const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
+  const canReview = editRole === 'admin' || editRole === 'manuscript-owner';
+  let allPendingComments = [];
+  let allReplies = [];
+  if (canEdit || canReview) {
+    allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
+    allPendingComments = await suggestions.getCommentsForFile(session.path);
+    allReplies = await suggestions.getRepliesForFile(session.path);
+
+    // Resolve anchor positions against current file content — without this,
+    // suggestions have stale originalFrom after other suggestions are accepted
+    const fileContent = sessionData.content;
+    for (const s of allPendingSuggestions) {
+      const resolved = suggestions.resolveAnchor(s, fileContent);
+      if (!resolved.stale) {
+        s.resolvedFrom = resolved.from;
+        s.resolvedTo = resolved.to;
+      } else {
+        s.resolvedStale = true;
+        console.log('[RESOLVE] suggestion', s.id, 'marked STALE — type:', s.type, 'origText:', (s.originalText||'').substring(0,20), 'anchor.exact:', (s.anchor?.exact||'').substring(0,20), 'prefix:', (s.anchor?.prefix || s.contextBefore || '').substring(0,20));
+      }
+    }
+    for (const c of allPendingComments) {
+      const resolved = suggestions.resolveAnchor(c, fileContent);
+      if (!resolved.stale) {
+        c.resolvedFrom = resolved.from;
+        c.resolvedTo = resolved.to;
+      } else {
+        c.resolvedStale = true;
+      }
+    }
+  }
+
+  // If content came from disk cache and user has edit access, show a message
+  const ghub = require('./github');
+  const editUnavailable = sessionData.fromDiskCache && req.user ? true : false;
+  const rateLimitReset = editUnavailable ? ghub.getRateLimitReset() : null;
+
+  // Audio data — load if audiobook is enabled for this book
+  let audioSession = null;
+  if (book.audiobook && book.audiobook.enabled) {
+    try {
+      audioSession = await audio.getAudioSession(book.repoPath, session.filename);
+    } catch { /* degrade gracefully — no audio */ }
+  }
+
+  return {
+    series,
+    subseries: subseries || null,
+    book,
+    session: { ...session, title: sessionData.title },
+    h2s,
+    commonHtml,
+    sessionHtml,
+    prevSession,
+    nextSession,
+    editRole: canEdit ? editRole : null,
+    canReview: canReview || false,
+    rawContent: canEdit ? sessionData.content : null,
+    contentSha: canEdit ? sessionData.sha : null,
+    pendingSuggestions: allPendingSuggestions,
+    pendingComments: allPendingComments,
+    pendingReplies: allReplies,
+    sessionFilePath: canEdit ? session.path : null,
+    bookRepoPath: canEdit ? book.repoPath : null,
+    editUnavailable,
+    rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
+    audioSession,
+  };
+}
+
+// AJAX session navigation endpoint — returns JSON with pre-rendered HTML fragments
+app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
+  try {
+    const segments = [req.params.seg1, req.params.seg2, req.params.seg3, req.params.seg4].filter(Boolean);
+    const tree = await content.buildContentTree();
+    const resolved = content.resolveRoute(tree, segments);
+
+    if (!resolved || resolved.type !== 'session') {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Permission check for hidden books
+    const book = resolved.book;
+    if (book && book.status === 'hidden') {
+      const canAccess = await content.canAccessBook(req.user, book.repoPath);
+      if (!canAccess) return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const data = await getSessionPageData(req, resolved);
+    const ejs = require('ejs');
+    const viewsDir = path.join(__dirname, '../views');
+
+    // Render HTML fragments via EJS partials
+    // Include user (from res.locals, set by auth middleware) so sidebar-auth renders correctly
+    const ejsData = { ...data, content, audioFormatDuration: audio.formatDuration, user: req.user || null };
+    const [sidebarHtml, breadcrumbHtml, editToolbarHtml, sessionNavHtml] = await Promise.all([
+      ejs.renderFile(path.join(viewsDir, 'partials/session-sidebar.ejs'), ejsData),
+      ejs.renderFile(path.join(viewsDir, 'partials/session-breadcrumb.ejs'), ejsData),
+      ejs.renderFile(path.join(viewsDir, 'partials/session-edit-toolbar.ejs'), ejsData),
+      ejs.renderFile(path.join(viewsDir, 'partials/session-nav.ejs'), ejsData),
+    ]);
+
+    res.json({
+      title: `${data.session.title} — ${data.book.title}`,
+      sidebarHtml,
+      mobileLabel: data.session.title || data.session.displayName,
+      breadcrumbHtml,
+      editToolbarHtml,
+      sessionHtml: data.sessionHtml,
+      sessionNavHtml,
+      audioSession: data.audioSession,
+      bookPath: data.book.repoPath.replace(/^series\//, ''),
+      bookUrl: content.bookUrl(data.series, data.subseries, data.book),
+      nextSessionUrl: data.nextSession ? content.sessionUrl(data.series, data.subseries, data.book, data.nextSession) : '',
+      audioDurationFormatted: data.audioSession ? audio.formatDuration(data.audioSession.durationSeconds) : '',
+      editData: data.editRole ? {
+        rawContent: data.rawContent,
+        contentSha: data.contentSha,
+        editRole: data.editRole,
+        sessionFilePath: data.sessionFilePath,
+        bookRepoPath: data.bookRepoPath,
+        pendingSuggestions: data.pendingSuggestions || [],
+        pendingComments: data.pendingComments || [],
+        pendingReplies: data.pendingReplies || [],
+        canReview: data.canReview || false,
+        user: req.user ? { email: req.user.email, displayName: req.user.displayName, photoURL: req.user.photoURL } : null,
+      } : null,
+    });
+  } catch (err) {
+    console.error('[ajax-nav] Session data error:', err.message);
+    res.status(500).json({ error: 'Failed to load session data' });
+  }
+});
+
 // Content routes — catch-all resolver
 app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
   try {
@@ -419,110 +591,12 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         audioFormatDuration: audio.formatDuration,
       });
     } else if (resolved.type === 'session') {
-      const { series, subseries, book, session } = resolved;
-      await content.loadSessionTitles(book);
-      const sessionData = await content.loadSessionContent(session);
-      const commonParts = content.gatherCommonContent(series, subseries || null, book);
-      const commonHtml = renderCommonContent(commonParts);
-      // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
-      const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
-      const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
-      const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath });
-
-      // Extract h2 headings for sidebar table of contents
-      const h2s = [];
-      const h2Pattern = /^##\s+(.+)$/gm;
-      let h2Match;
-      while ((h2Match = h2Pattern.exec(sessionData.content)) !== null) {
-        const text = h2Match[1].trim();
-        const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        h2s.push({ text, slug });
-      }
-
-      // Find prev/next sessions
-      const idx = book.sessions.findIndex(s => s.slug === session.slug);
-      const prevSession = idx > 0 ? book.sessions[idx - 1] : null;
-      const nextSession = idx < book.sessions.length - 1 ? book.sessions[idx + 1] : null;
-
-      // Editor data — for users with edit/review permissions
-      // Disable editing when content came from disk cache (GitHub API unavailable) —
-      // editing must always start with the latest content to prevent stale edits
-      const suggestions = require('./suggestions');
-      let editRole = null;
-      let allPendingSuggestions = [];
-      if (req.user && !sessionData.fromDiskCache) {
-        editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
-      }
-      const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
-      const canReview = editRole === 'admin' || editRole === 'manuscript-owner';
-      let allPendingComments = [];
-      let allReplies = [];
-      if (canEdit || canReview) {
-        allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
-        allPendingComments = await suggestions.getCommentsForFile(session.path);
-        allReplies = await suggestions.getRepliesForFile(session.path);
-
-        // Resolve anchor positions against current file content — without this,
-        // suggestions have stale originalFrom after other suggestions are accepted
-        const fileContent = sessionData.content;
-        for (const s of allPendingSuggestions) {
-          const resolved = suggestions.resolveAnchor(s, fileContent);
-          if (!resolved.stale) {
-            s.resolvedFrom = resolved.from;
-            s.resolvedTo = resolved.to;
-          } else {
-            s.resolvedStale = true;
-            console.log('[RESOLVE] suggestion', s.id, 'marked STALE — type:', s.type, 'origText:', (s.originalText||'').substring(0,20), 'anchor.exact:', (s.anchor?.exact||'').substring(0,20), 'prefix:', (s.anchor?.prefix || s.contextBefore || '').substring(0,20));
-          }
-        }
-        for (const c of allPendingComments) {
-          const resolved = suggestions.resolveAnchor(c, fileContent);
-          if (!resolved.stale) {
-            c.resolvedFrom = resolved.from;
-            c.resolvedTo = resolved.to;
-          } else {
-            c.resolvedStale = true;
-          }
-        }
-      }
-
-      // If content came from disk cache and user has edit access, show a message
-      const github = require('./github');
-      const editUnavailable = sessionData.fromDiskCache && req.user ? true : false;
-      const rateLimitReset = editUnavailable ? github.getRateLimitReset() : null;
-
-      // Audio data — load if audiobook is enabled for this book
-      let audioSession = null;
-      if (book.audiobook && book.audiobook.enabled) {
-        try {
-          audioSession = await audio.getAudioSession(book.repoPath, session.filename);
-        } catch { /* degrade gracefully — no audio */ }
-      }
+      const data = await getSessionPageData(req, resolved);
 
       res.render('session', {
-        series,
-        subseries: subseries || null,
-        book,
-        session: { ...session, title: sessionData.title },
-        h2s,
-        commonHtml,
-        sessionHtml,
-        prevSession,
-        nextSession,
+        ...data,
         content,
-        title: `${sessionData.title} — ${book.title}`,
-        editRole: canEdit ? editRole : null,
-        canReview: canReview || false,
-        rawContent: canEdit ? sessionData.content : null,
-        contentSha: canEdit ? sessionData.sha : null,
-        pendingSuggestions: allPendingSuggestions,
-        pendingComments: allPendingComments,
-        pendingReplies: allReplies,
-        sessionFilePath: canEdit ? session.path : null,
-        bookRepoPath: canEdit ? book.repoPath : null,
-        editUnavailable,
-        rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
-        audioSession,
+        title: `${data.session.title} — ${data.book.title}`,
         audioFormatDuration: audio.formatDuration,
       });
     }

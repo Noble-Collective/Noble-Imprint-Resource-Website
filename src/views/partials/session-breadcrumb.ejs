@@ -1,0 +1,10 @@
+        <a href="/">Resources</a> <span>&rsaquo;</span>
+        <a href="/#series-<%= series.slug %>"><%= series.title %></a>
+        <% if (subseries) { %>
+          <span>&rsaquo;</span>
+          <a href="/#series-<%= series.slug %>"><%= subseries.title %></a>
+        <% } %>
+        <span>&rsaquo;</span>
+        <a href="<%= content.bookUrl(series, subseries, book) %>"><%= book.title %></a>
+        <span>&rsaquo;</span>
+        <%= session.title || session.displayName %>

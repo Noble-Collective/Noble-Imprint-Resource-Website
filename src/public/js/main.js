@@ -373,6 +373,20 @@
     });
   }
 
+  /* ----- Reinit after AJAX navigation swap ----- */
+
+  window.__reinitAfterSwap = function () {
+    // Remove old mobile TOC dropdown (cloned from sidebar, now stale)
+    var oldDropdown = document.querySelector('.mobile-toc-sidebar-dropdown');
+    if (oldDropdown) oldDropdown.remove();
+
+    // Re-init mobile TOC (rebuilds dropdown from swapped sidebar content)
+    initMobileToc();
+
+    // Re-init mobile sidebar toggle (binds to new sidebar elements)
+    initMobileSidebarToggle();
+  };
+
   /* ----- Init on DOM Ready ----- */
 
   document.addEventListener('DOMContentLoaded', function () {

@@ -5138,3 +5138,52 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
     padding-bottom: 120px;
   }
 }
+
+/* ============================================================
+   AJAX Navigation
+   ============================================================ */
+
+/* Thin progress bar at top of viewport */
+.ajax-nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  background: var(--gold, #d7b44a);
+  z-index: 10000;
+  transition: width 8s cubic-bezier(0.1, 0.5, 0.1, 1);
+}
+.ajax-nav-progress--active {
+  width: 85%;
+}
+.ajax-nav-progress--done {
+  width: 100%;
+  transition: width 0.2s ease;
+  opacity: 0;
+  transition: width 0.2s ease, opacity 0.2s ease 0.1s;
+}
+
+/* Tap-to-continue banner for Safari iOS autoplay failure */
+.audio-tap-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  background: var(--gold, #d7b44a);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  -webkit-tap-highlight-color: transparent;
+}
+.audio-tap-banner:active {
+  background: #c5a43e;
+}
+.audio-tap-banner svg {
+  flex-shrink: 0;
+}

@@ -1702,6 +1702,17 @@ if (data) {
     window.location.reload();
   }
 
+  // --- AJAX navigation cleanup (tears down editor without triggering page reload) ---
+  window.__editorCleanup = function () {
+    if (!editMode) return; // editor not active
+    stopPolling();
+    if (editorView) {
+      editorView.destroy();
+      editorView = null;
+    }
+    editMode = null;
+  };
+
   // --- View Source toggle ---
   function toggleViewSource() {
     if (!editorView) return;

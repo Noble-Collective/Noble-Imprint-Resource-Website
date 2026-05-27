@@ -7,11 +7,12 @@
   const player = document.getElementById('audio-player');
   if (!fab || !player) return;
 
-  const bookPath = fab.dataset.bookPath;
-  const audioFile = fab.dataset.audioFile;
-  const timestampsFile = fab.dataset.timestampsFile;
-  const totalDuration = parseFloat(fab.dataset.duration) || 0;
-  const nextUrl = fab.dataset.nextUrl || '';
+  // Read from FAB data attributes dynamically — AJAX nav updates these on session swap
+  function getBookPath() { return fab.dataset.bookPath; }
+  function getAudioFile() { return fab.dataset.audioFile; }
+  function getTimestampsFile() { return fab.dataset.timestampsFile; }
+  function getTotalDuration() { return parseFloat(fab.dataset.duration) || 0; }
+  function getNextUrl() { return fab.dataset.nextUrl || ''; }
 
   const playBtn = document.getElementById('audio-play-btn');
   const iconPlay = playBtn.querySelector('.icon-play');
@@ -38,7 +39,7 @@
   let userScrolledAway = false;
   let programmaticScroll = false;
 
-  const storageKey = `audio-pos:${bookPath}/${audioFile}`;
+  function getStorageKey() { return `audio-pos:${getBookPath()}/${getAudioFile()}`; }
 
   function formatTime(s) {
     if (!s || isNaN(s)) return '0:00';
@@ -58,7 +59,7 @@
   // --- Fetch signed URL ---
   async function ensureAudioUrl() {
     if (signedUrl) return signedUrl;
-    const res = await fetch(`/api/audio/url/${bookPath}/${audioFile}`);
+    const res = await fetch(`/api/audio/url/${getBookPath()}/${getAudioFile()}`);
     if (!res.ok) throw new Error('Failed to get audio URL');
     signedUrl = (await res.json()).url;
     return signedUrl;
@@ -66,9 +67,9 @@
 
   // --- Fetch timestamps and build segment map ---
   async function loadTimestamps() {
-    if (timestamps || !timestampsFile) return;
+    if (timestamps || !getTimestampsFile()) return;
     try {
-      const res = await fetch(`/api/audio/url/${bookPath}/${timestampsFile}`);
+      const res = await fetch(`/api/audio/url/${getBookPath()}/${getTimestampsFile()}`);
       if (!res.ok) return;
       const tsRes = await fetch((await res.json()).url);
       if (!tsRes.ok) return;
@@ -146,7 +147,7 @@
 
   // --- H2 section markers on the scrubber ---
   function renderH2Markers() {
-    if (!segmentMap || !totalDuration) return;
+    if (!segmentMap || !getTotalDuration()) return;
 
     // Clear existing markers
     scrubberContainer.querySelectorAll('.scrubber-h2-marker').forEach(m => m.remove());
@@ -164,7 +165,7 @@
     if (h2Segments.length === 0) return;
 
     for (const seg of h2Segments) {
-      const pct = (seg.start / totalDuration) * 100;
+      const pct = (seg.start / getTotalDuration()) * 100;
       const marker = document.createElement('div');
       marker.className = 'scrubber-h2-marker';
       marker.style.left = pct + '%';
@@ -183,7 +184,7 @@
 
   // --- Heading audio icons (clickable jump-to-audio links) ---
   function renderHeadingAudioIcons() {
-    if (!segmentMap || !totalDuration) return;
+    if (!segmentMap || !getTotalDuration()) return;
 
     const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
     const seen = new Set();
@@ -223,7 +224,8 @@
   }
 
   // --- Highlight via positioned overlay (no DOM modification) ---
-  const overlayContainer = document.createElement('div');
+  // Using let so AJAX nav can replace the container after DOM swap
+  let overlayContainer = document.createElement('div');
   overlayContainer.id = 'audio-highlight-overlays';
   overlayContainer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
   document.querySelector('.session-content')?.appendChild(overlayContainer);
@@ -444,10 +446,10 @@
     audioEl = new Audio(url);
     audioEl.preload = 'auto';
 
-    const saved = localStorage.getItem(storageKey);
+    const saved = localStorage.getItem(getStorageKey());
     if (saved) {
       const pos = parseFloat(saved);
-      if (pos > 0 && pos < totalDuration - 5) audioEl.currentTime = pos;
+      if (pos > 0 && pos < getTotalDuration() - 5) audioEl.currentTime = pos;
     }
 
     audioEl.addEventListener('timeupdate', () => {
@@ -455,7 +457,7 @@
         scrubber.value = (audioEl.currentTime / audioEl.duration) * 1000;
         currentTimeEl.textContent = formatTime(audioEl.currentTime);
       }
-      localStorage.setItem(storageKey, audioEl.currentTime.toFixed(1));
+      localStorage.setItem(getStorageKey(), audioEl.currentTime.toFixed(1));
     });
 
     audioEl.addEventListener('loadedmetadata', () => {
@@ -464,10 +466,13 @@
 
     audioEl.addEventListener('ended', () => {
       showPaused();
-      localStorage.removeItem(storageKey);
-      if (nextUrl) {
+      localStorage.removeItem(getStorageKey());
+      var currentNextUrl = getNextUrl();
+      if (window.__ajaxNav && currentNextUrl) {
+        window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
+      } else if (currentNextUrl) {
         localStorage.setItem('audio-autoplay', 'true');
-        window.location.href = nextUrl;
+        window.location.href = currentNextUrl;
       }
     });
   }
@@ -580,4 +585,119 @@
   // Load timestamps eagerly so heading icons and scrubber markers
   // appear immediately, not after first play
   loadTimestamps();
+
+  // --- Expose API for AJAX navigation ---
+  window.__audioPlayer = {
+    /** Update session config after AJAX DOM swap (does NOT start playback) */
+    updateSession: function (opts) {
+      // Update the FAB data attributes and internal state for the new session
+      if (opts.bookPath != null) fab.dataset.bookPath = opts.bookPath;
+      if (opts.audioFile != null) fab.dataset.audioFile = opts.audioFile;
+      if (opts.timestampsFile != null) fab.dataset.timestampsFile = opts.timestampsFile;
+      if (opts.duration != null) fab.dataset.duration = opts.duration;
+      if (opts.nextUrl != null) fab.dataset.nextUrl = opts.nextUrl;
+      if (opts.durationFormatted != null) durationEl.textContent = opts.durationFormatted;
+    },
+
+    /** Fetch new signed URL, change src, and play. Shows banner on NotAllowedError. */
+    playNextChapter: async function () {
+      // Clear old state
+      signedUrl = null;
+      timestamps = null;
+      segmentMap = null;
+      activeSegIdx = -1;
+      userScrolledAway = false;
+      clearHighlight();
+
+      // Remove old heading audio icons and H2 markers
+      document.querySelectorAll('.heading-audio-icon').forEach(function (el) { el.remove(); });
+      scrubberContainer.querySelectorAll('.scrubber-h2-marker').forEach(function (m) { m.remove(); });
+
+      try {
+        // Fetch new signed audio URL (getters read from updated FAB data attributes)
+        var res = await fetch('/api/audio/url/' + getBookPath() + '/' + getAudioFile());
+        if (!res.ok) throw new Error('Failed to get audio URL');
+        signedUrl = (await res.json()).url;
+
+        // Set new source and play
+        audioEl.src = signedUrl;
+        audioEl.currentTime = 0;
+        scrubber.value = 0;
+        currentTimeEl.textContent = '0:00';
+
+        await audioEl.play();
+        showPlaying();
+
+        // Load timestamps for the new session
+        window.__audioPlayer.loadNewTimestamps();
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          // Safari iOS: show tap-to-continue banner
+          showTapToContinueBanner();
+        } else {
+          console.error('[audio] playNextChapter failed:', err);
+        }
+      }
+    },
+
+    /** Rebuild the highlight overlay container inside the (swapped) .session-content */
+    rebuildHighlightContainer: function () {
+      // Remove old overlay container (may have been detached by DOM swap)
+      var old = document.getElementById('audio-highlight-overlays');
+      if (old) old.remove();
+
+      // Create new one inside the new .session-content
+      overlayContainer = document.createElement('div');
+      overlayContainer.id = 'audio-highlight-overlays';
+      overlayContainer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
+      var sc = document.querySelector('.session-content');
+      if (sc) sc.appendChild(overlayContainer);
+    },
+
+    /** Fetch timestamps for the new session, rebuild segment map and heading icons */
+    loadNewTimestamps: function () {
+      timestamps = null;
+      segmentMap = null;
+      activeSegIdx = -1;
+      loadTimestamps();
+    },
+
+    /** Returns whether audio is currently playing */
+    isPlaying: function () {
+      return audioEl && !audioEl.paused;
+    },
+
+    /** Get the audio element (for AJAX nav to check state) */
+    getAudioElement: function () {
+      return audioEl;
+    },
+  };
+
+  // --- "Tap to continue listening" banner for Safari iOS autoplay failure ---
+  function showTapToContinueBanner() {
+    // Remove existing banner if any
+    var existing = document.getElementById('audio-tap-banner');
+    if (existing) existing.remove();
+
+    var banner = document.createElement('div');
+    banner.id = 'audio-tap-banner';
+    banner.className = 'audio-tap-banner';
+    banner.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><polygon points="5,3 19,12 5,21"/></svg> <span>Tap to continue listening</span>';
+    banner.addEventListener('click', function () {
+      if (audioEl) {
+        audioEl.play().then(function () {
+          showPlaying();
+        }).catch(function () {});
+      }
+      banner.remove();
+    });
+
+    // Insert at the top of reading content
+    var readingContent = document.getElementById('reading-content');
+    if (readingContent) {
+      readingContent.insertBefore(banner, readingContent.firstChild);
+    } else {
+      document.querySelector('.main').appendChild(banner);
+    }
+  }
 })();

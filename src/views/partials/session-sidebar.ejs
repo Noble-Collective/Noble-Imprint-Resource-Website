@@ -1,0 +1,27 @@
+    <a href="<%= content.bookUrl(series, subseries, book) %>" class="sidebar-back">&larr; <%= book.title %></a>
+
+    <ul class="nav-session-list">
+      <% book.sessions.forEach(function(s, i) {
+        // Extract number from display name: "Chapter One" → 1, "Session 3" → 3
+        var wordNums = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
+        var numMatch = s.displayName.match(/\b(\d+)\b/) || s.displayName.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
+        var sessionNum = numMatch ? (wordNums[numMatch[1].toLowerCase()] || numMatch[1]) : '';
+      %>
+        <li>
+          <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item<%= s.slug === session.slug ? ' active' : '' %>">
+            <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
+            <span class="nav-session-name"><%= s.displayName %></span>
+          </a>
+          <% if (s.slug === session.slug && h2s && h2s.length > 0) { %>
+            <ul class="nav-h2-list">
+              <% h2s.forEach(function(h) { %>
+                <li>
+                  <a href="#<%= h.slug %>" class="nav-h2-item"><%= h.text %></a>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+        </li>
+      <% }); %>
+    </ul>
+    <%- include('sidebar-auth') %>
