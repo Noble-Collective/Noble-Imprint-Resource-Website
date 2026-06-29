@@ -1,12 +1,15 @@
 /**
  * ajax-nav.js — AJAX session navigation for continuous audiobook playback.
  *
- * Progressive enhancement: intercepts session-to-session navigation within
- * the same book, fetches content as JSON, swaps DOM regions without a full
- * page reload. The <audio> element persists, preserving the browser's
- * gesture-unlock for seamless playback on mobile.
+ * Only used for audio auto-advance: when a chapter's audio finishes, the
+ * ended handler calls navigateToSession() to swap content without a full
+ * page reload, keeping the <audio> element alive so the browser's
+ * gesture-unlock persists on mobile.
  *
- * Falls back to full page reload on error or for non-session navigation.
+ * Manual navigation (sidebar clicks, prev/next arrows, breadcrumbs) always
+ * does a full page reload to avoid breaking the editor system.
+ *
+ * Falls back to full page reload on error.
  */
 
 (function () {
@@ -141,9 +144,13 @@
     loadingTimer = setTimeout(showLoadingBar, 300);
 
     try {
-      // Tear down editor if active
-      if (typeof window.__editorCleanup === 'function') {
-        window.__editorCleanup();
+      // If editor is active, bail out to full page reload — AJAX swap breaks editor state
+      if (window.__editorView) {
+        if (options.autoplay) {
+          localStorage.setItem('audio-autoplay', 'true');
+        }
+        window.location.href = url;
+        return;
       }
 
       // Fetch session data
@@ -214,46 +221,13 @@
     }
   }
 
-  // --- Link interception ---
-
-  document.addEventListener('click', function (e) {
-    // Find the closest <a> element
-    var link = e.target.closest('a');
-    if (!link) return;
-
-    var href = link.getAttribute('href');
-    if (!href) return;
-
-    // Only intercept session links within the current book
-    if (!isSessionUrl(href)) return;
-
-    // Don't intercept modified clicks (new tab, etc.)
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-
-    // Don't intercept if target is set to a different window/tab
-    var target = link.getAttribute('target');
-    if (target && target !== '_self') return;
-
-    e.preventDefault();
-    navigateToSession(href);
-  });
-
   // --- Browser back/forward ---
+  // After an auto-advance pushState, back/forward just reloads the page.
+  // No DOM swapping — keeps things simple and avoids editor state issues.
 
-  window.addEventListener('popstate', function (e) {
-    if (e.state && e.state.ajaxNav) {
-      navigateToSession(e.state.url, { _popstate: true });
-    } else {
-      // Not an AJAX-navigated entry — let the browser handle it (full reload)
-      // This handles the case where user navigates back to the original page load
-      window.location.reload();
-    }
+  window.addEventListener('popstate', function () {
+    window.location.reload();
   });
-
-  // Mark initial page load in history state so popstate can detect it
-  if (!history.state || !history.state.ajaxNav) {
-    history.replaceState({ ajaxNav: true, url: window.location.pathname }, '');
-  }
 
   // --- Expose API ---
 
