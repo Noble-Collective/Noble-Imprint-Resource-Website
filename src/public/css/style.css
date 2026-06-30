@@ -2486,11 +2486,6 @@ body.drawer-open {
     line-height: 1.6;
   }
 
-  /* Make header opaque on mobile so TOC bar doesn't show through */
-  .site-header {
-    background-color: rgb(58, 56, 56);
-  }
-
   /* Mobile TOC bar — fixed below header */
   .mobile-toc-bar {
     position: fixed;
