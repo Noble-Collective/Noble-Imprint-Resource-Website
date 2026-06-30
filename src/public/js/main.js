@@ -254,11 +254,11 @@
 
     var lastScroll = window.scrollY;
 
-    // Position below header (add a few px to clear the header's box-shadow)
+    // Position below header
     var header = document.querySelector('.site-header');
     function positionBar() {
       if (header) {
-        bar.style.top = (header.offsetHeight + 4) + 'px';
+        bar.style.top = header.offsetHeight + 'px';
       }
     }
     positionBar();
@@ -285,7 +285,7 @@
       // Position dropdown below bar
       function positionDropdown() {
         if (header) {
-          dropdown.style.top = (header.offsetHeight + bar.offsetHeight + 4) + 'px';
+          dropdown.style.top = (header.offsetHeight + bar.offsetHeight) + 'px';
         }
       }
       positionDropdown();
