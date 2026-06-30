@@ -383,17 +383,30 @@ async function getSessionPageData(req, resolvedRoute) {
   // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
   const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
   const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
-  const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath });
+  const maxNavHeadingLevel = book.maxNavHeadingLevel || 2;
+  const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath, maxNavHeadingLevel });
 
-  // Extract h2 headings for sidebar table of contents
-  const h2s = [];
-  const h2Pattern = /^##\s+(.+)$/gm;
-  let h2Match;
-  while ((h2Match = h2Pattern.exec(sessionData.content)) !== null) {
-    const text = h2Match[1].trim();
-    const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    h2s.push({ text, slug });
+  // Extract headings for sidebar table of contents (configurable depth via meta.json maxNavHeadingLevel)
+  const headings = [];
+  const headingPattern = /^(#{1,6})\s+(.+)$/gm;
+  const slugCounts = {};
+  let headingMatch;
+  while ((headingMatch = headingPattern.exec(sessionData.content)) !== null) {
+    const level = headingMatch[1].length;
+    if (level < 2 || level > maxNavHeadingLevel) continue;
+    const text = headingMatch[2].trim();
+    let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Deduplicate slugs
+    if (slugCounts[slug]) {
+      slugCounts[slug]++;
+      slug = slug + '-' + slugCounts[slug];
+    } else {
+      slugCounts[slug] = 1;
+    }
+    headings.push({ text, slug, level });
   }
+  // Backward compat: h2s is a filtered view for templates that still reference it
+  const h2s = headings.filter(h => h.level === 2);
 
   // Find prev/next sessions
   const idx = book.sessions.findIndex(s => s.slug === session.slug);
@@ -461,6 +474,8 @@ async function getSessionPageData(req, resolvedRoute) {
     book,
     session: { ...session, title: sessionData.title },
     h2s,
+    headings,
+    maxNavHeadingLevel,
     commonHtml,
     sessionHtml,
     prevSession,

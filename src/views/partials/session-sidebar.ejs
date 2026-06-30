@@ -12,14 +12,43 @@
             <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
             <span class="nav-session-name"><%= s.displayName %></span>
           </a>
-          <% if (s.slug === session.slug && h2s && h2s.length > 0) { %>
-            <ul class="nav-h2-list">
-              <% h2s.forEach(function(h) { %>
-                <li>
-                  <a href="#<%= h.slug %>" class="nav-h2-item"><%= h.text %></a>
-                </li>
-              <% }); %>
-            </ul>
+          <% if (s.slug === session.slug && headings && headings.length > 0) {
+            // Build nested heading tree from flat list
+            function renderHeadings(items, parentLevel) {
+              // Top-level list (parentLevel=1) is expanded; nested lists start collapsed
+              var collapsed = parentLevel > 1 ? ' is-collapsed' : '';
+              var html = '<ul class="nav-heading-list nav-heading-level-' + parentLevel + '-list' + collapsed + '">';
+              var j = 0;
+              while (j < items.length) {
+                var h = items[j];
+                // Collect children: items immediately following at deeper levels
+                var children = [];
+                var k = j + 1;
+                while (k < items.length && items[k].level > h.level) {
+                  children.push(items[k]);
+                  k++;
+                }
+                var hasChildren = children.length > 0;
+                html += '<li class="nav-heading-item">';
+                html += '<div class="nav-heading-row">';
+                html += '<a href="#' + h.slug + '" class="nav-heading-link nav-heading-level-' + h.level + '">' + h.text + '</a>';
+                if (hasChildren) {
+                  html += '<button class="nav-heading-toggle" data-toggle-heading aria-expanded="false" aria-label="Expand">';
+                  html += '<svg class="nav-heading-chevron" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 1l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                  html += '</button>';
+                }
+                html += '</div>';
+                if (hasChildren) {
+                  html += renderHeadings(children, h.level);
+                }
+                html += '</li>';
+                j = k;
+              }
+              html += '</ul>';
+              return html;
+            }
+          %>
+            <%- renderHeadings(headings, 1) %>
           <% } %>
         </li>
       <% }); %>

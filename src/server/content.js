@@ -113,6 +113,7 @@ async function loadBook(bookPath, dirName) {
     commonBook,
     sessions,
     audiobook: meta.audiobook || null,
+    maxNavHeadingLevel: meta.maxNavHeadingLevel || 2,
     repoPath: bookPath,
   };
 }

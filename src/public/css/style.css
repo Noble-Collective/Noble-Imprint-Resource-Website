@@ -538,13 +538,93 @@ img {
   font-size: 0.8rem;
 }
 
-/* H2 sub-nav under active session */
+/* Heading sub-nav under active session */
+.nav-heading-list {
+  list-style: none;
+  padding: 0.15rem 0 0.25rem 0;
+  margin: 0;
+}
+.nav-heading-list.is-collapsed {
+  display: none;
+}
+.nav-heading-item {
+  margin: 0;
+}
+.nav-heading-row {
+  display: flex;
+  align-items: center;
+}
+.nav-heading-link {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text-light);
+  text-decoration: none;
+  transition: color 0.15s;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-heading-link:hover {
+  color: var(--color-green);
+}
+/* Heading level indentation */
+.nav-heading-link.nav-heading-level-2 {
+  padding: 0.3rem 0.5rem 0.3rem 3.25rem;
+  font-size: 0.72rem;
+}
+.nav-heading-link.nav-heading-level-3 {
+  padding: 0.25rem 0.5rem 0.25rem 4rem;
+  font-size: 0.68rem;
+}
+.nav-heading-link.nav-heading-level-4 {
+  padding: 0.2rem 0.5rem 0.2rem 4.75rem;
+  font-size: 0.65rem;
+}
+.nav-heading-link.nav-heading-level-5 {
+  padding: 0.2rem 0.5rem 0.2rem 5.5rem;
+  font-size: 0.62rem;
+}
+.nav-heading-link.nav-heading-level-6 {
+  padding: 0.2rem 0.5rem 0.2rem 6.25rem;
+  font-size: 0.62rem;
+}
+/* Expand/collapse toggle button */
+.nav-heading-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-light);
+  padding: 0;
+  margin-right: 0.5rem;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-heading-toggle:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--color-green);
+}
+.nav-heading-chevron {
+  transition: transform 0.2s ease;
+}
+.nav-heading-toggle[aria-expanded="true"] .nav-heading-chevron {
+  transform: rotate(90deg);
+}
+
+/* Backward compat: old h2 classes */
 .nav-h2-list {
   list-style: none;
   padding: 0.25rem 0 0.5rem 0;
   margin: 0;
 }
-
 .nav-h2-item {
   display: block;
   padding: 0.3rem 1.25rem 0.3rem 3.25rem;
@@ -555,7 +635,6 @@ img {
   transition: color 0.15s;
   line-height: 1.4;
 }
-
 .nav-h2-item:hover {
   color: var(--color-green);
 }
@@ -2486,7 +2565,15 @@ body.drawer-open {
     margin-left: auto;
   }
 
-  /* H2 sub-nav mobile */
+  /* Heading sub-nav mobile */
+  .nav-heading-link.nav-heading-level-2 { padding-left: 2.5rem; font-size: 0.7rem; }
+  .nav-heading-link.nav-heading-level-3 { padding-left: 3.25rem; font-size: 0.67rem; }
+  .nav-heading-link.nav-heading-level-4 { padding-left: 4rem; font-size: 0.64rem; }
+  .nav-heading-link.nav-heading-level-5 { padding-left: 4.5rem; font-size: 0.62rem; }
+  .nav-heading-link.nav-heading-level-6 { padding-left: 5rem; font-size: 0.62rem; }
+  .nav-heading-toggle { width: 36px; min-width: 36px; height: 32px; } /* bigger touch target */
+
+  /* H2 sub-nav mobile (backward compat) */
   .nav-h2-item {
     padding-left: 2.5rem;
     font-size: 0.7rem;

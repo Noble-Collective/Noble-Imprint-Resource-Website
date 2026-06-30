@@ -274,6 +274,9 @@
       dropdown.innerHTML = sidebar.innerHTML;
       document.body.appendChild(dropdown);
 
+      // Init heading expand/collapse toggles on the cloned dropdown
+      initHeadingToggles(dropdown);
+
       // Prevent scrolling inside dropdown from triggering page scroll hide
       dropdown.addEventListener('scroll', function (e) {
         e.stopPropagation();
@@ -373,6 +376,28 @@
     });
   }
 
+  /* ----- Heading nav expand/collapse ----- */
+
+  function initHeadingToggles(root) {
+    var container = root || document;
+    var toggles = container.querySelectorAll('[data-toggle-heading]');
+    toggles.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        // Find the child heading list (sibling of the .nav-heading-row, not a deeper nested one)
+        var row = btn.closest('.nav-heading-row');
+        var childList = row ? row.nextElementSibling : null;
+        if (childList && !childList.classList.contains('nav-heading-list')) childList = null;
+        if (childList) {
+          childList.classList.toggle('is-collapsed', expanded);
+        }
+      });
+    });
+  }
+
   /* ----- Reinit after AJAX navigation swap ----- */
 
   window.__reinitAfterSwap = function () {
@@ -385,6 +410,9 @@
 
     // Re-init mobile sidebar toggle (binds to new sidebar elements)
     initMobileSidebarToggle();
+
+    // Re-init heading toggles on the new sidebar
+    initHeadingToggles(document.querySelector('.sidebar'));
   };
 
   /* ----- Init on DOM Ready ----- */
@@ -397,5 +425,6 @@
     initVersePopup();
     initMobileToc();
     initUserMenu();
+    initHeadingToggles(document.querySelector('.sidebar'));
   });
 })();

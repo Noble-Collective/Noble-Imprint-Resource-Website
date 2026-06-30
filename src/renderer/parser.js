@@ -95,6 +95,8 @@ function preprocess(raw, options = {}) {
 
 function createRenderer(options = {}) {
   const headingColors = options.color || {};
+  const maxNavHeadingLevel = options.maxNavHeadingLevel || 2;
+  const slugCounts = {};
 
   const md = new MarkdownIt({
     html: true,
@@ -115,11 +117,19 @@ function createRenderer(options = {}) {
     if (color && color !== '#000000') {
       token.attrSet('style', `color: ${color}`);
     }
-    // Add id slug to h2 elements for anchor linking
-    if (level === 'h2') {
+    // Add id slug to headings for anchor linking (h2 through maxNavHeadingLevel)
+    const levelNum = parseInt(level.charAt(1));
+    if (levelNum >= 2 && levelNum <= maxNavHeadingLevel) {
       const contentToken = tokens[idx + 1];
       if (contentToken && contentToken.content) {
-        const slug = contentToken.content.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        let slug = contentToken.content.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        // Deduplicate slugs
+        if (slugCounts[slug]) {
+          slugCounts[slug]++;
+          slug = slug + '-' + slugCounts[slug];
+        } else {
+          slugCounts[slug] = 1;
+        }
         token.attrSet('id', slug);
       }
     }
