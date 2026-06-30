@@ -386,27 +386,39 @@ async function getSessionPageData(req, resolvedRoute) {
   const maxNavHeadingLevel = book.maxNavHeadingLevel || 2;
   const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath, maxNavHeadingLevel });
 
-  // Extract headings for sidebar table of contents (configurable depth via meta.json maxNavHeadingLevel)
-  const headings = [];
-  const headingPattern = /^(#{1,6})\s+(.+)$/gm;
-  const slugCounts = {};
-  let headingMatch;
-  while ((headingMatch = headingPattern.exec(sessionData.content)) !== null) {
-    const level = headingMatch[1].length;
-    if (level < 2 || level > maxNavHeadingLevel) continue;
-    const text = headingMatch[2].trim();
-    let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    // Deduplicate slugs
-    if (slugCounts[slug]) {
-      slugCounts[slug]++;
-      slug = slug + '-' + slugCounts[slug];
-    } else {
-      slugCounts[slug] = 1;
+  // Extract headings for ALL sessions in the book for full sidebar navigation.
+  // Content is already cached after loadSessionTitles, so this is fast.
+  function extractHeadings(rawContent) {
+    const items = [];
+    const pattern = /^(#{1,6})\s+(.+)$/gm;
+    const counts = {};
+    let m;
+    while ((m = pattern.exec(rawContent)) !== null) {
+      const level = m[1].length;
+      if (level < 2 || level > maxNavHeadingLevel) continue;
+      const text = m[2].trim();
+      let slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      if (counts[slug]) { counts[slug]++; slug = slug + '-' + counts[slug]; }
+      else { counts[slug] = 1; }
+      items.push({ text, slug, level });
     }
-    headings.push({ text, slug, level });
+    return items;
   }
-  // Backward compat: h2s is a filtered view for templates that still reference it
+
+  // Headings for the current session (used for rendering)
+  const headings = extractHeadings(sessionData.content);
   const h2s = headings.filter(h => h.level === 2);
+
+  // Headings for all sessions in the book (used for sidebar navigation)
+  const allSessionHeadings = {};
+  allSessionHeadings[session.slug] = headings;
+  await Promise.all(book.sessions.map(async (s) => {
+    if (s.slug === session.slug) return; // already have it
+    try {
+      const data = await content.loadSessionContent(s);
+      allSessionHeadings[s.slug] = extractHeadings(data.content);
+    } catch { allSessionHeadings[s.slug] = []; }
+  }));
 
   // Find prev/next sessions
   const idx = book.sessions.findIndex(s => s.slug === session.slug);
@@ -475,6 +487,7 @@ async function getSessionPageData(req, resolvedRoute) {
     session: { ...session, title: sessionData.title },
     h2s,
     headings,
+    allSessionHeadings,
     maxNavHeadingLevel,
     commonHtml,
     sessionHtml,

@@ -474,6 +474,21 @@ img {
   padding-top: 0.25rem;
 }
 
+.nav-session-row {
+  display: flex;
+  align-items: center;
+}
+.nav-session-row .nav-session-item {
+  flex: 1;
+  min-width: 0;
+}
+.nav-session-toggle {
+  margin-right: 0.5rem;
+}
+.nav-session-headings.is-collapsed {
+  display: none;
+}
+
 .nav-session-item {
   display: flex;
   align-items: center;

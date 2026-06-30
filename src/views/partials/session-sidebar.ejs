@@ -1,54 +1,67 @@
     <a href="<%= content.bookUrl(series, subseries, book) %>" class="sidebar-back">&larr; <%= book.title %></a>
 
+<%
+  // Recursive heading tree renderer
+  function renderHeadings(items, parentLevel, sessionUrl, isActive) {
+    var collapsed = parentLevel > 1 ? ' is-collapsed' : '';
+    var html = '<ul class="nav-heading-list nav-heading-level-' + parentLevel + '-list' + collapsed + '">';
+    var j = 0;
+    while (j < items.length) {
+      var h = items[j];
+      var children = [];
+      var k = j + 1;
+      while (k < items.length && items[k].level > h.level) {
+        children.push(items[k]);
+        k++;
+      }
+      var hasChildren = children.length > 0;
+      var href = isActive ? '#' + h.slug : sessionUrl + '#' + h.slug;
+      html += '<li class="nav-heading-item">';
+      html += '<div class="nav-heading-row">';
+      html += '<a href="' + href + '" class="nav-heading-link nav-heading-level-' + h.level + '">' + h.text + '</a>';
+      if (hasChildren) {
+        html += '<button class="nav-heading-toggle" data-toggle-heading aria-expanded="false" aria-label="Expand">';
+        html += '<svg class="nav-heading-chevron" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 1l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        html += '</button>';
+      }
+      html += '</div>';
+      if (hasChildren) {
+        html += renderHeadings(children, h.level, sessionUrl, isActive);
+      }
+      html += '</li>';
+      j = k;
+    }
+    html += '</ul>';
+    return html;
+  }
+%>
+
     <ul class="nav-session-list">
       <% book.sessions.forEach(function(s, i) {
-        // Extract number from display name: "Chapter One" → 1, "Session 3" → 3
         var wordNums = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
         var numMatch = s.displayName.match(/\b(\d+)\b/) || s.displayName.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
         var sessionNum = numMatch ? (wordNums[numMatch[1].toLowerCase()] || numMatch[1]) : '';
+        var isActive = s.slug === session.slug;
+        var sessionHeadings = (allSessionHeadings && allSessionHeadings[s.slug]) || [];
+        var sessionUrl = content.sessionUrl(series, subseries, book, s);
+        var hasHeadings = sessionHeadings.length > 0;
       %>
-        <li>
-          <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item<%= s.slug === session.slug ? ' active' : '' %>">
-            <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
-            <span class="nav-session-name"><%= s.displayName %></span>
-          </a>
-          <% if (s.slug === session.slug && headings && headings.length > 0) {
-            // Build nested heading tree from flat list
-            function renderHeadings(items, parentLevel) {
-              // Top-level list (parentLevel=1) is expanded; nested lists start collapsed
-              var collapsed = parentLevel > 1 ? ' is-collapsed' : '';
-              var html = '<ul class="nav-heading-list nav-heading-level-' + parentLevel + '-list' + collapsed + '">';
-              var j = 0;
-              while (j < items.length) {
-                var h = items[j];
-                // Collect children: items immediately following at deeper levels
-                var children = [];
-                var k = j + 1;
-                while (k < items.length && items[k].level > h.level) {
-                  children.push(items[k]);
-                  k++;
-                }
-                var hasChildren = children.length > 0;
-                html += '<li class="nav-heading-item">';
-                html += '<div class="nav-heading-row">';
-                html += '<a href="#' + h.slug + '" class="nav-heading-link nav-heading-level-' + h.level + '">' + h.text + '</a>';
-                if (hasChildren) {
-                  html += '<button class="nav-heading-toggle" data-toggle-heading aria-expanded="false" aria-label="Expand">';
-                  html += '<svg class="nav-heading-chevron" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 1l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                  html += '</button>';
-                }
-                html += '</div>';
-                if (hasChildren) {
-                  html += renderHeadings(children, h.level);
-                }
-                html += '</li>';
-                j = k;
-              }
-              html += '</ul>';
-              return html;
-            }
-          %>
-            <%- renderHeadings(headings, 1) %>
+        <li class="nav-session-group<%= isActive ? ' nav-session-group--active' : '' %>">
+          <div class="nav-session-row">
+            <a href="<%= sessionUrl %>" class="nav-session-item<%= isActive ? ' active' : '' %>">
+              <span class="session-num<%= sessionNum === '' ? ' session-num--no-number' : '' %>"><%= sessionNum %></span>
+              <span class="nav-session-name"><%= s.displayName %></span>
+            </a>
+            <% if (hasHeadings) { %>
+              <button class="nav-heading-toggle nav-session-toggle" data-toggle-heading aria-expanded="<%= isActive ? 'true' : 'false' %>" aria-label="Expand">
+                <svg class="nav-heading-chevron" width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 1l4 3-4 3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            <% } %>
+          </div>
+          <% if (hasHeadings) { %>
+            <div class="nav-session-headings<%= isActive ? '' : ' is-collapsed' %>">
+              <%- renderHeadings(sessionHeadings, 1, sessionUrl, isActive) %>
+            </div>
           <% } %>
         </li>
       <% }); %>

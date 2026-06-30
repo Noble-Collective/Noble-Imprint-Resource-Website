@@ -387,11 +387,19 @@
         e.stopPropagation();
         var expanded = btn.getAttribute('aria-expanded') === 'true';
         btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        // Find the child heading list (sibling of the .nav-heading-row, not a deeper nested one)
+        // Session-level toggle: collapse/expand .nav-session-headings
+        var sessionRow = btn.closest('.nav-session-row');
+        if (sessionRow) {
+          var headingsDiv = sessionRow.nextElementSibling;
+          if (headingsDiv && headingsDiv.classList.contains('nav-session-headings')) {
+            headingsDiv.classList.toggle('is-collapsed', expanded);
+            return;
+          }
+        }
+        // Heading-level toggle: collapse/expand child .nav-heading-list
         var row = btn.closest('.nav-heading-row');
         var childList = row ? row.nextElementSibling : null;
-        if (childList && !childList.classList.contains('nav-heading-list')) childList = null;
-        if (childList) {
+        if (childList && childList.classList.contains('nav-heading-list')) {
           childList.classList.toggle('is-collapsed', expanded);
         }
       });
