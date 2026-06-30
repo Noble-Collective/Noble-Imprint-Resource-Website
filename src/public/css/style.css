@@ -585,25 +585,25 @@ img {
 .nav-heading-link:hover {
   color: var(--color-green);
 }
-/* Heading level indentation */
+/* Heading level indentation — h2 starts indented past the session name text */
 .nav-heading-link.nav-heading-level-2 {
-  padding: 0.3rem 0.5rem 0.3rem 3.25rem;
+  padding: 0.3rem 0.5rem 0.3rem 4.25rem;
   font-size: 0.72rem;
 }
 .nav-heading-link.nav-heading-level-3 {
-  padding: 0.25rem 0.5rem 0.25rem 4rem;
+  padding: 0.25rem 0.5rem 0.25rem 5rem;
   font-size: 0.68rem;
 }
 .nav-heading-link.nav-heading-level-4 {
-  padding: 0.2rem 0.5rem 0.2rem 4.75rem;
+  padding: 0.2rem 0.5rem 0.2rem 5.75rem;
   font-size: 0.65rem;
 }
 .nav-heading-link.nav-heading-level-5 {
-  padding: 0.2rem 0.5rem 0.2rem 5.5rem;
+  padding: 0.2rem 0.5rem 0.2rem 6.5rem;
   font-size: 0.62rem;
 }
 .nav-heading-link.nav-heading-level-6 {
-  padding: 0.2rem 0.5rem 0.2rem 6.25rem;
+  padding: 0.2rem 0.5rem 0.2rem 7.25rem;
   font-size: 0.62rem;
 }
 /* Expand/collapse toggle button */
@@ -2580,12 +2580,12 @@ body.drawer-open {
     margin-left: auto;
   }
 
-  /* Heading sub-nav mobile */
-  .nav-heading-link.nav-heading-level-2 { padding-left: 2.5rem; font-size: 0.7rem; }
-  .nav-heading-link.nav-heading-level-3 { padding-left: 3.25rem; font-size: 0.67rem; }
-  .nav-heading-link.nav-heading-level-4 { padding-left: 4rem; font-size: 0.64rem; }
-  .nav-heading-link.nav-heading-level-5 { padding-left: 4.5rem; font-size: 0.62rem; }
-  .nav-heading-link.nav-heading-level-6 { padding-left: 5rem; font-size: 0.62rem; }
+  /* Heading sub-nav mobile — indented past session name */
+  .nav-heading-link.nav-heading-level-2 { padding-left: 3.5rem; font-size: 0.7rem; }
+  .nav-heading-link.nav-heading-level-3 { padding-left: 4.25rem; font-size: 0.67rem; }
+  .nav-heading-link.nav-heading-level-4 { padding-left: 5rem; font-size: 0.64rem; }
+  .nav-heading-link.nav-heading-level-5 { padding-left: 5.5rem; font-size: 0.62rem; }
+  .nav-heading-link.nav-heading-level-6 { padding-left: 6rem; font-size: 0.62rem; }
   .nav-heading-toggle { width: 36px; min-width: 36px; height: 32px; } /* bigger touch target */
 
   /* H2 sub-nav mobile (backward compat) */
