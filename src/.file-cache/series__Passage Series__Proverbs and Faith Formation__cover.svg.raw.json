@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900" role="img" aria-label="Hear, My Son cover">
+  <rect width="600" height="900" fill="#1f2937"/>
+  <rect x="30" y="30" width="540" height="840" fill="none" stroke="#c9a24b" stroke-width="3"/>
+  <text x="300" y="130" text-anchor="middle" fill="#c9a24b" font-family="Georgia, 'Times New Roman', serif" font-size="28" letter-spacing="6">PASSAGE</text>
+  <text x="300" y="420" text-anchor="middle" fill="#f5f5f4" font-family="Georgia, serif" font-size="66" font-style="italic">Hear,</text>
+  <text x="300" y="500" text-anchor="middle" fill="#f5f5f4" font-family="Georgia, serif" font-size="66" font-style="italic">My Son</text>
+  <line x1="190" y1="548" x2="410" y2="548" stroke="#c9a24b" stroke-width="2"/>
+  <text x="300" y="606" text-anchor="middle" fill="#d6d3d1" font-family="Georgia, serif" font-size="23">A Primer on Proverbs</text>
+  <text x="300" y="638" text-anchor="middle" fill="#d6d3d1" font-family="Georgia, serif" font-size="23">as a Tool for Faith Formation</text>
+  <text x="300" y="826" text-anchor="middle" fill="#a8a29e" font-family="Georgia, serif" font-size="19" letter-spacing="3">NOBLE IMPRINT</text>
+</svg>
