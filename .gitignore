@@ -14,3 +14,9 @@ mockups/
 
 # Test
 test-results/
+test-screenshots/
+
+# Local scratch / dev artifacts
+temp/
+cookies.txt
+.claude/
