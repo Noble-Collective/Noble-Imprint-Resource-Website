@@ -1,0 +1,67 @@
+<%- include('partials/header') %>
+
+  <aside class="sidebar">
+    <div class="sidebar-title">Voice Test</div>
+    <ul class="nav-series">
+      <li><a href="/" class="nav-series-link" style="display:block;"><span>&larr; Resource Library</span></a></li>
+      <li><a href="/bible" class="nav-series-link" style="display:block;"><span>Bibles</span></a></li>
+    </ul>
+    <%- include('partials/sidebar-auth') %>
+  </aside>
+
+  <main class="main">
+    <style>
+      .vt-sample { max-width: 640px; margin: 0 auto 2.5rem; padding: 1.5rem 1.75rem;
+        background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; }
+      .vt-sample h2 { font-family: 'DM Serif Display', serif; margin: 1.25rem 0 0.5rem; }
+      .vt-sample h2:first-child { margin-top: 0; }
+      .vt-sample p { font-family: 'Lora', serif; line-height: 1.7; margin: 0 0 0.9rem; }
+      .vt-sample sup { font-size: 0.62em; opacity: 0.5; padding: 0 0.15em 0 0.05em; font-family: 'DM Sans', sans-serif; }
+      .vt-voices { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+      .vt-voice { padding: 1rem 1.25rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 10px; }
+      .vt-voice-head { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+      .vt-voice-name { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 1.05rem; }
+      .vt-voice-accent { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+        padding: 0.1rem 0.5rem; border-radius: 999px; background: rgba(0,0,0,0.06); }
+      .vt-voice-blurb { font-family: 'DM Sans', sans-serif; font-size: 0.9rem; opacity: 0.7; }
+      .vt-voice audio { width: 100%; margin-top: 0.25rem; }
+      .vt-note { max-width: 640px; margin: 0 auto 2rem; font-family: 'DM Sans', sans-serif;
+        font-size: 0.9rem; opacity: 0.7; text-align: center; }
+    </style>
+
+    <h1 class="page-title" style="text-align:center;">Audiobook Voice Test</h1>
+    <p class="page-subtitle" style="text-align:center;">
+      <%= data.title %> &middot; <%= data.translation %>
+    </p>
+    <p class="vt-note">
+      The same passage read by <%= data.voices.length %> ElevenLabs voices. Listen and tell us which
+      best fits Scripture. Verse numbers are shown on screen but not read aloud.
+    </p>
+
+    <div class="vt-sample">
+      <% data.blocks.forEach(function(b) { %>
+        <% if (b.type === 'h1') { %>
+          <h2><%- b.text %></h2>
+        <% } else if (b.type === 'h2') { %>
+          <p style="font-style:italic;opacity:0.75;margin:-0.2rem 0 0.7rem;"><%- b.text %></p>
+        <% } else { %>
+          <p><%- b.text %></p>
+        <% } %>
+      <% }); %>
+    </div>
+
+    <div class="vt-voices">
+      <% data.voices.forEach(function(v) { %>
+        <div class="vt-voice">
+          <div class="vt-voice-head">
+            <span class="vt-voice-name"><%= v.name %></span>
+            <% if (v.accent) { %><span class="vt-voice-accent"><%= v.accent %></span><% } %>
+            <span class="vt-voice-blurb"><%= v.blurb %></span>
+          </div>
+          <audio controls preload="none" src="<%= v.url %>"></audio>
+        </div>
+      <% }); %>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

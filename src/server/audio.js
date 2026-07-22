@@ -82,6 +82,37 @@ async function getAudioSession(bookRepoPath, sessionFilename) {
 }
 
 /**
+ * Voice-comparison test data. Reads voice-test/{slug}/manifest.json from the
+ * audiobook bucket and returns it with a signed URL per voice sample. Used by
+ * the /voice-test page for side-by-side voice review. Returns null if absent.
+ */
+async function getVoiceCompareData(slug) {
+  const safeSlug = String(slug).toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const cacheKey = `voice-compare:${safeSlug}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const dir = `voice-test/${safeSlug}`;
+  try {
+    const [contents] = await getBucket().file(`${dir}/manifest.json`).download();
+    const manifest = JSON.parse(contents.toString());
+    for (const v of manifest.voices || []) {
+      const [url] = await getBucket().file(`${dir}/${v.file}`).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + SIGNED_URL_EXPIRY,
+      });
+      v.url = url;
+    }
+    cache.set(cacheKey, manifest, MANIFEST_TTL);
+    return manifest;
+  } catch (err) {
+    if (err.code === 404) return null;
+    console.error(`[audio] Failed to load voice-compare manifest for ${safeSlug}:`, err.message);
+    return null;
+  }
+}
+
+/**
  * Clear all audio manifest caches.
  */
 function clearCache() {
@@ -103,6 +134,7 @@ module.exports = {
   getAudioManifest,
   getSignedUrl,
   getAudioSession,
+  getVoiceCompareData,
   clearCache,
   formatDuration,
 };

@@ -255,6 +255,24 @@ app.get('/api/verses', (req, res) => {
   res.json({ ref, translation, verses });
 });
 
+// Voice comparison test page — side-by-side voice samples of a passage.
+// Default slug is the Psalm 1 & 2 test.
+app.get('/voice-test/:slug?', async (req, res, next) => {
+  try {
+    const slug = req.params.slug || 'psalm-1-2';
+    const data = await audio.getVoiceCompareData(slug);
+    if (!data) {
+      return res.status(404).render('error', {
+        title: 'Voice Test',
+        message: 'No voice samples have been published yet. Run the Voice Compare workflow to generate them.',
+      });
+    }
+    res.render('voice-test', { data, title: `Voice Test — ${data.title}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Bible browsing routes
 app.get('/bible', (req, res) => {
   const bibles = bible.getAllTranslations();
