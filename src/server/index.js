@@ -8,7 +8,7 @@ const github = require('./github');
 const audio = require('./audio');
 const auth = require('./auth');
 const firestore = require('./firestore');
-const { renderMarkdown, renderCommonContent } = require('../renderer/parser');
+const { renderMarkdown, renderCommonContent, resolveIncludes } = require('../renderer/parser');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -398,11 +398,16 @@ async function getSessionPageData(req, resolvedRoute) {
   const sessionData = await content.loadSessionContent(session);
   const commonParts = content.gatherCommonContent(series, subseries || null, book);
   const commonHtml = renderCommonContent(commonParts);
+  // Resolve <!-- @include: Key -->  directives against the common-content blocks
+  // (book → subseries → series). Done on the raw markdown so injected content
+  // (questions, callouts, blockquotes, attributions) flows through the normal pipeline.
+  const includeBlocks = content.gatherCommonBlocks(series, subseries || null, book);
+  const resolvedContent = resolveIncludes(sessionData.content, includeBlocks);
   // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
   const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
   const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
   const maxNavHeadingLevel = book.maxNavHeadingLevel || 2;
-  const sessionHtml = renderMarkdown(sessionData.content, { color: book.color, imagesPath, maxNavHeadingLevel });
+  const sessionHtml = renderMarkdown(resolvedContent, { color: book.color, imagesPath, maxNavHeadingLevel });
 
   // Extract headings for ALL sessions in the book for full sidebar navigation.
   // Content is already cached after loadSessionTitles, so this is fast.
@@ -424,7 +429,7 @@ async function getSessionPageData(req, resolvedRoute) {
   }
 
   // Headings for the current session (used for rendering)
-  const headings = extractHeadings(sessionData.content);
+  const headings = extractHeadings(resolvedContent);
   const h2s = headings.filter(h => h.level === 2);
 
   // Headings for all sessions in the book (used for sidebar navigation)
@@ -434,7 +439,7 @@ async function getSessionPageData(req, resolvedRoute) {
     if (s.slug === session.slug) return; // already have it
     try {
       const data = await content.loadSessionContent(s);
-      allSessionHeadings[s.slug] = extractHeadings(data.content);
+      allSessionHeadings[s.slug] = extractHeadings(resolveIncludes(data.content, includeBlocks));
     } catch { allSessionHeadings[s.slug] = []; }
   }));
 

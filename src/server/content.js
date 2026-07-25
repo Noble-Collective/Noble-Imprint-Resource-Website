@@ -336,6 +336,28 @@ function gatherCommonContent(series, subseries, book) {
   return parts;
 }
 
+// Parse a common-content markdown string into a { KeyName: innerContent } map.
+// Blocks are defined as <KeyName>\n ...content... \n</KeyName>.
+function parseCommonBlocks(md) {
+  const blocks = {};
+  if (!md) return blocks;
+  const re = /<([A-Za-z][A-Za-z0-9]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
+  let m;
+  while ((m = re.exec(md)) !== null) blocks[m[1]] = m[2];
+  return blocks;
+}
+
+// Build the include-key map for a session, resolving book → subseries → series.
+// Book-level keys win over subseries, which win over series (keys should be
+// unique across the series dir, so this only matters as a documented precedence).
+function gatherCommonBlocks(series, subseries, book) {
+  const blocks = {};
+  if (series && series.commonSeries) Object.assign(blocks, parseCommonBlocks(series.commonSeries));
+  if (subseries && subseries.commonSubseries) Object.assign(blocks, parseCommonBlocks(subseries.commonSubseries));
+  if (book && book.commonBook) Object.assign(blocks, parseCommonBlocks(book.commonBook));
+  return blocks;
+}
+
 // Check if a user can access a specific book (for hidden books)
 async function canAccessBook(user, bookRepoPath) {
   if (!user) return false;
@@ -460,6 +482,8 @@ module.exports = {
   loadSessionContent,
   loadSessionTitles,
   gatherCommonContent,
+  parseCommonBlocks,
+  gatherCommonBlocks,
   filterContentTree,
   canAccessBook,
   getAllBooks,

@@ -1,6 +1,56 @@
 const MarkdownIt = require('markdown-it');
 const footnotePlugin = require('markdown-it-footnote');
 
+// ── Common-content includes ──────────────────────────────────────────────
+// Resolves `<!-- @include: KeyName param="value" -->` directives against a
+// { KeyName: content } map gathered from the book/subseries/series common files.
+// Supports two parameters:
+//   id="…"   — substitutes every {id} token in the block (unique ids for shared questions)
+//   bold="…" — bolds the single line in the block whose visible text matches exactly
+// Errors are HARD: an undefined key, a missing required id, or a bold target that
+// matches no line throws — surfacing the problem rather than silently dropping content.
+class IncludeError extends Error {}
+
+function parseIncludeParams(str) {
+  const params = {};
+  const re = /(\w+)="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(str)) !== null) params[m[1]] = m[2];
+  return params;
+}
+
+function boldMatchingLine(body, target, key) {
+  let found = false;
+  const out = body.split('\n').map(line => {
+    const m = line.match(/^(\s*>\s*)?([\s\S]*?)(\s*)$/);
+    const prefix = m[1] || '', text = m[2], trailing = m[3] || '';
+    if (text === target) { found = true; return `${prefix}**${text}**${trailing}`; }
+    return line;
+  });
+  if (!found) throw new IncludeError(`@include "${key}": bold="${target}" matched no line in the block`);
+  return out.join('\n');
+}
+
+function resolveIncludes(content, blocks) {
+  if (!content || content.indexOf('@include') === -1) return content;
+  return content.replace(
+    /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9]*)\s*(.*?)\s*-->/g,
+    (full, key, paramStr) => {
+      if (!blocks || !(key in blocks)) {
+        throw new IncludeError(`@include references undefined key "${key}"`);
+      }
+      let body = blocks[key];
+      const params = parseIncludeParams(paramStr);
+      if (body.includes('{id}')) {
+        if (!params.id) throw new IncludeError(`@include "${key}" requires an id="…" parameter`);
+        body = body.split('{id}').join(params.id);
+      }
+      if (params.bold) body = boldMatchingLine(body, params.bold, key);
+      return body;
+    }
+  );
+}
+
 // Pre-process custom syntax in raw markdown BEFORE markdown-it sees it.
 // This is the most reliable approach since markdown-it's HTML parser
 // interferes with custom tags like <Question> and <Callout>.
@@ -141,6 +191,7 @@ function createRenderer(options = {}) {
 }
 
 function renderMarkdown(content, options = {}) {
+  if (options.includeBlocks) content = resolveIncludes(content, options.includeBlocks);
   const processed = preprocess(content, options);
   const md = createRenderer(options);
   let html = md.render(processed);
@@ -377,4 +428,4 @@ function renderCommonContent(parts) {
   return parts.map(part => renderMarkdown(part)).join('');
 }
 
-module.exports = { renderMarkdown, renderCommonContent, createRenderer };
+module.exports = { renderMarkdown, renderCommonContent, createRenderer, resolveIncludes, IncludeError };
