@@ -1478,45 +1478,52 @@ body.text-mode .home-text {
 }
 .info-body strong { color: #fff; }
 
-/* Wide screens: two-column alternating timeline like the print layout */
+/* Wide screens: two-column alternating timeline like the print layout.
+   Odd/even items float into left/right columns that pack independently, so the
+   alternating items interleave (compact, like the print) rather than each taking
+   a full row. */
 @media (min-width: 680px) {
+  .infographic .info-items { display: flow-root; }
   .infographic .info-items::before { left: 50%; margin-left: -1px; top: 0.5rem; bottom: 0.5rem; }
   .infographic .info-item {
     display: block;
     width: 50%;
     box-sizing: border-box;
     position: relative;
-    padding: 0 0 2rem;
+    padding: 0 0 1.75rem;
     gap: 0;
   }
   .infographic .info-item:nth-child(odd) {
-    margin-right: 50%;
-    padding: 0 3rem 2rem 2.9rem;   /* left space reserves the outer icon */
+    float: left; clear: left;
+    padding-right: 3rem;
     text-align: right;
   }
   .infographic .info-item:nth-child(even) {
-    margin-left: 50%;
-    padding: 0 2.9rem 2rem 3rem;   /* right space reserves the outer icon */
+    float: right; clear: right;
+    padding-left: 3rem;
     text-align: left;
   }
-  /* node on the central spine */
+  .infographic .info-item:nth-child(2) { margin-top: 3rem; }  /* stagger the right column */
+  /* hollow node ring on the spine (accent-filled center masks the line behind it) */
   .infographic .info-item::after {
     content: "";
     position: absolute;
-    top: 0.35rem;
-    width: 13px;
-    height: 13px;
+    top: 0.3rem;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--accent, #8D4449);
+    border: 2px solid #fff;
+    box-sizing: border-box;
     z-index: 2;
   }
-  .infographic .info-item:nth-child(odd)::after { right: -6.5px; }
-  .infographic .info-item:nth-child(even)::after { left: -6.5px; }
+  .infographic .info-item:nth-child(odd)::after { right: -7px; }
+  .infographic .info-item:nth-child(even)::after { left: -7px; }
   /* short connector from the spine node toward the content */
   .infographic .info-item::before {
     content: "";
     position: absolute;
-    top: calc(0.35rem + 5.5px);
+    top: calc(0.3rem + 6px);
     height: 2px;
     width: 1.75rem;
     background: rgba(255, 255, 255, 0.55);
@@ -1524,7 +1531,7 @@ body.text-mode .home-text {
   }
   .infographic .info-item:nth-child(odd)::before { right: 0; }
   .infographic .info-item:nth-child(even)::before { left: 0; }
-  /* icon/number floats at the outer edge, aligned with the label */
+  /* icon/glyph floats at the outer edge, aligned with the label */
   .infographic .info-marker {
     position: absolute;
     top: 0;
@@ -1537,6 +1544,11 @@ body.text-mode .home-text {
   }
   .infographic .info-item:nth-child(odd) .info-marker { left: 0; }
   .infographic .info-item:nth-child(even) .info-marker { right: 0; }
+  /* only the label clears the icon; body spans the full half-width (under the icon) */
+  .infographic .info-item:nth-child(odd) .info-label { padding-left: 3rem; }
+  .infographic .info-item:nth-child(even) .info-label { padding-right: 3rem; }
+  /* reserve the icon's height on the label row so the full-width body clears the icon */
+  .infographic .info-label { min-height: 2.1rem; }
   .infographic .info-text { padding-top: 0; }
 }
 

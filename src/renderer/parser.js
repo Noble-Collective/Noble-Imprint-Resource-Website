@@ -148,11 +148,24 @@ function preprocess(raw, options = {}) {
       if (name === 'triquetra') return TRIQUETRA;
       return `<i class="fa-solid fa-${name}" aria-hidden="true"></i>`;
     };
+    // Story-arc glyph for sequence infographics: a plot mountain (base → rise →
+    // climax → fall → resolution) with the current stage's node filled.
+    const ARC_PTS = [[10, 46], [24, 46], [38, 30], [48, 19], [62, 30], [76, 46]];
+    const storyArc = (active) => {
+      let d = 'M0,46 H10';
+      for (let i = 1; i < ARC_PTS.length; i++) d += ` L${ARC_PTS[i][0]},${ARC_PTS[i][1]}`;
+      d += ' H86';
+      const circles = ARC_PTS.map((p, i) =>
+        `<circle cx="${p[0]}" cy="${p[1]}" r="5.5" fill="${i === active - 1 ? 'currentColor' : 'none'}"/>`
+      ).join('');
+      return `<svg class="info-arc" viewBox="0 0 86 56" width="46" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="${d}"/>${circles}</svg>`;
+    };
     text = text.replace(/<Infographic([^>]*)>([\s\S]*?)<\/Infographic>/g, (_, attrs, inner) => {
       const title = (attrs.match(/title="([^"]*)"/) || [])[1] || '';
       const type = (attrs.match(/type="([^"]*)"/) || [])[1] || 'menu';
       const firstItem = inner.search(/<Item\b/);
-      const intro = (firstItem >= 0 ? inner.slice(0, firstItem) : inner).trim();
+      // Intro: break after the first sentence so the second always starts a new line.
+      const intro = (firstItem >= 0 ? inner.slice(0, firstItem) : inner).trim().replace(/\.\s+/, '.<br>');
       const itemPat = /<Item([^>]*)>([\s\S]*?)<\/Item>/g;
       const items = [];
       let im, n = 0;
@@ -163,7 +176,7 @@ function preprocess(raw, options = {}) {
         const label = (ia.match(/label="([^"]*)"/) || [])[1] || '';
         const body = im[2].trim();
         const marker = type === 'sequence'
-          ? `<span class="info-num">${n}</span>`
+          ? storyArc(n)
           : iconMarkup(icon);
         items.push(
           `<li class="info-item"><span class="info-marker">${marker}</span>` +
