@@ -1477,6 +1477,69 @@ body.text-mode .home-text {
   opacity: 0.96;
 }
 .info-body strong { color: #fff; }
+
+/* Wide screens: two-column alternating timeline like the print layout */
+@media (min-width: 680px) {
+  .infographic .info-items::before { left: 50%; margin-left: -1px; top: 0.5rem; bottom: 0.5rem; }
+  .infographic .info-item {
+    display: block;
+    width: 50%;
+    box-sizing: border-box;
+    position: relative;
+    padding: 0 0 2rem;
+    gap: 0;
+  }
+  .infographic .info-item:nth-child(odd) {
+    margin-right: 50%;
+    padding: 0 3rem 2rem 2.9rem;   /* left space reserves the outer icon */
+    text-align: right;
+  }
+  .infographic .info-item:nth-child(even) {
+    margin-left: 50%;
+    padding: 0 2.9rem 2rem 3rem;   /* right space reserves the outer icon */
+    text-align: left;
+  }
+  /* node on the central spine */
+  .infographic .info-item::after {
+    content: "";
+    position: absolute;
+    top: 0.35rem;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #fff;
+    z-index: 2;
+  }
+  .infographic .info-item:nth-child(odd)::after { right: -6.5px; }
+  .infographic .info-item:nth-child(even)::after { left: -6.5px; }
+  /* short connector from the spine node toward the content */
+  .infographic .info-item::before {
+    content: "";
+    position: absolute;
+    top: calc(0.35rem + 5.5px);
+    height: 2px;
+    width: 1.75rem;
+    background: rgba(255, 255, 255, 0.55);
+    z-index: 1;
+  }
+  .infographic .info-item:nth-child(odd)::before { right: 0; }
+  .infographic .info-item:nth-child(even)::before { left: 0; }
+  /* icon/number floats at the outer edge, aligned with the label */
+  .infographic .info-marker {
+    position: absolute;
+    top: 0;
+    width: auto;
+    height: auto;
+    background: transparent;
+    border-radius: 0;
+    font-size: 1.9rem;
+    line-height: 1;
+  }
+  .infographic .info-item:nth-child(odd) .info-marker { left: 0; }
+  .infographic .info-item:nth-child(even) .info-marker { right: 0; }
+  .infographic .info-text { padding-top: 0; }
+}
+
 @media (max-width: 480px) {
   .infographic { padding: 1.5rem 1.1rem 1.75rem; }
   .info-item { grid-template-columns: 2.5rem 1fr; gap: 0.75rem; }
