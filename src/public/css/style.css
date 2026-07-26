@@ -1345,7 +1345,15 @@ body.text-mode .home-text {
   color: color-mix(in srgb, var(--accent) 80%, black);
 }
 .session-content.accent-themed tbody tr:nth-child(even) {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, white);
+}
+
+/* Bold text: semibold rather than the default heavy 700 (Lora/Poppins bold reads very heavy) */
+.session-content strong,
+.session-content b,
+.reading-content strong,
+.reading-content b {
+  font-weight: 600;
 }
 
 /* Pullquote callout */
