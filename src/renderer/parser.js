@@ -4,11 +4,14 @@ const footnotePlugin = require('markdown-it-footnote');
 // ── Common-content includes ──────────────────────────────────────────────
 // Resolves `<!-- @include: KeyName param="value" -->` directives against a
 // { KeyName: content } map gathered from the book/subseries/series common files.
-// Supports two parameters:
-//   id="…"   — substitutes every {id} token in the block (unique ids for shared questions)
-//   bold="…" — bolds the single line in the block whose visible text matches exactly
-// Errors are HARD: an undefined key, a missing required id, or a bold target that
-// matches no line throws — surfacing the problem rather than silently dropping content.
+// Supports three parameters:
+//   id="…"     — substitutes every {id} token in the block (unique ids for shared questions)
+//   bold="…"   — bolds the single line in the block whose visible text matches exactly
+//   active="…" — marks the single <Item> in the block whose label matches as active
+//                (a filled node in an infographic timeline)
+// Errors are HARD: an undefined key, a missing required id, a bold target that
+// matches no line, or an active target that matches no item throws — surfacing the
+// problem rather than silently dropping content.
 class IncludeError extends Error {}
 
 function parseIncludeParams(str) {
@@ -31,6 +34,21 @@ function boldMatchingLine(body, target, key) {
   return out.join('\n');
 }
 
+function activateMatchingItem(body, target, key) {
+  let found = false;
+  const out = body.replace(/<Item\b([^>]*)>/g, (full, attrs) => {
+    const lm = attrs.match(/label="([^"]*)"/);
+    if (!found && lm && lm[1] === target) {
+      found = true;
+      if (/\bactive\b/.test(attrs)) return full;
+      return `<Item${attrs} active>`;
+    }
+    return full;
+  });
+  if (!found) throw new IncludeError(`@include "${key}": active="${target}" matched no <Item label> in the block`);
+  return out;
+}
+
 function resolveIncludes(content, blocks) {
   if (!content || content.indexOf('@include') === -1) return content;
   return content.replace(
@@ -46,6 +64,7 @@ function resolveIncludes(content, blocks) {
         body = body.split('{id}').join(params.id);
       }
       if (params.bold) body = boldMatchingLine(body, params.bold, key);
+      if (params.active) body = activateMatchingItem(body, params.active, key);
       return body;
     }
   );
