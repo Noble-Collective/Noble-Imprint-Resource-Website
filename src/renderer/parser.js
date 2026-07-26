@@ -6,7 +6,8 @@ const footnotePlugin = require('markdown-it-footnote');
 // { KeyName: content } map gathered from the book/subseries/series common files.
 // Supports three parameters:
 //   id="…"     — substitutes every {id} token in the block (unique ids for shared questions)
-//   bold="…"   — bolds the single line in the block whose visible text matches exactly
+//   bold="…"   — bolds the passed text: a single line, a run of consecutive lines
+//                (joined by spaces), or a partial substring within one line
 //   active="…" — marks the single <Item> in the block whose label matches as active
 //                (a filled node in an infographic timeline)
 // Errors are HARD: an undefined key, a missing required id, a bold target that
@@ -23,15 +24,42 @@ function parseIncludeParams(str) {
 }
 
 function boldMatchingLine(body, target, key) {
-  let found = false;
-  const out = body.split('\n').map(line => {
+  // Bolds the passed text within the block. Handles three cases so the caller can
+  // pass the ACTUAL text to emphasize (not a line number):
+  //   1. a single full line,
+  //   2. a run of consecutive full lines (joined by spaces) — each line is bolded,
+  //   3. a partial substring inside one line.
+  const parsed = body.split('\n').map(line => {
     const m = line.match(/^(\s*>\s*)?([\s\S]*?)(\s*)$/);
-    const prefix = m[1] || '', text = m[2], trailing = m[3] || '';
-    if (text === target) { found = true; return `${prefix}**${text}**${trailing}`; }
-    return line;
+    return { line, prefix: m[1] || '', text: m[2], trailing: m[3] || '' };
   });
-  if (!found) throw new IncludeError(`@include "${key}": bold="${target}" matched no line in the block`);
-  return out.join('\n');
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+  const tgt = norm(target);
+
+  // (1)/(2) contiguous run of full lines whose joined visible text equals the target
+  for (let s = 0; s < parsed.length; s++) {
+    if (!parsed[s].text) continue;
+    let joined = '';
+    for (let e = s; e < parsed.length; e++) {
+      if (!parsed[e].text) break;
+      joined = joined ? `${joined} ${norm(parsed[e].text)}` : norm(parsed[e].text);
+      if (joined === tgt) {
+        for (let i = s; i <= e; i++) {
+          parsed[i].line = `${parsed[i].prefix}**${parsed[i].text}**${parsed[i].trailing}`;
+        }
+        return parsed.map(p => p.line).join('\n');
+      }
+      if (!tgt.startsWith(joined)) break; // this run can't grow into the target
+    }
+  }
+  // (3) partial substring inside a single line
+  for (const p of parsed) {
+    if (p.text && p.text.includes(target)) {
+      p.line = `${p.prefix}${p.text.replace(target, `**${target}**`)}${p.trailing}`;
+      return parsed.map(x => x.line).join('\n');
+    }
+  }
+  throw new IncludeError(`@include "${key}": bold="${target}" matched no line(s) in the block`);
 }
 
 function activateMatchingItem(body, target, key) {
