@@ -16,7 +16,7 @@ import re, sys, os, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(HERE, 'docs')
-BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Story Behind It All (Final)/sessions'
+BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Story Behind It All/sessions'
 
 def norm(s):
     s = s.replace('’',"'").replace('‘',"'").replace('“','"').replace('”','"')

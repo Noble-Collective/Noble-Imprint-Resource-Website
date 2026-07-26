@@ -2,7 +2,7 @@
 
 Running doc for converting Google-Doc session manuscripts into the custom session
 markdown used by the Noble Imprint website/app. Built for **"The Story Behind It
-All (Final)"** (Narrative Journey Series → Essentials); the same pipeline is meant
+All"** (Narrative Journey Series → Essentials); the same pipeline is meant
 to be reused for the rest of the series.
 
 _Last updated: 2026-07-26 — all 12 sessions built, verified, and live (book is `status: hidden`)._
@@ -164,7 +164,7 @@ Files are `NN-The-Xxx.md` (zero-padded): `01-The-Battle.md` … `12-The-Finale.m
 
 - Website: `ea68dc5` (active= include param), earlier `b573c52` (infographic polish, css `v=75`).
 - Content: `7e7acd4` (12 sessions + shared infographics), `84149a2` (S4 Coming Clean).
-- Live (admin-only, hidden): `resources.noblecollective.org/narrative-journey-series/essentials/the-story-behind-it-all-final/<slug>`
+- Live (admin-only, hidden): `resources.noblecollective.org/narrative-journey-series/essentials/the-story-behind-it-all/<slug>`
   where slug is `01-the-battle` … `12-the-finale`.
 
 ## 10. Front & back matter (added 2026-07)
