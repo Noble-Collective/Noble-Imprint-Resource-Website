@@ -65,6 +65,38 @@
       </div>
     </div>
 
+    <script>
+    // Infographic dot spacing: enforce a minimum gap between consecutive spine
+    // dots (= 1.5× the first gap), pushing DOWN only the ones that are too close
+    // and leaving every other dot at its natural position. Two-column (wide) only.
+    (function () {
+      function fixDots() {
+        var wide = window.innerWidth >= 680;
+        document.querySelectorAll('.infographic .info-items').forEach(function (ul) {
+          var items = Array.prototype.slice.call(ul.querySelectorAll('.info-item'));
+          items.forEach(function (it) { it.style.marginTop = ''; }); // reset to CSS defaults
+          if (!wide || items.length < 3) return;
+          var top = function (it) { return it.getBoundingClientRect().top; };
+          var firstGap = top(items[1]) - top(items[0]);
+          if (firstGap <= 0) return;
+          var MIN = firstGap * 1.5;
+          for (var i = 2; i < items.length; i++) {
+            var gap = top(items[i]) - top(items[i - 1]);
+            if (gap < MIN) {
+              var cur = parseFloat(getComputedStyle(items[i]).marginTop) || 0;
+              items[i].style.marginTop = (cur + (MIN - gap)) + 'px';
+            }
+          }
+        });
+      }
+      var raf = function () { requestAnimationFrame(fixDots); };
+      window.addEventListener('load', raf);
+      window.addEventListener('resize', raf);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(raf);
+      document.addEventListener('DOMContentLoaded', raf);
+    })();
+    </script>
+
     <% if (typeof editRole !== 'undefined' && editRole) { %>
     <!-- Editor container (hidden until edit mode) -->
     <div class="editor-container" id="editor-container" style="display:none">

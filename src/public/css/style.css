@@ -1503,7 +1503,7 @@ body.text-mode .home-text {
     padding-left: 3rem;
     text-align: left;
   }
-  .infographic .info-item:nth-child(2) { margin-top: 3rem; }  /* stagger the right column */
+  .infographic .info-item:nth-child(2) { margin-top: 3rem; }  /* default offset for the right column */
   /* hollow node ring on the spine (accent-filled center masks the line behind it) */
   .infographic .info-item::after {
     content: "";
@@ -1519,6 +1519,8 @@ body.text-mode .home-text {
   }
   .infographic .info-item:nth-child(odd)::after { right: -7px; }
   .infographic .info-item:nth-child(even)::after { left: -7px; }
+  /* an "active" item shows a filled (solid) node instead of the hollow ring */
+  .infographic .info-item--active::after { background: #fff; }
   /* short connector from the spine node toward the content */
   .infographic .info-item::before {
     content: "";

@@ -150,15 +150,17 @@ function preprocess(raw, options = {}) {
     };
     // Story-arc glyph for sequence infographics: a plot mountain (base → rise →
     // climax → fall → resolution) with the current stage's node filled.
-    const ARC_PTS = [[10, 46], [24, 46], [38, 30], [48, 19], [62, 30], [76, 46]];
+    const ARC_PTS = [[9, 48], [23, 42], [37, 27], [47, 10], [61, 27], [75, 48]];
     const storyArc = (active) => {
-      let d = 'M0,46 H10';
+      let d = 'M0,48 H9';
       for (let i = 1; i < ARC_PTS.length; i++) d += ` L${ARC_PTS[i][0]},${ARC_PTS[i][1]}`;
       d += ' H86';
+      // Non-active circles are filled with the panel accent so the connecting line
+      // is masked inside them (it connects at the ring edges, not through the center).
       const circles = ARC_PTS.map((p, i) =>
-        `<circle cx="${p[0]}" cy="${p[1]}" r="5.5" fill="${i === active - 1 ? 'currentColor' : 'none'}"/>`
+        `<circle cx="${p[0]}" cy="${p[1]}" r="7" fill="${i === active - 1 ? 'currentColor' : 'var(--accent, #8D4449)'}"/>`
       ).join('');
-      return `<svg class="info-arc" viewBox="0 0 86 56" width="46" height="30" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="${d}"/>${circles}</svg>`;
+      return `<svg class="info-arc" viewBox="0 0 86 58" width="50" height="34" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="${d}"/>${circles}</svg>`;
     };
     text = text.replace(/<Infographic([^>]*)>([\s\S]*?)<\/Infographic>/g, (_, attrs, inner) => {
       const title = (attrs.match(/title="([^"]*)"/) || [])[1] || '';
@@ -174,12 +176,13 @@ function preprocess(raw, options = {}) {
         const ia = im[1];
         const icon = (ia.match(/icon="([^"]*)"/) || [])[1] || '';
         const label = (ia.match(/label="([^"]*)"/) || [])[1] || '';
+        const active = /\bactive\b/.test(ia);
         const body = im[2].trim();
         const marker = type === 'sequence'
           ? storyArc(n)
           : iconMarkup(icon);
         items.push(
-          `<li class="info-item"><span class="info-marker">${marker}</span>` +
+          `<li class="info-item${active ? ' info-item--active' : ''}"><span class="info-marker">${marker}</span>` +
           `<span class="info-text"><span class="info-label">${label}</span>` +
           `<span class="info-body">${body}</span></span></li>`
         );
