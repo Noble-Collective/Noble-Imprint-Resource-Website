@@ -407,7 +407,7 @@ async function getSessionPageData(req, resolvedRoute) {
   const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
   const imagesPath = sessionsDir ? sessionsDir + '/images' : '';
   const maxNavHeadingLevel = book.maxNavHeadingLevel || 2;
-  const sessionHtml = renderMarkdown(resolvedContent, { color: book.color, imagesPath, maxNavHeadingLevel });
+  const sessionHtml = renderMarkdown(resolvedContent, { color: book.color, accent: book.accent, imagesPath, maxNavHeadingLevel });
 
   // Extract headings for ALL sessions in the book for full sidebar navigation.
   // Content is already cached after loadSessionTitles, so this is fast.

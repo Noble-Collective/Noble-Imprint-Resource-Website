@@ -91,6 +91,17 @@ function preprocess(raw, options = {}) {
     (_, content) => `<span class="chapter-num">${content.trim()}</span>`
   );
 
+  // ── Accent → inline span in the book's accent color (from meta.json "accent") ──
+  // <Accent>text</Accent> → <span class="accent" style="color:…">text</span>
+  // Inner markdown (e.g. _italics_) is preserved and rendered normally.
+  if (text.indexOf('<Accent>') !== -1) {
+    const styleAttr = options.accent ? ` style="color: ${options.accent}"` : '';
+    text = text.replace(
+      /<Accent>([\s\S]*?)<\/Accent>/g,
+      (_, content) => `<span class="accent"${styleAttr}>${content.trim()}</span>`
+    );
+  }
+
   // ── Attribution ──
   // << **1 Peter 2:24** → right-aligned div
   text = text.replace(

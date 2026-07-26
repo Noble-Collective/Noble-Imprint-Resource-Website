@@ -109,6 +109,7 @@ async function loadBook(bookPath, dirName) {
     banner: meta.banner || null,
     status,
     color: meta.color || {},
+    accent: meta.accent || null,
     coverPath,
     commonBook,
     sessions,
