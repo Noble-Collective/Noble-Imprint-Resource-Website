@@ -1413,10 +1413,10 @@ body.text-mode .home-text {
   line-height: 1.6;
   opacity: 0.95;
 }
-.info-items {
+.infographic .info-items {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0;   /* beat the generic .session-content ul padding so spine + nodes align */
   position: relative;
 }
 .info-items::before {
