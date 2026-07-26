@@ -1348,12 +1348,13 @@ body.text-mode .home-text {
   background: color-mix(in srgb, var(--accent) 9%, white);
 }
 
-/* Bold text: semibold rather than the default heavy 700 (Lora/Poppins bold reads very heavy) */
+/* Bold text: use Lora's real 500 (medium) — 700/600 get faux-bolded since only
+   400/500 are loaded, which reads heavy/clunky. 500 is a clean, lighter emphasis. */
 .session-content strong,
 .session-content b,
 .reading-content strong,
 .reading-content b {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Pullquote callout */
