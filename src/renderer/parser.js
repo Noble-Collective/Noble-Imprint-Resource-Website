@@ -355,12 +355,35 @@ function renderMarkdown(content, options = {}) {
     if (isInsideTagAttribute(fm.index)) continue; // Inside a tag
 
     const fullRef = fm[0];
+    const fullBook = fm[1];
     replacements.push({
       start: fm.index,
       end: fm.index + fm[0].length,
       original: fm[0],
       ref: fullRef,
     });
+
+    // Also link semicolon-separated chapter:verse continuations that follow the
+    // full ref, even when NOT inside parentheses — e.g. "Job 1:6–12; 2:1–6" links
+    // "2:1–6" too (same book). Otherwise these are only caught inside parens.
+    let tailStart = fm.index + fm[0].length;
+    const contPat = /^(;\s?)((?:cf\.\s?)?\d+:\d+(?:[–\-]\d+:\d+|[–\-]\d+)?(?:,\s?\d+(?:[–\-]\d+)?)*)/;
+    let cm;
+    while ((cm = contPat.exec(html.slice(tailStart))) !== null) {
+      const sep = cm[1];
+      const verseSpec = cm[2].replace(/^cf\.\s?/, '');
+      const segStart = tailStart + sep.length + (cm[2].length - verseSpec.length);
+      const segEnd = segStart + verseSpec.length;
+      if (!isInsideTagAttribute(segStart)) {
+        replacements.push({
+          start: segStart,
+          end: segEnd,
+          original: verseSpec,
+          ref: `${fullBook} ${verseSpec}`,
+        });
+      }
+      tailStart = segEnd;
+    }
   }
 
   // Collect shorthand references — split on semicolons inside parens
