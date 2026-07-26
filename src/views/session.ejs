@@ -56,7 +56,7 @@
     <% } %>
 
     <div class="reading-content" id="reading-content">
-      <div class="session-content">
+      <div class="session-content<%= book.accent ? ' accent-themed' : '' %>"<% if (book.accent) { %> style="--accent: <%= book.accent %>"<% } %>>
         <%- sessionHtml %>
       </div>
 

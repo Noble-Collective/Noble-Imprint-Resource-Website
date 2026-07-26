@@ -1314,6 +1314,21 @@ body.text-mode .home-text {
   margin: -0.5rem 0 1.5rem;
 }
 
+/* Per-book accent theming — active only when the book sets meta.json "accent"
+   (adds .accent-themed + --accent on .session-content). Blockquotes and callouts
+   are tinted from the one accent at different strengths so they stay distinct;
+   other books are untouched. color-mix degrades gracefully (border still themed). */
+.session-content.accent-themed blockquote {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.session-content.accent-themed .pullquote {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.session-content.accent-themed .pullquote::before {
+  color: var(--accent);
+}
+
 /* Pullquote callout */
 .pullquote {
   background: rgba(83, 105, 66, 0.07);
