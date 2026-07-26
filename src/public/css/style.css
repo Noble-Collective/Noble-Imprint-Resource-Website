@@ -1331,6 +1331,19 @@ body.text-mode .home-text {
 .session-content.accent-themed .pullquote p {
   color: color-mix(in srgb, var(--accent) 80%, black);
 }
+/* Questions: neutral warm grey — the default gold/cream fights the red accent */
+.session-content.accent-themed .question-block {
+  border-left-color: #c9c6c1;
+  background: #f5f4f2;
+}
+/* Tables: heading bar + even rows tinted from the accent */
+.session-content.accent-themed .table-heading-row {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 80%, black);
+}
+.session-content.accent-themed tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
 
 /* Pullquote callout */
 .pullquote {
