@@ -166,3 +166,23 @@ Files are `NN-The-Xxx.md` (zero-padded): `01-The-Battle.md` … `12-The-Finale.m
 - Content: `7e7acd4` (12 sessions + shared infographics), `84149a2` (S4 Coming Clean).
 - Live (admin-only, hidden): `resources.noblecollective.org/narrative-journey-series/essentials/the-story-behind-it-all-final/<slug>`
   where slug is `01-the-battle` … `12-the-finale`.
+
+## 10. Front & back matter (added 2026-07)
+
+Four non-session files frame the 12 sessions, named to sort around them (the nav
+strips the `NN-` prefix): `00-Front-Matter`, `00-The-Opening` (before session 1);
+`13-The-Recall`, `14-Further-Resources` (after session 12).
+
+- **The Opening / The Recall / Further Resources** — content from their Google-Doc
+  manuscripts (all already self-structured to the Bond Between Us framework), converted
+  by **`convert_matter.py`** (reads `docs/opening.md` `docs/recall.md` `docs/further.md`
+  → `out/`). Creed → blockquote, Key Elements bullets, `<Question>` blocks, quotes →
+  `> … <<`, session lists, bibliography (`#### Session N` + citations), reading plan
+  (Week bullets), passages/reading tables split from the doc's run-on paragraphs.
+- **Front Matter** — Series Introduction + Session Overview adapted from the Bond Between
+  Us PDF (hand-written, not scripted); title/subtitle/CC-BY-SA copyright changed to this book.
+- **Bond reference**: `The Bond Between Us_Interior_v15 (bleed).pdf` — front matter pages
+  0–18, The Opening 19–34, The Recall 395–408, Further Resources 410–421.
+- Decisions, adaptations, and open flags recorded in **`MATTER_DECISIONS.md`** (copyright
+  year placeholder; omitted Community-specific epigraph/dedication; the Growth Evaluation
+  rubric grid couldn't be recovered from the flattened Doc export).
