@@ -1460,8 +1460,8 @@ body.text-mode .home-text {
 
 /* Question block */
 .question-block {
-  border-left: 3px solid #bdbcb9;
-  background: #ececeb;
+  border-left: 3px solid #c4c3c0;
+  background: #f1f0ef;
   padding: 1rem 1.25rem;
   margin: 1.25rem 0;
   border-radius: 0 4px 4px 0;
