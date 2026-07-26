@@ -1389,6 +1389,101 @@ body.text-mode .home-text {
   margin: 0;
 }
 
+/* ── Infographics ──────────────────────────────────────────────────────────
+   Rendered from <Infographic>/<Item> markdown as a responsive accent-themed
+   timeline: a vertical spine with icon/number nodes, label + body per item. */
+.infographic {
+  background: var(--accent, #8D4449);
+  color: #fff;
+  border-radius: 14px;
+  padding: 2rem 1.75rem 2.25rem;
+  margin: 2.5rem 0;
+}
+.info-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.55rem;
+  text-align: center;
+  margin-bottom: 0.55rem;
+}
+.info-intro {
+  text-align: center;
+  max-width: 42rem;
+  margin: 0 auto 1.9rem;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+.info-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.info-items::before {
+  content: "";
+  position: absolute;
+  left: 1.5rem;
+  top: 1rem;
+  bottom: 1.5rem;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.info-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 1rem;
+  padding: 0.25rem 0 1.5rem;
+}
+.info-item:last-child { padding-bottom: 0; }
+.info-marker {
+  position: relative;
+  z-index: 1;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  background: var(--accent, #8D4449);
+  border-radius: 50%;
+}
+.info-num {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+}
+.info-text { display: block; padding-top: 0.35rem; }
+.info-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.1rem;
+  line-height: 1.25;
+  margin-bottom: 0.3rem;
+}
+.info-body {
+  display: block;
+  line-height: 1.55;
+  font-size: 0.95rem;
+  opacity: 0.96;
+}
+.info-body strong { color: #fff; }
+@media (max-width: 480px) {
+  .infographic { padding: 1.5rem 1.1rem 1.75rem; }
+  .info-item { grid-template-columns: 2.5rem 1fr; gap: 0.75rem; }
+  .info-marker { width: 2.5rem; height: 2.5rem; font-size: 1.2rem; }
+  .info-items::before { left: 1.25rem; }
+}
+
 /* Chapter section number (e.g. Seneca's original paragraph numbers) */
 .chapter-num {
   font-weight: 700;

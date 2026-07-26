@@ -135,6 +135,49 @@ function preprocess(raw, options = {}) {
     }
   );
 
+  // ── Infographic blocks ──
+  // <Infographic title="…" type="menu|sequence"> intro… <Item icon="…" label="…">body</Item> … </Infographic>
+  // Title/intro/labels/bodies are the editable source of truth; rendered as a
+  // responsive accent-themed timeline. Icons are Font Awesome solid names
+  // (icon="church"); "triquetra" is a custom inline SVG. Inner markdown in the
+  // intro/body is rendered in the post-process inline pass.
+  if (text.indexOf('<Infographic') !== -1) {
+    const TRIQUETRA = '<svg class="info-tri" viewBox="0 0 64 64" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="4"><circle cx="32" cy="23" r="13"/><circle cx="22" cy="41" r="13"/><circle cx="42" cy="41" r="13"/></svg>';
+    const iconMarkup = (name) => {
+      if (!name) return '';
+      if (name === 'triquetra') return TRIQUETRA;
+      return `<i class="fa-solid fa-${name}" aria-hidden="true"></i>`;
+    };
+    text = text.replace(/<Infographic([^>]*)>([\s\S]*?)<\/Infographic>/g, (_, attrs, inner) => {
+      const title = (attrs.match(/title="([^"]*)"/) || [])[1] || '';
+      const type = (attrs.match(/type="([^"]*)"/) || [])[1] || 'menu';
+      const firstItem = inner.search(/<Item\b/);
+      const intro = (firstItem >= 0 ? inner.slice(0, firstItem) : inner).trim();
+      const itemPat = /<Item([^>]*)>([\s\S]*?)<\/Item>/g;
+      const items = [];
+      let im, n = 0;
+      while ((im = itemPat.exec(inner)) !== null) {
+        n++;
+        const ia = im[1];
+        const icon = (ia.match(/icon="([^"]*)"/) || [])[1] || '';
+        const label = (ia.match(/label="([^"]*)"/) || [])[1] || '';
+        const body = im[2].trim();
+        const marker = type === 'sequence'
+          ? `<span class="info-num">${n}</span>`
+          : iconMarkup(icon);
+        items.push(
+          `<li class="info-item"><span class="info-marker">${marker}</span>` +
+          `<span class="info-text"><span class="info-label">${label}</span>` +
+          `<span class="info-body">${body}</span></span></li>`
+        );
+      }
+      return `\n<div class="infographic infographic--${type}">` +
+        (title ? `<div class="info-title">${title}</div>` : '') +
+        (intro ? `<div class="info-intro">${intro}</div>` : '') +
+        `<ul class="info-items">${items.join('')}</ul></div>\n`;
+    });
+  }
+
   // ── Standard markdown images ![alt](name) — convert to <img> with proxy URL ──
   text = text.replace(
     /^!\[([^\]]*)\]\(([^)]+)\)\s*$/gm,
@@ -229,6 +272,16 @@ function renderMarkdown(content, options = {}) {
       const rendered = inlineMd.renderInline(inner);
       return `${open}${rendered}${close}`;
     }
+  );
+
+  // Process infographic intro + item bodies (inline markdown left raw in the html block)
+  html = html.replace(
+    /(<div class="info-intro">)([\s\S]*?)(<\/div>)/g,
+    (_, open, inner, close) => `${open}${inlineMd.renderInline(inner)}${close}`
+  );
+  html = html.replace(
+    /(<span class="info-body">)([\s\S]*?)(<\/span>)/g,
+    (_, open, inner, close) => `${open}${inlineMd.renderInline(inner)}${close}`
   );
 
   // Process callout pullquotes — extract markers from paragraphs and
