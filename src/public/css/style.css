@@ -1328,6 +1328,9 @@ body.text-mode .home-text {
 .session-content.accent-themed .pullquote::before {
   color: var(--accent);
 }
+.session-content.accent-themed .pullquote p {
+  color: color-mix(in srgb, var(--accent) 80%, black);
+}
 
 /* Pullquote callout */
 .pullquote {
