@@ -80,7 +80,7 @@
           var firstGap = top(items[1]) - top(items[0]);
           if (firstGap <= 0) return;
           var MIN = firstGap * 1.5;
-          for (var i = 2; i < items.length; i++) {
+          for (var i = 1; i < items.length; i++) {
             var gap = top(items[i]) - top(items[i - 1]);
             if (gap < MIN) {
               var cur = parseFloat(getComputedStyle(items[i]).marginTop) || 0;

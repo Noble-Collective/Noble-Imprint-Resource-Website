@@ -1533,15 +1533,16 @@ body.text-mode .home-text {
   }
   .infographic .info-item:nth-child(odd)::before { right: 0; }
   .infographic .info-item:nth-child(even)::before { left: 0; }
-  /* icon/glyph floats at the outer edge, aligned with the label */
+  /* icon/glyph floats at the outer edge, vertically centered on the label line
+     (a small upward nudge so the tall glyph doesn't overhang into the body text) */
   .infographic .info-marker {
     position: absolute;
-    top: 0;
+    top: -0.22rem;
     width: auto;
     height: auto;
     background: transparent;
     border-radius: 0;
-    font-size: 1.9rem;
+    font-size: 1.8rem;
     line-height: 1;
   }
   .infographic .info-item:nth-child(odd) .info-marker { left: 0; }
@@ -1549,8 +1550,6 @@ body.text-mode .home-text {
   /* only the label clears the icon; body spans the full half-width (under the icon) */
   .infographic .info-item:nth-child(odd) .info-label { padding-left: 3rem; }
   .infographic .info-item:nth-child(even) .info-label { padding-right: 3rem; }
-  /* reserve the icon's height on the label row so the full-width body clears the icon */
-  .infographic .info-label { min-height: 2.1rem; }
   .infographic .info-text { padding-top: 0; }
 }
 
