@@ -1331,10 +1331,13 @@ body.text-mode .home-text {
 .session-content.accent-themed .pullquote p {
   color: color-mix(in srgb, var(--accent) 80%, black);
 }
-/* Questions: neutral warm grey — the default gold/cream fights the red accent */
-.session-content.accent-themed .question-block {
-  border-left-color: #c9c6c1;
-  background: #f5f4f2;
+/* Bible-ref links take the book's accent (green stays the global default) */
+.session-content.accent-themed .bible-ref {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.session-content.accent-themed .bible-ref:hover {
+  color: color-mix(in srgb, var(--accent) 75%, black);
 }
 /* Tables: heading bar + even rows tinted from the accent */
 .session-content.accent-themed .table-heading-row {
@@ -1449,8 +1452,8 @@ body.text-mode .home-text {
 
 /* Question block */
 .question-block {
-  border-left: 3px solid var(--color-gold);
-  background: #fdfbf4;
+  border-left: 3px solid #bdbcb9;
+  background: #ececeb;
   padding: 1rem 1.25rem;
   margin: 1.25rem 0;
   border-radius: 0 4px 4px 0;
