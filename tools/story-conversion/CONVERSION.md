@@ -42,6 +42,33 @@ book file.
 The website code change that this depends on — the `active="…"` include param — is in
 the website repo (`src/renderer/parser.js`) and deploys via its own CI on push.
 
+## 2b. Converting a NEW book (checklist)
+
+The pipeline is reusable across the whole Narrative Journey series. For each new book:
+1. Get the Google Doc IDs (sessions + Opening/Recall/Further if the book has them) from Steve.
+2. `curl` each into `docs/` (see §2 step 1): `session1.md … sessionN.md`, and `opening.md`,
+   `recall.md`, `further.md` for the matter pages.
+3. **Set the PER-BOOK values** (the only book-specific edits):
+   - `convert.py` → `ID_PREFIX` (top of file): the question-id prefix, e.g. `"TheBestPossibleLife"`.
+   - `convert_matter.py` → `ID_PREFIX` (top of file): same prefix.
+   - `completeness.py` → `BOOK` path and the `titles` map (filename ↔ session) + session
+     count/`range`, to match the new book's sessions.
+4. Run `python convert.py <N>` per session; place outputs as `NN-Title.md` in the book's
+   `sessions/` (zero-padded, descriptive — the nav strips the `NN-` prefix; see §5).
+5. Run `python convert_matter.py` for Opening/Recall/Further. **Front Matter is hand-adapted**
+   from the Bond PDF (the Series Introduction + Session Overview are generic — change only
+   title/subtitle/CC-BY-SA copyright/book-specific lines; see §10 + `MATTER_DECISIONS.md`).
+6. Verify (§6): structural render check + `python completeness.py` (expect ~100% word-for-word) +
+   eyeball key regions.
+7. Deploy: commit the resources repo + `POST /api/refresh`. The website only needs a deploy if
+   you changed parser/CSS (usually not — the include engine, `<Accent>`, infographics, and the
+   session template are already shared/deployed).
+
+What's ALREADY shared (nothing to redo per book): the 5 infographics + the five movement intros,
+section directions, and shared question sets all live in `commonSeries.md` and are pulled by
+`@include`. Steve's standing decisions in §4 apply. Note: `ID_PREFIX` currently defaults to
+`"TheStory"` (the "Final" tag was dropped) — change it for each new book.
+
 ## 3. Doc IDs
 
 | # | Title | Google Doc ID |

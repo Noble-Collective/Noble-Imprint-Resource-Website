@@ -7,6 +7,7 @@ format conversion. Writes out/<name>.md.
 import re, os, sys
 HERE=os.path.dirname(os.path.abspath(__file__))
 DOCS=os.path.join(HERE,'docs'); OUT=os.path.join(HERE,'out'); os.makedirs(OUT,exist_ok=True)
+ID_PREFIX = "TheStory"  # PER-BOOK: question-id prefix
 
 def italic_to_us(s):
     s=s.replace('**','\x00'); s=re.sub(r'\*([^\*\x00]+?)\*', r'_\1_', s); return s.replace('\x00','**')
@@ -60,7 +61,7 @@ def session_list_line(t):
 
 # ─────────────────────────── The Opening / The Recall ───────────────────────────
 def build_opening_recall(name, title, kind):  # kind: 'opening'|'recall'
-    P=paras(name); out=['# '+title]; i=0; idbase='TheStoryFinal'+('Opening' if kind=='opening' else 'Recall')
+    P=paras(name); out=['# '+title]; i=0; idbase=ID_PREFIX+('Opening' if kind=='opening' else 'Recall')
     # 1) creed block (opening: under first "# Introduction"; recall: "# Conclusion" empty)
     # find "# The Opening"/"# The Recall"
     def find_h1(txt):

@@ -17,6 +17,9 @@ SRC = os.path.join(HERE, 'docs', f'session{N}.md')
 OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
+# PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
+ID_PREFIX = "TheStory"
+
 warnings = []
 def warn(m): warnings.append(m)
 
@@ -127,7 +130,7 @@ def emit_questions(idkey):
     out.append('')
     while i < len(paras) and qnum(paras[i]):
         n, qt = qnum(paras[i]); i += 1
-        out.append(f'<Question id=TheStoryFinalSes{N}-{idkey}-Q{n}>{n}. {convert_question(qt)}</Question>')
+        out.append(f'<Question id={ID_PREFIX}Ses{N}-{idkey}-Q{n}>{n}. {convert_question(qt)}</Question>')
 
 def skip_to_h2():
     global i
@@ -160,14 +163,14 @@ while i < len(paras):
                 flush_heading(2, text, '<!-- @include: MinisterTheText -->')
                 out += ['', '### Application Questions',
                         '', '<!-- @include: ApplicationDirections -->',
-                        '', f'<!-- @include: ApplicationQuestions id="TheStoryFinalSes{N}-RehearseScript" -->',
+                        '', f'<!-- @include: ApplicationQuestions id="{ID_PREFIX}Ses{N}-RehearseScript" -->',
                         '', '<!-- @include: MinistryPracticesInfographic -->']
                 skip_to_h2(); continue
             if 'missional outreach' in low:
                 flush_heading(2, text, '<!-- @include: WitnessTheText -->')
                 out += ['', '### Strategy Questions',
                         '', '<!-- @include: StrategyDirections -->',
-                        '', f'<!-- @include: StrategyQuestions id="TheStoryFinalSes{N}-PublicizeTruth" -->',
+                        '', f'<!-- @include: StrategyQuestions id="{ID_PREFIX}Ses{N}-PublicizeTruth" -->',
                         '', '<!-- @include: MissionPracticesInfographic -->']
                 skip_to_h2(); continue
             if low == 'introduction':
@@ -229,9 +232,9 @@ while i < len(paras):
             if 'storycraft' in low:
                 flush_heading(3, text, '<!-- @include: StorycraftDirections -->')
                 out += ['', '#### Narrative Elements',
-                        '', f'<!-- @include: NarrativeElementsQuestion id="TheStoryFinalSes{N}-Storycraft-Q1" -->',
+                        '', f'<!-- @include: NarrativeElementsQuestion id="{ID_PREFIX}Ses{N}-Storycraft-Q1" -->',
                         '', '#### Story Retell',
-                        '', f'<!-- @include: StoryRetellQuestion id="TheStoryFinalSes{N}-Storycraft-Q2" -->',
+                        '', f'<!-- @include: StoryRetellQuestion id="{ID_PREFIX}Ses{N}-Storycraft-Q2" -->',
                         '', '<!-- @include: NarrativeStructureInfographic -->']
                 while i < len(paras) and not (hd(paras[i]) and hd(paras[i])[0] <= 3):
                     i += 1
