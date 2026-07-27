@@ -1560,6 +1560,37 @@ body.text-mode .home-text {
   .info-items::before { left: 1.25rem; }
 }
 
+/* ── Per-session infographic themes ────────────────────────────────────────
+   Opt in by wrapping a session's content in <div class="ig-theme-NAME">. Only
+   colors/borders/background change — structure, spine, nodes, icons, spacing,
+   and the minimum-dot-spacing JS are all unchanged. */
+/* Blush gradient (white → soft blush, red headings & icons) */
+.ig-theme-blush .infographic { --accent: #faf1f1; background: linear-gradient(135deg, #ffffff 0%, #f3dede 100%); color: #5c3d40; border: 1px solid #ecd9d9; }
+.ig-theme-blush .info-title { color: #8D4449; }
+.ig-theme-blush .info-marker { color: #8D4449; }
+.ig-theme-blush .info-items::before { background: rgba(141,68,73,.28); }
+.ig-theme-blush .info-item::after { border-color: #8D4449; }
+.ig-theme-blush .info-item--active::after { background: #8D4449; }
+.ig-theme-blush .info-item::before { background: rgba(141,68,73,.45); }
+.ig-theme-blush .info-body strong { color: #8D4449; }
+/* Accent-bar card (white card, red top bar + soft shadow, red icons, grey body) */
+.ig-theme-card .infographic { --accent: #fff; background: #fff; color: #4b4b4b; border-top: 3px solid #8D4449; box-shadow: 0 2px 16px rgba(0,0,0,.08); }
+.ig-theme-card .info-title { color: #8D4449; }
+.ig-theme-card .info-marker { color: #8D4449; }
+.ig-theme-card .info-items::before { background: rgba(141,68,73,.25); }
+.ig-theme-card .info-item::after { border-color: #8D4449; }
+.ig-theme-card .info-item--active::after { background: #8D4449; }
+.ig-theme-card .info-item::before { background: rgba(141,68,73,.40); }
+.ig-theme-card .info-body strong { color: #333; }
+/* Outline (white ground, thin red border, red text / icons / nodes) */
+.ig-theme-outline .infographic { --accent: #fff; background: #fff; color: #8D4449; border: 1px solid #8D4449; }
+.ig-theme-outline .info-title { color: #8D4449; }
+.ig-theme-outline .info-items::before { background: rgba(141,68,73,.30); }
+.ig-theme-outline .info-item::after { border-color: #8D4449; }
+.ig-theme-outline .info-item--active::after { background: #8D4449; }
+.ig-theme-outline .info-item::before { background: rgba(141,68,73,.50); }
+.ig-theme-outline .info-body strong { color: #8D4449; }
+
 /* Chapter section number (e.g. Seneca's original paragraph numbers) */
 .chapter-num {
   font-weight: 700;
