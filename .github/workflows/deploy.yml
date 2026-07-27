@@ -33,8 +33,18 @@ jobs:
       - name: Build and push image
         run: |
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          docker build --build-arg BUILD_TIME="$BUILD_TIME" -t gcr.io/noble-imprint-website/resource-website .
-          docker push gcr.io/noble-imprint-website/resource-website
+          IMAGE=gcr.io/noble-imprint-website/resource-website
+          # Retry build+push so a transient registry/network blip (e.g. a Docker Hub
+          # i/o timeout on the base-image pull) doesn't fail the whole deploy.
+          for attempt in 1 2 3; do
+            echo "::group::Build & push — attempt $attempt"
+            if docker build --build-arg BUILD_TIME="$BUILD_TIME" -t "$IMAGE" . && docker push "$IMAGE"; then
+              echo "::endgroup::"; echo "Succeeded on attempt $attempt"; exit 0
+            fi
+            echo "::endgroup::"
+            [ "$attempt" -lt 3 ] && { echo "Attempt $attempt failed; retrying in $((attempt * 20))s…"; sleep $((attempt * 20)); }
+          done
+          echo "Build & push failed after 3 attempts"; exit 1
 
       - name: Deploy to Cloud Run
         run: |
