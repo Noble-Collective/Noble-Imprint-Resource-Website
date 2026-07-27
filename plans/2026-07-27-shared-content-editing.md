@@ -33,7 +33,52 @@ direct editor and the suggestion editor:
   editor-masking.js, editor-constraints.js, editor-margin.js, editor-comments.js).
   CodeMirror bundle `src/editor-entry.js` → `src/public/js/codemirror-bundle.js` (rebuild via `npm run build:editor`).
 
-## The hard part (design carefully before coding)
+## Design options (decide before coding)
+
+### Option A — in-line editing (Steve's preference; higher effort + risk)
+Resolve includes in the editor, track provenance, and **route edits on shared lines to the
+shared file** so the user edits shared content in place, seamlessly with the rest of the book.
+This is what "The hard part" and "Suggested phased approach" below describe. Best UX, but it
+reaches into the fragile parts: commit routing to a different file, resolved→source anchor
+mapping, and special handling of parameter-driven fragments (`id`/`bold`/`active`).
+
+### Option B — read-only shared + link-out (bulletproof; lower effort + risk)
+Display the shared content **inline for context but grayed-out / read-only** in the session
+editor. When the user clicks/tries to edit a shared line, show the banner + a message:
+> "This is shared content from **commonSeries.md** (series level) — edits affect every session
+> that uses it. **[Edit the shared file →]**"
+The link opens a dedicated editor page for that shared file (`commonBook.md` / `commonSeries.md`)
+where the user direct-edits the whole file using the **existing, proven single-file editor,
+unchanged**.
+
+**Why it's rock-solid:** the session editor never writes to another file, never needs
+resolved→source anchor mapping, and never special-cases parameterized fragments. All the
+risk (commit routing + anchoring) is designed out; the shared file is edited by the same
+battle-tested machinery already used for sessions, just pointed at a different path.
+
+What Option B needs:
+- Resolve includes in the editor as **read-only regions** + a provenance map (same server work
+  as A-step-2, minus edit back-mapping). Parameter-driven bits just render as-is/grayed.
+- Mask shared ranges as **non-editable** in CM — extend `editor-constraints.js` the same way it
+  already blocks structural syntax (this machinery exists and is proven).
+- **Banner + "Edit shared file" link** → a lightweight editor route/page that loads
+  `commonBook.md` / `commonSeries.md` into the SAME editor. The editor is wired to session
+  paths today, so this is a small, contained addition: point the existing editor at a
+  common-file path, with include-resolution OFF on that page (the common file *is* the source).
+- Suggestions on shared lines: either disabled inline (offer "suggest on the shared file"
+  via the link) or simply not offered inline.
+
+**Recommendation: ship B first as a safe, complete baseline** (shared content visible, clearly
+flagged with level, and fully editable via link-out using proven code), **then optionally layer A**
+if in-context inline editing proves worth the added risk. B also delivers requirements 1 & 3
+(visible shared content + level banner) immediately, and requirement 2 (edits land in the right
+file) via the link-out — with near-zero chance of regressing existing editing.
+
+_"The hard part" and the phased approach below pertain to **Option A**. If we go with B, the
+work is: server read-only resolution + provenance → CM read-only masking → banner + common-file
+editor route → tests → (no commit-routing/anchor changes needed)._
+
+## The hard part (Option A — design carefully before coding)
 - A shared block is **one source used by many sessions**. Editing it changes ALL sessions
   that include it — the UI must make that consequence clear (the banner should probably warn
   "shared — changes affect every session that uses this").
