@@ -539,6 +539,52 @@ async function getSessionPageData(req, resolvedRoute) {
   };
 }
 
+// Editor-model endpoint (shared-content editing P1). Returns the resolved editor
+// buffer + segment map + referenced files (with SHAs) + annotations pre-mapped to
+// buffer offsets. Backward-compatible: a session with no @include returns
+// segments=[one session segment], files=[session], and only session annotations.
+app.get('/api/editor-model/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
+  try {
+    const segments = [req.params.seg1, req.params.seg2, req.params.seg3, req.params.seg4].filter(Boolean);
+    const tree = await content.buildContentTree();
+    const resolved = content.resolveRoute(tree, segments);
+
+    if (!resolved || resolved.type !== 'session') {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const book = resolved.book;
+    if (book && book.status === 'hidden') {
+      const canAccess = await content.canAccessBook(req.user, book.repoPath);
+      if (!canAccess) return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (!req.user) return res.status(403).json({ error: 'Not authorized' });
+    const editRole = await firestore.getUserBookRole(req.user.email, book.repoPath);
+    const canEdit = editRole === 'admin' || editRole === 'manuscript-owner' || editRole === 'comment-suggest';
+    if (!canEdit) return res.status(403).json({ error: 'Not authorized' });
+
+    const editorModel = require('./editor-model');
+    const model = await editorModel.getEditorModel(resolved);
+
+    if (model.fromDiskCache) {
+      const ghub = require('./github');
+      const reset = ghub.getRateLimitReset();
+      return res.status(409).json({ error: 'Editing unavailable — content served from cache', rateLimitReset: reset ? reset.toISOString() : null });
+    }
+
+    res.json({
+      ...model,
+      editRole,
+      canReview: editRole === 'admin' || editRole === 'manuscript-owner',
+      user: { email: req.user.email, displayName: req.user.displayName, photoURL: req.user.photoURL },
+    });
+  } catch (err) {
+    console.error('[editor-model] error:', err.message);
+    res.status(500).json({ error: 'Failed to load editor model' });
+  }
+});
+
 // AJAX session navigation endpoint — returns JSON with pre-rendered HTML fragments
 app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
   try {

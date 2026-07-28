@@ -359,6 +359,67 @@ function gatherCommonBlocks(series, subseries, book) {
   return blocks;
 }
 
+// Parse a common-content markdown string into an ordered list of blocks, each
+// carrying the offset of its body within the source string. Mirrors
+// parseCommonBlocks' regex but keeps positions (needed for the editor segment map).
+function parseCommonBlocksTracked(md) {
+  const blocks = [];
+  if (!md) return blocks;
+  const re = /<([A-Za-z][A-Za-z0-9]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
+  let m;
+  while ((m = re.exec(md)) !== null) {
+    const bodyStart = m.index + m[0].indexOf('\n') + 1; // after the `<Key>\n` open line
+    blocks.push({ key: m[1], body: m[2], srcFrom: bodyStart });
+  }
+  return blocks;
+}
+
+// Load a common-content file WITH its SHA (unlike loadCommonContent, which drops
+// it). Returns { content, sha } or null when the file is missing/effectively empty.
+async function loadCommonFileWithSha(dirPath, filename) {
+  try {
+    const { content, sha } = await github.getFileContent(`${dirPath}/${filename}`);
+    if (content.trim().length < 5) return null;
+    return { content, sha };
+  } catch {
+    return null;
+  }
+}
+
+// Build the editor-side include index for a session, resolving book → subseries →
+// series. Loads each common file WITH its SHA at its deterministic committable
+// path and records, per block, where its body sits in the source file. Returns:
+//   { index: { key: { body, sourceFile, sourceSha, level, srcFrom } },
+//     files: [ { path, level, sha } ]  }   // only the common files that exist
+// Book-level keys win over subseries, which win over series (same precedence as
+// gatherCommonBlocks). `files` lists lowest-precedence first (series → book).
+async function gatherCommonBlocksTracked(series, subseries, book) {
+  const index = {};
+  const files = [];
+  const levels = [
+    { obj: series, filename: 'commonSeries.md', level: 'series' },
+    { obj: subseries, filename: 'commonSubseries.md', level: 'subseries' },
+    { obj: book, filename: 'commonBook.md', level: 'book' },
+  ];
+  for (const { obj, filename, level } of levels) {
+    if (!obj || !obj.repoPath) continue;
+    const path = `${obj.repoPath}/${filename}`;
+    const loaded = await loadCommonFileWithSha(obj.repoPath, filename);
+    if (!loaded) continue;
+    files.push({ path, level, sha: loaded.sha });
+    for (const blk of parseCommonBlocksTracked(loaded.content)) {
+      index[blk.key] = {
+        body: blk.body,
+        sourceFile: path,
+        sourceSha: loaded.sha,
+        level,
+        srcFrom: blk.srcFrom,
+      };
+    }
+  }
+  return { index, files };
+}
+
 // Check if a user can access a specific book (for hidden books)
 async function canAccessBook(user, bookRepoPath) {
   if (!user) return false;
@@ -485,6 +546,8 @@ module.exports = {
   gatherCommonContent,
   parseCommonBlocks,
   gatherCommonBlocks,
+  parseCommonBlocksTracked,
+  gatherCommonBlocksTracked,
   filterContentTree,
   canAccessBook,
   getAllBooks,

@@ -98,6 +98,264 @@ function resolveIncludes(content, blocks) {
   );
 }
 
+// ── Tracked include resolution (segment map for the editor) ──────────────────
+// resolveIncludesTracked mirrors resolveIncludes but ALSO returns an ordered
+// segment map describing where each range of the resolved buffer came from. It
+// is used ONLY by the editor path; the reading view keeps using resolveIncludes
+// above (untouched). Behavioral invariant (asserted by unit tests):
+//   resolveIncludesTracked(content, index, meta).resolved === resolveIncludes(content, bodies)
+//
+// Each segment covers a contiguous buffer range [bufFrom, bufTo) and is split
+// into `pieces`, alternating editable / read-only:
+//   - editable piece: buffer text is VERBATIM from the source file, i.e.
+//       buffer.slice(bufFrom,bufTo) === sourceFile.slice(srcFrom,srcTo)
+//   - read-only piece: a parameter-driven substitution ({id}) or insertion
+//       (`**` from bold=, ` active` from active=) — NEVER written back to source.
+// `readonlySpans` lists the buffer ranges of the read-only pieces (client aid).
+// `additiveOffset` (sourceOffset = bufPos + additiveOffset) is set only when the
+// segment is a single editable piece (session text, param-free shared blocks);
+// otherwise it is null and callers must use `pieces`.
+//
+// The read-only classification means the content a user CAN edit inside a shared
+// block exists verbatim in the shared source, so additive-offset mapping and the
+// content-anchoring commit path stay exact with no reverse transform on write.
+
+// Split editable 'src' pieces on `{id}`, substituting the id value. The `{id}`
+// token maps to a read-only piece; the surrounding text stays verbatim.
+function pieceSubstituteId(pieces, idValue) {
+  const out = [];
+  for (const p of pieces) {
+    if (!p.editable) { out.push(p); continue; }
+    const text = p.text;
+    let last = 0;
+    let at;
+    while ((at = text.indexOf('{id}', last)) !== -1) {
+      if (at > last) out.push({ text: text.slice(last, at), srcFrom: p.srcFrom + last, srcTo: p.srcFrom + at, editable: true });
+      out.push({ text: idValue, srcFrom: p.srcFrom + at, srcTo: p.srcFrom + at + 4, editable: false, reason: 'id' });
+      last = at + 4; // '{id}'.length
+    }
+    if (last < text.length) out.push({ text: text.slice(last), srcFrom: p.srcFrom + last, srcTo: p.srcTo, editable: true });
+    else if (text.length === 0) out.push(p);
+  }
+  return out;
+}
+
+// Insertion points for bold= expressed as flat (whole-block) offsets, mirroring
+// boldMatchingLine's three cases exactly. Returns [{flat, text:'**', reason}].
+function computeBoldInsertions(text, target, key) {
+  const lines = text.split('\n');
+  const starts = [];
+  let acc = 0;
+  for (const l of lines) { starts.push(acc); acc += l.length + 1; }
+  const parsed = lines.map(line => {
+    const mm = line.match(/^(\s*>\s*)?([\s\S]*?)(\s*)$/);
+    return { prefix: mm[1] || '', text: mm[2], trailing: mm[3] || '' };
+  });
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+  const tgt = norm(target);
+  // (1)/(2) a contiguous run of full lines whose joined visible text equals target
+  for (let s = 0; s < parsed.length; s++) {
+    if (!parsed[s].text) continue;
+    let joined = '';
+    for (let e = s; e < parsed.length; e++) {
+      if (!parsed[e].text) break;
+      joined = joined ? `${joined} ${norm(parsed[e].text)}` : norm(parsed[e].text);
+      if (joined === tgt) {
+        const ins = [];
+        for (let i = s; i <= e; i++) {
+          const open = starts[i] + parsed[i].prefix.length;
+          ins.push({ flat: open, text: '**', reason: 'bold' });
+          ins.push({ flat: open + parsed[i].text.length, text: '**', reason: 'bold' });
+        }
+        return ins;
+      }
+      if (!tgt.startsWith(joined)) break;
+    }
+  }
+  // (3) partial substring inside a single line
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i];
+    if (p.text && p.text.includes(target)) {
+      const base = starts[i] + p.prefix.length + p.text.indexOf(target);
+      return [
+        { flat: base, text: '**', reason: 'bold' },
+        { flat: base + target.length, text: '**', reason: 'bold' },
+      ];
+    }
+  }
+  throw new IncludeError(`@include "${key}": bold="${target}" matched no line(s) in the block`);
+}
+
+// Insertion point for active= (mirrors activateMatchingItem). Returns [] when the
+// matched item is already active, or throws when no item label matches.
+function computeActiveInsertion(text, target, key) {
+  const re = /<Item\b([^>]*)>/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const attrs = m[1];
+    const lm = attrs.match(/label="([^"]*)"/);
+    if (lm && lm[1] === target) {
+      if (/\bactive\b/.test(attrs)) return [];
+      return [{ flat: m.index + 5 + attrs.length, text: ' active', reason: 'active' }];
+    }
+  }
+  throw new IncludeError(`@include "${key}": active="${target}" matched no <Item label> in the block`);
+}
+
+// Apply flat-offset insertions to a piece list, splitting editable pieces as
+// needed and emitting read-only 'ins' pieces (zero-width in source).
+function pieceApplyInsertions(pieces, insertions) {
+  if (!insertions.length) return pieces;
+  const sorted = insertions.slice().sort((a, b) => a.flat - b.flat);
+  const sliceEditable = (p, a, b) => ({ text: p.text.slice(a, b), srcFrom: p.srcFrom + a, srcTo: p.srcFrom + b, editable: true });
+  const insPiece = (ins, srcPoint) => ({ text: ins.text, srcFrom: srcPoint, srcTo: srcPoint, editable: false, reason: ins.reason });
+  const out = [];
+  let flat = 0;
+  let ii = 0;
+  for (const p of pieces) {
+    const pStart = flat;
+    const pEnd = flat + p.text.length;
+    // Insertions landing before/at this piece's start (zero-width, at its start).
+    while (ii < sorted.length && sorted[ii].flat <= pStart) {
+      out.push(insPiece(sorted[ii], p.srcFrom));
+      ii++;
+    }
+    if (!p.editable) {
+      // Read-only pieces ({id} substitutions) are passed through unchanged. bold=
+      // and active= never target inside them; guard against an unexpected interior hit.
+      if (ii < sorted.length && sorted[ii].flat < pEnd) {
+        throw new IncludeError('include tracking: insertion inside a read-only span (unexpected)');
+      }
+      out.push(p);
+      flat = pEnd;
+      continue;
+    }
+    // Editable piece: split at each interior insertion, keeping halves verbatim.
+    let cursor = 0;
+    while (ii < sorted.length && sorted[ii].flat < pEnd) {
+      const within = sorted[ii].flat - pStart;
+      if (within > cursor) out.push(sliceEditable(p, cursor, within));
+      out.push(insPiece(sorted[ii], p.srcFrom + within));
+      cursor = within;
+      ii++;
+    }
+    if (cursor < p.text.length) out.push(sliceEditable(p, cursor, p.text.length));
+    else if (p.text.length === 0) out.push(p);
+    flat = pEnd;
+  }
+  while (ii < sorted.length) { // trailing insertions at/after end of block
+    const lastSrc = out.length ? out[out.length - 1].srcTo : 0;
+    out.push(insPiece(sorted[ii], lastSrc));
+    ii++;
+  }
+  return out;
+}
+
+// Resolve one block body with its params into { text, pieces } in body-local
+// coordinates. Applies id → bold → active in the SAME order as resolveIncludes.
+function resolveBlockPieces(body, key, params) {
+  let pieces = [{ text: body, srcFrom: 0, srcTo: body.length, editable: true }];
+  if (body.includes('{id}')) {
+    if (!params.id) throw new IncludeError(`@include "${key}" requires an id="…" parameter`);
+    pieces = pieceSubstituteId(pieces, params.id);
+  }
+  if (params.bold) {
+    pieces = pieceApplyInsertions(pieces, computeBoldInsertions(pieces.map(p => p.text).join(''), params.bold, key));
+  }
+  if (params.active) {
+    const ins = computeActiveInsertion(pieces.map(p => p.text).join(''), params.active, key);
+    if (ins.length) pieces = pieceApplyInsertions(pieces, ins);
+  }
+  return { text: pieces.map(p => p.text).join(''), pieces };
+}
+
+// blockIndex: { key: { body, sourceFile, sourceSha, level, srcFrom } }
+//   srcFrom = offset of `body` within its common source file.
+// sessionMeta (optional): { sourceFile, sourceSha } for the session file itself.
+function resolveIncludesTracked(content, blockIndex, sessionMeta) {
+  sessionMeta = sessionMeta || {};
+  const sessionFile = sessionMeta.sourceFile || null;
+  const sessionSha = sessionMeta.sourceSha || null;
+  const segments = [];
+  let buf = '';
+  let bufLen = 0;
+  let srcPos = 0;
+
+  function pushSessionSegment(fromSrc, toSrc) {
+    if (toSrc <= fromSrc) return;
+    const text = content.slice(fromSrc, toSrc);
+    const bufFrom = bufLen;
+    const bufTo = bufLen + text.length;
+    segments.push({
+      bufFrom, bufTo,
+      kind: 'session',
+      sourceFile: sessionFile,
+      sourceSha: sessionSha,
+      level: null,
+      key: null,
+      includeDirective: null,
+      additiveOffset: fromSrc - bufFrom,
+      pieces: [{ bufFrom, bufTo, srcFrom: fromSrc, srcTo: toSrc, editable: true }],
+      readonlySpans: [],
+    });
+    buf += text;
+    bufLen = bufTo;
+  }
+
+  const re = /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9]*)\s*(.*?)\s*-->/g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const full = m[0], key = m[1], paramStr = m[2];
+    pushSessionSegment(srcPos, m.index);
+
+    const block = blockIndex && blockIndex[key];
+    if (!block) throw new IncludeError(`@include references undefined key "${key}"`);
+    const params = parseIncludeParams(paramStr);
+    const { text, pieces } = resolveBlockPieces(block.body, key, params);
+
+    const segBufFrom = bufLen;
+    const absPieces = [];
+    const readonlySpans = [];
+    let cum = 0;
+    for (const p of pieces) {
+      const pbFrom = segBufFrom + cum;
+      const pbTo = pbFrom + p.text.length;
+      const abs = {
+        bufFrom: pbFrom, bufTo: pbTo,
+        srcFrom: block.srcFrom + p.srcFrom,
+        srcTo: block.srcFrom + p.srcTo,
+        editable: p.editable,
+      };
+      if (!p.editable) {
+        abs.reason = p.reason;
+        readonlySpans.push({ bufFrom: pbFrom, bufTo: pbTo, reason: p.reason });
+      }
+      absPieces.push(abs);
+      cum += p.text.length;
+    }
+    const segBufTo = segBufFrom + text.length;
+    const singleEditable = absPieces.length === 1 && absPieces[0].editable;
+    segments.push({
+      bufFrom: segBufFrom, bufTo: segBufTo,
+      kind: 'shared',
+      sourceFile: block.sourceFile,
+      sourceSha: block.sourceSha,
+      level: block.level || null,
+      key,
+      includeDirective: { text: full, srcFrom: m.index, srcTo: m.index + full.length },
+      additiveOffset: singleEditable ? (absPieces[0].srcFrom - absPieces[0].bufFrom) : null,
+      pieces: absPieces,
+      readonlySpans,
+    });
+    buf += text;
+    bufLen = segBufTo;
+    srcPos = m.index + full.length;
+  }
+  pushSessionSegment(srcPos, content.length);
+
+  return { resolved: buf, segments };
+}
+
 // Pre-process custom syntax in raw markdown BEFORE markdown-it sees it.
 // This is the most reliable approach since markdown-it's HTML parser
 // interferes with custom tags like <Question> and <Callout>.
@@ -579,4 +837,4 @@ function renderCommonContent(parts) {
   return parts.map(part => renderMarkdown(part)).join('');
 }
 
-module.exports = { renderMarkdown, renderCommonContent, createRenderer, resolveIncludes, IncludeError };
+module.exports = { renderMarkdown, renderCommonContent, createRenderer, resolveIncludes, resolveIncludesTracked, IncludeError };
