@@ -395,6 +395,7 @@ app.get('/', async (req, res, next) => {
   try {
     const tree = await content.buildContentTree();
     const filtered = await content.filterContentTree(tree, req.user);
+    await content.loadAllSessionTitles(filtered); // so numberedSessionCount is accurate on the cards
     const bibles = bible.getAllTranslations();
     res.render('home', {
       tree: filtered,

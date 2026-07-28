@@ -328,6 +328,35 @@ async function loadSessionTitles(book) {
   await Promise.all(promises);
 }
 
+// Count sessions that get a number in the nav / book page — i.e. whose H1 title
+// (displayName, after loadSessionTitles) contains a number, matching the numbering
+// rule in book.ejs. Front/back-matter pages (Front Matter, The Opening, The Recall,
+// Further Resources, Series Orientation, etc.) have no number and are excluded.
+const _SESSION_NUM_WORDS = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve';
+function numberedSessionCount(book) {
+  if (!book || !book.sessions) return 0;
+  const wordRe = new RegExp('\\b(' + _SESSION_NUM_WORDS + ')\\b', 'i');
+  return book.sessions.filter(s => {
+    const dn = s.displayName || '';
+    return /\b\d+\b/.test(dn) || wordRe.test(dn);
+  }).length;
+}
+
+// Load H1 titles for every book in a tree so numberedSessionCount is accurate on
+// the home listing. Sequential per book to avoid spiking the GitHub API on a cold
+// cache; idempotent (loadSessionTitles skips sessions already loaded).
+async function loadAllSessionTitles(tree) {
+  if (!tree || !tree.series) return;
+  for (const series of tree.series) {
+    for (const child of (series.children || [])) {
+      if (child.type === 'book') await loadSessionTitles(child);
+      else if (child.type === 'subseries') {
+        for (const b of (child.books || [])) await loadSessionTitles(b);
+      }
+    }
+  }
+}
+
 // Gather all common content for a session (series + subseries + book level)
 function gatherCommonContent(series, subseries, book) {
   const parts = [];
@@ -543,6 +572,8 @@ module.exports = {
   loadConfig,
   loadSessionContent,
   loadSessionTitles,
+  loadAllSessionTitles,
+  numberedSessionCount,
   gatherCommonContent,
   parseCommonBlocks,
   gatherCommonBlocks,

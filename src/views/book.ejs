@@ -67,7 +67,8 @@
           <% } %>
 
           <div class="book-detail-meta">
-            <span><%= book.sessions.length %> <%= book.sessions.length === 1 ? 'session' : 'sessions' %></span>
+            <% var sessCount = content.numberedSessionCount(book); %>
+            <span><%= sessCount %> <%= sessCount === 1 ? 'session' : 'sessions' %></span>
             <span class="meta-sep">&middot;</span>
             <span><%= series.title %></span>
             <% if (subseries) { %>
