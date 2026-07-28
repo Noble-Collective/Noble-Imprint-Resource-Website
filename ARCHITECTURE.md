@@ -209,7 +209,7 @@ An admin reviews the suggestion, seeing the changes rendered visually (deletions
 
 - **Structural syntax is untouchable** in suggest mode. The `<Question>`, `<Callout>`, `<<`, and other custom tags are hidden and protected by edit zone constraints. Users can only edit text content within tag boundaries.
 - **A "View Source" toggle** is available in the toolbar, showing the full raw markdown for power users. Direct edit mode (admins/manuscript owners only) allows structural changes with Obsidian-style reveal.
-- **Multiple suggestions per file are supported.** Each hunk is independent. The text-based find-and-replace acceptance ensures hunks don't interfere with each other.
+- **Multiple suggestions per file are supported.** Each hunk is independent. The text-based find-and-replace acceptance ensures hunks don't interfere with each other. Accepting several in a row is consistent: after each commit the server keeps its cache authoritative (the just-written content + new SHA), so a following accept operates on the post-commit content rather than a stale read.
 - **SHA-based conflict detection.** When accepting a suggestion, the server checks whether the original text still exists in the current file. If the file has changed and the text can't be found, the suggestion is marked "stale."
 - **Every accepted change is a Git commit** with a clear message and author. The full history is always available.
 

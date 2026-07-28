@@ -32,7 +32,7 @@ cd Noble-Imprint-Resource-Website
 npm install
 ```
 
-A `.env` file and `service-account-key.json` must be present in the repo root (both gitignored). These contain the GitHub token, Claude API key, Firebase config, and GCP service account credentials for Firestore access. Ask the project admin if you need these files.
+A `.env` file and `service-account-key.json` must be present in the repo root (both gitignored). These contain the GitHub token, Claude API key, Firebase config, and GCP service account credentials for Firestore access. Ask the project admin if you need these files. Optionally, `GITHUB_APP_ID` / `GITHUB_APP_INSTALLATION_ID` / `GITHUB_APP_PRIVATE_KEY_B64` authenticate the server as a GitHub App (isolated rate-limit budget) instead of the personal `GITHUB_TOKEN` — see `CLAUDE.md` → Testing.
 
 ### Run Locally
 
@@ -45,12 +45,17 @@ Server starts at http://localhost:8080. All env vars are loaded automatically fr
 ### Run Tests
 
 ```bash
-# Full suite (64 tests, ~3-4 min)
+# Full suite (~150 tests, runs serially, ~20 min — hits the real GitHub API)
+npx playwright test
+
+# One file
 npx playwright test tests/editor.spec.js
 
 # Single test
 npx playwright test tests/editor.spec.js -g "H1 heading"
 ```
+
+See `CLAUDE.md` → Testing for the harness details (serial `workers: 1`, the shared cleanup fixture, `?scope=files` refresh, and the optional GitHub App auth for an isolated rate-limit budget).
 
 ---
 

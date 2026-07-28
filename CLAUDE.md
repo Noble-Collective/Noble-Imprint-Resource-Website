@@ -24,7 +24,7 @@ npx playwright test tests/editor.spec.js
 npx playwright test -g "suggestion auto-saves to Firestore"
 ```
 
-**Important:** The test suite hits the real GitHub API via the local server, consuming rate limit budget (~25 `/api/refresh` calls rebuild the content tree). Avoid running the full suite during active editing sessions.
+**Important:** The test suite hits the real GitHub API via the local server. Two things keep it affordable: (1) tests call `/api/refresh?scope=files` (a scoped invalidation that skips the full 22-book tree rebuild — ~10x fewer API calls than the old full `/api/refresh`); (2) point the server at an isolated **GitHub App** identity (see Testing → GitHub App auth) so a test run gets its own 5,000/hr bucket instead of sharing the personal token's limit with `gh` and the audiobook workflow. Run serially (`workers: 1`, set in `playwright.config.js`).
 
 ## Architecture
 
@@ -70,8 +70,8 @@ The editor is built on CodeMirror 6 with a custom suggestion/comment workflow:
 1. User edits in suggest mode → `diffChars` detects changes → auto-save creates/updates Firestore documents via `POST /api/suggestions/hunk`
 2. Server resolves position from `lineNumber` + context fallback, builds multi-selector anchor (80-char prefix + exact text + 80-char suffix + content hash + structural hints)
 3. Reviewer sees margin cards → accept calls `PUT /api/suggestions/hunk/:id/accept`
-4. Server finds text via 5-strategy anchor cascade (full context → prefix+exact → exact+suffix → bare text → structural hint), performs replacement, commits to GitHub
-5. `reanchorAnnotations()` updates ALL remaining suggestions/comments with fresh positions against the new file content
+4. Server finds text via 5-strategy anchor cascade (full context → prefix+exact → exact+suffix → bare text → structural hint), performs replacement, commits to GitHub. `updateFileContent` then writes the just-committed content + new SHA into the cache (authoritative), so a subsequent accept reads the post-commit content locally instead of GitHub's (lagging) contents API — without this, two sequential accepts could clobber each other. `getHunk`/`updateHunk`/`deleteHunk` guard empty ids (clean not-found, not an opaque Firestore error).
+5. `reanchorAnnotations()` updates ALL remaining suggestions/comments with fresh positions against the new file content. Note: annotation registry positions are clamped to finite/in-bounds (`buildShiftedRegistryEntries`) — a NaN/out-of-range position (e.g. an anchor-lost comment) otherwise crashes CodeMirror when rendered or navigated to.
 
 ### Authentication
 
@@ -100,8 +100,18 @@ Book repo paths use `|` instead of `/` as separators in Firestore field names (F
 
 ## Testing
 
-Tests use Playwright with Chromium. The server must be running locally on port 8080 with a `.env` file. Tests authenticate via `POST /api/auth/test-login` (dev-only endpoint). Test data uses `Test Book` at `series/Narrative Journey Series/Foundations/Test Book/`. Cleanup via `POST /api/cleanup-test-data`.
+Tests use Playwright with Chromium. The server must be running locally on port 8080 with a `.env` file. Tests authenticate via `POST /api/auth/test-login` (dev-only endpoint). Test data uses `Test Book` at `series/Narrative Journey Series/Foundations/Test Book/`.
 
-Tests interact with the editor through `window.__editorView` which exposes CM6 EditorView methods. Common patterns: `page.evaluate(() => cursorAfter('text'))`, `page.evaluate(() => selectText('from', 'to'))`.
+**Config (`playwright.config.js`):** `workers: 1` (tests share the one Test Book file + Firestore state — they MUST run serially), `retries: 2` (absorbs legitimate real-network timing flakes), `globalSetup: tests/global-setup.js` (one-time Firestore cleanup), and `testIgnore` for `ajax-nav-manual.spec.js` (a manual/`--headed` spec not run in the default suite).
 
-Each test that modifies state calls `POST /api/refresh` to clear caches — this hits the GitHub API, so running the full suite consumes significant rate limit budget.
+**Shared fixture (`tests/fixtures.js`):** specs import `{ test, expect }` from `./fixtures`, NOT `@playwright/test`. It has an auto `beforeEach` that POSTs `/api/cleanup-test-data` before every test, so tests don't inherit leftover suggestion/comment/reply state (the dominant source of count/anchor failures). New specs should import from `./fixtures`.
+
+**Cache/refresh:** tests call `POST /api/refresh?scope=files` (scoped — invalidates file caches, keeps the content tree; ~10x cheaper than a full refresh). Tests that mutate the shared session file use the `saveCleanFile()` / `restoreCleanFile()` helpers; content-position-dependent tests should `restoreCleanFile()` before reading content so prior drift can't shift positions.
+
+**Timing:** prefer polling assertions (`expect.poll`, `expect(locator).toHaveCount(...)`, `expect(...).toPass()`) over fixed `waitForTimeout` + immediate checks — auto-save (1.5s debounce), the 10s suggestion poll, and cross-user propagation are all async.
+
+**GitHub App auth (isolated rate limit):** to give the test server its own 5,000/hr bucket (separate from `gh`/the audiobook workflow's personal token), set `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY_B64` (base64 of the App's `.pem`) in `.env`. `github.js` prefers App-installation auth when these are present and falls back to `GITHUB_TOKEN` otherwise. The App (`Noble Imprint Content Server`) is installed on the Noble-Collective org, scoped to `Noble-Imprint-Resources` only, Contents: Read & Write.
+
+**Include fixtures:** `Test Book/Session 5` (`5-Session5-Includes.md`) exercises `@include` shared content (book/series level + parameterized `bold=`/`{id}`) for the shared-content-editing work.
+
+Tests interact with the editor through `window.__editorView` (CM6 EditorView), `window.__annotationRegistry`, and `window.__originalDocField`. Common patterns: `page.evaluate(() => cursorAfter('text'))`, `page.evaluate(() => selectText('from', 'to'))`.
