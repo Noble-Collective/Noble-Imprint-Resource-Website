@@ -121,8 +121,11 @@ Things I noticed but deliberately left alone — for you to inspect/decide.
 - **Copyright year `2024`** is an unverified placeholder in BOTH books' front matter.
 - **Further Resources (book 2):** its Google Doc still contains book 1's bibliography/reading
   plan; I shipped a heading-only placeholder rather than convert stale content.
-- **"PSALM INTRODUCTION: Psalm 15, 128"** appears as an unfilled editorial line in book 2's
-  The Opening (looks like an author placeholder, not final content).
+- **"PSALM INTRODUCTION: Psalm 15, 128"** was an unfilled editorial line (author placeholder, not
+  final content) in book 2's The Opening. **REMOVED** from the deployed
+  `The Best Possible Life/sessions/00-The-Opening.md` (2026-07-28, per Steve). It only appeared in
+  book 2 (nothing similar in books 1 or 3). The source Google Doc still has the line — delete it
+  there too, or a re-export/re-conversion of book 2's Opening reintroduces it.
 - **Sessions 2–12 (book 2) were not line-by-line proofread** — only completeness-verified
   (100% word coverage). More source-Doc typos may exist beyond the ones listed per book.
 - ~~Test Book churn~~ / ~~dropped subseries descriptors~~ — resolved: churn is harmless
@@ -203,7 +206,8 @@ full authoritative version. Review this live after push.
 > exist. `completeness.py` confirms no words were dropped; it does not catch misspellings.
 - S1 synopsis "Redemption" row: `rest (1:93:1)` → should be `1:9; 3:1`.
 - The Opening: "aAn heir" (should be "An heir"); "leads tointo idolatry"; "Chrisitan" →
-  "Christian"; an unfilled editorial line "PSALM INTRODUCTION: Psalm 15, 128".
+  "Christian". (The unfilled editorial line "PSALM INTRODUCTION: Psalm 15, 128" was REMOVED from
+  the deployed file — see the "Flagged for inspection" section; still present in the source Doc.)
 - The Recall: "brotherly kind- ness" (export hyphenation artifact in the 2 Peter 1:5–8 quote).
 
 **PDF typos corrected in the shared front-matter blocks** (fixed, not reproduced — the Bond
