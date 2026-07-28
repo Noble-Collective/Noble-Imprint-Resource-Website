@@ -1,5 +1,5 @@
 // Test: Bold formatting should create ONE margin card, not two.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';

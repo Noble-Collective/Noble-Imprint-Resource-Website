@@ -2,7 +2,7 @@
  * Manual Playwright tests for AJAX session navigation.
  * Run with: npx playwright test tests/ajax-nav-manual.spec.js --headed
  */
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE = 'http://localhost:8080';
 // The Call of Christ has multiple sessions without audio — good for testing nav

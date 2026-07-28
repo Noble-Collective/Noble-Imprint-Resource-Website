@@ -1,6 +1,6 @@
 // Test: Making identical edits (e.g., adding "s") at different positions
 // should each create their own margin card.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';

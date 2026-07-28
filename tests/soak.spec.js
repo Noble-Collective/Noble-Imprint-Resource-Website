@@ -1,6 +1,6 @@
 // Soak test: simulate a real editing session with suggestions, comments, bold/italic,
 // discards, accepts, resolves, mode exits/re-entries — verify consistency after each step.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
@@ -8,7 +8,9 @@ const TEST_FILE = 'series/Narrative Journey Series/Foundations/Test Book/session
 
 async function login(page) {
   await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
-  await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 15000 });
+  // Generous timeout: a cold server-side render fetches content from GitHub and can
+  // exceed a tight budget under suite load.
+  await page.goto(BASE_URL + TEST_SESSION_PATH, { timeout: 45000 });
 }
 
 async function clearAll() {
@@ -97,6 +99,34 @@ async function leaveSuggest(page) {
 
 async function verify(page, step, expectedSuggs, expectedComments) {
   await page.waitForTimeout(500);
+  // Wait for the client registry to CONVERGE with Firestore before asserting.
+  // Auto-save/polling are async: a just-created suggestion lands in Firestore a
+  // beat before the client's addAnnotation runs, so a naive snapshot can transiently
+  // see a Firestore entry that's "missing from registry". Only a PERSISTENT mismatch
+  // (never converges within the timeout) is a real bug.
+  await expect.poll(async () => {
+    const fsNow = await getFirestoreState();
+    // (a) Wait for auto-save to PERSIST the expected counts (editor → Firestore lag:
+    //     a just-made suggestion sits in the 1.5s debounce + network before Firestore).
+    if (expectedSuggs !== undefined && fsNow.suggestions.length !== expectedSuggs) return false;
+    if (expectedComments !== undefined && fsNow.comments.length !== expectedComments) return false;
+    // (b) Wait for the client registry to CATCH UP with the server (Firestore → registry
+    //     lag). Server "resolvedStale" entries are legitimately shown as stale cards,
+    //     not live registry entries, so they're excluded from the convergence requirement.
+    const content = await page.evaluate(async (fp) => {
+      const r = await fetch('/api/suggestions/content?filePath=' + encodeURIComponent(fp));
+      return r.json();
+    }, TEST_FILE);
+    const regIds = await page.evaluate(() => {
+      const v = window.__editorView;
+      if (!v || !window.__annotationRegistry) return [];
+      return [...v.state.field(window.__annotationRegistry).keys()];
+    });
+    const s = new Set(regIds);
+    const missing = [...(content.pendingSuggestions || []), ...(content.pendingComments || [])]
+      .filter(x => !x.resolvedStale && !s.has(x.id));
+    return missing.length === 0;
+  }, { timeout: 15000, intervals: [250, 500, 750, 1000] }).toBe(true);
   const editor = await getEditorState(page);
   const fs = await getFirestoreState();
   const errors = [];
@@ -160,7 +190,7 @@ async function verify(page, step, expectedSuggs, expectedComments) {
     // For each registry entry, check the doc text at currentFrom..currentTo matches expected text,
     // then scroll there and verify the DOM decoration covers exactly those characters.
     for (const entry of registryState.entries) {
-      if (entry.currentFrom == null || entry.currentTo == null) continue;
+      if (!Number.isFinite(entry.currentFrom) || !Number.isFinite(entry.currentTo)) continue;
       if (entry.currentFrom < 0 || entry.currentTo > registryState.docLen) continue;
 
       if (entry.kind === 'suggestion' && (entry.type === 'insertion' || entry.type === 'replacement')) {
@@ -172,7 +202,7 @@ async function verify(page, step, expectedSuggs, expectedComments) {
 
         // Scroll to position and verify DOM decoration has exact text
         await page.evaluate(({ pos }) => {
-          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: Math.min(pos, window.__editorView.state.doc.length) }, scrollIntoView: true });
         }, { pos: entry.currentFrom });
         await page.waitForTimeout(200);
 
@@ -192,7 +222,7 @@ async function verify(page, step, expectedSuggs, expectedComments) {
       if (entry.kind === 'suggestion' && (entry.type === 'deletion' || entry.type === 'replacement')) {
         // Deletion widget: check DOM has the widget with correct data-hunk-id
         await page.evaluate(({ pos }) => {
-          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: Math.min(pos, window.__editorView.state.doc.length) }, scrollIntoView: true });
         }, { pos: entry.currentFrom });
         await page.waitForTimeout(200);
 
@@ -210,14 +240,18 @@ async function verify(page, step, expectedSuggs, expectedComments) {
       }
 
       if (entry.kind === 'comment') {
+        // A comment whose text no longer exists in the doc (e.g. it was placed on
+        // "systemEDIT" and the suggestion producing that was later discarded) is
+        // legitimately anchor-lost — its position/highlight won't match its text.
+        const anchorLost = entry.selectedText && !registryState.doc.includes(entry.selectedText);
         // Check: doc text at registry position matches selectedText
         const docSlice = registryState.doc.slice(entry.currentFrom, entry.currentTo);
-        if (entry.selectedText && docSlice !== entry.selectedText) {
+        if (entry.selectedText && docSlice !== entry.selectedText && !anchorLost) {
           errors.push(`Comment highlight range wrong: doc[${entry.currentFrom}..${entry.currentTo}]="${docSlice.substring(0, 15)}" !== "${entry.selectedText.substring(0, 15)}"`);
         }
 
         await page.evaluate(({ pos }) => {
-          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+          if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: Math.min(pos, window.__editorView.state.doc.length) }, scrollIntoView: true });
         }, { pos: entry.currentFrom });
         await page.waitForTimeout(200);
 
@@ -228,8 +262,8 @@ async function verify(page, step, expectedSuggs, expectedComments) {
         }, { id: entry.id, expectedText: entry.selectedText });
 
         if (!commentCheck.found) {
-          errors.push(`Comment highlight missing for ${entry.id} "${(entry.selectedText || '').substring(0, 15)}"`);
-        } else if (entry.selectedText && commentCheck.text !== entry.selectedText) {
+          if (!anchorLost) errors.push(`Comment highlight missing for ${entry.id} "${(entry.selectedText || '').substring(0, 15)}"`);
+        } else if (entry.selectedText && commentCheck.text !== entry.selectedText && !anchorLost) {
           errors.push(`Comment highlight text mismatch: DOM="${commentCheck.text.substring(0, 15)}" !== "${entry.selectedText.substring(0, 15)}"`);
         }
       }
@@ -310,7 +344,7 @@ async function verify(page, step, expectedSuggs, expectedComments) {
   for (const entry of (registryState?.entries || [])) {
     if (entry.currentFrom == null) continue;
     await page.evaluate(({ pos }) => {
-      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      if (window.__editorView) window.__editorView.dispatch({ selection: { anchor: Math.min(pos, window.__editorView.state.doc.length) }, scrollIntoView: true });
     }, { pos: entry.currentFrom });
     await page.waitForTimeout(300);
 
@@ -416,7 +450,10 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
 
     // === R3: Add a comment mid-session ===
     console.log('\n=== R3: Add comment mid-session ===');
-    doc = await page.evaluate(() => window.__editorView.state.doc.toString());
+    // Pick the comment word from the ORIGINAL (unedited) doc so the comment lands on
+    // stable text — not on a suggestion-edited word like "systemEDIT" that a later
+    // discard would remove, orphaning the comment.
+    doc = await page.evaluate(() => window.__editorView.state.field(window.__originalDocField));
     const commentWord2 = findUniqueWords(doc, 1, usedWords)[0];
     usedWords.push(commentWord2);
     await page.evaluate((w) => {
@@ -442,7 +479,7 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
 
     // === R5: Bold a word ===
     console.log('\n=== R5: Bold a word ===');
-    doc = await page.evaluate(() => window.__editorView.state.doc.toString());
+    doc = await page.evaluate(() => window.__editorView.state.field(window.__originalDocField));
     const boldWord = findUniqueWords(doc, 1, usedWords)[0];
     usedWords.push(boldWord);
     if (boldWord) {
@@ -502,6 +539,7 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
         filePath: TEST_FILE,
         bookPath: 'series/Narrative Journey Series/Foundations/Test Book',
         baseCommitSha: fileSha,
+        lineNumber: fileContent.substring(0, apiSuggPos).split('\n').length,
         type: 'replacement',
         originalFrom: apiSuggPos,
         originalTo: apiSuggPos + apiSuggWord.length,
@@ -575,7 +613,9 @@ test('Soak test: full editing session with suggestions, comments, bold, discard,
 
     // === R9: Add another UI suggestion + comment ===
     console.log('\n=== R9: New UI suggestion + new comment ===');
-    doc = await page.evaluate(() => window.__editorView.state.doc.toString());
+    // Original (unedited) doc so new edits target stable text, not another pending
+    // suggestion's output (e.g. "MasterAPI") which would nest and shift decorations.
+    doc = await page.evaluate(() => window.__editorView.state.field(window.__originalDocField));
     const newWords = findUniqueWords(doc, 2, usedWords);
     usedWords.push(...newWords);
     if (newWords[0]) {

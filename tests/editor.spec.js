@@ -1,6 +1,6 @@
 // Noble Imprint — Comprehensive Editor Tests
 // Run with: GOOGLE_CLOUD_PROJECT=noble-imprint-website npx playwright test tests/editor.spec.js
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
@@ -211,7 +211,11 @@ async function getPendingSuggestionCount() {
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
-  const snap = await db.collection('suggestions').where('status', '==', 'pending').get();
+  // Scope to THIS test file — an unfiltered count also picks up pending
+  // suggestions on other sessions/books, which makes "expect 0" flaky.
+  const snap = await db.collection('suggestions')
+    .where('filePath', '==', TEST_FILE)
+    .where('status', '==', 'pending').get();
   return snap.size;
 }
 
@@ -220,7 +224,9 @@ async function getPendingCommentCount() {
   const admin = require('firebase-admin');
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
-  const snap = await db.collection('comments').where('status', '==', 'open').get();
+  const snap = await db.collection('comments')
+    .where('filePath', '==', TEST_FILE)
+    .where('status', '==', 'open').get();
   return snap.size;
 }
 
@@ -835,6 +841,7 @@ test.describe('Registry Robustness', () => {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
         data: {
           filePath, bookPath, baseCommitSha: sha,
+          lineNumber: content.substring(0, pos).split('\n').length,
           type: 'replacement', originalFrom: pos, originalTo: pos + word.length,
           originalText: word, newText: word + 'X',
           contextBefore: ctxBefore, contextAfter: ctxAfter,
@@ -894,6 +901,7 @@ test.describe('Registry Robustness', () => {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
         data: {
           filePath, bookPath, baseCommitSha: sha,
+          lineNumber: content.substring(0, pos).split('\n').length,
           type: 'replacement', originalFrom: pos, originalTo: pos + word.length,
           originalText: word, newText: word + 'CHANGED',
           contextBefore: ctxBefore, contextAfter: ctxAfter,
@@ -1006,11 +1014,9 @@ test.describe('Editor - Auto-Save', () => {
       await page.keyboard.press('Control+z');
     }
     await waitForAutoSave(page);
-    // Extra wait for the DELETE round-trip to Firestore
-    await page.waitForTimeout(2000);
-
-    const count = await getPendingSuggestionCount();
-    expect(count).toBe(0);
+    // Poll for the async undo→DELETE round-trip to Firestore to complete (the debounced
+    // delete + network can lag a fixed wait, making a single check flaky).
+    await expect.poll(async () => await getPendingSuggestionCount(), { timeout: 10000, intervals: [250, 500, 750] }).toBe(0);
   });
 });
 
@@ -1390,7 +1396,7 @@ test.describe('Accept Precision', () => {
   // Clear server cache before each test (prior tests may have restored the file
   // with a new SHA that the server cache doesn't know about)
   test.beforeEach(async ({ request }) => {
-    await request.post(BASE_URL + '/api/refresh');
+    await request.post(BASE_URL + '/api/refresh?scope=files');
   });
 
   // Restore original file after each test (the test modifies GitHub)
@@ -1435,6 +1441,7 @@ test.describe('Accept Precision', () => {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
       data: {
         filePath: TEST_FILE, bookPath: TEST_BOOK, baseCommitSha: sha,
+        lineNumber: content.substring(0, targetPos).split('\n').length,
         type: 'replacement', originalFrom: targetPos, originalTo: targetPos + 1,
         originalText: '.', newText: '',
         contextBefore: ctxBefore, contextAfter: ctxAfter,
@@ -1989,6 +1996,7 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         filePath: TEST_FILE_PATH,
         bookPath: TEST_BOOK_PATH,
         baseCommitSha: sha,
+        lineNumber: content.substring(0, pos).split('\n').length,
         type: 'replacement',
         originalFrom: pos,
         originalTo: pos + targetWord.length,
@@ -2060,6 +2068,7 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         filePath: TEST_FILE_PATH,
         bookPath: TEST_BOOK_PATH,
         baseCommitSha: sha,
+        lineNumber: content.substring(0, pos).split('\n').length,
         type: 'replacement',
         originalFrom: pos,
         originalTo: pos + replyWord.length,
@@ -2110,6 +2119,7 @@ test.describe('API Key Auth (Claude AI bot)', () => {
         filePath: TEST_FILE_PATH,
         bookPath: TEST_BOOK_PATH,
         baseCommitSha: sha,
+        lineNumber: content.substring(0, pos).split('\n').length,
         type: 'replacement',
         originalFrom: pos,
         originalTo: pos + botWord.length,
@@ -2270,8 +2280,11 @@ test.describe('Integration - Full Editing Session', () => {
     const verified = await getFileContent(page);
     expect(verified.content).toContain('INTEGFIRST');
     expect(verified.content).toContain('INTEGSECOND');
-    expect(verified.content).not.toContain(word1);
-    expect(verified.content).not.toContain(word2);
+    // Assert the original words are gone as WHOLE WORDS — a plain substring check
+    // false-fails when the word happens to be embedded in the replacement text
+    // (e.g. word1 "FIRST" is a substring of "INTEGFIRST").
+    expect(verified.content).not.toMatch(new RegExp('\\b' + word1 + '\\b'));
+    expect(verified.content).not.toMatch(new RegExp('\\b' + word2 + '\\b'));
 
     // No suggestion decorations remain in editor
     const insertDecos = await page.locator('.cm-suggestion-insert').count();

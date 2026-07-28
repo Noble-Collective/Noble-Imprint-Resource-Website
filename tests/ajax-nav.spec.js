@@ -8,7 +8,7 @@
  * Run with: npx playwright test tests/ajax-nav.spec.js --workers=1
  * Server must be running on port 8080.
  */
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_EMAIL = 'steve@noblecollective.org';

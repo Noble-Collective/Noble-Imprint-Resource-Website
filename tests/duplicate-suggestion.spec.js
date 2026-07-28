@@ -1,5 +1,5 @@
 // Reproduce duplicate suggestions across various sequences.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
@@ -235,21 +235,25 @@ test('Scenario 4: 2 suggestions, leave/re-enter, discard, long wait for stray au
 
     await makeSuggestion(page, words[0]);
     await makeSuggestion(page, words[1]);
-    await page.waitForTimeout(4000);
+    // Poll until BOTH suggestions have auto-saved (deterministic vs a fixed wait)
+    await expect.poll(async () => (await countFirestoreSuggestions()).count, { timeout: 15000 }).toBe(2);
 
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
-    await page.waitForTimeout(2000);
+    // Wait until both cards have re-loaded before discarding
+    await expect(page.locator('.margin-card--suggestion')).toHaveCount(2, { timeout: 10000 });
 
     // Discard first
     const btn = page.locator('.margin-action--reject').first();
     if (await btn.isVisible()) { await btn.click(); }
 
-    // Wait a LONG time to catch any stray auto-save that re-creates
+    // Wait for the discard to propagate to Firestore (count → 1)...
+    await expect.poll(async () => (await countFirestoreSuggestions()).count, { timeout: 10000 }).toBe(1);
+    // ...then wait a LONG time to catch any STRAY auto-save that would re-create it
     await page.waitForTimeout(6000);
 
-    let r = await countFirestoreSuggestions();
+    const r = await countFirestoreSuggestions();
     checkNoDuplicates(r, 'S4 after long wait');
     console.log('S4 margin cards:', await page.locator('.margin-card--suggestion').count());
     expect(r.count).toBe(1);
@@ -270,22 +274,27 @@ test('Scenario 5: 3 suggestions, leave/re-enter, discard middle', async ({ page 
     await makeSuggestion(page, words[0]);
     await makeSuggestion(page, words[1]);
     await makeSuggestion(page, words[2]);
-    await page.waitForTimeout(4000);
+    // Poll until all 3 have auto-saved (deterministic vs a fixed wait)
+    await expect.poll(async () => (await countFirestoreSuggestions()).count, { timeout: 15000 }).toBe(3);
 
     await leaveSuggest(page);
     await login(page);
     await enterSuggest(page);
-    await page.waitForTimeout(2000);
+
+    // Wait until all 3 suggestions have re-loaded before discarding — otherwise a
+    // full-suite timing squeeze can discard/count before the third card renders.
+    await expect(page.locator('.margin-card--suggestion')).toHaveCount(3, { timeout: 10000 });
 
     // Discard the MIDDLE card (second one)
     const cards = page.locator('.margin-action--reject');
     const count = await cards.count();
     if (count >= 2) {
       await cards.nth(1).click();
-      await page.waitForTimeout(6000);
     }
 
-    let r = await countFirestoreSuggestions();
+    // Poll until the discard has propagated (count → 2), then verify no duplicates
+    await expect.poll(async () => (await countFirestoreSuggestions()).count, { timeout: 12000 }).toBe(2);
+    const r = await countFirestoreSuggestions();
     checkNoDuplicates(r, 'S5 after discard middle');
     console.log('S5 margin cards:', await page.locator('.margin-card--suggestion').count());
     expect(r.count).toBe(2);
@@ -399,7 +408,7 @@ test('Scenario 6: accept shifts positions — savedHunks keys must stay in sync'
     expect(r.count).toBe(3);
 
     // Accept the deletion SERVER-SIDE — shifts file, re-anchors remaining
-    const result = await suggestions.acceptHunk(delId, 'steve@noblecollective.org');
+    const result = await suggestions.acceptHunk(delId.id, 'steve@noblecollective.org');
     console.log('S6 accept:', result.stale ? 'STALE' : 'OK');
     expect(result.stale).toBeFalsy();
 
@@ -407,7 +416,7 @@ test('Scenario 6: accept shifts positions — savedHunks keys must stay in sync'
     // (via require), so it only cleared the test process's cache. The server
     // (separate Node process) still has the old file content cached for up to 30s.
     // Without this, the client gets stale content and savedHunks keys mismatch.
-    await page.request.post(BASE_URL + '/api/refresh');
+    await page.request.post(BASE_URL + '/api/refresh?scope=files');
     await page.waitForTimeout(2000);
 
     // Verify the position mismatch exists (this is the bug condition)

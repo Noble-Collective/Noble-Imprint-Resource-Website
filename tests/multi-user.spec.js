@@ -1,5 +1,5 @@
 // Multi-user safety tests: auto-save errors, version checks, deduplication, presence.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
@@ -245,7 +245,7 @@ test.describe('File version check', () => {
 
       // Clear the SERVER's content cache so the version endpoint returns the new SHA
       // (cache.invalidateAll() from the test process doesn't affect the server's cache)
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       // Check that contentSha is set
       const pageSha = await page.evaluate(() => window.__EDITOR_DATA?.contentSha);
@@ -386,8 +386,10 @@ test.describe('Server-side suggestion dedup', () => {
       });
       console.log('Dedup: second returned:', id2);
 
-      // Should return the same ID (deduped)
-      expect(id2).toBe(id1);
+      // Should return the same ID (deduped). createHunk returns { id, deduped },
+      // so compare the id field, not the object references.
+      expect(id2.id).toBe(id1.id);
+      expect(id2.deduped).toBe(true);
 
       // Firestore should have exactly 1 document
       const r = await countFirestoreSuggestions();
@@ -497,7 +499,7 @@ test.describe('Poll for changes + stale banner', () => {
       await github.updateFileContent(TEST_FILE, content + '\n<!-- poll test -->', sha, 'Test: poll SHA change');
 
       // Clear server cache so the version endpoint returns the new SHA
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       // Wait for the 30s polling interval to detect the change (up to 40s)
       await expect(banner).toBeVisible({ timeout: 40000 });
@@ -522,7 +524,7 @@ test.describe('Poll for changes + stale banner', () => {
       const { content, sha } = await github.getFileContent(TEST_FILE);
       const marker = '<!-- reload-test-marker -->';
       await github.updateFileContent(TEST_FILE, content + '\n' + marker, sha, 'Test: reload marker');
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       const banner = page.locator('#editor-stale-banner');
       await expect(banner).toBeVisible({ timeout: 40000 });
@@ -573,7 +575,7 @@ test.describe('Poll for changes + stale banner', () => {
     try {
       // Clear server cache so page loads with a fresh SHA (prior tests may have
       // restored the file, creating a new SHA that the server cache doesn't know about)
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       await login(page);
       await enterSuggest(page);
@@ -671,7 +673,7 @@ test.describe('Poll for changes + stale banner', () => {
       // Other user discards the suggestion (delete from Firestore)
       const admin = require('firebase-admin');
       if (!admin.apps.length) admin.initializeApp();
-      await admin.firestore().collection('suggestions').doc(suggId).delete();
+      await admin.firestore().collection('suggestions').doc(suggId.id).delete();
 
       // Wait for polling to detect the decrease and auto-refresh (up to 15s)
       await page.waitForTimeout(15000);
@@ -687,7 +689,7 @@ test.describe('Poll for changes + stale banner', () => {
     await clearAll();
     try {
       // Steve opens the editor and creates a suggestion via the UI (loadedFromServer: false)
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
       const word = await findUniqueWord(page);
@@ -794,7 +796,7 @@ test.describe('Cross-user data integrity', () => {
       });
 
       // Steve opens the editor — Jane's suggestion is loaded
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
       await page.waitForTimeout(2000);
@@ -859,14 +861,14 @@ test.describe('Cross-user data integrity', () => {
 
       // Jane posts a reply (direct Firestore)
       await suggestions.createReply({
-        parentId: suggId, parentType: 'suggestion', filePath: TEST_FILE,
+        parentId: suggId.id, parentType: 'suggestion', filePath: TEST_FILE,
         text: 'I think this is a good change',
         authorEmail: 'jane@noblecollective.org', authorName: 'Jane Doe',
       });
 
-      // Wait for fast poll to sync the reply (up to 15s)
+      // Wait for fast poll to sync the reply (10s poll + Firestore/render latency)
       const reply = page.locator('.margin-card-reply');
-      await expect(reply).toHaveCount(1, { timeout: 15000 });
+      await expect(reply).toHaveCount(1, { timeout: 20000 });
       await expect(reply.locator('.margin-card-reply-author')).toContainText('Jane');
 
     } finally { await clearAll(); }
@@ -905,8 +907,8 @@ test.describe('Cross-user data integrity', () => {
       await expect(page.locator('.margin-card--suggestion')).toHaveCount(1, { timeout: 5000 });
 
       // Jane accepts the suggestion (server-side)
-      await suggestions.acceptHunk(suggId, 'jane@noblecollective.org');
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await suggestions.acceptHunk(suggId.id, 'jane@noblecollective.org');
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       // Wait for fast poll to detect the change and auto-refresh (up to 15s)
       await page.waitForTimeout(15000);
@@ -1062,7 +1064,7 @@ test.describe('Draft preservation on reload', () => {
       const github = require('../src/server/github');
       const { content, sha } = await github.getFileContent(TEST_FILE);
       await github.updateFileContent(TEST_FILE, content + '\n<!-- draft-save-test -->', sha, 'Test: draft save');
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       // Wait for polling to detect the stale file
       const banner = page.locator('#editor-stale-banner');
@@ -1112,7 +1114,7 @@ test.describe('Draft preservation on reload', () => {
       const github = require('../src/server/github');
       const { content, sha } = await github.getFileContent(TEST_FILE);
       await github.updateFileContent(TEST_FILE, content + '\n<!-- draft-fail-test -->', sha, 'Test: draft fail');
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
 
       const banner = page.locator('#editor-stale-banner');
       await expect(banner).toBeVisible({ timeout: 40000 });
@@ -1178,7 +1180,7 @@ test.describe('Accept retry on stale conflict', () => {
       // Login as admin and enter review mode
       // Clear server cache first — a previous test may have modified the file,
       // leaving the server's 30s cache out of sync with GitHub
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await page.click('#btn-review');
       await page.waitForSelector('.cm-editor');
@@ -1259,7 +1261,7 @@ test.describe('Accept retry on stale conflict', () => {
       // Login as admin and enter review mode
       // Clear server cache first — a previous test may have modified the file,
       // leaving the server's 30s cache out of sync with GitHub
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
 
       // Freeze both polls to prevent interference with stale card testing:
@@ -1299,7 +1301,7 @@ test.describe('Accept retry on stale conflict', () => {
       const { content: current, sha: curSha } = await github.getFileContent(TEST_FILE);
       const cleaned = current.replace(targetWord, '');
       await github.updateFileContent(TEST_FILE, cleaned, curSha, 'Test: delete target word');
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await page.waitForTimeout(2000);
 
       // Unroute the accept mock so the content endpoint works normally
@@ -1351,7 +1353,7 @@ test.describe('Polling safety + coverage gaps', () => {
       const pos = content.indexOf(targetWord);
 
       // Open editor first (no comments yet)
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
       await page.waitForTimeout(2000);
@@ -1409,7 +1411,7 @@ test.describe('Polling safety + coverage gaps', () => {
       });
 
       // Open editor — comment should be visible
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
       await page.waitForTimeout(2000);
@@ -1438,11 +1440,11 @@ test.describe('Polling safety + coverage gaps', () => {
   test('discarded suggestion stays discarded through polling cycles', async ({ page }) => {
     test.setTimeout(90000);
     await clearAll();
+    await saveCleanFile();
+    await restoreCleanFile(); // clean content before building the suggestion anchor
     try {
       const suggestions = require('../src/server/suggestions');
       const github = require('../src/server/github');
-      const cache = require('../src/server/cache');
-      cache.del('file:' + TEST_FILE);
       const { content, sha } = await github.getFileContent(TEST_FILE);
 
       // Find a unique word for the suggestion
@@ -1466,7 +1468,7 @@ test.describe('Polling safety + coverage gaps', () => {
       });
 
       // Open editor in suggest mode
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
       await page.waitForTimeout(2000);
@@ -1528,7 +1530,7 @@ test.describe('Polling safety + coverage gaps', () => {
       });
 
       // Login as admin, enter review mode
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await page.click('#btn-review');
       await page.waitForSelector('.cm-editor');
@@ -1601,7 +1603,7 @@ test.describe('Polling safety + coverage gaps', () => {
       expect(freshEditor).toBeTruthy();
 
       // Browser-side check: open editor, verify presence display
-      await page.request.post(`${BASE_URL}/api/refresh`);
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
       await login(page);
       await enterSuggest(page);
 
@@ -1709,11 +1711,14 @@ test.describe('Accept precision for short words', () => {
     test.setTimeout(120000);
     await clearAll();
     await saveCleanFile();
+    // Restore canonical content BEFORE computing positions — a prior test may have
+    // left Session 1 modified, which would shift the "that" occurrences and make the
+    // accept land on the wrong one. restoreCleanFile leaves the clean content cached.
+    await restoreCleanFile();
     try {
       const suggestions = require('../src/server/suggestions');
       const github = require('../src/server/github');
       const cache = require('../src/server/cache');
-      cache.del('file:' + TEST_FILE);
       const { content, sha } = await github.getFileContent(TEST_FILE);
 
       // Find "that" — appears many times
@@ -1740,7 +1745,7 @@ test.describe('Accept precision for short words', () => {
         originalText: '', newText: 'REPLACED-' + word,
         ...ctx, authorEmail: 'other@example.com', authorName: 'Other User',
       });
-      await suggestions.updateHunk(shortWordId, {
+      await suggestions.updateHunk(shortWordId.id, {
         type: 'replacement',
         originalFrom: targetPos, originalTo: targetPos + word.length,
         originalText: word, newText: 'REPLACED-' + word, ...ctx,
@@ -1774,15 +1779,15 @@ test.describe('Accept precision for short words', () => {
 
       // Accept the OTHER suggestion first — triggers reanchorAnnotations
       await page.request.post(`${BASE_URL}/api/auth/test-login`, { data: { email: 'steve@noblecollective.org' } });
-      await page.request.post(`${BASE_URL}/api/refresh`);
-      const otherAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${otherId}/accept`, {
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
+      const otherAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${otherId.id}/accept`, {
         headers: { 'Content-Type': 'application/json' },
       });
       expect(otherAccept.ok()).toBeTruthy();
 
       // Now accept the short-word suggestion (after reanchor ran)
-      await page.request.post(`${BASE_URL}/api/refresh`);
-      const shortAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${shortWordId}/accept`, {
+      await page.request.post(`${BASE_URL}/api/refresh?scope=files`);
+      const shortAccept = await page.request.put(`${BASE_URL}/api/suggestions/hunk/${shortWordId.id}/accept`, {
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -1849,12 +1854,12 @@ test.describe('Accept safety for short words', () => {
       await github.updateFileContent(TEST_FILE, mangled, sha, 'Mangle context for test');
 
       // Clear caches so accept sees the mangled file
-      await page.request.post(BASE_URL + '/api/refresh');
+      await page.request.post(BASE_URL + '/api/refresh?scope=files');
       cache.del('file:' + TEST_FILE);
 
       // Accept the suggestion — context is destroyed, "that" still exists elsewhere
       await page.request.post(BASE_URL + '/api/auth/test-login', { data: { email: 'steve@noblecollective.org' } });
-      const acceptRes = await page.request.put(BASE_URL + '/api/suggestions/hunk/' + suggId + '/accept', {
+      const acceptRes = await page.request.put(BASE_URL + '/api/suggestions/hunk/' + suggId.id + '/accept', {
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -2011,8 +2016,11 @@ test.describe('Multi-word replacement', () => {
 
 // --- Edit region tracking: separate edits stay separate, single edits stay unified ---
 test.describe('Edit region tracking', () => {
-  test.beforeEach(async () => { await clearAll(); });
-  test.afterEach(async () => { await clearAll(); });
+  // Restore the shared Session-1 file before AND after: earlier blocks (e.g. the
+  // short-word "mangle context" test) can leave it modified, and this block's diff
+  // assertions require the canonical content.
+  test.beforeEach(async () => { await clearAll(); await restoreCleanFile(); });
+  test.afterEach(async () => { await clearAll(); await restoreCleanFile(); });
 
   test('two nearby separate word replacements produce 2 cards, not 1', async ({ page }) => {
     await login(page);
@@ -2204,12 +2212,17 @@ test.describe('Edit region tracking', () => {
     await login(page);
     await enterSuggest(page);
 
-    // Put cursor at end of 'philosophy' and backspace once — should delete just 'y'
-    await page.evaluate(() => {
+    // Put cursor at the end of a real word in the doc and backspace once —
+    // should delete just that word's LAST char (find the word dynamically so the
+    // test doesn't depend on specific session content).
+    const info = await page.evaluate(() => {
       const v = window.__editorView;
       const doc = v.state.doc.toString();
-      const pos = doc.indexOf('philosophy') + 10; // right after the 'y'
+      const m = doc.match(/\b[a-z]{6,12}\b/); // a plain lowercase word
+      const word = m[0];
+      const pos = doc.indexOf(word) + word.length; // right after the last char
       v.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      return { word, lastChar: word[word.length - 1] };
     });
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(600);
@@ -2217,11 +2230,11 @@ test.describe('Edit region tracking', () => {
     const deleted = await page.evaluate(() =>
       Array.from(document.querySelectorAll('.cm-suggestion-delete')).map(e => e.textContent)
     );
-    console.log('Backspace 1 char — strikethrough:', deleted);
+    console.log('Backspace 1 char from "' + info.word + '" — strikethrough:', deleted);
 
-    // Should show just 'y' as deleted, not the entire word 'philosophy'
+    // Should show just the last char as deleted, not the entire word
     expect(deleted.length).toBe(1);
-    expect(deleted[0]).toBe('y');
+    expect(deleted[0]).toBe(info.lastChar);
   });
 
   test('replacement sharing prefix stores full original text in Firestore', async ({ page }) => {

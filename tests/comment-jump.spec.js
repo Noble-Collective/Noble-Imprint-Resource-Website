@@ -1,6 +1,6 @@
 // Reproduce: 2 suggestions + 1 comment, accept or reject a suggestion, comment jumps to top.
 // Test both accept and reject, with words on successive lines and within same paragraph.
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 
 const BASE_URL = 'http://localhost:8080';
 const TEST_SESSION_PATH = '/narrative-journey-series/foundations/test-book/1-session1-thegospel';
