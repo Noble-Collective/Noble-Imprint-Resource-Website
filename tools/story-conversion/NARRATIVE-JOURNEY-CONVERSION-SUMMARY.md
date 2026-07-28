@@ -274,7 +274,10 @@ was removed.
 **Typos in source Docs (reproduced faithfully — fix in the Google Docs):**
 > ⚠️ Incidental findings, not a full proofread. Session 1 was reviewed closely; sessions 2–12 and
 > the matter were completeness-verified (100% word coverage) but not line-by-line proofed.
-- The Opening: "Mark 6:30-56" is missing its closing paren ("(Mark 6:30-56 —" in the Core-Content
+- The Opening: **heading "Faith Foundation: ExploreExploring the Terrain"** — "Explore"/"Exploring"
+  concatenated in the Doc (a revision artifact); reproduced verbatim per house rule (left LIVE, like
+  book 2's "Chrisitan"/"aAn heir"), fix at the source Doc → "Faith Foundation: Exploring the
+  Terrain". "Mark 6:30-56" is missing its closing paren ("(Mark 6:30-56 —" in the Core-Content
   list); a double space in "move us  more Godward"; the Lord's Prayer is cited as
   "Matthew 6:9-14" in the Opening prose (the creed page and elsewhere use 6:9-13).
 
