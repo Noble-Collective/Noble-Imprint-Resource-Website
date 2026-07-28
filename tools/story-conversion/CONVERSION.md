@@ -5,9 +5,11 @@ markdown used by the Noble Imprint website/app. Built for **"The Story Behind It
 All"** (Narrative Journey Series → Essentials); the same pipeline is meant
 to be reused for the rest of the series.
 
-_Last updated: 2026-07-28 — book 1 ("The Story Behind It All") complete & live; book 2
-("The Best Possible Life") started — Session 1 converted & verified as a calibration pass
-(see §11)._
+_Last updated: 2026-07-28 — book 1 ("The Story Behind It All") & book 2 ("The Best Possible
+Life") complete & live; book 3 ("The Open Invitation", Formation / Lord's Prayer) converted &
+verified (12 sessions + front matter + Opening; Recall/Further shipped as placeholders — both
+their Docs were stale book-1 content). Per-book callouts in
+`NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md`._
 
 ---
 

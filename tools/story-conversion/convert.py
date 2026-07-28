@@ -18,11 +18,12 @@ OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
 # PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
-ID_PREFIX = "TheBestPossibleLife"
+ID_PREFIX = "TheOpenInvitation"
 # PER-BOOK setting: the include key for this book's Creedal Statement block (lives
 # in the book's commonBook.md). "The Story Behind It All" = ApostlesCreed; "The Best
-# Possible Life" (Christian Living) = TenCommandments.
-CREED_KEY = "TenCommandments"
+# Possible Life" (Christian Living) = TenCommandments; "The Open Invitation"
+# (Christian Formation) = LordsPrayer.
+CREED_KEY = "LordsPrayer"
 
 warnings = []
 def warn(m): warnings.append(m)
@@ -305,7 +306,12 @@ while i < len(paras):
         item = bm.group(1)
         lm = re.match(r'^\*\*(.+?)\*\*:\s*(.*)$', item)
         if lm:
-            out.append(f'- **{clean(lm.group(1))}** - {clean(lm.group(2))}')
+            label = clean(lm.group(1))
+            # Normalize the catechism run-in label so the bold term is uniform across
+            # books (some Docs write "Catechism Question", others "Catechism"). Per Steve.
+            if label.lower().startswith('catechism'):
+                label = 'Catechism'
+            out.append(f'- **{label}** - {clean(lm.group(2))}')
         else:
             out.append('- ' + clean(item))
         continue
