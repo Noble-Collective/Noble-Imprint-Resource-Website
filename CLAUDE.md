@@ -114,6 +114,7 @@ Book repo paths use `|` instead of `/` as separators in Firestore field names (F
 - **Rate limit awareness**: GitHub API budget (5000/hour) is consumed by content reads, content tree builds, and suggestion accepts. The server logs `[GITHUB] ... budget: N/5000` for tracking
 - **No CSS build**: all styles in a single `src/public/css/style.css`, responsive breakpoints at 989px, 768px, 480px
 - **Disk cache committed to git**: `src/.file-cache/` is checked in so Docker builds have warm caches. Refreshed nightly by `.github/workflows/refresh-cache.yml`
+- **Session counts are numbered-only**: the count on the home cards and book page uses `content.numberedSessionCount(book)` — sessions whose H1 title carries a number (the same rule that renders the number badge left of each title in nav/book page), so front/back-matter (Front Matter, The Opening, The Recall, Further Resources) is excluded. The count needs H1 titles, so the home route calls `content.loadAllSessionTitles(tree)` before render — **keep that call** (home otherwise doesn't load session content; it's sequential-per-book + idempotent to stay off the rate-limit-sensitive `buildContentTree` path).
 
 ## Testing
 
