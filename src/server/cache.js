@@ -24,4 +24,14 @@ function invalidateAll() {
   store.clear();
 }
 
-module.exports = { get, set, del, invalidateAll };
+// Invalidate only cached file CONTENTS (keys prefixed 'file:'), preserving the
+// content tree and directory listings. Lets the scoped /api/refresh force fresh
+// file reads WITHOUT triggering a full 22-book tree rebuild (~70 GitHub calls) —
+// which is what drains the rate-limit budget during the Playwright suite.
+function invalidateFiles() {
+  for (const key of Array.from(store.keys())) {
+    if (key.startsWith('file:')) store.delete(key);
+  }
+}
+
+module.exports = { get, set, del, invalidateAll, invalidateFiles };

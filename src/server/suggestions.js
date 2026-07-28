@@ -348,6 +348,7 @@ async function createHunk({ filePath, bookPath, baseCommitSha, type, originalFro
 }
 
 async function updateHunk(id, { originalFrom, originalTo, originalText, newText, contextBefore, contextAfter, type }) {
+  if (!id || typeof id !== 'string') return; // guard: doc('') throws an opaque Firestore error
   await suggestionsCollection().doc(id).update({
     originalFrom,
     originalTo,
@@ -368,11 +369,16 @@ async function updateHunk(id, { originalFrom, originalTo, originalText, newText,
 }
 
 async function deleteHunk(id) {
+  if (!id || typeof id !== 'string') return; // guard: doc('') throws an opaque Firestore error
   await deleteRepliesForParent(id);
   await suggestionsCollection().doc(id).delete();
 }
 
 async function getHunk(id) {
+  // Guard against empty/invalid ids — Firestore's doc('') throws an opaque
+  // "documentPath is not a valid resource path" error. Treat as not-found so
+  // callers (acceptHunk/rejectHunk) surface a clean "Suggestion not found".
+  if (!id || typeof id !== 'string') return null;
   const doc = await suggestionsCollection().doc(id).get();
   if (!doc.exists) return null;
   return { id: doc.id, ...doc.data() };
@@ -577,7 +583,11 @@ async function acceptHunk(id, resolverEmail) {
   // Re-anchor all remaining annotations against the new file content
   await reanchorAnnotations(hunk.filePath, newContent);
 
-  cache.invalidateAll();
+  // NOTE: do NOT cache.invalidateAll() here. updateFileContent() already stored
+  // the just-written content + new SHA in the cache, so reads are fresh. Wiping
+  // the whole cache would force the next read to hit GitHub's (lagging) contents
+  // API — the read-after-write race that let sequential accepts overwrite each
+  // other. An accept changes only this file's content, not the content tree.
   return { stale: false };
 }
 

@@ -1,4 +1,5 @@
 const { Octokit } = require('octokit');
+const { createAppAuth } = require('@octokit/auth-app');
 const fs = require('fs');
 const pathLib = require('path');
 const cache = require('./cache');
@@ -20,16 +21,34 @@ let octokit;
 
 function getOctokit() {
   if (!octokit) {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
-    octokit = new Octokit({
-      auth: token,
+    const common = {
       throttle: {
         onRateLimit: () => false,           // don't retry — fail immediately
         onSecondaryRateLimit: () => false,   // don't retry abuse limits either
       },
       retry: { enabled: false },
-    });
+    };
+    // Prefer GitHub App installation auth when configured. This gives the server
+    // its OWN rate-limit + secondary-throttle bucket (isolated from personal PATs
+    // and the audiobook workflow's token), scoped to just the content repo, with
+    // short-lived auto-rotating tokens. Falls back to the personal PAT otherwise.
+    const appId = process.env.GITHUB_APP_ID;
+    const installationId = process.env.GITHUB_APP_INSTALLATION_ID;
+    const privateKeyB64 = process.env.GITHUB_APP_PRIVATE_KEY_B64;
+    if (appId && installationId && privateKeyB64) {
+      const privateKey = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
+      octokit = new Octokit({
+        authStrategy: createAppAuth,
+        auth: { appId, installationId, privateKey },
+        ...common,
+      });
+      console.log(`[GITHUB] Authenticating as GitHub App ${appId} (installation ${installationId})`);
+    } else {
+      const token = process.env.GITHUB_TOKEN;
+      if (!token) throw new Error('GITHUB_TOKEN or GitHub App credentials (GITHUB_APP_ID/INSTALLATION_ID/PRIVATE_KEY_B64) are required');
+      octokit = new Octokit({ auth: token, ...common });
+      console.log('[GITHUB] Authenticating with personal access token (GITHUB_TOKEN)');
+    }
   }
   return octokit;
 }
@@ -184,13 +203,22 @@ async function listTags() {
 }
 
 async function updateFileContent(filePath, content, sha, message) {
-  await loggedApiCall(`PUT file ${filePath}`, () =>
+  const res = await loggedApiCall(`PUT file ${filePath}`, () =>
     getOctokit().rest.repos.createOrUpdateFileContents({
       owner: OWNER, repo: REPO, path: filePath, message,
       content: Buffer.from(content).toString('base64'), sha,
     })
   );
-  cache.del('file:' + filePath);
+  // Keep the cache AUTHORITATIVE after a write: store exactly what we just wrote
+  // plus the new file SHA GitHub returned. A follow-up getFileContent then serves
+  // the post-commit content locally instead of hitting GitHub's contents API,
+  // which can lag (read-after-write) and return pre-commit content — the bug that
+  // let two sequential accepts clobber each other. Falls back to invalidation if
+  // the response shape is unexpected.
+  const newSha = res && res.data && res.data.content && res.data.content.sha;
+  if (newSha) cache.set('file:' + filePath, { content, sha: newSha }, FILE_CACHE_TTL);
+  else cache.del('file:' + filePath);
+  return { sha: newSha || null };
 }
 
 function clearDiskCache() {

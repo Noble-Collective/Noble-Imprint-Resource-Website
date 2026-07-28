@@ -278,16 +278,23 @@ function buildDecorations(view) {
 }
 
 // --- Diff engine: detect unsaved edits, build their decorations ---
-function buildDraftDecorations(hunks) {
+function buildDraftDecorations(hunks, docLen) {
   const decorations = [];
   for (const hunk of hunks) {
+    // Bounds guard (mirrors the registry builder): during accept/discard/poll
+    // rebuilds the doc is replaced across several dispatches, and a stale draft
+    // hunk can carry a position outside the current document. Feeding that to
+    // Decoration.range() → lineAt() crashes CodeMirror. Skip out-of-range hunks.
+    const from = hunk.type === 'deletion' ? hunk.currentPos : hunk.currentFrom;
+    const to = hunk.type === 'deletion' ? hunk.currentPos : hunk.currentTo;
+    if (from == null || to == null || from < 0 || to > docLen || from > to) continue;
     if (hunk.type === 'insertion') {
-      decorations.push(Decoration.mark({ class: 'cm-suggestion-insert', attributes: { 'data-hunk-id': hunk.id } }).range(hunk.currentFrom, hunk.currentTo));
+      decorations.push(Decoration.mark({ class: 'cm-suggestion-insert', attributes: { 'data-hunk-id': hunk.id } }).range(from, to));
     } else if (hunk.type === 'deletion') {
-      decorations.push(Decoration.widget({ widget: new DeletedTextWidget(hunk.originalText, hunk.id), side: -1 }).range(hunk.currentPos));
+      decorations.push(Decoration.widget({ widget: new DeletedTextWidget(hunk.originalText, hunk.id), side: -1 }).range(from));
     } else if (hunk.type === 'replacement') {
-      decorations.push(Decoration.widget({ widget: new DeletedTextWidget(hunk.originalText, hunk.id), side: -1 }).range(hunk.currentFrom));
-      decorations.push(Decoration.mark({ class: 'cm-suggestion-insert', attributes: { 'data-hunk-id': hunk.id } }).range(hunk.currentFrom, hunk.currentTo));
+      decorations.push(Decoration.widget({ widget: new DeletedTextWidget(hunk.originalText, hunk.id), side: -1 }).range(from));
+      decorations.push(Decoration.mark({ class: 'cm-suggestion-insert', attributes: { 'data-hunk-id': hunk.id } }).range(from, to));
     }
   }
   decorations.sort((a, b) => a.from - b.from);
@@ -611,7 +618,7 @@ const draftPlugin = ViewPlugin.fromClass(
 
         console.log('[DRAFT] computeHunks returned', allHunks.length, 'total,', hunks.length, 'draft (filtered', allHunks.length - hunks.length, 'registry dupes):', hunks.map(h => h.type + ' "' + (h.originalText||'').slice(0,20) + '"→"' + (h.newText||'').slice(0,20) + '"'));
         currentHunks = hunks;
-        this.decorations = buildDraftDecorations(hunks);
+        this.decorations = buildDraftDecorations(hunks, update.view.state.doc.length);
 
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {

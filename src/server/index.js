@@ -172,6 +172,14 @@ app.get('/api/content-tree', async (req, res) => {
 // Cache refresh endpoint — called after deploy or content update to clear stale content
 app.post('/api/refresh', async (req, res) => {
   const cache = require('./cache');
+  // Scoped refresh (used by the test suite): drop only cached file contents and
+  // keep the content tree, skipping the full rebuild. A full rebuild is ~70+
+  // GitHub API calls; scoped is ~0. Backward-compatible — no ?scope=files means
+  // the original full refresh below, unchanged.
+  if (req.query.scope === 'files') {
+    cache.invalidateFiles();
+    return res.json({ ok: true, scope: 'files' });
+  }
   cache.invalidateAll();
   github.clearDiskCache();
   // Proactively rebuild the content tree so the first visitor doesn't wait

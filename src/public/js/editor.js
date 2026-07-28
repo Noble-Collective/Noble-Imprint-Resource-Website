@@ -1257,6 +1257,15 @@ if (data) {
   // in the working doc by tracking cumulative shifts from suggestion applications.
   function buildShiftedRegistryEntries(suggestions, comments, workingDocContent) {
     const entries = [];
+    // Clamp computed positions to the working-doc bounds. A stale/miscomputed
+    // position beyond the doc crashes CodeMirror (lineAt on an out-of-range pos)
+    // when the entry renders as a decoration or when a margin/nav action dispatches
+    // a selection to it. Clamping keeps every registry position valid.
+    const _docLen = (workingDocContent || '').length;
+    // Coerce to a finite in-bounds position. A NaN/null/undefined position (e.g. a
+    // comment whose anchor was lost → toWorkingPos(undefined) → NaN) otherwise reaches
+    // CodeMirror as a selection/decoration position and crashes it (lineAt(NaN)).
+    const clampPos = (p) => { const n = Number(p); return Number.isFinite(n) ? Math.max(0, Math.min(n, _docLen)) : 0; };
     const validSuggs = (suggestions || []).filter(s => !s.resolvedStale);
 
     // Sort suggestions by ascending original-file position
@@ -1284,7 +1293,7 @@ if (data) {
         originalText: s.originalText || '', newText: s.newText || '',
         originalFrom: s.originalFrom, originalTo: s.originalTo,
         resolvedFrom: s.resolvedFrom, resolvedTo: s.resolvedTo,
-        currentFrom: curFrom, currentTo: curTo,
+        currentFrom: clampPos(curFrom), currentTo: clampPos(curTo),
         authorEmail: s.authorEmail, authorName: s.authorName,
         authorPhotoURL: s.authorPhotoURL || null,
         firestoreId: s.id, loadedFromServer: true,
@@ -1360,7 +1369,7 @@ if (data) {
       entries.push({
         id: c.id, kind: 'comment',
         selectedText: c.selectedText || '', commentText: c.commentText || '',
-        currentFrom: curFrom, currentTo: curTo,
+        currentFrom: clampPos(curFrom), currentTo: clampPos(curTo),
         originalFrom: from, originalTo: to,
         authorEmail: c.authorEmail, authorName: c.authorName,
         authorPhotoURL: c.authorPhotoURL || null,
