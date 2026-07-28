@@ -41,6 +41,8 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
   kingdom." (I authored the tagline from a passage Steve supplied; he chose this of 3 options.)
 - [2026-07-28, per Steve] Updated intro ¶2's Essentials topic list: `…community, and devotion`
   → `…community, devotion, and witness` (to account for the new witness/mission volume).
+- [2026-07-28, per Steve] Bolded `Session Overview` in the "fivefold, multimodal layout …
+  (see **Session Overview** for more detail)" sentence.
 - Corrected a volume title in the table: `The Story Behind it All` → `The Story Behind It All`.
 - Typo fix (in the now-included Essentials descriptor): `Christiain belief` → `Christian belief`.
 - Merged two paragraphs the PDF had split across a page break into single paragraphs: the
