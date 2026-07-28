@@ -36,6 +36,11 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
   descriptor** (from the PDF); remaining rows = one volume + its focus line.
   [revised 2026-07-28 per Steve — was a single 3-column table; the per-subseries descriptors
   are now INCLUDED, not dropped.]
+- [2026-07-28, per Steve] Added a **6th Essentials volume** row — **The Kingdom Come** — tagline
+  "Kindles the missional heartbeat of Christian witness—commissioned to declare the coming
+  kingdom." (I authored the tagline from a passage Steve supplied; he chose this of 3 options.)
+- [2026-07-28, per Steve] Updated intro ¶2's Essentials topic list: `…community, and devotion`
+  → `…community, devotion, and witness` (to account for the new witness/mission volume).
 - Corrected a volume title in the table: `The Story Behind it All` → `The Story Behind It All`.
 - Typo fix (in the now-included Essentials descriptor): `Christiain belief` → `Christian belief`.
 - Merged two paragraphs the PDF had split across a page break into single paragraphs: the
