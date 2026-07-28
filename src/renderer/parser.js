@@ -80,7 +80,7 @@ function activateMatchingItem(body, target, key) {
 function resolveIncludes(content, blocks) {
   if (!content || content.indexOf('@include') === -1) return content;
   return content.replace(
-    /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9]*)\s*(.*?)\s*-->/g,
+    /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9_-]*)\s*(.*?)\s*-->/g,
     (full, key, paramStr) => {
       if (!blocks || !(key in blocks)) {
         throw new IncludeError(`@include references undefined key "${key}"`);
@@ -302,7 +302,7 @@ function resolveIncludesTracked(content, blockIndex, sessionMeta) {
     bufLen = bufTo;
   }
 
-  const re = /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9]*)\s*(.*?)\s*-->/g;
+  const re = /<!--\s*@include:\s*([A-Za-z][A-Za-z0-9_-]*)\s*(.*?)\s*-->/g;
   let m;
   while ((m = re.exec(content)) !== null) {
     const full = m[0], key = m[1], paramStr = m[2];

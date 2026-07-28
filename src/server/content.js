@@ -371,7 +371,7 @@ function gatherCommonContent(series, subseries, book) {
 function parseCommonBlocks(md) {
   const blocks = {};
   if (!md) return blocks;
-  const re = /<([A-Za-z][A-Za-z0-9]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
+  const re = /<([A-Za-z][A-Za-z0-9_-]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
   let m;
   while ((m = re.exec(md)) !== null) blocks[m[1]] = m[2];
   return blocks;
@@ -394,7 +394,7 @@ function gatherCommonBlocks(series, subseries, book) {
 function parseCommonBlocksTracked(md) {
   const blocks = [];
   if (!md) return blocks;
-  const re = /<([A-Za-z][A-Za-z0-9]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
+  const re = /<([A-Za-z][A-Za-z0-9_-]*)>\r?\n([\s\S]*?)\r?\n<\/\1>/g;
   let m;
   while ((m = re.exec(md)) !== null) {
     const bodyStart = m.index + m[0].indexOf('\n') + 1; // after the `<Key>\n` open line

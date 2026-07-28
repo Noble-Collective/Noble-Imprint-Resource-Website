@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { resolveIncludes, resolveIncludesTracked } = require('../../src/renderer/parser');
 const { buildEditorModel } = require('../../src/server/editor-model');
+const { parseCommonBlocks } = require('../../src/server/content');
 
 // ── Fixtures (mirror Test Book Session 5) ────────────────────────────────────
 const commonBookMd = `<TestBookNote>
@@ -391,4 +392,31 @@ test('BACKWARD COMPAT: no-include session yields segments=[session], files=[sess
   assert.strictEqual(model.files.length, 1);
   assert.strictEqual(model.pendingSuggestions.length, 1);
   assert.strictEqual(model.pendingSuggestions[0].id, 'a');
+});
+
+// ── Block keys may contain underscores/dashes (e.g. Recall_BookOverview_KeyIdea) ──
+test('block keys with underscores/dashes parse and resolve (reading + tracked)', () => {
+  const md = `<Recall_BookOverview_KeyIdea>
+Summarize the main idea of this study.
+</Recall_BookOverview_KeyIdea>
+
+<Recall-Faith-Foundation>
+Explore the discussion questions with your community.
+</Recall-Faith-Foundation>
+`;
+  const blocks = parseCommonBlocks(md);
+  assert.ok('Recall_BookOverview_KeyIdea' in blocks, 'underscore key parsed');
+  assert.ok('Recall-Faith-Foundation' in blocks, 'dash key parsed');
+
+  const session = 'Before\n<!-- @include: Recall_BookOverview_KeyIdea -->\nAfter\n';
+  const resolved = resolveIncludes(session, blocks);
+  assert.match(resolved, /Summarize the main idea/);
+  assert.doesNotMatch(resolved, /@include/);
+
+  // editor variant must agree
+  const blockIndex = {
+    Recall_BookOverview_KeyIdea: { body: blocks['Recall_BookOverview_KeyIdea'], sourceFile: 'commonSeries.md', level: 'series', sha: 'x' },
+  };
+  const tracked = resolveIncludesTracked(session, blockIndex, {});
+  assert.strictEqual(tracked.resolved, resolved, 'tracked resolver byte-parity with resolveIncludes');
 });
