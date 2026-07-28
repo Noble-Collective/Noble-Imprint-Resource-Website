@@ -275,9 +275,12 @@ was removed.
 > ⚠️ Incidental findings, not a full proofread. Session 1 was reviewed closely; sessions 2–12 and
 > the matter were completeness-verified (100% word coverage) but not line-by-line proofed.
 - The Opening: **heading "Faith Foundation: ExploreExploring the Terrain"** — "Explore"/"Exploring"
-  concatenated in the Doc (a revision artifact); reproduced verbatim per house rule (left LIVE, like
-  book 2's "Chrisitan"/"aAn heir"), fix at the source Doc → "Faith Foundation: Exploring the
-  Terrain". "Mark 6:30-56" is missing its closing paren ("(Mark 6:30-56 —" in the Core-Content
+  concatenated in the Doc (a revision artifact). **CORRECTED** in the converted file + local
+  `docs/opening.md` export to "Faith Foundation: Exploring the Terrain" to match the identical
+  framework heading in books 1 & 2 (per Steve). The source Google Doc still has the typo — fix it
+  there too, or a re-export reintroduces it. (This framework heading is shared-in-structure across
+  all books, so the sibling books are the authority for its correct form.) "Mark 6:30-56" is
+  missing its closing paren ("(Mark 6:30-56 —" in the Core-Content
   list); a double space in "move us  more Godward"; the Lord's Prayer is cited as
   "Matthew 6:9-14" in the Opening prose (the creed page and elsewhere use 6:9-13).
 

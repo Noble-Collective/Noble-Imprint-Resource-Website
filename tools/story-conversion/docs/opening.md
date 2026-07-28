@@ -84,7 +84,7 @@ The essentials of the Christian faith are extremely relevant to our lives. Pick 
 
 2. Which biblical narrative or study topic seems most interesting or relevant to you? Why?
 
-## **Faith Foundation: ExploreExploring the Terrain**
+## **Faith Foundation: Exploring the Terrain**
 
 *God calls his people to move beyond a superficial understanding of Christian essentials. Use the discussion questions and key quotes to ponder with others how the subject area of study is of great importance in the Christian faith.*
 
