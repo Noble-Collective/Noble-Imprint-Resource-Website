@@ -489,16 +489,13 @@ async function getSessionPageData(req, resolvedRoute) {
     try {
       editorModelData = await editorModel.getEditorModel({ series, subseries: subseries || null, book, session });
       // Client works in BUFFER space (originalContent = resolvedContent), so expose
-      // each annotation's buffer offsets as resolvedFrom/To. P2: session-file
-      // annotations only (shared-file annotations are added in P3).
+      // each annotation's buffer offsets as resolvedFrom/To. Include annotations from
+      // the session file AND every referenced shared file (pre-mapped to the buffer).
       const toClient = (a) => ({ ...a, resolvedFrom: a.bufferFrom, resolvedTo: a.bufferTo });
-      allPendingSuggestions = editorModelData.pendingSuggestions
-        .filter(s => s.sourceFile === session.path && s.bufferMapped)
-        .map(toClient);
-      allPendingComments = editorModelData.pendingComments
-        .filter(c => c.sourceFile === session.path && c.bufferMapped)
-        .map(toClient);
-      allReplies = await suggestions.getRepliesForFile(session.path);
+      allPendingSuggestions = editorModelData.pendingSuggestions.filter(s => s.bufferMapped).map(toClient);
+      allPendingComments = editorModelData.pendingComments.filter(c => c.bufferMapped).map(toClient);
+      const replyLists = await Promise.all(editorModelData.files.map(f => suggestions.getRepliesForFile(f.path)));
+      allReplies = replyLists.flat();
     } catch (err) {
       console.error('[editor-model] getSessionPageData fallback:', err.message);
       editorModelData = null; // fall through to the plain single-file path below
@@ -538,6 +535,33 @@ async function getSessionPageData(req, resolvedRoute) {
   const editUnavailable = sessionData.fromDiskCache && req.user ? true : false;
   const rateLimitReset = editUnavailable ? ghub.getRateLimitReset() : null;
 
+  // P4/D3: open a common file directly (single-file edit) via ?editFile=<repo path>.
+  // Reuses the proven single-file editor — NO include resolution, so hasShared is
+  // false on the client and it behaves like editing any normal file. Admins may
+  // edit any shared file; manuscript-owners may edit book/subseries files but not
+  // series-level (which spans the whole series). The server is the real gate.
+  let editingSharedFile = null;
+  const editFileParam = req.query && req.query.editFile;
+  if (editFileParam && canEdit && !sessionData.fromDiskCache) {
+    const dir = editFileParam.replace(/\/[^/]+$/, '');
+    const role = await firestore.getUserBookRole(req.user.email, dir);
+    const isSeries = /commonSeries\.md$/.test(editFileParam);
+    const allowed = role === 'admin' || (role === 'manuscript-owner' && !isSeries);
+    if (allowed) {
+      try {
+        const f = await github.getFileContent(editFileParam);
+        const fSug = await suggestions.getSuggestionsForFile(editFileParam);
+        const fCom = await suggestions.getCommentsForFile(editFileParam);
+        const fRep = await suggestions.getRepliesForFile(editFileParam);
+        for (const s of fSug) { const r = suggestions.resolveAnchor(s, f.content); if (!r.stale) { s.resolvedFrom = r.from; s.resolvedTo = r.to; } else { s.resolvedStale = true; } }
+        for (const c of fCom) { const r = suggestions.resolveAnchor(c, f.content); if (!r.stale) { c.resolvedFrom = r.from; c.resolvedTo = r.to; } else { c.resolvedStale = true; } }
+        editingSharedFile = { path: editFileParam, dir, content: f.content, sha: f.sha, suggestions: fSug, comments: fCom, replies: fRep };
+      } catch (err) { console.error('[editFile] load failed:', editFileParam, err.message); }
+    } else {
+      console.warn('[editFile] denied for', req.user.email, '→', editFileParam, '(role:', role, ')');
+    }
+  }
+
   // Audio data — load if audiobook is enabled for this book
   let audioSession = null;
   if (book.audiobook && book.audiobook.enabled) {
@@ -561,20 +585,23 @@ async function getSessionPageData(req, resolvedRoute) {
     nextSession,
     editRole: canEdit ? editRole : null,
     canReview: canReview || false,
-    rawContent: canEdit ? sessionData.content : null,
-    contentSha: canEdit ? sessionData.sha : null,
-    // Shared-content editing (null unless the session has @include): the resolved
-    // editor buffer, its segment map, and the committable files with SHAs. When
-    // present the client edits `resolvedContent` (buffer space) and routes each
-    // change back to the correct file via the segment map.
-    resolvedContent: canEdit && editorModelData ? editorModelData.resolvedContent : null,
-    segments: canEdit && editorModelData ? editorModelData.segments : null,
-    editorFiles: canEdit && editorModelData ? editorModelData.files : null,
-    pendingSuggestions: allPendingSuggestions,
-    pendingComments: allPendingComments,
-    pendingReplies: allReplies,
-    sessionFilePath: canEdit ? session.path : null,
-    bookRepoPath: canEdit ? book.repoPath : null,
+    // When editing a common file directly (?editFile), the edit target is that file
+    // (single-file, no includes); otherwise it's the session (with its segment map).
+    rawContent: canEdit ? (editingSharedFile ? editingSharedFile.content : sessionData.content) : null,
+    contentSha: canEdit ? (editingSharedFile ? editingSharedFile.sha : sessionData.sha) : null,
+    // Shared-content editing (null unless the session has @include and we're NOT in
+    // single-file edit mode): the resolved editor buffer, its segment map, and the
+    // committable files with SHAs. The client edits `resolvedContent` (buffer space)
+    // and routes each change back to the correct file via the segment map.
+    resolvedContent: (!editingSharedFile && canEdit && editorModelData) ? editorModelData.resolvedContent : null,
+    segments: (!editingSharedFile && canEdit && editorModelData) ? editorModelData.segments : null,
+    editorFiles: (!editingSharedFile && canEdit && editorModelData) ? editorModelData.files : null,
+    editingSharedFile: editingSharedFile ? { path: editingSharedFile.path, backUrl: req.path } : null,
+    pendingSuggestions: editingSharedFile ? editingSharedFile.suggestions : allPendingSuggestions,
+    pendingComments: editingSharedFile ? editingSharedFile.comments : allPendingComments,
+    pendingReplies: editingSharedFile ? editingSharedFile.replies : allReplies,
+    sessionFilePath: canEdit ? (editingSharedFile ? editingSharedFile.path : session.path) : null,
+    bookRepoPath: canEdit ? (editingSharedFile ? editingSharedFile.dir : book.repoPath) : null,
     editUnavailable,
     rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
     audioSession,

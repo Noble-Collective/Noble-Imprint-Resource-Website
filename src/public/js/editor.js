@@ -9,7 +9,7 @@ import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, 
 import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
 import { constraintExtension, setZones, recomputeZones, readonlyExtension, setReadonlyRanges, readonlyRangesField } from '/static/js/editor-constraints.js';
-import { Decoration, StateField, StateEffect } from '/static/js/codemirror-bundle.js';
+import { Decoration, StateField, StateEffect, WidgetType } from '/static/js/codemirror-bundle.js';
 
 // data.pendingSuggestions is the INITIAL snapshot from the server — read-only.
 // During the session, the annotation registry is the live source of truth.
@@ -51,11 +51,12 @@ if (data) {
     }
     return null;
   }
-  // Source text for a given file path. P2 only routes to the session file; shared
-  // file sources are added in P3.
+  // Source text for a given file path — the session file or any referenced common
+  // file (the server ships each file's content in editorFiles).
   function sourceTextFor(path) {
     if (path === data.sessionFilePath) return sessionSource;
-    return null;
+    const f = (data.editorFiles || []).find(x => x.path === path);
+    return f && typeof f.content === 'string' ? f.content.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : null;
   }
   // Remap a hunk-save body from BUFFER space to SOURCE space and pick its target
   // file. Returns { filePath, baseCommitSha, body } or null if the change can't be
@@ -81,31 +82,66 @@ if (data) {
       body: { ...body, originalFrom: mFrom.offset, originalTo: mTo.offset, lineNumber, contextBefore, contextAfter },
     };
   }
-  // Read-only buffer ranges for the current mode. P2: shared content is read-only
-  // in every mode. (P3 will make shared editable in suggest mode, leaving only the
-  // parameterized spans locked there.)
-  function readonlyRangesForMode() {
+  // Read-only buffer ranges for the current mode:
+  //  - direct (D3): whole shared segments are read-only inline (edited via link-out).
+  //  - suggest/review: shared content is editable; only the parameterized spans
+  //    ({id}, the ** from bold=, " active" from active=) are locked.
+  function readonlyRangesForMode(mode) {
     if (!hasShared) return [];
-    return segments.filter(s => s.kind === 'shared').map(s => ({ from: s.bufFrom, to: s.bufTo }));
+    if (mode === 'direct') {
+      return segments.filter(s => s.kind === 'shared').map(s => ({ from: s.bufFrom, to: s.bufTo }));
+    }
+    const out = [];
+    for (const s of segments) for (const r of (s.readonlySpans || [])) out.push({ from: r.bufFrom, to: r.bufTo });
+    return out;
   }
+
+  // Live shared-segment ranges (whole segments), mapped through edits — used for
+  // the tint, the banner, and direct-mode session-source reconstruction. Distinct
+  // from the read-only ranges (which vary by mode). Each entry carries the source
+  // file/level + the original @include directive for reconstruction.
+  const setSharedSegs = StateEffect.define();
+  const sharedSegField = StateField.define({
+    create() { return []; },
+    update(value, tr) {
+      for (const e of tr.effects) if (e.is(setSharedSegs)) return e.value;
+      if (tr.docChanged && value.length) {
+        return value.map(r => ({ ...r, from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) }))
+          .filter(r => r.to > r.from);
+      }
+      return value;
+    },
+  });
+  function initialSharedSegs() {
+    return (segments || []).filter(s => s.kind === 'shared').map(s => ({
+      from: s.bufFrom, to: s.bufTo, sourceFile: s.sourceFile, level: s.level, key: s.key,
+      directive: s.includeDirective ? s.includeDirective.text : '',
+    }));
+  }
+  function sharedSegAt(pos) {
+    if (!editorView) return null;
+    for (const r of editorView.state.field(sharedSegField)) if (pos >= r.from && pos <= r.to) return r;
+    return null;
+  }
+
   // Reconstruct the SESSION source (with @include directives) from the current
-  // edited buffer, for a direct-mode save. Shared blocks are read-only, so we
-  // re-emit their original @include line and keep the edited session text between
-  // them. Returns null on any inconsistency (caller must then abort, never write
-  // resolved content back to the session file).
+  // edited buffer, for a direct-mode save. Shared blocks are read-only in direct
+  // mode, so we re-emit their original @include line and keep the edited session
+  // text between them. Returns null on any inconsistency (caller must then abort,
+  // never write resolved content back to the session file).
   function reconstructSessionSource() {
     if (!hasShared || !editorView) return null;
     const doc = editorView.state.doc.toString();
-    const liveShared = [...editorView.state.field(readonlyRangesField)].sort((a, b) => a.from - b.from);
+    const live = [...editorView.state.field(sharedSegField)].sort((a, b) => a.from - b.from);
     const sharedSegs = segments.filter(s => s.kind === 'shared');
-    if (liveShared.length !== sharedSegs.length) return null;
+    if (live.length !== sharedSegs.length) return null;
     let out = '';
     let cursor = 0;
-    for (let i = 0; i < liveShared.length; i++) {
-      if (liveShared[i].from < cursor) return null;
-      out += doc.slice(cursor, liveShared[i].from);
-      out += sharedSegs[i].includeDirective.text;
-      cursor = liveShared[i].to;
+    for (let i = 0; i < live.length; i++) {
+      if (live[i].from < cursor) return null;
+      out += doc.slice(cursor, live[i].from);
+      out += live[i].directive;
+      cursor = live[i].to;
     }
     out += doc.slice(cursor);
     return out;
@@ -117,7 +153,7 @@ if (data) {
   function buildSharedDecorations(view) {
     if (!hasShared) return Decoration.none;
     const ranges = [];
-    const liveShared = view.state.field(readonlyRangesField);
+    const liveShared = view.state.field(sharedSegField);
     for (const r of liveShared) {
       if (r.to <= r.from) continue;
       // one line decoration per line touched by the shared range
@@ -145,7 +181,7 @@ if (data) {
   });
   const sharedDecoUpdater = EditorView.updateListener.of((update) => {
     if (!hasShared) return;
-    if (update.docChanged || update.startState.field(readonlyRangesField) !== update.state.field(readonlyRangesField)) {
+    if (update.docChanged || update.startState.field(sharedSegField) !== update.state.field(sharedSegField)) {
       const deco = buildSharedDecorations(update.view);
       update.view.dispatch({ effects: setSharedDeco.of(deco) });
     }
@@ -160,34 +196,98 @@ if (data) {
     '.cm-shared-range': {
       backgroundColor: 'rgba(141, 68, 73, 0.06)',
     },
+    '.cm-shared-affordance': {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: '10px',
+      flexWrap: 'wrap',
+      margin: '2px 0 8px 0',
+      padding: '3px 0 3px 10px',
+      borderLeft: '3px solid var(--accent, #8D4449)',
+      font: '500 11.5px/1.4 "DM Sans", system-ui, sans-serif',
+      color: '#8a7d7a',
+    },
+    '.cm-shared-src strong': { color: '#6b3438', fontWeight: '600' },
+    '.cm-shared-lock': { opacity: '0.8' },
+    '.cm-shared-editlink': {
+      color: '#8D4449',
+      fontWeight: '700',
+      textDecoration: 'none',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    },
+    '.cm-shared-editlink:hover': { textDecoration: 'underline' },
   });
 
-  // --- Shared-content banner (names the source file + level of the focused shared block) ---
+  // --- Inline shared-content affordance ---------------------------------------
+  // Instead of a heavy top banner, each shared block carries a small caption at
+  // its foot: a lock + which common file it comes from, and (for users who may
+  // edit that file) an "Edit <file> →" link that opens the file directly (P4/D3).
   const LEVEL_LABEL = { book: 'common book', subseries: 'common subseries', series: 'common series' };
   function baseName(p) { return (p || '').split('/').pop(); }
-  function updateSharedBanner(view) {
-    const banner = document.getElementById('editor-shared-banner');
-    if (!banner) return;
-    const seg = segmentAtBuffer(view.state.selection.main.head);
-    if (hasShared && seg && seg.kind === 'shared') {
-      const nameEl = document.getElementById('shared-banner-name');
-      const lvl = LEVEL_LABEL[seg.level] || 'shared';
-      if (nameEl) nameEl.textContent = baseName(seg.sourceFile);
-      banner.dataset.level = seg.level || '';
-      banner.dataset.file = seg.sourceFile || '';
-      banner.dataset.levelLabel = lvl;
-      const lvlEl = document.getElementById('shared-banner-level');
-      if (lvlEl) lvlEl.textContent = lvl;
-      banner.style.display = '';
-    } else {
-      banner.style.display = 'none';
-    }
+  // Direct-edit link visibility: admins may edit any shared file; manuscript-owners
+  // may edit book/subseries files but NOT series-level (which spans the whole series).
+  function sharedEditLinkAllowed(level) {
+    const role = data.editRole;
+    if (role === 'admin') return true;
+    if (role === 'manuscript-owner') return level !== 'series';
+    return false;
   }
-  const sharedBannerUpdater = EditorView.updateListener.of((update) => {
-    if (!hasShared) return;
-    if (update.selectionSet || update.focusChanged || update.docChanged) updateSharedBanner(update.view);
+  function sharedEditUrl(path) {
+    return window.location.pathname + '?editFile=' + encodeURIComponent(path);
+  }
+  class SharedAffordanceWidget extends WidgetType {
+    constructor(seg) { super(); this.seg = seg; }
+    eq(o) { return o.seg.sourceFile === this.seg.sourceFile && o.seg.key === this.seg.key; }
+    toDOM() {
+      const el = document.createElement('div');
+      el.className = 'cm-shared-affordance';
+      const name = baseName(this.seg.sourceFile);
+      const lvl = LEVEL_LABEL[this.seg.level] || 'shared';
+      const info = document.createElement('span');
+      info.className = 'cm-shared-src';
+      info.innerHTML = '<span class="cm-shared-lock">🔒</span> Shared from <strong>' + name + '</strong> · ' + lvl + ' — edits affect every session that uses it';
+      el.appendChild(info);
+      if (sharedEditLinkAllowed(this.seg.level)) {
+        const a = document.createElement('a');
+        a.className = 'cm-shared-editlink';
+        a.textContent = 'Edit ' + name + ' →';
+        a.href = sharedEditUrl(this.seg.sourceFile);
+        a.addEventListener('mousedown', (e) => e.preventDefault());
+        a.addEventListener('click', (e) => { e.preventDefault(); window.location.href = a.href; });
+        el.appendChild(a);
+      }
+      return el;
+    }
+    ignoreEvent() { return true; }
+  }
+  function buildSharedWidgets(view) {
+    if (!hasShared) return Decoration.none;
+    const ranges = [];
+    for (const r of view.state.field(sharedSegField)) {
+      if (r.to <= r.from) continue;
+      const line = view.state.doc.lineAt(Math.min(r.to, view.state.doc.length));
+      ranges.push(Decoration.widget({ widget: new SharedAffordanceWidget(r), side: 1, block: true }).range(line.to));
+    }
+    ranges.sort((a, b) => a.from - b.from);
+    return Decoration.set(ranges, true);
+  }
+  const setSharedWidgets = StateEffect.define();
+  const sharedWidgetState = StateField.define({
+    create() { return Decoration.none; },
+    update(value, tr) {
+      for (const e of tr.effects) if (e.is(setSharedWidgets)) return e.value;
+      if (tr.docChanged && value !== Decoration.none) return value.map(tr.changes);
+      return value;
+    },
+    provide: (f) => EditorView.decorations.from(f),
   });
-  function initSharedBanner(view) { updateSharedBanner(view); }
+  const sharedWidgetUpdater = EditorView.updateListener.of((update) => {
+    if (!hasShared) return;
+    if (update.docChanged || update.startState.field(sharedSegField) !== update.state.field(sharedSegField)) {
+      update.view.dispatch({ effects: setSharedWidgets.of(buildSharedWidgets(update.view)) });
+    }
+  });
 
   // --- View Source toggle (compartments for masking + read-only) ---
   const maskingCompartment = new Compartment();
@@ -1727,7 +1827,7 @@ if (data) {
       viewSourceCompartment.of([]),
       ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
       ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
-      ...(hasShared ? [readonlyExtension(), sharedDecoState, sharedDecoUpdater, sharedTheme, sharedBannerUpdater] : []),
+      ...(hasShared ? [readonlyExtension(), sharedSegField, sharedDecoState, sharedDecoUpdater, sharedWidgetState, sharedWidgetUpdater, sharedTheme] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
       directEditButtonUpdater,
       gutterHider,
@@ -1777,11 +1877,13 @@ if (data) {
       editorView.dispatch({ effects: setZones.of(zones) });
     }
 
-    // Initialize shared-content read-only ranges + tint decorations
+    // Initialize shared-content state: live segment ranges, read-only ranges
+    // (mode-dependent), tint decorations, and the inline affordance widgets.
     if (hasShared) {
-      editorView.dispatch({ effects: setReadonlyRanges.of(readonlyRangesForMode()) });
+      editorView.dispatch({ effects: setSharedSegs.of(initialSharedSegs()) });
+      editorView.dispatch({ effects: setReadonlyRanges.of(readonlyRangesForMode(mode)) });
       editorView.dispatch({ effects: setSharedDeco.of(buildSharedDecorations(editorView)) });
-      initSharedBanner(editorView);
+      editorView.dispatch({ effects: setSharedWidgets.of(buildSharedWidgets(editorView)) });
     }
 
     // Init margin panel + comments
@@ -2097,6 +2199,9 @@ if (data) {
   });
   document.getElementById('btn-review')?.addEventListener('click', () => initEditor('suggest'));
   document.getElementById('btn-view-source')?.addEventListener('click', toggleViewSource);
+
+  // Arrived via "Edit shared file →": open the common file straight into direct edit.
+  if (data.editingSharedFile) initEditor('direct');
 
   // Navigate between suggestion/comment cards
   function navigateCards(direction) {

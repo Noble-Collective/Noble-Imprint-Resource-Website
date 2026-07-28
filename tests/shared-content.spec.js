@@ -70,29 +70,40 @@ test.describe('Shared-content editing — P2 (render, tint, banner, read-only)',
     expect(count).toBeGreaterThan(0);
   });
 
-  test('banner names the source file + level when cursor enters shared content', async ({ page }) => {
+  test('each shared block shows an inline affordance naming its source file + edit link', async ({ page }) => {
     await login(page, S5_PATH);
     await enterSuggestMode(page);
-    await cursorAfter(page, 'book-level');
-    await expect(page.locator('#editor-shared-banner')).toBeVisible();
-    await expect(page.locator('#shared-banner-name')).toHaveText('commonBook.md');
-    // moving into series-level shared content updates the banner
-    await cursorAfter(page, 'series-level');
-    await expect(page.locator('#shared-banner-name')).toHaveText('commonSeries.md');
-    // moving back to a session line hides the banner
-    await cursorAfter(page, 'native session content');
-    await expect(page.locator('#editor-shared-banner')).toBeHidden();
+    const affordances = page.locator('.cm-shared-affordance');
+    await expect(affordances.first()).toBeVisible();
+    const joined = (await affordances.allInnerTexts()).join('\n');
+    expect(joined).toContain('commonBook.md');
+    expect(joined).toContain('commonSeries.md');
+    // admin sees an "Edit <file> →" link pointing at the ?editFile route
+    const link = page.locator('.cm-shared-editlink').first();
+    await expect(link).toBeVisible();
+    expect(await link.getAttribute('href')).toContain('editFile=');
+    // the old heavy top banner is gone
+    expect(await page.locator('#editor-shared-banner').count()).toBe(0);
   });
 
-  test('shared content is READ-ONLY in suggest mode', async ({ page }) => {
+  test('parameterized spans are read-only in suggest mode (edit blocked by the filter)', async ({ page }) => {
     await login(page, S5_PATH);
     await enterSuggestMode(page);
-    const before = await getDoc(page);
-    await cursorAfter(page, 'book-level');
-    await page.keyboard.type('XXXX');
-    await page.waitForTimeout(300);
-    const after = await getDoc(page);
-    expect(after).toEqual(before); // edit blocked, buffer unchanged
+    // Drive the change filter directly — the {id} value lives inside a masked
+    // (atomic) <Question> tag, so a cursor can't be placed there via the UI anyway.
+    const result = await page.evaluate(() => {
+      const v = window.__editorView;
+      const segs = window.__EDITOR_DATA.segments || [];
+      let span = null;
+      for (const s of segs) for (const r of (s.readonlySpans || [])) if (r.reason === 'id') span = r;
+      if (!span) return { found: false };
+      const before = v.state.doc.toString();
+      const pos = span.bufFrom + 1; // inside the substituted id value
+      v.dispatch({ changes: { from: pos, to: pos, insert: 'ZZ' } });
+      return { found: true, changed: v.state.doc.toString() !== before };
+    });
+    expect(result.found).toBeTruthy();
+    expect(result.changed).toBeFalsy(); // parameterized span edit blocked
   });
 
   test('shared content is READ-ONLY in direct mode', async ({ page }) => {
@@ -145,5 +156,151 @@ test.describe('Shared-content editing — P2 (render, tint, banner, read-only)',
     expect(info.segments).toBeNull();
     expect(info.resolved).toBeNull();
     expect(info.sharedLines).toBe(0);
+  });
+});
+
+// Count pending suggestions on a file (authenticated via the page's cookie).
+async function suggestionCount(page, filePath) {
+  const r = await page.request.get(BASE_URL + '/api/suggestions/content', { params: { filePath } });
+  if (!r.ok()) return -1;
+  const j = await r.json();
+  return (j.pendingSuggestions || []).length;
+}
+
+test.describe('Shared-content editing — P3 (suggest routing to shared files)', () => {
+  test('editing BOOK-level shared prose routes the suggestion to commonBook.md', async ({ page }) => {
+    await login(page, S5_PATH);
+    await enterSuggestMode(page);
+    const before = await getDoc(page);
+    await cursorAfter(page, 'reads the same in every session');
+    await page.keyboard.type(' BOOKEDIT');
+    await page.waitForTimeout(400);
+    expect(await getDoc(page)).not.toEqual(before); // shared prose IS editable in suggest mode
+
+    await expect.poll(() => suggestionCount(page, BOOK_COMMON), { timeout: 10000 }).toBeGreaterThan(0);
+    expect(await suggestionCount(page, S5_FILE)).toBe(0);       // not the session file
+    expect(await suggestionCount(page, SERIES_COMMON)).toBe(0); // not the series file
+  });
+
+  test('editing SERIES-level shared prose routes the suggestion to commonSeries.md', async ({ page }) => {
+    await login(page, S5_PATH);
+    await enterSuggestMode(page);
+    await cursorAfter(page, 'changes every session in the series');
+    await page.keyboard.type(' SERIESEDIT');
+    await page.waitForTimeout(400);
+
+    await expect.poll(() => suggestionCount(page, SERIES_COMMON), { timeout: 10000 }).toBeGreaterThan(0);
+    expect(await suggestionCount(page, S5_FILE)).toBe(0);
+    expect(await suggestionCount(page, BOOK_COMMON)).toBe(0);
+  });
+
+  test('a session edit and a shared edit route to their respective files', async ({ page }) => {
+    await login(page, S5_PATH);
+    await enterSuggestMode(page);
+    await cursorAfter(page, 'native session content');
+    await page.keyboard.type(' SESS');
+    await page.waitForTimeout(300);
+    await cursorAfter(page, 'reads the same in every session');
+    await page.keyboard.type(' BOOKX');
+    await page.waitForTimeout(500);
+
+    await expect.poll(() => suggestionCount(page, S5_FILE), { timeout: 10000 }).toBeGreaterThan(0);
+    await expect.poll(() => suggestionCount(page, BOOK_COMMON), { timeout: 10000 }).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Shared-content editing — P4 (direct edit of the shared file)', () => {
+  test('the affordance link opens the common file as a single-file direct edit', async ({ page }) => {
+    await login(page, S5_PATH + '?editFile=' + encodeURIComponent(BOOK_COMMON));
+    const info = await page.evaluate(() => ({
+      editing: window.__EDITOR_DATA.editingSharedFile ? window.__EDITOR_DATA.editingSharedFile.path : null,
+      sessionFilePath: window.__EDITOR_DATA.sessionFilePath,
+      segments: window.__EDITOR_DATA.segments,
+      raw: window.__EDITOR_DATA.rawContent,
+    }));
+    expect(info.editing).toBe(BOOK_COMMON);
+    expect(info.sessionFilePath).toBe(BOOK_COMMON); // edits target the common file
+    expect(info.segments).toBeNull();               // single-file: no include resolution
+    expect(info.raw).toContain('book-level');
+    // back-to-session banner present
+    await expect(page.locator('.editor-sharedfile-banner')).toBeVisible();
+    // editor auto-opened showing the RAW common file (block tags visible, unresolved)
+    await page.waitForSelector('#codemirror-host .cm-editor', { timeout: 10000 });
+    await page.waitForTimeout(500);
+    const doc = await getDoc(page);
+    expect(doc).toContain('TestSharedBookNote');
+    expect(doc).toContain('book-level');
+  });
+
+  test('series-level shared file also opens for an admin', async ({ page }) => {
+    await login(page, S5_PATH + '?editFile=' + encodeURIComponent(SERIES_COMMON));
+    const p = await page.evaluate(() => window.__EDITOR_DATA.editingSharedFile ? window.__EDITOR_DATA.editingSharedFile.path : null);
+    expect(p).toBe(SERIES_COMMON);
+  });
+
+  test('?editFile with an unreadable path does NOT open a shared-file edit', async ({ page }) => {
+    await login(page, S5_PATH + '?editFile=' + encodeURIComponent('series/Does Not Exist/commonSeries.md'));
+    const info = await page.evaluate(() => ({
+      editing: window.__EDITOR_DATA.editingSharedFile,
+      // falls back to the normal session edit target
+      sessionFilePath: window.__EDITOR_DATA.sessionFilePath,
+    }));
+    expect(info.editing).toBeNull();
+    expect(info.sessionFilePath).toBe(S5_FILE);
+  });
+});
+
+test.describe('Shared-content editing — endpoint + reconstruction + reload', () => {
+  test('GET /api/editor-model returns the resolved buffer, segments, and files with SHAs', async ({ page }) => {
+    await login(page, S5_PATH); // establishes the auth cookie in the page context
+    const r = await page.request.get(BASE_URL + '/api/editor-model/narrative-journey-series/foundations/test-book/5-session5-includes');
+    expect(r.ok()).toBeTruthy();
+    const j = await r.json();
+    expect(j.resolvedContent).toContain('book-level');
+    expect(j.segments.some(s => s.kind === 'shared')).toBeTruthy();
+    expect(j.files.map(f => f.level)).toEqual(expect.arrayContaining(['session', 'series', 'book']));
+    expect(j.files.every(f => typeof f.sha === 'string')).toBeTruthy();
+  });
+
+  test('GET /api/editor-model denies an unauthenticated request', async ({ request }) => {
+    const r = await request.get(BASE_URL + '/api/editor-model/narrative-journey-series/foundations/test-book/5-session5-includes');
+    // Test Book is hidden, so an anonymous request is refused (404 to avoid
+    // revealing it; a visible book would 403). Either way: not authorized.
+    expect(r.ok()).toBeFalsy();
+    expect([401, 403, 404]).toContain(r.status());
+  });
+
+  test('DIRECT-mode save reconstructs the session SOURCE (@include lines), never resolved content', async ({ page }) => {
+    await login(page, S5_PATH);
+    await enterDirectMode(page);
+    let captured = null;
+    await page.route('**/api/suggestions/direct-edit', async (route) => {
+      captured = route.request().postDataJSON();
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok', sha: 'faux-sha' }) });
+    });
+    await cursorAfter(page, 'native session content');
+    await page.keyboard.type(' RECON');
+    await page.waitForTimeout(300);
+    await page.click('#btn-editor-done');
+    await page.waitForSelector('#commit-modal', { state: 'visible' });
+    await page.click('#commit-confirm');
+    await expect.poll(() => captured, { timeout: 8000 }).not.toBeNull();
+    expect(captured.filePath).toBe(S5_FILE);                       // writes to the SESSION file
+    expect(captured.content).toContain('<!-- @include: TestSharedBookNote'); // directive re-emitted
+    expect(captured.content).toContain('RECON');                   // session edit preserved
+    expect(captured.content).not.toContain('reads the same in every session'); // book prose NOT inlined
+  });
+
+  test('a shared-file suggestion reloads mapped into the buffer', async ({ page }) => {
+    await login(page, S5_PATH);
+    await enterSuggestMode(page);
+    await cursorAfter(page, 'reads the same in every session');
+    await page.keyboard.type(' ANCHORX');
+    await page.waitForTimeout(400);
+    await expect.poll(() => suggestionCount(page, BOOK_COMMON), { timeout: 10000 }).toBeGreaterThan(0);
+    // reload — the shared suggestion should come back materialized in the buffer
+    await page.goto(BASE_URL + S5_PATH);
+    await enterSuggestMode(page);
+    await expect.poll(async () => (await getDoc(page)) || '', { timeout: 8000 }).toContain('ANCHORX');
   });
 });

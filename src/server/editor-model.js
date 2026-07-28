@@ -108,6 +108,7 @@ async function getEditorModel(resolvedRoute) {
     const fileContent = f.path === session.path
       ? sessionData.content
       : (await github.getFileContent(f.path)).content;
+    f.content = fileContent; // client needs source text to route edits to this file
     const sugg = await suggestions.getSuggestionsForFile(f.path);
     const comm = await suggestions.getCommentsForFile(f.path);
     for (const s of sugg) {

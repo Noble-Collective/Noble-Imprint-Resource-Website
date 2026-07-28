@@ -142,12 +142,14 @@
         <button class="stale-banner-btn" id="stale-banner-reload">Reload latest version</button>
         <button class="stale-banner-dismiss" id="stale-banner-dismiss" title="Dismiss">&times;</button>
       </div>
-      <!-- Shared @include content banner (shown when the cursor is in shared content) -->
-      <div class="editor-shared-banner" id="editor-shared-banner" style="display:none">
+      <!-- Shared-file edit banner (shown when editing a common file directly via ?editFile) -->
+      <% if (typeof editingSharedFile !== 'undefined' && editingSharedFile) { %>
+      <div class="editor-sharedfile-banner" id="editor-sharedfile-banner">
         <span class="shared-banner-icon">&#128279;</span>
-        <span class="shared-banner-text">Shared from <strong id="shared-banner-name"></strong> &middot; <span id="shared-banner-level"></span> level &mdash; edits affect every session that uses this block</span>
-        <a class="shared-banner-link" id="shared-banner-link" href="#" style="display:none">Edit shared file &rarr;</a>
+        <span class="shared-banner-text">Editing shared file <strong><%= editingSharedFile.path.split('/').pop() %></strong> — changes affect every session that includes it</span>
+        <a class="shared-banner-back" href="<%= editingSharedFile.backUrl %>">&larr; Back to session</a>
       </div>
+      <% } %>
       <div class="editor-body">
         <div id="codemirror-host"></div>
         <div class="editor-refresh-overlay" id="editor-refresh-overlay" style="display:none">
@@ -206,6 +208,7 @@
         resolvedContent: (typeof resolvedContent !== 'undefined') ? resolvedContent : null,
         segments: (typeof segments !== 'undefined') ? segments : null,
         editorFiles: (typeof editorFiles !== 'undefined') ? editorFiles : null,
+        editingSharedFile: (typeof editingSharedFile !== 'undefined') ? editingSharedFile : null,
         pendingSuggestions: pendingSuggestions || [],
         pendingComments: pendingComments || [],
         pendingReplies: pendingReplies || [],
@@ -213,7 +216,7 @@
         user: user ? { email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null,
       }).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
     </script>
-    <script type="module" src="/static/js/editor.js?v=5"></script>
+    <script type="module" src="/static/js/editor.js?v=7"></script>
 <% } %>
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
