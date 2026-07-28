@@ -44,32 +44,71 @@ book file.
 The website code change that this depends on — the `active="…"` include param — is in
 the website repo (`src/renderer/parser.js`) and deploys via its own CI on push.
 
-## 2b. Converting a NEW book (checklist)
+## 2b. Converting a NEW book (checklist) — CURRENT as of 2026-07-28
 
-The pipeline is reusable across the whole Narrative Journey series. For each new book:
-1. Get the Google Doc IDs (sessions + Opening/Recall/Further if the book has them) from Steve.
-2. `curl` each into `docs/` (see §2 step 1): `session1.md … sessionN.md`, and `opening.md`,
-   `recall.md`, `further.md` for the matter pages.
-3. **Set the PER-BOOK values** (the only book-specific edits):
-   - `convert.py` → `ID_PREFIX` (top of file): the question-id prefix, e.g. `"TheBestPossibleLife"`.
-   - `convert_matter.py` → `ID_PREFIX` (top of file): same prefix.
-   - `completeness.py` → `BOOK` path and the `titles` map (filename ↔ session) + session
-     count/`range`, to match the new book's sessions.
-4. Run `python convert.py <N>` per session; place outputs as `NN-Title.md` in the book's
-   `sessions/` (zero-padded, descriptive — the nav strips the `NN-` prefix; see §5).
-5. Run `python convert_matter.py` for Opening/Recall/Further. **Front Matter is hand-adapted**
-   from the Bond PDF (the Series Introduction + Session Overview are generic — change only
-   title/subtitle/CC-BY-SA copyright/book-specific lines; see §10 + `MATTER_DECISIONS.md`).
-6. Verify (§6): structural render check + `python completeness.py` (expect ~100% word-for-word) +
-   eyeball key regions.
-7. Deploy: commit the resources repo + `POST /api/refresh`. The website only needs a deploy if
-   you changed parser/CSS (usually not — the include engine, `<Accent>`, infographics, and the
-   session template are already shared/deployed).
+The pipeline is reusable across the whole Narrative Journey → Essentials series. Two books are
+done (The Story Behind It All, The Best Possible Life). Remaining Essentials books: **The Open
+Invitation** (Formation / Lord's Prayer), **The Bond Between Us** (Community), **The Glory Due
+His Name** (Devotion), **The Kingdom Come** (Witness). Read §11 (book-2 log) for a worked example.
 
-What's ALREADY shared (nothing to redo per book): the 5 infographics + the five movement intros,
-section directions, and shared question sets all live in `commonSeries.md` and are pulled by
-`@include`. Steve's standing decisions in §4 apply. Note: `ID_PREFIX` currently defaults to
-`"TheStory"` (the "Final" tag was dropped) — change it for each new book.
+**Inputs to get from Steve first:** which book; the 12 session Google-Doc IDs + the 3 matter
+Doc IDs (Opening/Recall/Further); the book's **interior PDF** in `Downloads/` (used ONLY for:
+the creed text, the accent color, and the page-1 Introductory Quotes — per Steve, no other
+prose comes from the PDF); the book's creed (which catechism summary — e.g. Lord's Prayer for
+The Open Invitation); and its accent hex.
+
+Steps:
+1. **Back up** the previous book's `docs/` (e.g. `docs/_the-best-possible-life/`), then `curl`
+   the 15 new Docs into `docs/` as `session1.md…session12.md` + `opening.md recall.md further.md`
+   (see §2 step 1). Sanity-check sizes (not sign-in HTML).
+2. **Per-book script settings** (the only script edits): `convert.py` → `ID_PREFIX` +
+   `CREED_KEY` (e.g. `"LordsPrayer"`); `convert_matter.py` → `ID_PREFIX`; `completeness.py` →
+   `BOOK` path + `titles` map. (Question ids look like `{ID_PREFIX}Ses{N}-…`.)
+3. **`commonBook.md`** (book-level): the book's creed block, `<CREED_KEY>…</CREED_KEY>`, built
+   from the interior PDF. Generate it with a small script that reads the PDF → writes the file
+   (keeps scripture text out of model output; an API content filter trips on decontextualized
+   verse phrases). See `build_creed.py` in §11's history.
+4. **`meta.json`**: `"accent"` = book hex; set all heading `color` levels to the accent (mirror
+   book 1/2); `"banner": "Pre-Release"`; `"status"`: start `hidden` if you want to build before
+   review, else `public`. `maxNavHeadingLevel: 3`.
+5. `python convert.py <N>` per session → place as `NN-Title.md` in `sessions/` (zero-padded
+   descriptive; nav strips the `NN-` prefix; see §5). Watch WARN lines (empty Passage Outline
+   is expected/benign).
+6. `python convert_matter.py` → Opening/Recall/Further. **⚠ Verify the source Docs are actually
+   THIS book's** — book 1's Further-Resources Doc still held stale book-1 content, so we shipped
+   a heading-only placeholder. If a matter Doc is stale, ship a placeholder and flag it.
+7. **Front Matter** — build `sessions/00-Front-Matter.md` in the CURRENT structure (see §12):
+   `# Front Matter` → `## Introductory Quotes` (from interior PDF p.1) → `## A Narrative Journey
+   Series` + `<!-- @include: NarrativeJourneySeriesList -->` → `## Publishing and Licensing`
+   (`_<Full Title incl. subtitle>_, Pre-Release Edition` blank-line then
+   `<!-- @include: PublishingLicensing -->`) → `## Series Introduction` +
+   `<!-- @include: SeriesIntroduction -->` → `## Session Overview` +
+   `<!-- @include: SessionOverview -->`.
+8. **Verify:** `python completeness.py` (expect 12/12 100%); structural sweep (5 infographics,
+   5 movement intros, 1 creed include, 0 literal `<Item>`/`<Infographic>`, 0 un-commented
+   `@include`); resolve ALL `@include` keys with the REAL parser (require + `resolveIncludes`)
+   and `renderMarkdown` a spot-check (tables merge, links, no throw). See the node one-liners in
+   §11.
+9. **Deploy:** commit the CONTENT repo + `POST https://resources.noblecollective.org/api/refresh`.
+   Content-repo push is SAFE re: audio (audiobook auto-gen disabled). Expect to rebase over
+   Playwright Test-Book churn commits (disjoint files). No website deploy needed unless you
+   changed `src/` (parser/CSS).
+
+**ALREADY shared — do NOT recreate (all in `commonSeries.md`, pulled via `@include`):** the 5
+infographics; the 5 movement intros; section directions; the shared question sets
+(`NarrativeElementsQuestion`, `StoryRetellQuestion`, `ApplicationQuestions`, `StrategyQuestions`
+— take `id=`); **`SeriesIntroduction`** (full prose + the all-books summary as 3 merged
+subseries tables); **`SessionOverview`** (full fivefold movements); **`NarrativeJourneySeriesList`**
+(front-matter series list, already includes all books incl. The Kingdom Come); **`PublishingLicensing`**
+(shared © 2026 / CC BY-SA / BSB copyright). The series intro/overview/list already list every
+book, so nothing series-level changes per new book. Book-specific only: the creed
+(`commonBook.md`), `meta.json`, Introductory Quotes, the Publishing title line, and session prose.
+
+**Converter behavior to know (all in `convert.py`):** per-book `CREED_KEY` drives the creed
+`@include`; `split_attr` handles author initials ("J. C. Ryle") and a closing quote/paren before
+a scripture ref (`…willing." Isaiah 30:15`); an unstyled first line under Spiritual Practice is
+promoted to a `####` title. Steve's standing decisions in §4 apply (no per-session creed bold /
+active practice dot unless he specifies).
 
 ## 3. Doc IDs
 
@@ -330,6 +369,86 @@ blocks (`commonSeries.md` + this book's `commonBook.md`); no `bold=`/`active=` p
 were checked with the structural sweep + completeness; matter pages were eyeballed. Live
 visual review pending push (book is `status: hidden`, admin-only).
 
-**Nothing pushed yet** — all changes local, per Steve's "convert all, then push all together."
-Source-typo flag from S1 also stands: synopsis "Redemption" row reads `rest (1:93:1)` (should
-be `1:9; 3:1`) — fix in the Google Doc.
+**DEPLOYED + PUBLIC (2026-07-28).** Book 2 is live and `status: public`; book 1 unchanged/public.
+Source-typo flag from S1 stands: synopsis "Redemption" row reads `rest (1:93:1)` (should be
+`1:9; 3:1`) — fix in the Google Doc. Later same-day changes (all live): front-matter restructure
+(§12), shared Series Orientation rebuilt from the Bond PDF, `The Kingdom Come` added to the
+series list/summary, PDF-emphasis pass (Narrative Journey italics, movement bolds), and the
+external-link accent+new-tab render change. Full itemized log:
+`NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md`.
+
+## 12. Current book front-matter structure (both done books, 2026-07-28)
+
+Each book's `sessions/00-Front-Matter.md` (book-specific bits inline, everything else `@include`d
+from `commonSeries.md`):
+
+```
+# Front Matter
+
+## Introductory Quotes
+<epigraphs from the interior PDF p.1 — book-specific — as `> quote` + `<< Author, _Work_`>
+
+## A Narrative Journey Series
+
+<!-- @include: NarrativeJourneySeriesList -->
+
+## Publishing and Licensing
+
+_<Full Title: A Narrative Journey of Christian X>_, Pre-Release Edition
+
+<!-- @include: PublishingLicensing -->
+
+## Series Introduction
+
+<!-- @include: SeriesIntroduction -->
+
+## Session Overview
+
+<!-- @include: SessionOverview -->
+```
+
+- The old title-page block (`## <Title>` / subtitle / "Narrative Journey Series · Essentials")
+  and the old `## Copyright` block were REMOVED. Publishing line uses the FULL title (with
+  subtitle); it's a plain blank-line paragraph break before the include (NOT a hard break).
+- Shared blocks live in `commonSeries.md`; each book's creed is in its own `commonBook.md`.
+- Website render (deployed, `style.css v=79` + `parser.js`): external prose links take the book
+  accent color + open in a new tab (`target="_blank"`).
+
+## 13. Kickoff prompt for the NEXT book (paste into a fresh session)
+
+> Convert the next Narrative Journey → Essentials book to the shared-content "final format,"
+> exactly as we did for "The Story Behind It All" and "The Best Possible Life."
+>
+> READ FIRST: `Noble-Imprint-Resource-Website/tools/story-conversion/CONVERSION.md` (esp. §2b
+> the NEW-book checklist, §11 the book-2 worked example, §12 the front-matter structure) and
+> `NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md` (per-book callouts + the shared-element change log);
+> plus memory notes `project_the_best_possible_life`, `project_the_story_behind_it_all_final`,
+> `project_common_content_includes`, and the feedback notes (`feedback_trace_downstream_automation`,
+> `feedback_no_regen_without_approval`, `feedback_present_options`, `feedback_no_library_content`).
+>
+> REPOS: website+tooling `C:\Users\Steve\Dev\Noble-Imprint-Resource-Website`; content (source of
+> truth) `C:\Users\Steve\Dev\Noble-Imprint-Resources`.
+>
+> BOOK: <name> (folder under `series/Narrative Journey Series/Essentials/`). Creed = <which
+> catechism summary, e.g. the Lord's Prayer>. ID_PREFIX = "<NoSpacesTitle>".
+>
+> INPUTS I'll give you: the 12 session Google-Doc IDs + the 3 matter Doc IDs (Opening/Recall/
+> Further); the interior PDF in Downloads (for the creed text, accent hex, and page-1
+> Introductory Quotes — ONLY those come from the PDF); the accent hex if you want it fixed.
+>
+> DO: follow CONVERSION.md §2b end to end — back up the prior book's `docs/`, curl the 15 Docs,
+> set the per-book values in the 3 scripts, build `commonBook.md` (creed) + `meta.json`
+> (accent/green headings/banner "Pre-Release"), convert + place all 12 sessions, do the matter
+> (verify the Docs are THIS book's, not stale), build the front matter in the §12 structure
+> reusing ALL shared blocks via `@include` (do NOT recreate the infographics, movement intros,
+> question sets, Series Introduction/Session Overview/series list/copyright). Render every
+> infographic with the standard shared `<Infographic>`. Verify: `completeness.py` 12/12 100% +
+> structural sweep + resolve all `@include` keys with the real parser + a `renderMarkdown`
+> spot-check. Then deploy: commit the CONTENT repo + `POST /api/refresh`.
+>
+> GUARDRAILS: convert Session 1 first as a calibration pass and let me review before doing 2–12;
+> present options before consequential/irreversible decisions; keep the shared-element change log
+> in `NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md` updated for anything you change in common content;
+> before pushing content, remember audiobook auto-gen is disabled — do NOT re-enable it or
+> regenerate audio; don't touch other library content without asking. Standing decisions: no
+> per-session creed bold / active practice dot unless I specify.
