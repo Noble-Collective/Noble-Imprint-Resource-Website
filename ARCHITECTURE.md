@@ -278,6 +278,7 @@ The rendering engine is the most critical component. It parses the markdown file
 | `<IntroductionNote>` etc. | Renders as styled section containers |
 | `<br>` | Renders as vertical spacing |
 | Heading hierarchy (`#` – `#####`) | Renders as HTML headings, with optional colors from `meta.json` |
+| `<!-- @include: Block param="…" -->` | Injects a shared block from `commonBook/commonSubseries/commonSeries.md`; `id=`/`bold=`/`active=` parameterize it |
 
 ### The masked editor (CodeMirror 6)
 
@@ -298,6 +299,16 @@ Key technical details:
 - **Obsidian-style reveal in direct edit mode.** When the cursor is on a line, the syntax markers for that line appear in muted gray while the visual styling (heading size, bold weight, etc.) remains. Moving the cursor away re-hides the markers.
 - **Pasted text is inserted literally** — no re-parsing of pasted content. What you paste is what goes into the buffer.
 - **Google Docs-style layout.** Editor content is constrained to 680px (matching reading view), with line numbers on the left, suggestion/comment margin on the right, and a sticky toolbar that follows as you scroll.
+
+### Shared content across sessions (`@include`)
+
+Many sessions reuse the same blocks — a creed, a movement instruction, a shared question. Rather than duplicate them, a session references them with `<!-- @include: BlockName param="value" -->`, and the blocks live once in `commonBook.md` / `commonSubseries.md` / `commonSeries.md`. Editing one shared block changes every session that includes it — so the editor has to make that consequence visible and route edits to the right file.
+
+**The segment map.** When an editing user opens a session that has includes, the server resolves the includes into the editor buffer *and* returns a **segment map** that records, for every range of the buffer, which source file it came from (`resolveIncludesTracked` → `GET /api/editor-model`). `@include` directive lines are segment boundaries; parameter-driven spans (the `{id}` substitution, the `**` added by `bold=`, the ` active` added by `active=`) are marked read-only. The invariant: every editable position maps to exactly one source file by a simple additive offset, and the editable text is verbatim from that file — so the existing content-anchoring commit path works unchanged, per file, with no reverse transformation on write.
+
+**What the user experiences.** Shared blocks render inline, tinted, with a small caption naming their source file. In **suggest mode** the user edits shared text in place and the suggestion is stored against the correct common file (a session edit still goes to the session file). In **direct mode** shared content is read-only inline, with an "Edit `commonBook.md` →" link that opens the common file as its own single-file edit; a direct save of the session reconstructs the session source *with* the `@include` lines intact — the resolved shared text is never written back into the session file.
+
+**Safety.** This preserves "your files are never at risk": parameterized substitutions are read-only (a shared `{id}` is never written back), each edit is content-anchored in its own source file, and a session with no `@include` takes the original single-file code path unchanged. Series-level common files (which span an entire series) are writable only by admins.
 
 ### Suggestion storage and diff model
 
@@ -373,6 +384,8 @@ Noble-Imprint-Resource-Website/
 │   │   ├── firestore.js                # User CRUD + permissions
 │   │   ├── suggestions.js             # Suggestions + comments + replies
 │   │   ├── suggestion-routes.js        # Editing API routes
+│   │   ├── editor-model.js             # @include editor model (segment map,
+│   │   │                               #   /api/editor-model, per-file routing)
 │   │   ├── admin-routes.js             # Admin console routes
 │   │   ├── github.js                   # GitHub API (read + write)
 │   │   ├── content.js                  # Content tree builder
@@ -531,3 +544,13 @@ Used in `commonSeries.md` and `commonSubseries.md` files:
 ```
 
 Standard HTML break tags for vertical spacing between sections.
+
+### Shared-content includes
+
+```markdown
+<!-- @include: ApostlesCreed -->
+<!-- @include: SpiritualPracticesInfographic active="Lament" -->
+<!-- @include: NarrativeElementsQuestion id="Ses1" -->
+```
+
+Injects a named block defined once in `commonBook.md` / `commonSubseries.md` / `commonSeries.md` (book→subseries→series precedence), so shared content lives in one place. Optional parameters adapt the block per session: `id=` substitutes `{id}` (unique ids for shared `<Question>` blocks), `bold=` emphasizes a matching line/run/substring, `active=` marks one `<Item>` in an infographic as the current step. Undefined key / missing required id / non-matching bold or active target all throw (surfaced, never silently dropped). The website resolves includes for both the reading view and the editor; in the editor, shared content is editable and routed back to the common file (see "Shared content across sessions").

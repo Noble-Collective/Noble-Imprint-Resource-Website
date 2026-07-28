@@ -45,7 +45,10 @@ Server starts at http://localhost:8080. All env vars are loaded automatically fr
 ### Run Tests
 
 ```bash
-# Full suite (~150 tests, runs serially, ~20 min — hits the real GitHub API)
+# Fast pure-function unit tests (node:test — no server, no GitHub)
+npm run test:unit
+
+# Full Playwright suite (~166 tests, runs serially, ~25 min — hits the real GitHub API)
 npx playwright test
 
 # One file
@@ -109,6 +112,18 @@ Visual styling (heading size, bold weight, italic, blockquote borders) is applie
 **Edit constraints** in suggest mode: a synchronous `transactionFilter` clamps selections to zone boundaries (single line, within innermost tag). A separate `transactionFilter` blocks edits outside editable zones. No mouseup hacks, no setTimeout delays.
 
 **Obsidian-style reveal** in direct edit mode: the focused line shows syntax markers in muted gray while keeping visual styling. Moving the cursor re-hides them.
+
+### Shared Content (`@include`)
+
+Sessions reuse common blocks with `<!-- @include: BlockName param="value" -->`. Blocks live in `commonBook.md` / `commonSubseries.md` / `commonSeries.md` (book→subseries→series precedence) and are injected at render time. Params: `id=` (makes a shared `<Question>`'s id unique per session), `bold=` (emphasizes a line/run/substring), `active=` (marks one infographic `<Item>` active).
+
+**Shared content is editable, routed to the right file.** The editor resolves includes so shared blocks appear inline — tinted, with a small "Shared from `commonBook.md` … Edit → " caption at each block's foot.
+
+- **Suggest mode:** you edit shared text in place and the suggestion is routed to the correct common file (never the session), via a server-built **segment map** (`GET /api/editor-model`). A session edit still goes to the session file. Parameterized spans (`{id}`, the `**` from `bold=`, ` active` from `active=`) are locked so the substitution is never written back.
+- **Direct mode:** shared content is read-only inline; the "Edit `commonBook.md` →" link opens the common file as its own single-file edit (`?editFile=<path>`), with a "Back to session" bar. Admins may edit any shared file; manuscript-owners book/subseries files but not series-level.
+- **A session with no `@include` behaves exactly as a plain single file** — the shared-content code path is entirely inert.
+
+Internals: `CLAUDE.md` → "Shared-content editing (`@include`)". Design history: `plans/2026-07-27-shared-content-editing-full.md`.
 
 ### Suggestion System
 
@@ -187,7 +202,8 @@ src/
                                      Firestore save, yellow highlight decorations
     editor-constraints.js            v2 constraints: zone computation,
                                      transactionFilter selection clamp,
-                                     transactionFilter edit protection
+                                     transactionFilter edit protection;
+                                     readonlyExtension() locks shared/param ranges
     main.js                          Reading view: sidebar, drawer, view toggle,
                                      verse popups, user menu
     auth.js                          Firebase Auth client (Google sign-in/out)
@@ -209,6 +225,10 @@ src/
                                      (GitHub commit), reject, reply cleanup
     suggestion-routes.js             API routes: /hunk, /comments, /replies,
                                      /content, /file, /direct-edit
+    editor-model.js                  Shared-content (@include) editor model:
+                                     resolved buffer + segment map + per-file
+                                     SHAs + buffer-mapped annotations
+                                     (buildEditorModel pure; getEditorModel I/O)
     admin-routes.js                  Admin page rendering + user/book management APIs
     github.js                        GitHub API client (Octokit): read files,
                                      read directories, commit file updates
@@ -269,6 +289,8 @@ Tests use Playwright with Chromium in headless mode. The server must be running 
 - **Editor interaction:** Tests use `window.__editorView` (exposed by editor.js) to programmatically set cursor positions and selections via CodeMirror's dispatch API
 - **Helper functions:** `selectText()`, `cursorAfter()`, `replaceWith()`, `typeText()`, `deleteSelection()`, `scrollEditorTo()`, `getRawDoc()`
 - **Suggestion cleanup:** `clearAllSuggestions()` deletes all pending suggestions between tests
+- **Unit tests:** `npm run test:unit` runs `tests/unit/*.test.js` (Node's `node:test`, no server/GitHub) — covers the `@include` segment map, `gatherCommonBlocksTracked`, and `buildEditorModel`
+- **Shared-content tests:** `tests/shared-content.spec.js` covers the full `@include` editing flow on Test Book Session 5 (render, routing, `?editFile` link-out, endpoint, direct-mode source reconstruction, reload)
 
 ### Important: Server Process Management
 
@@ -435,6 +457,13 @@ All editing API routes require authentication (session cookie or API key). Mount
 | `GET` | `/` | List suggestions (query: bookPath, status) | Any auth |
 | `GET` | `/file?filePath=...` | Get suggestions + comments + replies for a file | Any auth |
 | `GET` | `/content?filePath=...` | Get file content + suggestions + comments | Any auth |
+
+**Shared-content editing** (top-level routes, not under `/api/suggestions/`):
+
+| Method | Endpoint | Purpose | Auth |
+|--------|----------|---------|------|
+| `GET` | `/api/editor-model/:seg…` | Resolved editor buffer + segment map + per-file SHAs + buffer-mapped annotations (for `@include` sessions) | Edit role |
+| `GET` | `/<session path>?editFile=<repo path>` | Open a common file as a single-file direct edit (D3 link-out) | Admin (any) / manuscript-owner (not series) |
 
 ### Comments
 
