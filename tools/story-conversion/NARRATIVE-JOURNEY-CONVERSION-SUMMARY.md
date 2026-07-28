@@ -220,3 +220,11 @@ title `The Story Behind it All`→`…It All`.
 - Shared content (5 infographics, 5 movement intros, section directions, shared question
   sets) lives once in `Narrative Journey Series/commonSeries.md` and is `@include`d by every
   book — nothing is recreated per book. Each book's creed is book-level in its `commonBook.md`.
+- [2026-07-28, per Steve] **Website rendering change** (`src/renderer/parser.js` +
+  `src/public/css/style.css`, cache-buster `v=79`): external `http(s)` links in prose now
+  render underlined + in the book accent color (matching `.bible-ref`) and open in a new tab
+  (`target="_blank" rel="noopener noreferrer"`). Applies site-wide; benign/additive.
+- [2026-07-28, per Steve] **Book-specific front-matter content** (NOT shared): Publishing &
+  Licensing line uses the full title + subtitle (`_<Title>: A Narrative Journey of Christian
+  <Domain>_, Pre-Release Edition`); Introductory Quotes populated per book from each book's
+  interior PDF (Story: Chesterton/Tolkien/Lewis; Best: Augustine/1 Peter 2:11–12).

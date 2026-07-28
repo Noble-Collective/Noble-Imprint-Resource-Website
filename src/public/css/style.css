@@ -1339,6 +1339,17 @@ body.text-mode .home-text {
 .session-content.accent-themed .bible-ref:hover {
   color: color-mix(in srgb, var(--accent) 75%, black);
 }
+/* External (http) links in prose render like the book's other links: underline +
+   the book accent when themed (matches .bible-ref). */
+.session-content a[href^="http"] {
+  text-decoration: underline;
+}
+.session-content.accent-themed a[href^="http"] {
+  color: var(--accent);
+}
+.session-content.accent-themed a[href^="http"]:hover {
+  color: color-mix(in srgb, var(--accent) 75%, black);
+}
 /* Tables: heading bar + even rows tinted from the accent */
 .session-content.accent-themed .table-heading-row {
   background: color-mix(in srgb, var(--accent) 18%, transparent);

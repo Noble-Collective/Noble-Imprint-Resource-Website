@@ -829,6 +829,12 @@ function renderMarkdown(content, options = {}) {
     '$1\n</thead>'
   );
 
+  // External links (autolinked URLs + explicit http(s) links) open in a new tab.
+  html = html.replace(
+    /<a href="(https?:\/\/[^"]*)"/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer"'
+  );
+
   return html;
 }
 
