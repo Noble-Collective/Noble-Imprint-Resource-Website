@@ -41,21 +41,21 @@ Resources. `completeness.py` = 12/12 at 100%.
 
 ## Book 2 — The Best Possible Life  (Christian Living · Ten Commandments)
 
-**Status:** IN PROGRESS — building the final format IN PLACE, `status: hidden`. NOTHING
-PUSHED yet (per Steve: convert everything, then push together).
+**Status:** DEPLOYED (hidden), 2026-07-28. Built the final format IN PLACE, `status: hidden`,
+banner `Pre-Release`. Content repo `ff7db09` pushed + `/api/refresh` OK; website tooling `2673dc3`.
 - **12 sessions** (`01-The-Way … 12-The-Contest`): converted, placed, verified —
   `completeness.py` = **12/12 at 100%**; structural sweep clean (5 infographics + 5 movement
   intros + Ten Commandments creed each; 0 stray tags).
 - **The Opening / The Recall:** converted from book-2 Google Docs & placed.
 - **Creed:** the **Ten Commandments** (Exodus 20:1–17), book-level in `commonBook.md`.
 - **Accent:** `#00854a` (green, from the old-copy PDF + cover).
+- Old preview `session1.md` removed.
 
 **Missing / incomplete:**
-- **Further Resources:** DONE as a **heading-only placeholder** (book-2 session headings,
+- **Further Resources:** shipped as a **heading-only placeholder** (book-2 session headings,
   empty bodies) — its Google Doc still holds book 1's bibliography/reading plan, so real
   content is pending an updated book-2 Doc.
 - **Passage Outlines:** headings present, content empty in the manuscripts (all sessions).
-- Old preview `sessions/session1.md` still present — to be removed at push.
 
 **Front Matter:** DONE — rebuilt from the authoritative **Bond Between Us PDF** (the "Series
 Orientation"), not from book 1. Now a fully-generic shared pair in `commonSeries.md`
@@ -73,15 +73,21 @@ full authoritative version. Review this live after push.
 - S1 "Reflective Walk" practice title was unstyled in the Doc; converter now promotes such a
   line to a `####` heading.
 - Copyright year placeholder (mirroring book 1's 2024) — confirm.
-- Recommendation: also refactor **book 1's** Front Matter to use the new shared
-  `SeriesIntroduction` / `SessionOverview` includes (identical output) for a single source —
-  awaiting go-ahead (book 1 is live).
 
 **Typos in source Docs (reproduced faithfully — fix in the Google Docs):**
+> ⚠️ These are **incidental findings**, not a full proofread. Session 1 was reviewed closely
+> and Session 5 surfaced via an attribution warning; sessions 2–4 and 6–12 were verified for
+> completeness (100% word coverage) but **not** line-by-line proofed, so more source typos may
+> exist. `completeness.py` confirms no words were dropped; it does not catch misspellings.
 - S1 synopsis "Redemption" row: `rest (1:93:1)` → should be `1:9; 3:1`.
 - The Opening: "aAn heir" (should be "An heir"); "leads tointo idolatry"; "Chrisitan" →
   "Christian"; an unfilled editorial line "PSALM INTRODUCTION: Psalm 15, 128".
 - The Recall: "brotherly kind- ness" (export hyphenation artifact in the 2 Peter 1:5–8 quote).
+
+**PDF typos corrected in the shared front-matter blocks** (fixed, not reproduced — the Bond
+PDF is a build artifact, not a live source): `Chrisitanity`→`Christianity`, `Christiain`→
+`Christian`, plus formatting artifacts `journal- like`, `(meta) narrative`, and the volume
+title `The Story Behind it All`→`…It All`.
 
 ---
 
