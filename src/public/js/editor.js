@@ -8,7 +8,8 @@ import {
 import { initMarginPanel, updateMarginCards, updateCommentCards, updateReplies, removeRepliesForParent, repositionCards, focusMarginCard, animateCardRemoval, setCardStatus, disableAllCardActions, enableAllCardActions, addStaleCard, removeStaleCard, updateStaleCard, renderHistoryCards, clearHistoryCards } from '/static/js/editor-margin.js';
 import { commentExtension, initComments, getPendingFormatGroups, clearPendingFormatGroup } from '/static/js/editor-comments.js';
 import { getRegistryAnnotations } from '/static/js/editor-suggestions.js';
-import { constraintExtension, setZones, recomputeZones } from '/static/js/editor-constraints.js';
+import { constraintExtension, setZones, recomputeZones, readonlyExtension, setReadonlyRanges, readonlyRangesField } from '/static/js/editor-constraints.js';
+import { Decoration, StateField, StateEffect } from '/static/js/codemirror-bundle.js';
 
 // data.pendingSuggestions is the INITIAL snapshot from the server — read-only.
 // During the session, the annotation registry is the live source of truth.
@@ -16,7 +17,177 @@ const data = window.__EDITOR_DATA;
 if (data) {
   let editorView = null;
   let editMode = null; // 'suggest' | 'direct' | 'review'
-  const originalContent = (data.rawContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rawContent = (data.rawContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // --- Shared-content editing (@include) ---
+  // When the session has @include directives the server sends the RESOLVED buffer
+  // plus a segment map. The editor buffer is then the resolved content and edits
+  // are routed back to the correct source file. Everything here is inert
+  // (hasShared === false) for sessions without @include, so those behave exactly
+  // as before.
+  const segments = data.segments || null;
+  const hasShared = !!(segments && segments.some(s => s.kind === 'shared'));
+  const sessionSource = rawContent; // the session file text (with @include lines)
+  const originalContent = hasShared
+    ? ((data.resolvedContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'))
+    : rawContent;
+
+  // The segment (in ORIGINAL buffer coordinates) containing a buffer position.
+  function segmentAtBuffer(pos) {
+    if (!segments) return null;
+    for (const s of segments) if (pos >= s.bufFrom && pos <= s.bufTo) return s;
+    return null;
+  }
+  // Map a buffer position to { file, offset } in its source file, using the
+  // editable pieces (which are verbatim source). Returns null inside a read-only
+  // span (parameterized content).
+  function mapBufferToSource(pos) {
+    const s = segmentAtBuffer(pos);
+    if (!s) return null;
+    for (const p of s.pieces) {
+      if (p.editable && pos >= p.bufFrom && pos <= p.bufTo) {
+        return { file: s.sourceFile, offset: p.srcFrom + (pos - p.bufFrom) };
+      }
+    }
+    return null;
+  }
+  // Source text for a given file path. P2 only routes to the session file; shared
+  // file sources are added in P3.
+  function sourceTextFor(path) {
+    if (path === data.sessionFilePath) return sessionSource;
+    return null;
+  }
+  // Remap a hunk-save body from BUFFER space to SOURCE space and pick its target
+  // file. Returns { filePath, baseCommitSha, body } or null if the change can't be
+  // routed (spans a segment boundary, or touches a read-only span). For sessions
+  // without @include this is a pass-through that preserves today's exact payload.
+  function routeHunkBody(body) {
+    if (!hasShared) return { filePath: data.sessionFilePath, baseCommitSha: data.contentSha, body };
+    const seg = segmentAtBuffer(body.originalFrom);
+    const segEnd = segmentAtBuffer(body.originalTo);
+    if (!seg || seg !== segEnd) return null;
+    const src = sourceTextFor(seg.sourceFile);
+    if (src == null) return null;
+    const mFrom = mapBufferToSource(body.originalFrom);
+    const mTo = mapBufferToSource(body.originalTo);
+    if (!mFrom || !mTo) return null;
+    const contextBefore = src.substring(Math.max(0, mFrom.offset - 50), mFrom.offset);
+    const contextAfter = src.substring(mTo.offset, Math.min(src.length, mTo.offset + 50));
+    const lineNumber = src.substring(0, mFrom.offset).split('\n').length;
+    const fileMeta = (data.editorFiles || []).find(f => f.path === seg.sourceFile);
+    return {
+      filePath: seg.sourceFile,
+      baseCommitSha: fileMeta ? fileMeta.sha : data.contentSha,
+      body: { ...body, originalFrom: mFrom.offset, originalTo: mTo.offset, lineNumber, contextBefore, contextAfter },
+    };
+  }
+  // Read-only buffer ranges for the current mode. P2: shared content is read-only
+  // in every mode. (P3 will make shared editable in suggest mode, leaving only the
+  // parameterized spans locked there.)
+  function readonlyRangesForMode() {
+    if (!hasShared) return [];
+    return segments.filter(s => s.kind === 'shared').map(s => ({ from: s.bufFrom, to: s.bufTo }));
+  }
+  // Reconstruct the SESSION source (with @include directives) from the current
+  // edited buffer, for a direct-mode save. Shared blocks are read-only, so we
+  // re-emit their original @include line and keep the edited session text between
+  // them. Returns null on any inconsistency (caller must then abort, never write
+  // resolved content back to the session file).
+  function reconstructSessionSource() {
+    if (!hasShared || !editorView) return null;
+    const doc = editorView.state.doc.toString();
+    const liveShared = [...editorView.state.field(readonlyRangesField)].sort((a, b) => a.from - b.from);
+    const sharedSegs = segments.filter(s => s.kind === 'shared');
+    if (liveShared.length !== sharedSegs.length) return null;
+    let out = '';
+    let cursor = 0;
+    for (let i = 0; i < liveShared.length; i++) {
+      if (liveShared[i].from < cursor) return null;
+      out += doc.slice(cursor, liveShared[i].from);
+      out += sharedSegs[i].includeDirective.text;
+      cursor = liveShared[i].to;
+    }
+    out += doc.slice(cursor);
+    return out;
+  }
+
+  // Line-tint decoration marking shared @include segments in the buffer.
+  const sharedLineDeco = Decoration.line({ class: 'cm-shared-line' });
+  const sharedRangeMark = Decoration.mark({ class: 'cm-shared-range' });
+  function buildSharedDecorations(view) {
+    if (!hasShared) return Decoration.none;
+    const ranges = [];
+    const liveShared = view.state.field(readonlyRangesField);
+    for (const r of liveShared) {
+      if (r.to <= r.from) continue;
+      // one line decoration per line touched by the shared range
+      let pos = r.from;
+      while (pos <= r.to) {
+        const line = view.state.doc.lineAt(pos);
+        ranges.push(sharedLineDeco.range(line.from));
+        if (line.to >= r.to) break;
+        pos = line.to + 1;
+      }
+      ranges.push(sharedRangeMark.range(r.from, Math.min(r.to, view.state.doc.length)));
+    }
+    ranges.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
+    return Decoration.set(ranges, true);
+  }
+  const setSharedDeco = StateEffect.define();
+  const sharedDecoState = StateField.define({
+    create() { return Decoration.none; },
+    update(value, tr) {
+      for (const e of tr.effects) if (e.is(setSharedDeco)) return e.value;
+      if (tr.docChanged && value !== Decoration.none) return value.map(tr.changes);
+      return value;
+    },
+    provide: (f) => EditorView.decorations.from(f),
+  });
+  const sharedDecoUpdater = EditorView.updateListener.of((update) => {
+    if (!hasShared) return;
+    if (update.docChanged || update.startState.field(readonlyRangesField) !== update.state.field(readonlyRangesField)) {
+      const deco = buildSharedDecorations(update.view);
+      update.view.dispatch({ effects: setSharedDeco.of(deco) });
+    }
+  });
+  // Visual treatment for shared @include content: a left accent border + faint
+  // tint on shared lines, and a subtle background on the shared range.
+  const sharedTheme = EditorView.theme({
+    '.cm-shared-line': {
+      borderLeft: '3px solid var(--accent, #8D4449)',
+      backgroundColor: 'rgba(141, 68, 73, 0.05)',
+    },
+    '.cm-shared-range': {
+      backgroundColor: 'rgba(141, 68, 73, 0.06)',
+    },
+  });
+
+  // --- Shared-content banner (names the source file + level of the focused shared block) ---
+  const LEVEL_LABEL = { book: 'common book', subseries: 'common subseries', series: 'common series' };
+  function baseName(p) { return (p || '').split('/').pop(); }
+  function updateSharedBanner(view) {
+    const banner = document.getElementById('editor-shared-banner');
+    if (!banner) return;
+    const seg = segmentAtBuffer(view.state.selection.main.head);
+    if (hasShared && seg && seg.kind === 'shared') {
+      const nameEl = document.getElementById('shared-banner-name');
+      const lvl = LEVEL_LABEL[seg.level] || 'shared';
+      if (nameEl) nameEl.textContent = baseName(seg.sourceFile);
+      banner.dataset.level = seg.level || '';
+      banner.dataset.file = seg.sourceFile || '';
+      banner.dataset.levelLabel = lvl;
+      const lvlEl = document.getElementById('shared-banner-level');
+      if (lvlEl) lvlEl.textContent = lvl;
+      banner.style.display = '';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  const sharedBannerUpdater = EditorView.updateListener.of((update) => {
+    if (!hasShared) return;
+    if (update.selectionSet || update.focusChanged || update.docChanged) updateSharedBanner(update.view);
+  });
+  function initSharedBanner(view) { updateSharedBanner(view); }
 
   // --- View Source toggle (compartments for masking + read-only) ---
   const maskingCompartment = new Compartment();
@@ -216,10 +387,12 @@ if (data) {
             originalText: mergedOrigText, newText: mergedNewText,
             ...extractContext(origDoc, origWordStart, origWordEnd),
           };
+          const routedMerge = routeHunkBody(mergedData);
+          if (!routedMerge) { break; } // can't route merged edit (read-only/boundary) — leave as-is
           try {
             const upRes = await fetch('/api/suggestions/hunk/' + id, {
               method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(mergedData),
+              body: JSON.stringify(routedMerge.body),
             });
             if (upRes.ok) {
               savedHunks.delete(a.originalFrom + ':' + (a.originalTo || a.originalFrom));
@@ -247,11 +420,13 @@ if (data) {
         if (regEntry && regEntry.loadedFromServer) continue;
 
         // Update existing Firestore record
+        const routedUpd = routeHunkBody(hunkData);
+        if (!routedUpd) { console.warn('[AUTO-SAVE] skipping unroutable hunk update:', hunk.originalFrom, hunk.originalTo); continue; }
         try {
           const updateRes = await fetch('/api/suggestions/hunk/' + existing.docId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(hunkData),
+            body: JSON.stringify(routedUpd.body),
           });
           if (!updateRes.ok) throw new Error('HTTP ' + updateRes.status);
           // Update the key if it changed (merge threshold shifted the range)
@@ -277,13 +452,15 @@ if (data) {
         }
       } else {
         // Create new Firestore record
+        const routed = routeHunkBody(hunkData);
+        if (!routed) { console.warn('[AUTO-SAVE] skipping unroutable hunk (read-only/boundary):', hunk.originalFrom, hunk.originalTo); continue; }
         try {
           const res = await fetch('/api/suggestions/hunk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
-              baseCommitSha: data.contentSha, ...hunkData,
+              filePath: routed.filePath, bookPath: data.bookRepoPath,
+              baseCommitSha: routed.baseCommitSha, ...routed.body,
             }),
           });
           if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -367,15 +544,19 @@ if (data) {
       const currentOriginal = editorView.state.field(originalDocField);
       const ctx = extractContext(currentOriginal, hunk.originalFrom, hunk.originalTo);
       const fmtLineNumber = currentOriginal.substring(0, hunk.originalFrom).split('\n').length;
+      const draftBody = {
+        type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
+        originalText: hunk.originalText, newText: hunk.newText, lineNumber: fmtLineNumber, ...ctx,
+      };
+      const routedDraft = routeHunkBody(draftBody);
+      if (!routedDraft) { allOk = false; continue; }
       try {
         const res = await fetch('/api/suggestions/hunk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            filePath: data.sessionFilePath, bookPath: data.bookRepoPath,
-            baseCommitSha: data.contentSha,
-            type: hunk.type, originalFrom: hunk.originalFrom, originalTo: hunk.originalTo,
-            originalText: hunk.originalText, newText: hunk.newText, lineNumber: fmtLineNumber, ...ctx,
+            filePath: routedDraft.filePath, bookPath: data.bookRepoPath,
+            baseCommitSha: routedDraft.baseCommitSha, ...routedDraft.body,
           }),
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -443,6 +624,10 @@ if (data) {
   // --- Auto-load new suggestions from other users ---
   async function autoLoadNewSuggestions() {
     if (!data.sessionFilePath || !editorView) return;
+    // Include sessions: the /content endpoint returns RAW (unresolved) session text,
+    // which would corrupt the resolved buffer. In-place suggestion reload is repointed
+    // to /api/editor-model in P3; until then, skip it (a manual reload picks up changes).
+    if (hasShared) return;
     // Don't auto-load while an accept or discard is rebuilding the document —
     // concurrent setAnnotations dispatches cause position corruption
     if (isDiscarding || acceptingInProgress) return;
@@ -802,6 +987,10 @@ if (data) {
 
   // --- Smart refresh: re-fetch from GitHub and rebuild editor state ---
   async function refreshFromGitHub() {
+    // Include sessions: rebuilding in place from the raw /content endpoint would
+    // corrupt the resolved buffer (repointed to /api/editor-model in P3). Do a full
+    // page reload instead, which re-resolves server-side.
+    if (hasShared) { window.location.reload(); return; }
     showRefreshOverlay();
     // Save a text anchor near the viewport top so we can scroll back to the same
     // content after rebuild (raw scrollTop doesn't work because document length changes)
@@ -1538,6 +1727,7 @@ if (data) {
       viewSourceCompartment.of([]),
       ...(isSuggestOrReview ? [suggestionExtension(), commentExtension()] : []),
       ...(isConstrained ? [constraintExtension(), zoneUpdater] : []),
+      ...(hasShared ? [readonlyExtension(), sharedDecoState, sharedDecoUpdater, sharedTheme, sharedBannerUpdater] : []),
       ...(mode === 'review' ? [EditorState.readOnly.of(true)] : []),
       directEditButtonUpdater,
       gutterHider,
@@ -1585,6 +1775,13 @@ if (data) {
     if (isConstrained) {
       const zones = recomputeZones(editorView.state.doc);
       editorView.dispatch({ effects: setZones.of(zones) });
+    }
+
+    // Initialize shared-content read-only ranges + tint decorations
+    if (hasShared) {
+      editorView.dispatch({ effects: setReadonlyRanges.of(readonlyRangesForMode()) });
+      editorView.dispatch({ effects: setSharedDeco.of(buildSharedDecorations(editorView)) });
+      initSharedBanner(editorView);
     }
 
     // Init margin panel + comments
@@ -1757,7 +1954,18 @@ if (data) {
 
   async function directSave(comment) {
     if (!editorView) return;
-    const currentContent = editorView.state.doc.toString();
+    let currentContent = editorView.state.doc.toString();
+
+    // For include sessions the buffer is RESOLVED content; the session file must be
+    // written as SOURCE (with @include directives), never the inlined resolved text.
+    if (hasShared) {
+      const reconstructed = reconstructSessionSource();
+      if (reconstructed == null) {
+        showToast('Could not safely save shared-content session — please reload and retry.', 'error');
+        return;
+      }
+      currentContent = reconstructed;
+    }
 
     hideCommitModal();
 

@@ -4330,6 +4330,30 @@ body.drawer-open {
   padding: 0 4px;
   line-height: 1;
 }
+/* Shared @include content banner */
+.editor-shared-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(141, 68, 73, 0.08);
+  border-bottom: 1px solid rgba(141, 68, 73, 0.35);
+  color: #6b3438;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+}
+.shared-banner-text {
+  flex: 1;
+}
+.shared-banner-link {
+  color: #8D4449;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.shared-banner-link:hover {
+  text-decoration: underline;
+}
 /* Presence indicator */
 .editor-presence {
   display: flex;

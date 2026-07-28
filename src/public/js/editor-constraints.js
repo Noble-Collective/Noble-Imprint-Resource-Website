@@ -251,9 +251,56 @@ const editProtection = EditorState.transactionFilter.of((tr) => {
   return tr;
 });
 
+// --- Read-only ranges (shared-content editing) ------------------------------
+// A mode-INDEPENDENT block on edits that touch protected buffer ranges. Used to
+// lock shared @include content and parameter-driven spans ({id}, the ** from
+// bold=, the " active" from active=). Unlike editProtection above (suggest-mode
+// only), this also applies in direct mode, where there are otherwise no
+// constraints. Each range is { from, to }.
+const setReadonlyRanges = StateEffect.define();
+
+export const readonlyRangesField = StateField.define({
+  create() { return []; },
+  update(value, tr) {
+    for (const e of tr.effects) {
+      if (e.is(setReadonlyRanges)) return e.value;
+    }
+    // Map ranges through doc changes so they track edits elsewhere in the buffer.
+    if (tr.docChanged && value.length) {
+      return value.map(r => ({ from: tr.changes.mapPos(r.from, 1), to: tr.changes.mapPos(r.to, -1) }))
+        .filter(r => r.to > r.from);
+    }
+    return value;
+  },
+});
+
+// A change [fromA,toA) intersects [r.from,r.to) when fromA < r.to && toA > r.from.
+// Zero-width insertions exactly at a boundary (fromA===toA===r.from or ===r.to)
+// do NOT intersect, so typing immediately before/after protected content is allowed.
+const readonlyProtection = EditorState.transactionFilter.of((tr) => {
+  if (!tr.docChanged) return tr;
+  const ranges = tr.startState.field(readonlyRangesField);
+  if (!ranges.length) return tr;
+
+  let blocked = false;
+  tr.changes.iterChanges((fromA, toA) => {
+    for (const r of ranges) {
+      if (fromA < r.to && toA > r.from) { blocked = true; return; }
+    }
+  });
+  if (blocked) return [];
+  return tr;
+});
+
 // --- Export ---
 export function constraintExtension() {
   return [editableZonesField, selectionClamp, editProtection];
 }
 
-export { setZones, computeEditableZones as recomputeZones };
+// Read-only enforcement for shared/parameterized ranges — safe to include in any
+// mode (returns an empty-effect field until setReadonlyRanges is dispatched).
+export function readonlyExtension() {
+  return [readonlyRangesField, readonlyProtection];
+}
+
+export { setZones, setReadonlyRanges, computeEditableZones as recomputeZones };

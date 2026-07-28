@@ -228,18 +228,27 @@ app.post('/api/cleanup-test-data', async (req, res) => {
   try {
     const admin = require('firebase-admin');
     const db = admin.firestore();
-    const testFile = 'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md';
+    // Test files whose suggestion/comment/reply state must be reset between tests.
+    // Session 5 + its shared common files back the shared-content-editing specs.
+    const testFiles = [
+      'series/Narrative Journey Series/Foundations/Test Book/sessions/1-Session1-TheGospel.md',
+      'series/Narrative Journey Series/Foundations/Test Book/sessions/5-Session5-Includes.md',
+      'series/Narrative Journey Series/Foundations/Test Book/commonBook.md',
+      'series/Narrative Journey Series/commonSeries.md',
+    ];
     let deleted = 0;
 
     for (const col of ['suggestions', 'comments', 'replies']) {
-      const snap = await db.collection(col)
-        .where('filePath', '==', testFile)
-        .get();
-      if (!snap.empty) {
-        const batch = db.batch();
-        snap.docs.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        deleted += snap.size;
+      for (const testFile of testFiles) {
+        const snap = await db.collection(col)
+          .where('filePath', '==', testFile)
+          .get();
+        if (!snap.empty) {
+          const batch = db.batch();
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          deleted += snap.size;
+        }
       }
     }
 
@@ -469,7 +478,33 @@ async function getSessionPageData(req, resolvedRoute) {
   const canReview = editRole === 'admin' || editRole === 'manuscript-owner';
   let allPendingComments = [];
   let allReplies = [];
-  if (canEdit || canReview) {
+  // Shared-content editing: when the session has @include directives, build the
+  // editor model (resolved buffer + segment map + per-file annotations pre-mapped
+  // to BUFFER offsets). Gated on hasIncludes so no-@include sessions take the exact
+  // path (and cost) they always have.
+  const hasIncludes = sessionData.content.indexOf('@include') !== -1;
+  let editorModelData = null;
+  if ((canEdit || canReview) && hasIncludes && !sessionData.fromDiskCache) {
+    const editorModel = require('./editor-model');
+    try {
+      editorModelData = await editorModel.getEditorModel({ series, subseries: subseries || null, book, session });
+      // Client works in BUFFER space (originalContent = resolvedContent), so expose
+      // each annotation's buffer offsets as resolvedFrom/To. P2: session-file
+      // annotations only (shared-file annotations are added in P3).
+      const toClient = (a) => ({ ...a, resolvedFrom: a.bufferFrom, resolvedTo: a.bufferTo });
+      allPendingSuggestions = editorModelData.pendingSuggestions
+        .filter(s => s.sourceFile === session.path && s.bufferMapped)
+        .map(toClient);
+      allPendingComments = editorModelData.pendingComments
+        .filter(c => c.sourceFile === session.path && c.bufferMapped)
+        .map(toClient);
+      allReplies = await suggestions.getRepliesForFile(session.path);
+    } catch (err) {
+      console.error('[editor-model] getSessionPageData fallback:', err.message);
+      editorModelData = null; // fall through to the plain single-file path below
+    }
+  }
+  if ((canEdit || canReview) && !editorModelData) {
     allPendingSuggestions = await suggestions.getSuggestionsForFile(session.path);
     allPendingComments = await suggestions.getCommentsForFile(session.path);
     allReplies = await suggestions.getRepliesForFile(session.path);
@@ -528,6 +563,13 @@ async function getSessionPageData(req, resolvedRoute) {
     canReview: canReview || false,
     rawContent: canEdit ? sessionData.content : null,
     contentSha: canEdit ? sessionData.sha : null,
+    // Shared-content editing (null unless the session has @include): the resolved
+    // editor buffer, its segment map, and the committable files with SHAs. When
+    // present the client edits `resolvedContent` (buffer space) and routes each
+    // change back to the correct file via the segment map.
+    resolvedContent: canEdit && editorModelData ? editorModelData.resolvedContent : null,
+    segments: canEdit && editorModelData ? editorModelData.segments : null,
+    editorFiles: canEdit && editorModelData ? editorModelData.files : null,
     pendingSuggestions: allPendingSuggestions,
     pendingComments: allPendingComments,
     pendingReplies: allReplies,
@@ -636,6 +678,9 @@ app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
         editRole: data.editRole,
         sessionFilePath: data.sessionFilePath,
         bookRepoPath: data.bookRepoPath,
+        resolvedContent: data.resolvedContent || null,
+        segments: data.segments || null,
+        editorFiles: data.editorFiles || null,
         pendingSuggestions: data.pendingSuggestions || [],
         pendingComments: data.pendingComments || [],
         pendingReplies: data.pendingReplies || [],
