@@ -43,6 +43,18 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
   → `…community, devotion, and witness` (to account for the new witness/mission volume).
 - [2026-07-28, per Steve] Bolded `Session Overview` in the "fivefold, multimodal layout …
   (see **Session Overview** for more detail)" sentence.
+- [2026-07-28, per Steve] Matched the Bond-PDF **body emphasis**: italicized every
+  `Narrative Journey` in prose + descriptor rows (14×; table headings left plain), italicized
+  the subseries names (`Foundations` / `Essentials` / `Pathways`) where ¶2 names them.
+  NOT yet done: the volume titles are **bold** in the PDF's summary table — awaiting Steve's
+  go-ahead to bold the table's title column.
+
+### `commonSeries.md` → `<SessionOverview>`  (emphasis, 2026-07-28, per Steve)
+- Bolded the in-prose movement-name references (all five: `**Biblical Interpretation: Hearing
+  the Word**`, `**Theological Dialogue: Discussing the Plot**`, `**Personal Reflection:
+  Entering the Story**`, `**Ministry Practice: Rehearsing the Script**`, `**Missional Outreach:
+  Publicizing the Truth**`) and the word `**Introduction**`.
+- Italicized `_formative hermeneutic_` and the `_Narrative Journey_` mention in the closing.
 - Corrected a volume title in the table: `The Story Behind it All` → `The Story Behind It All`.
 - Typo fix (in the now-included Essentials descriptor): `Christiain belief` → `Christian belief`.
 - Merged two paragraphs the PDF had split across a page break into single paragraphs: the
