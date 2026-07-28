@@ -1,44 +1,48 @@
 # **Introduction**
 
-We believe in God Almighty, the sovereign Creator of all things. He is the one and only true God—Father, Son, and Holy Spirit. He made humans, male and female, in his image. The crown of his creation, the first humans ruined God’s perfect world in their prideful rebellion. God gave his word to destroy the wicked and save believers.
-
-God fulfilled his word by sending his one and only Son into the world. For us and our salvation, Jesus suffered, died, was buried, and rose again from the dead. After Jesus ascended to heaven, God sent the Holy Spirit to empower Jesus’ disciples and to raise his people to new life in Christ. Truly, the kingdom of God has triumphed over the forces of evil and Christians hope for the return of Jesus, the defeat of Satan, the judgment of the wicked, the resurrection of the body, and life everlasting in the new creation of the world.
-
-A Christian Creed
-
 # **The Opening**
 
 * **Key Passage**: Preview
 
-* **Scripture Memory**: And without faith it is impossible to please God, because anyone who approaches Him must believe that He exists and that He rewards those who earnestly seek Him. Hebrews 11:6
+* **Scripture Memory**: For the grace of God has appeared, bringing salvation to everyone. It instructs us to renounce ungodliness and worldly passions, and to live sensible, upright, and godly lives in the present age. Titus 2:11-12
 
-* **Catechism**: What is the foundation of the Christian life? Faith.
+* **Catechism**: What is impacted by our faith in Christ? Living.
+
+PSALM INTRODUCTION: Psalm 15, 128
 
 # **The Opening: Introduction**
 
-Hold on to the pattern of sound teaching you have heard from me, with the faith and love that are in Christ Jesus. 2 Timothy 1:13
-
-The Person of Christ is to me the surest as well as the most sacred of all facts; as certain as my own personal existence; yea, even more so: for Christ lives in me, and he is the only valuable part of my existence. I am nothing without my Saviour; I am all with him, and would not exchange him for the whole world. To give up faith in Christ is to give up faith in humanity; to believe in him is to believe in the redemption and final glorification of men; and this faith is the best inspiration to a holy and useful life for the good of our race and the glory of God. Philip Schaff, *The Person of Christ*
-
 ## **Introduction (1500 words)**
 
-Our lives are lived as unfolding stories. Human imagination is captivated by the power of a persuasive story, and human existence is experienced in dramatic terms: characters and plot, beginnings and endings, conflict and resolution, heroes and adversaries, roles and scripts, and trial and triumph. These are not only the components of good narrative; they form the fabric of life and faith. Humans understand personal identity, pursue vocational endeavors, form intimate relationships, and explore cosmic reality as characters is an unfolding narrative. In many ways, each individual has their own personal story. We live in the present time as products of our pasts and as heirs of a pending future. The individual stories of each human make up a larger narrative of the whole cosmos: the story of the world. God is the author behind this overarching story. To the extent our individual stories align with what God is doing in the world, we can experience a life of meaning, substance, purpose, and salvation. However, if we try to navigate life from a wrong script, we risk ruin, despair, corruption, and catastrophic loss.
+You have been set free\! If you trust Christ as your Savior, God has rescued you from your sins, granted you victory over Satan, preserved you from divine wrath, and promised you life unending. Through Jesus, you have been delivered from bondage and ushered into freedom. Your former life of sin, destruction, and corruption no longer defines you and it no longer controls you. 
 
-The Scripture is the inspired account—the holy script—of God’s true dealings with humanity. As God’s revealed word to mankind, the Bible is a faithful record of *the story behind it all*. In this way, the Bible provides the clue to ask and answer the most important questions in the story of life. As a whole, the Bible teaches us most important truths about God, humanity, and the world in which we live. Many of these truths are recorded in the form of narrative. The stories of Scripture are doctrinal as much as they are authentic accounts of real events. Certainly, they are accurate in their *written record*. But they are also true in their *theological intent*. While the Bible’s individual stories highlight key teachings of the Christian faith, the single, overarching narrative of Scripture provides a righteous and reliable lens by which we can view the world and faithfully live in it. Sufficient upon which to build one’s entire worldview, the basic plot of the biblical narrative paints an overarching panorama of Christian doctrine, bearing witness to fundamental truths of reality.
+Even though struggle with sin, warfare against evil, and suffering in the world remain common experiences to Christian disciples, our salvation inheritance is safe and secure. As aAn heir in God’s family and a citizen of God’s kingdom, each believer lives in the present world as an exile who longs for a future homeland, a paradise in which sin, evil, and corruption will no longer exist. Certainly, that future world is the ultimate expression of “the best possible life”—an everlasting existence of perfect bliss and intimate communion with God and other believers. All believers are pilgrims on the road toward this uninterrupted and unalloyed joy. 
 
-As such, this study is an attempt to recover the storyline of God’s plan for his world. The Bible is an inspired script to this cosmic plot, helping believers embody their role in an unfolding redemptive drama. The Scripture is also a map, charting a trustworthy course for Christ’s disciples to sojourn through this transitory life into a recreated world of eternal life and unending bliss. Consequently, earnest biblical exploration is a sort of faith expedition: a voyage into the deep past, a survey of the unfolding present, and a glimpse of the imminent future. As a sacred script and reliable map, the scriptural metanarrative tells *the true story of the world*. The one and only true God created a good and perfect world that was tragically ruined by human sin. Faithful to his world and loving toward his creation, the Creator pledged to rescue his fallen world. God promised to send a deliverer who would restore the world, redeem sinful humanity, and vanquish the powers of darkness. Ultimately, God sent his Son, Jesus, to the earth. Fulfilling God’s ancient promises, Jesus was the appointed Savior of the world. He was humbly born into the world as a baby boy. He lived a life of righteousness and compassion, fully pleasing his heavenly Father. Jesus was executed unjustly on a cross, but this was all part of God's plan. Jesus’ death made payment for human sin. He was buried in a tomb and three days later resurrected from the dead.
+Until we reach that long-anticipated world, God calls us to live our lives in concert with his kingdom principles. The best possible life in this present world is one of faith in Christ and faithful living toward Christ. In Jesus, we have not only been called to believe the gospel but also to live a lifestyle in step with the gospel. As disciples, we grow in faithfulness as we embrace the Christian life as a new covenant relationship with God. Christians not only confess Christ as Savior but also follow Jesus as King. Allegiance to Jesus means a surrender of our whole life to his good and righteous rule. Truly, the gospel brings us freedom—freedom that can be found in no one or nothing other than Christ. However, tasting freedom is only the first part of being a fully devoted follower of Christ. Freedom in Christ involves aligning ourselves to God’s will in all areas of life. To be clear: no one can, or has ever, been obedient enough to earn this life of freedom. Salvation freedom is a gift of God’s grace that must be received by faith. A true life of faith translates into a sincere walk of obedience. 
 
-Announcing good news to sinful man, God promised life, forgiveness, and healing to all (and only\!) who fully trust in Jesus as King. After Jesus ascended into heaven, he sent his Holy Spirit to live within all his followers. These followers are disciples of the resurrected Christ, placing their faith in him and experiencing definitive conversion and dramatic transformation. Believing the good news of the gospel, the community of Christ’s disciples form the church: one global family of Christ followers. Transformed by Christ, disciples are witnesses of Christ in word and deed. The church is an exiled community of faith that serves as God’s kingdom representatives in the world. God has already defeated the kingdom of darkness. One day, God’s kingdom rule will come fully to earth at the second coming of Christ. The full coming of God’s kingdom will bring the fullest hopes of humanity to fruition. Upon Jesus’ return to earth, the defeat of all of God’s enemies will finally be realized, evil will be forever banished, Christ’s followers will be wholly restored to eternal life, and God will recreate his world.
+To many, the very idea of obedience paints a picture of drudgery, tedium, and burden. Even for sincere followers of Christ, a call to heed God’s commands can sometimes seem like an impossible task. When we measure our current lifestyle to God’s holy character and righteous standards, we fall desperately short. Often, the very thought of laws, commandments, and rules feels like an imposed restriction that only threatens and hampers newfound freedom in Christ. Aware of our weaknesses, our insecurities, our fears, and our bad habits, the life of obedience can feel like an insurmountable challenge.
 
-In this study, we explore twelve biblical narratives that teach these foundational Christian truths. Each of these stories represents a key moment—a turning point in the story behind it all—in God’s unfolding plan, and strives to capture the major movement of what God has been doing, is doing, and plans to do in all of human history. Similarly, each of these stories is connected with a key doctrine of the Christian faith. Christianity is a historical faith: the tenets of our faith are rooted in actual events that have occurred (or will occur) in human history. This selection of scripture narratives outlines basic Christian doctrine. While the whole canonical witness bears testimony to these truths (and further elaborates upon them), these principal texts provide a narrative introduction to Christian theology.
+In reality, the life of obedience is God’s invitation for us to live the best possible life. The “best of all lives” begins with faith in Christ. We need rescue from sin before we can bear fruit in obedience. We need cleansing from guilt in order to embody holy living. Thus, forgiveness is the precursor to piety. We depend upon gracious salvation as the only veritable foundation for godly conduct. The freedom of salvation ever characterizes a life of authentic obedience. Alternatively, outside of faith in Christ, God’s commands are a burden and an impossible task. God’s holiness and justice is a crushing weight to those still in their sin. But, for believers, God’s commands—in that they reflect all that is true, good, and beautiful—are pathways to live out salvation freedom. 
 
-These narratives represent seminal texts on the Christian faith, they also offer a brief sketch of the overall biblical metanarrative. A simple but dramatic plot, this grand narrative recounts God’s plan to save fallen humanity and repair his broken world. This work of salvation is an act of the triune God: God the Father, God the Son, and God the Holy Spirit. God’s redemptive sets the trajectory of cosmic history with a plan of salvation that progressively occurs over the scope of human history and also is immediately available for anyone who believes. The story of the world is heading toward a climatic finale where God will rescue people from the curse and banish wickedness in eternal perdition.
+What God forbids is a means of protecting the life of freedom. Conduct beyond the boundaries of God’s word only enslaves and oppresses. What God commands is a call to abundant joy and enduring peace, even if that path of obedience is to tread through a valley of suffering. Consequently, while obedience itself can never bring freedom, the life of obedience is the most free kind of life when embraced by those who have placed their faith in Christ.
 
-The twelve biblical texts in this study establish believers in essentials of Christian belief. The first story begins in the middle of the scriptural metanarrative. It studies the prosperity and suffering of an ancient God-fearer named Job (Job 1:1–2:13), exploring the nature of faith in a broken world. Then, we return to the very beginning of the biblical account. This opening chapter of the Bible teaches us about the character of God and the essence of creation (Genesis 1:1–2:3). The next session explores the nature and purpose of humanity (Genesis 2:4–25). Sin tragically enters God’s good world and brings creation to ruin (Genesis 3:1–24). The account of a devastating flood (Genesis 5:28–9:17) highlights God’s faithfulness to his word, a promise of judgment and salvation. God’s promise of salvation is ultimately fulfilled in the coming of God’s eternal Son, Jesus Christ (Luke 1:1–2:21). This passage offers a helpful introduction to a true understanding of Christ. Christ achieved salvation through his death on a cross and resurrection from the dead (Mark 15:1–16:8). Jesus’ ascension to heaven led to the coming of the Holy Spirit (Acts 1:1–2:47) through whom God powerfully transforms all who accept the gospel in faith (Acts 10:1–11:18). These transformed disciples form a community called the church in him (Revelation 1:9–3:22), who are God’s kingdom representatives on earth (Revelation 12:1–14:20). Ultimately, believers look forward to the return of Christ which will bring the defeat of Satan, the resurrection of the dead, and the new creation of the world.
+Consequently, this is God’s path for the best possible life: cultivate faith in Christ as Savior that leads to submissive obedience to him as Lord. For disciples of Jesus, God’s word is a call to obey God’s commandments, to follow in Christ’s steps, and embrace godly living. This is God's vision for your life, which exceeds any alternative hope or dream. Adopted into God’s family, God wants us to take on the family traits of his own character. This will necessarily involve spiritual growth and transformation. 
 
-What we believe matters. In fact, our convictions about what is true are of utmost importance. From our foundations of belief, we form an understanding of God, ourselves, and the world. These faith foundations impact the way we live in the world and relate to others. They determine our present wellbeing and our future destiny. Our beliefs impact our emotions and drive our conduct. They shape what we consider beautiful and what we confront as evil. While no person can understand reality with exhaustive precision, it is possible to come to a true and accurate understanding of reality. With the Bible as a sure and sacred guide, disciples can understand what God is doing in the world. And, having come to a clear conviction of this narrative—the story behind it all—believers can align their own personal life story with the trajectory of God’s unfolding story.
+God wants to change us. There are old habits God wants to remove and new habits he wants to establish. God aims to align our thoughts with the truth and expose false ways of thinking. God desires to reorder our behavior to reflect his character. In a great work of spiritual renovation, our good and merciful God intends to reshape our desires, refine our appetites, and rekindle our loves toward himself. The scope of this transformation is complete and total. God wants to reform our living in all spheres of life: individual habit, family devotion, community participation, and societal engagement. As such, this spiritual change also involves every facet of life: body, mind, heart, soul, and relationship. Ironically, the more submissive we become to Christ, the sweeter is our freedom.
 
-## **Survey the Landscape** 
+This book is a series of studies that will outline twelve key principles for the Christian life. Fundamentally, this study is an investigation of Christian living, exploring what it means to live a God-honoring life as men and women who have been liberated by the gracious work of Christ. While each of these principles of godly living represents a unique domain of Christian devotion, we quickly see that each area of the Chrisitan life impacts the others. Our life of faith is an integrated whole. For a brief instance: the way we relate to God impacts our relationships with others and is connected to our inner desires, our speech, and our involvement in the faith community. Consequently, we study these twelve principles in topical fashion, knowing that each domain of Christian living impacts the others.
+
+Although these twelve passages attempt at a comprehensive portrait of godly living, this biblical story set is not exhaustive. There is a lifetime to explore nuances and intricacies of living out our faith in a complex and sinful world. Nevertheless, the foundation laid in these twelve sessions offers a certain foundation for Christian disciples. The biblical narratives do not always depict positive examples of these ethical principles. Some biblical characters embody godliness with exemplary faithfulness. Others demonstrate the destruction and pain that result when God’s ways are unheeded. Nevertheless, even in these latter cases, we learn about godly living by virtue of being warned against godless misconduct. In as much as God’s word is *an unfolding narrative of true reality*—the story behind it all—it is also *a blueprint for godly living*—the best possible life.
+
+Therefore, the twelve biblical passages in this study establish believers in essentials of Christian living. 
+
+The first narrative provides an example of godliness in the life of a heroine named Ruth (Ruth 1:1-4:22), whose faithfulness to God is put on display in the midst of great loss and suffering. After this overview, we witness Shadrach, Meshach, and Abednego resist idolatry and demonstrate complete devotion to God when under the threat of persecution (Daniel 3:1-30). Their example teaches us how to establish God as our first and highest priority.  The failure of Aaron and the Israelites, which leads tointo idolatry (Exodus 32:1-35), warns us about giving devotion to other gods and worshiping the true God in a faithless manner. The next narrative depicts sincere reverence to God: through the honorable service of Aaron and the priests and the profane service of Nadab and Abihu (Leviticus 8:1-10:20). Joshua leading the Israelites into the promised land (Joshua 3:1-6:27) commends to us the life of rest and worship. The example of David and Abigail showcase what it looks like to honor God-appointed authority (1 Samuel 24:1-26:25). Cain’s violent attack of his brother (Genesis 4:1-26) warns us against murder and instructs us in upholding the unique dignity of human beings. Samson’s repeated sexual blunders with women nearly compromised his life mission and calls us to a life of sexual purity (Judges 13:1-16:31). When Ahab and Jezebel deceived, murdered, and robbed Naboth (1 Kings 21:1-29), we too are called to guard ourselves from theft and steward our possessions with generosity and charity. Nehemiah’s courageous endurance of verbal attacks (Nehemiah 6:1-7:4) helps us understand the danger of sinful speech and the nature of godly speech. When the Israelites succumb to their cravings and covetous desires in the wilderness (Numbers 11:1-35), we learn the importance of contentment and gratitude. Finally, we explore the whole book of Esther (Esther 1:1-10:3), a heroine who provides a helpful grid by which we can understand phases of spiritual development.
+
+In the pages ahead, we will explore each of these biblical principles in turn, attempting to grow in our understanding and application of these timeless truths. In using biblical narratives, we helpfully see the relevance of these principles in real life. In using Old Testament narratives, we quickly observe the consistency and reliability of God’s ways throughout the generations and across cultures. 
+
+In this effort to outline the major contours of a Christian lifestyle, we do so as pilgrims who long for the day when God will decisively and perfectly transform us into the likeness of Christ. Until that day, we progress in godliness by growing in obedience to God and by establishing ourselves in faith to Christ. Far from a life of drudgery or tedium, this is the path for the best possible life, a life of blessing in wilderness sojourn of this life.
+
+## **Book Overview: Surveying the Landscape**
 
 *Discipleship is a process of establishing believers in the essentials of the Christian faith. In this section, explore the core content, consider the key idea, and articulate particular areas of interest in this study.*
 
@@ -46,65 +50,61 @@ What we believe matters. In fact, our convictions about what is true are of utmo
 
 An outline of Christian teaching is like a map for the journey of faith. Survey the twelve scriptural passages and associated themes that will set the itinerary for your upcoming study.
 
-**Session 1: The Battle** (Job 1:1–2:13) | Job demonstrated genuine faith as he suffered painfully.
+**Session 1: The Way** (Ruth 1:1-4:22) | Ruth embodied faithfulness in godly living. 
 
-**Session 2: The Beginning** (Genesis 1:1–2:3) | The eternal and sovereign God created the whole world by his powerful word.
+**Session 2: The Furnace** (Daniel 3:1-30) | Shadrach, Meshach, and Abednego resisted idolatry and demonstrated full allegiance to God.
 
-**Session 3: The Image** (Genesis 2:4–25) | God made the first humans and placed them in his garden paradise.
+**Session 3: The Idol** (Exodus 32:1-35) | Aaron and the Israelites fell to the temptation of idolatry and worshiped a carved image. 
 
-**Session 4: The Fall** (Genesis 3:1–24) | The first humans doubted God’s word, disobeyed his command, and ruined God’s perfect world with their prideful sin.
+**Session 4: The Fire** (Leviticus 8:1-10:20) | Aaron and his son showed sincere reverence to God while Nadab and Abihu failed to honor God
 
-**Session 5: The Promise** (Genesis 5:28–9:17) | God announced his intent to destroy sinful humanity and to save his faithful followers.
+**Session 5: The Land** (Joshua 3:1-6:27) | Joshua led the people of Israel into the land of promised rest. 
 
-**Session 6: The Coming** (Luke 1:1–2:21) | God fulfilled his promise of salvation by sending his eternal Son into the world as a baby boy.
+**Session 6: The Anointed** (1 Samuel 24:1-26:25) | David (and Abigail) honored God-appointed authority. 
 
-**Session 7: The Cross** (Mark 15:1–16:8) | Jesus endured great suffering, died on the cross, and resurrected from the dead to save sinful humanity.
+**Session 7: The Keeper** (Genesis 4:1-26) | Cain violated the dignity of humanity by killing his brother, Abel. 
 
-**Session 8: The Spirit** (Acts 1:1–2:47) | After Jesus’ heavenly ascension, the Holy Spirit came upon the first Christians, making them powerful witnesses of Christ.
+**Session 8: The Appeal** (Judges 13:1-16:31) | Samson compromised his life mission by yielding to sexual sin 
 
-**Session 9: The Change** (Acts 10:1–11:18) | Cornelius and his household heard the gospel message preached by Peter and responded to it in faith.
+**Session 9: The Vineyard** (1 Kings 21:1-29) | Ahab and Jezebel murdered Naboth in order to steal his property. 
 
-**Session 10: The Church** (Revelation 1:9–3:22) | Jesus wrote seven letters to early Christian churches, calling them to faithful devotion.
+**Session 10: The Voice** (Nehemiah 6:1-7:4) | Nehemiah guarded himself against verbal attacks of his hostile opponents. 
 
-**Session 11: The Kingdom** (Revelation 12:1–14:20) | John recorded a vision of God’s kingdom overpowering Satan’s kingdom.
+**Session 11: The Craving** (Numbers 11:1-35) | The Israelites fell prey to their appetites and their covetous desires led to their ruin. 
 
-**Session 12: The Finale** (Revelation 19:11–22:21) | John wrote his vision of the new creation of the world.
+**Session 12: The Contest** (Esther 1:1-10:3) | Esther demonstrated growth in the faith as she served God in a difficult time and culture.
 
 ### **Key Idea**
 
 Faithful disciples plant firm roots in the soil of biblical principles. Review the main idea of this study. Discuss how the individual narratives and corresponding themes relate to this overarching theme.
 
-***Key Idea:*** *Disciples of Christ are as strong in faith as they are established in the essentials of Christian belief.*
+***Key Idea:*** *Disciples of Christ live godly lives in which they follow the teachings of Jesus.*
 
 ### **Personal Interest**
 
 The essentials of the Christian faith are extremely relevant to our lives. Pick one or two biblical passages or study themes that capture your attention. Briefly discuss with your community what most interests you about these narratives and topics.
 
-1. Which biblical narrative or study topic is most relevant to your cultural context?
+1. Which biblical narrative or study topic do you think is most relevant to your current cultural context?
 
 2. Which biblical narrative or study topic seems most interesting or relevant to you? Why?
 
 ## **Faith Foundation: Exploring the Terrain**
 
-*God calls his people to move beyond a superficial understanding of Christian essentials. Use the discussion questions and key quotes to ponder with others how the subject area of study is of great importance in the Christian faith.*
+*God calls his people to move beyond a superficial understanding of Christian essentials. Use the discussion questions and key quote to ponder with others how the subject area of study is of great importance in the Christian faith.*
 
 ### **Discussion Questions**
 
 Disciples progress in the faith in the context of committed Christian community. Discuss the following questions with other believers as a means to orient your community to the subject of this study.
 
-1. How do people pursue the truth? What different methods and sources do people use to come to an understanding of the truth?
+1. How do people characterize a godly person? What different examples do people use to understand godly living?
 
-2. Why is it important to have accurate beliefs? How do your beliefs affect other areas of your life (i.e., emotions, behaviors, relationships, etc.)?
+2. How important is it to live a godly life? How does your conduct in one area of life affect other areas of life?
 
-3. How would you evaluate your current understanding of basic Christian teaching? What beliefs do you understand clearly? What topics do you need to study more?
-
-   
+3. How would you evaluate your current understanding of basic Christian living? What dynamics of the Christian life do you understand clearly? What topics do you need to study more?
 
 ### **Significant Quote**
 
 Christians learn from believers who live in different generations and cultures. Read the following quote and discuss with others what it suggests about the importance of Christian witness.
-
-A Church which is a mere boneless body, like a jelly-fish, a colourless, bloodless, creedless Pantheon, in which every one is right and nobody is wrong who is in earnest, and in which it does not matter a jot what is preached and taught, so long as the preachers are sincere, — such a Church is an unpractical absurdity, and the baseless fabric of a dream. The Church which abandons all limits, and will not proclaim to mankind what it believes, or would have its members believe, may do very well for Cloudland or Utopia ; but it will never do for a world where there are tears and crosses, troubles and sorrows, sickness and death. J. C. Ryle, *Principles for Churchmen*
 
 Record any initial observations or community insights below.
 
@@ -122,29 +122,29 @@ Review the five movements of this interpretive framework and discuss how this he
 
 Wisdom calls believers and the community to approach an ordered process of faith development with diligence and preparation. Use the following calendar to plan out dates and teachers for the various sessions in this study.
 
-**Session 1: The Battle** (Job 1:1–2:13)
+**Session 1: The Way** (Ruth 1:1-4:22) 
 
-**Session 2: The Beginning** (Genesis 1:1–2:3)
+**Session 2: The Furnace** (Daniel 3:1-30) 
 
-**Session 3: The Image** (Genesis 2:4–25)
+**Session 3: The Idol** (Exodus 32:1-35) 
 
-**Session 4: The Fall** (Genesis 3:1–24)
+**Session 4: The Fire** (Leviticus 8:1-10:20) 
 
-**Session 5: The Promise** (Genesis 5:28–9:17)
+**Session 5: The Land** (Joshua 3:1-6:27) 
 
-**Session 6: The Coming** (Luke 1:1–2:21)
+**Session 6: The Anointed** (1 Samuel 24:1-26:25) 
 
-**Session 7: The Cross** (Mark 15:1–16:8)
+**Session 7: The Keeper** (Genesis 4:1-26) 
 
-**Session 8: The Spirit** (Acts 1:1–2:47)
+**Session 8: The Appeal** (Judges 13:1-16:31) 
 
-**Session 9: The Change** (Acts 10:1–11:18)
+**Session 9: The Vineyard** (1 Kings 21:1-29)
 
-**Session 10: The Church** (Revelation 1:9–3:22)
+**Session 10: The Voice** (Nehemiah 6:1-7:4) 
 
-**Session 11: The Kingdom** (Revelation 12:1–14:20)
+**Session 11: The Craving** (Numbers 11:1-35) 
 
-**Session 12: The Finale** (Revelation 19:11–22:21)
+**Session 12: The Contest** (Esther 1:1-10:3)
 
 ## **Core Project: Synthesizing the Faith**
 
@@ -152,9 +152,9 @@ Wisdom calls believers and the community to approach an ordered process of faith
 
 ### **Project Preview**
 
-A firm conviction of Christian truth is foundational to a mature faith. Therefore, at the end of this book, you will be asked to write a **creedal statement**. This creed is a condensed and memorable summary of the core biblical teachings on Christian belief. It is also a capstone project for this study. You can write this individually or as a community. The aim of this project is to help you synthesize all that you will learn over the course of this study as it relates to *the essential teachings of the Christian faith*. As we trek through the next twelve sessions, it will be important to keep this project in your mind.
+Foundational to a mature faith is a firm conviction of Christian truth. Therefore, at the end of this book, you will be asked to write a **code of godly living**. This creed is a condensed and memorable summary of the core biblical teachings on Christian living. It is also a capstone project for this study. You can write this individually or as a community. The aim of this project is to help you synthesize all that you will learn over the course of this study as it relates to *the essential teachings of the Christian conduct*. As we trek through the next twelve sessions, it will be important to keep this project in your mind.
 
-The following criteria will help guide your thinking about how you (and your church community) might draft such a statement. The creedal statement should be
+The following criteria will help guide your thinking about how you (and your church community) might draft such a statement. The community covenant should be
 
 * **short**: summarizes the key biblical teachings in a condensed and accessible format
 
@@ -166,19 +166,19 @@ The following criteria will help guide your thinking about how you (and your chu
 
 * **comprehensive**: addresses all major areas of Christian teaching
 
-### **Example Creed**
+### **Example Code**
 
 As we journey toward Christian maturity, we should learn from other disciples. As we study the Scriptures together, the community of Christ followers helps each of us hone our thinking around what is true. As you prepare to write your own mission manifesto (and share it with other believers), review the following statement as an example of this capstone project.
 
-\==We believe in God Almighty==
+\==We live==
 
 ### **Imaginative Storytelling**
 
 Believers in Jesus look forward to the future with hope and anticipation. As you consider the overarching topic of this study, think about how God wants to mature you in the faith. Specifically, imagine how your life would be different as God grows you into a mature Christian.
 
-If I could know the truth about life, these are some things I would want to understand…
+If I could understand what it means to follow Christ more faithfully, these are some things I would want to understand…
 
-If I could grow in my understanding of the truth, this is how my life would look…
+If I could grow in following Jesus more faithfully, this is how my life would look…
 
 ## **Faith Practice: Following the Way**
 
@@ -190,13 +190,13 @@ Setting growth goals helps to refine our Christian walk. As you look ahead to th
 
 As a result of this study, disciples, families, and churches will …
 
-* **establish** a mature Christian understanding of the essentials of the Christian faith
+* **establish** a mature Christian understanding of the essentials of the Christian living
 
-* **cultivate** a deepening commitment to biblical truth
+* **cultivate** a deepening commitment to godly conduct
 
-* **demonstrate** clarity and capability in articulating Christian truth
+* **demonstrate** clarity and capability in articulating the ways of Christ
 
-* **participate** in teaching basic Christian truths to others
+* **participate** in teaching basic Christian living to others
 
 ### **Focused Area**
 
@@ -205,4 +205,3 @@ Growth in the Christian life often happens one step at a time. Identify one of t
 ### **Community Prayer**
 
 We depend upon God’s power to grow each step in our Christian journeys. Pray that God would help each person in your community mature in the identified growth areas. Feel free to use the space below to write out a personal prayer or record requests from other members that you can keep in prayer throughout the course of this study.
-

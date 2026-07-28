@@ -18,7 +18,11 @@ OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
 # PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
-ID_PREFIX = "TheStory"
+ID_PREFIX = "TheBestPossibleLife"
+# PER-BOOK setting: the include key for this book's Creedal Statement block (lives
+# in the book's commonBook.md). "The Story Behind It All" = ApostlesCreed; "The Best
+# Possible Life" (Christian Living) = TenCommandments.
+CREED_KEY = "TenCommandments"
 
 warnings = []
 def warn(m): warnings.append(m)
@@ -46,12 +50,17 @@ def clean(s):
 BOOK = r"(?:[1-3]\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)*"
 SCRIP = BOOK + r"\s\d+:\d+(?:[–-]\d+)?(?:[;,]\s*(?:\d+:)?\d+(?:[–-]\d+)?)*"
 def split_attr(p, loose=False):
-    m = re.search(r'[.!?]\s+(' + SCRIP + r')\s*$', p)
+    # terminal punctuation may be followed by a closing quote/paren before the ref
+    # ("…not willing." Isaiah 30:15) — keep those in the quote body, not the attribution.
+    m = re.search(r'([.!?]["”\'’)]*)\s+(' + SCRIP + r')\s*$', p)
     if m:
-        return p[:m.start()+1].strip(), m.group(1).strip()
-    m = re.search(r'[.!?]\s+([A-Z][^.]*?,\s*(?:\*[^*]+\*|"[^"]+"|“[^”]+”|_[^_]+_))\s*$', p)
+        return p[:m.start()+len(m.group(1))].strip(), m.group(2).strip()
+    # author work-title attribution — allow leading initials ("J. C. Ryle") and
+    # multi-word surnames/particles (ported from convert_matter.py; the old
+    # `[A-Z][^.]*?` couldn't span the periods in initials and mis-split the quote).
+    m = re.search(r'([.!?]["”\'’)]*)\s+((?:[A-Z]\.\s*)*[A-Z][A-Za-z.\'’-]*(?:\s+(?:[A-Z]\.?|and|von|van|de|[A-Z][a-z]+))*,\s*(?:\*[^*]+\*|"[^"]+"|“[^”]+”|_[^_]+_))\s*$', p)
     if m:
-        return p[:m.start()+1].strip(), m.group(1).strip()
+        return p[:m.start()+len(m.group(1))].strip(), m.group(2).strip()
     if loose:
         idx = max(p.rfind('. '), p.rfind('! '), p.rfind('? '))
         if idx != -1:
@@ -220,7 +229,7 @@ while i < len(paras):
 
         if level == 3:
             if 'creedal statement' in low:
-                flush_heading(3, text, '<!-- @include: ApostlesCreed -->')
+                flush_heading(3, text, f'<!-- @include: {CREED_KEY} -->')
                 while i < len(paras) and not hd(paras[i]):
                     i += 1
                 continue
@@ -253,17 +262,23 @@ while i < len(paras):
                 flush_heading(3, text)
                 # Emit any manuscript practice content (most sessions have none), then
                 # the shared infographic — mirrors session 1's order (practice, then chart).
+                practice_titled = False
                 while i < len(paras) and not (hd(paras[i]) and hd(paras[i])[0] <= 2):
                     pp = paras[i]; i += 1
                     hh = hd(pp)
                     if hh:
-                        flush_heading(max(4, hh[0]), hh[1]); continue
+                        flush_heading(max(4, hh[0]), hh[1]); practice_titled = True; continue
                     mt = re.fullmatch(r'\*\*(.+?)\*\*', pp.strip())
                     if mt:  # bold-only line = the practice's title
-                        flush_heading(4, mt.group(1)); continue
+                        flush_heading(4, mt.group(1)); practice_titled = True; continue
                     if ' | ' in pp and not pp.lstrip().startswith('|'):  # "Label | prompt"
                         label, _, rest = pp.partition(' | ')
                         out += ['', f'<Accent>{clean(label)}:</Accent> {clean(rest)}']; continue
+                    # first plain, title-like line = the practice's name (unstyled in the
+                    # Doc, e.g. "Reflective Walk"): promote to a #### heading like a bold one.
+                    if (not practice_titled and not pp.lstrip().startswith('*')
+                            and len(pp.split()) <= 6 and not re.search(r'[.!?:]$', pp.strip())):
+                        flush_heading(4, clean(pp)); practice_titled = True; continue
                     out += ['', clean(pp)]
                 out += ['', '<!-- @include: SpiritualPracticesInfographic -->']
                 continue

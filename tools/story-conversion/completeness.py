@@ -16,7 +16,7 @@ import re, sys, os, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(HERE, 'docs')
-BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Story Behind It All/sessions'
+BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Best Possible Life/sessions'
 
 def norm(s):
     s = s.replace('’',"'").replace('‘',"'").replace('“','"').replace('”','"')
@@ -66,9 +66,9 @@ def check(n, src_path, out_path):
     return (n, dropped == 0, len(S), len(O), gaps)
 
 # map session number -> output filename
-titles = {1:'01-The-Battle',2:'02-The-Beginning',3:'03-The-Image',4:'04-The-Fall',
- 5:'05-The-Promise',6:'06-The-Coming',7:'07-The-Cross',8:'08-The-Spirit',
- 9:'09-The-Change',10:'10-The-Church',11:'11-The-Kingdom',12:'12-The-Finale'}
+titles = {1:'01-The-Way',2:'02-The-Furnace',3:'03-The-Idol',4:'04-The-Fire',
+ 5:'05-The-Land',6:'06-The-Anointed',7:'07-The-Keeper',8:'08-The-Appeal',
+ 9:'09-The-Vineyard',10:'10-The-Voice',11:'11-The-Craving',12:'12-The-Contest'}
 
 allok = True
 for n in range(1,13):
