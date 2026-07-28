@@ -1,5 +1,11 @@
 # Shared-content editing — P2→P4 implementation approach (client + routing)
 
+> **STATUS 2026-07-28: SHIPPED + deployed.** All of P2/P3/P4 below were built,
+> tested (17 Playwright + 23 unit; full suite 166 passed), and deployed. P4 uses
+> the inline-affordance UX (an "Edit <file> →" link at each shared block's foot,
+> not a top banner). Maintained reference: CLAUDE.md → "Shared-content editing".
+
+
 _Builds on the P1 server foundation (segment map + `/api/editor-model`, deployed).
 Supplements `2026-07-27-shared-content-editing-full.md`. D3 confirmed. P5 deferred._
 

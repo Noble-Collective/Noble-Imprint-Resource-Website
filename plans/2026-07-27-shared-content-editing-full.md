@@ -1,3 +1,10 @@
+> **STATUS 2026-07-28: SHIPPED (D3, P1→P4) + deployed to Cloud Run.** Segment map,
+> `/api/editor-model`, resolved-buffer editing, per-file suggest routing, and the
+> direct-mode "Edit shared file →" link-out are all live. Client/routing details in
+> the companion plan `2026-07-28-shared-content-editing-P2-P4-impl.md`. P5
+> (inline *direct* editing of shared content) remains deferred. See CLAUDE.md →
+> "Shared-content editing (@include)" for the maintained reference.
+
 # Shared-content editing — FULL experience (deep-dive plan)
 
 _Supersedes the option-comparison in `2026-07-27-shared-content-editing.md`. That file

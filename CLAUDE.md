@@ -14,6 +14,9 @@ npm run dev
 # Rebuild the CodeMirror editor bundle (only needed when src/editor-entry.js changes)
 npm run build:editor
 
+# Run the pure-function unit tests (node:test — no server, no GitHub, fast)
+npm run test:unit
+
 # Run all Playwright tests (server must be running on port 8080 first)
 npx playwright test
 
@@ -49,6 +52,8 @@ Three-stage pipeline:
 2. **markdown-it** — renders with `html: true`, `typographer: true`, footnote plugin, custom heading colors from `meta.json`
 3. **Post-process** — re-renders inline markdown inside HTML blocks, extracts pullquote markers into `<aside>` elements, detects/links Bible references with context tracking, merges heading tables, applies `sub-para` class for text-indent
 
+**Common-content includes:** `<!-- @include: KeyName param="value" -->` injects a named block from `commonBook.md`/`commonSubseries.md`/`commonSeries.md` (book→subseries→series precedence). Params: `id=` (substitutes `{id}`), `bold=` (bolds a line/run/substring), `active=` (marks one `<Item>` active). `resolveIncludes(content, blocks)` does this for the reading view. `resolveIncludesTracked(content, blockIndex, sessionMeta)` is a parallel variant used by the **editor** — it returns the resolved buffer PLUS a segment map (see Editing System → Shared-content editing). Keep the two in sync: a unit test asserts they produce byte-for-byte identical output.
+
 ### Editing System
 
 The editor is built on CodeMirror 6 with a custom suggestion/comment workflow:
@@ -59,11 +64,23 @@ The editor is built on CodeMirror 6 with a custom suggestion/comment workflow:
 - `editor.js` — orchestrator: initializes CM6, manages auto-save (1.5s debounce), accept/reject flows, polling (10s suggestions, 30s SHA check), presence
 - `editor-suggestions.js` — `annotationRegistry` StateField tracks all saved suggestions/comments with positions via CM6 `mapPos`. `diffChars` pipeline detects changes, merges nearby hunks, renders green insertion / red strikethrough decorations
 - `editor-masking.js` — hides markdown syntax. Short markers (`##`, `**`, `_`) use `Decoration.mark()` with CSS `font-size:0` (cursor passes through). Block tags (`<Question>`, `<Callout>`) use `Decoration.replace()` (cursor skips). Direct edit mode reveals focused line syntax in muted gray
-- `editor-constraints.js` — computes editable zones per-line in suggest mode, clamps selections to zone boundaries, blocks edits to structural syntax
+- `editor-constraints.js` — `constraintExtension()` computes editable zones per-line in suggest mode, clamps selections, blocks edits to structural syntax. Also `readonlyExtension()` — a mode-INDEPENDENT transactionFilter that blocks edits intersecting a set of protected ranges (used to lock shared/parameterized content; see below)
 - `editor-margin.js` — positioned suggestion/comment cards in a sidebar panel, overlap resolution, reply threads, history view
 - `editor-comments.js` — selection tooltip, comment popup, @-mention autocomplete via Tribute.js
+- `src/server/editor-model.js` — pure `buildEditorModel(...)` + I/O `getEditorModel(route)` that assemble the shared-content editor model (see below)
 
-**CodeMirror bundle:** `src/editor-entry.js` is bundled by esbuild into `src/public/js/codemirror-bundle.js` (~1.1MB, committed). The other `editor-*.js` files are loaded as ES modules at runtime and import from the bundle. Never edit the bundle directly.
+**CodeMirror bundle:** `src/editor-entry.js` is bundled by esbuild into `src/public/js/codemirror-bundle.js` (~1.1MB, committed). The other `editor-*.js` files are loaded as ES modules at runtime and import from the bundle. Never edit the bundle directly. **Bump the cache-buster** (`editor.js?v=N` in `session.ejs`, `style.css?v=N` in `partials/header.ejs`) whenever you change those files so deployed browsers refetch.
+
+### Shared-content editing (`@include`)
+
+Lets shared `@include` content be edited in the editor and routed to the correct common file. **Everything is gated on `hasShared`** (the session actually has `@include`); a session with no includes takes the exact original code path, byte-for-byte — the 150+ existing Playwright tests use non-include sessions and are unaffected.
+
+- **Segment map (server):** `resolveIncludesTracked` (parser.js) returns `{resolved, segments}`. Each segment = `{bufFrom, bufTo, kind:'session'|'shared', sourceFile, sourceSha, level, key, includeDirective:{text,srcFrom,srcTo IN SESSION SOURCE}, additiveOffset, pieces:[{bufFrom,bufTo,srcFrom,srcTo,editable}], readonlySpans}`. `@include` lines are boundaries; `{id}`/`bold=`(`**`)/`active=`(` active`) become read-only pieces. Invariant: every editable piece is a verbatim slice of its source file → offset mapping + content-anchoring stay exact with no reverse transform on write.
+- **`GET /api/editor-model/:seg…`** and `getSessionPageData` (for include sessions) return `resolvedContent`, `segments`, `editorFiles` (session + referenced commons, each with `content`+`sha`), and annotations pre-mapped to BUFFER offsets. Injected into `__EDITOR_DATA` / ajax `editData`.
+- **Client (`editor.js`):** for include sessions `originalContent = resolvedContent`, so the whole diff/registry engine works in buffer space unchanged. `routeHunkBody` remaps each save from buffer space to its source file at mapped offsets (pass-through for non-include sessions). Suggest mode edits shared content inline (routed per file; only param spans locked); direct mode keeps shared read-only and, on save, `reconstructSessionSource()` rebuilds the session SOURCE with `@include` lines (never writes resolved content back). Shared blocks get a tint + an inline affordance widget ("Edit commonBook.md →").
+- **Direct link-out (D3):** the affordance link opens the common file as a single-file edit via `?editFile=<repo path>` — no include resolution (so `hasShared` is false and it's the normal single-file editor), with a "Back to session" bar. Server-gated: admins any shared file, manuscript-owners book/subseries but not series-level.
+- **Not yet done:** P5 (inline *direct* editing of shared content — a multi-file commit endpoint + seam constraints) is deferred. Include-session refresh/poll does a full page reload rather than an in-place editor-model refresh.
+- Plans: `plans/2026-07-27-shared-content-editing-full.md` (architecture, D3 decision) and `plans/2026-07-28-shared-content-editing-P2-P4-impl.md` (client/routing approach).
 
 ### Suggestion Lifecycle
 
@@ -112,6 +129,10 @@ Tests use Playwright with Chromium. The server must be running locally on port 8
 
 **GitHub App auth (isolated rate limit):** to give the test server its own 5,000/hr bucket (separate from `gh`/the audiobook workflow's personal token), set `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY_B64` (base64 of the App's `.pem`) in `.env`. `github.js` prefers App-installation auth when these are present and falls back to `GITHUB_TOKEN` otherwise. The App (`Noble Imprint Content Server`) is installed on the Noble-Collective org, scoped to `Noble-Imprint-Resources` only, Contents: Read & Write.
 
-**Include fixtures:** `Test Book/Session 5` (`5-Session5-Includes.md`) exercises `@include` shared content (book/series level + parameterized `bold=`/`{id}`) for the shared-content-editing work.
+**Include fixtures:** `Test Book/Session 5` (`5-Session5-Includes.md`) `@include`s a book-level block (`Test Book/commonBook.md`) and a series-level block (`Narrative Journey Series/commonSeries.md`), plus parameterized `bold=`/`{id}` blocks — it backs `tests/shared-content.spec.js`. `cleanup-test-data` resets suggestion state for Session 1, Session 5, and both common files.
+
+**Unit tests (`npm run test:unit`):** `tests/unit/*.test.js` use Node's built-in `node:test` (no server, no GitHub). `segment-map.test.js` covers `resolveIncludesTracked`, `gatherCommonBlocksTracked`, and `buildEditorModel` with in-memory fixtures — including the verbatim-slice invariant and byte-for-byte parity with `resolveIncludes`. Run these when touching the include/segment-map/editor-model code; they're the fast first line of defense before the Playwright suite.
+
+**Shared-content Playwright (`tests/shared-content.spec.js`):** exercises the full `@include` editing flow on Session 5 — resolved render, shared tint + inline affordance, read-only in both modes, session/book/series suggest routing, the `?editFile` link-out + its guard, `/api/editor-model` shape + auth, direct-mode session-source reconstruction (via request interception — no GitHub write), and shared-suggestion reload. Also a no-include regression guard. Note some paths are deliberately NOT tested because they'd write to the real repo: accepting a shared suggestion, direct-committing to a shared file, and non-super-admin permission denial.
 
 Tests interact with the editor through `window.__editorView` (CM6 EditorView), `window.__annotationRegistry`, and `window.__originalDocField`. Common patterns: `page.evaluate(() => cursorAfter('text'))`, `page.evaluate(() => selectText('from', 'to'))`.
