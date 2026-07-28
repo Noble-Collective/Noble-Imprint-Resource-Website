@@ -28,20 +28,21 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
 - Collapsed em-dash spacing everywhere: `— ` / ` —` → `—` (e.g. table taglines `belief— built`
   → `belief—built`).
 - Normalized curly quotes/apostrophes to straight (`’ ‘` → `'`, `“ ”` → `"`).
-- Rendered the all-books "series summary" (a visual page layout in the PDF) as a **markdown
-  table**: 3 columns (Subseries | Volume | Focus), grouped by subseries with the subseries name
-  shown only on the first row of each group (blank continuation cells).
+- Rendered the all-books "series summary" as **three per-subseries blocks** (Foundations,
+  Essentials, Pathways), each a 1-cell heading table (`Narrative Journey FOUNDATIONS` /
+  `ESSENTIALS` / `PATHWAYS`) followed by a 2-column body table with **no header row** — the
+  front-end merges each pair into one table (colspan heading, empty header stripped; same
+  pattern as the Session Synopsis). First body row of each block = the subseries **tagline +
+  descriptor** (from the PDF); remaining rows = one volume + its focus line.
+  [revised 2026-07-28 per Steve — was a single 3-column table; the per-subseries descriptors
+  are now INCLUDED, not dropped.]
 - Corrected a volume title in the table: `The Story Behind it All` → `The Story Behind It All`.
+- Typo fix (in the now-included Essentials descriptor): `Christiain belief` → `Christian belief`.
 - Merged two paragraphs the PDF had split across a page break into single paragraphs: the
   "In general … enriched" + "the experience with additional …" paragraph, and the
   "records/journal …" paragraph (pp. 11–12).
-- **Placement:** put the summary table after ¶2 (the three-subseries paragraph); the PDF had it
-  as a full-page insert in the middle of ¶3.
-- **Omitted** (did NOT carry over) three per-subseries descriptor blocks from the PDF page 10:
-  the taglines `faith fundamentals for new believers`, `core discipleship for local churches`,
-  `basic training for emerging leaders`, and their descriptor paragraphs (`The Narrative Journey
-  begins with orienting new believers…`, `The second set of books…`, `The third set of books…`).
-  Reason: redundant with ¶2; kept the table clean. ← confirm you're OK dropping these.
+- **Placement:** put the three summary blocks after ¶2 (the three-subseries paragraph); the PDF
+  had the summary as a full-page insert in the middle of ¶3.
 - Stripped running headers/footers/page numbers; collapsed multiple spaces to one.
 
 ### `commonSeries.md` → `<SessionOverview>`  (source: Bond PDF, pp. 15–18)
@@ -76,9 +77,6 @@ Things I noticed but deliberately left alone — for you to inspect/decide.
 
 - **Book 1 front matter is now different on the LIVE public site.** Correcting it to the full
   authoritative Series Orientation changed a `status: public` book's output. Please review live.
-- **Test Book churn in the content repo.** The Playwright suite has committed *hundreds* of
-  `Accept suggestion` / `Restore after test` commits to the live content repo (I rebased over
-  them cleanly). The test suite is writing to the real repo history.
 - **Copyright year `2024`** is an unverified placeholder in BOTH books' front matter.
 - **Further Resources (book 2):** its Google Doc still contains book 1's bibliography/reading
   plan; I shipped a heading-only placeholder rather than convert stale content.
@@ -86,8 +84,8 @@ Things I noticed but deliberately left alone — for you to inspect/decide.
   The Opening (looks like an author placeholder, not final content).
 - **Sessions 2–12 (book 2) were not line-by-line proofread** — only completeness-verified
   (100% word coverage). More source-Doc typos may exist beyond the ones listed per book.
-- **Dropped subseries descriptors** (see the SeriesIntroduction change log) — if you want them
-  in the front matter, say so and I'll add them back.
+- ~~Test Book churn~~ / ~~dropped subseries descriptors~~ — resolved: churn is harmless
+  (no action needed); descriptors are now included in the three subseries tables.
 
 ---
 

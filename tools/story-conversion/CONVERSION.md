@@ -307,8 +307,10 @@ Matter: Opening `1gKjWkHaAPbgDlUEsQltwNzIZyf5YDN9FLzFeCdiz4lA`, Recall
   movement descriptions). The authoritative, fully-generic text was re-extracted from
   `Downloads/The Bond Between Us_Interior_v15 (bleed).pdf` (the "Series Orientation": pages
   9–13 intro, 15–18 overview) via `scratchpad/extract_bond.py` + `build_series_common.py` and
-  written to `commonSeries.md` as `<SeriesIntroduction>` (full prose + a markdown **all-books
-  summary table** for all 3 subseries / 10 volumes) and `<SessionOverview>` (full fivefold
+  written to `commonSeries.md` as `<SeriesIntroduction>` (full prose + an **all-books summary**
+  rendered as **three per-subseries merged-heading tables** — Foundations / Essentials /
+  Pathways — each a 1-cell heading table + a 2-col body table the front-end merges, with the
+  subseries tagline+descriptor as the first body row) and `<SessionOverview>` (full fivefold
   movements). Both books' `00-Front-Matter.md` now just `@include` these; only title/subtitle
   + Copyright stay inline (no per-book "this volume" paragraph — the table covers every book).
   **Book 1's front matter was ALSO corrected** and wired to the same includes → its output now
@@ -316,8 +318,8 @@ Matter: Opening `1gKjWkHaAPbgDlUEsQltwNzIZyf5YDN9FLzFeCdiz4lA`, Recall
   approved). Fixes applied to the PDF text: `Chrisitanity`→`Christianity`, `Christiain`→
   `Christian`, `journal- like`→`journal-like`, `(meta) narrative`→`(meta)narrative`, em-dash
   spacing collapsed, `The Story Behind it All`→`…It All`, and `(see series summary on previous
-  page)`→`(…above)`. Dropped from the table: the three per-subseries descriptor paragraphs
-  (redundant with intro ¶2). Copyright year still the `2024` placeholder.
+  page)`→`(…above)`. The three per-subseries descriptor paragraphs + taglines ARE included
+  (first body row of each subseries table). Copyright year still the `2024` placeholder.
 
 **Validation (2026-07-28):** all 24 `@include` keys used across the book resolve to defined
 blocks (`commonSeries.md` + this book's `commonBook.md`); no `bold=`/`active=` params used
