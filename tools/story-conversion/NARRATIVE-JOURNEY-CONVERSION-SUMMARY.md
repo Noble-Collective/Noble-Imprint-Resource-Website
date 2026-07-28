@@ -55,6 +55,28 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
   Entering the Story**`, `**Ministry Practice: Rehearsing the Script**`, `**Missional Outreach:
   Publicizing the Truth**`) and the word `**Introduction**`.
 - Italicized `_formative hermeneutic_` and the `_Narrative Journey_` mention in the closing.
+
+### `commonSeries.md` → `<NarrativeJourneySeriesList>` + `<PublishingLicensing>` (new, 2026-07-28, per Steve)
+- **`<NarrativeJourneySeriesList>`** — the front-matter "A Narrative Journey Series" page (PDF
+  p.1): subseries labels italic (`_Foundations_` / `_Essentials_` / `_Pathways_`) + a bullet
+  list of each volume with its "A Narrative Journey of Christian ___" subtitle. Normalized
+  `Behind it All`→`It All`. **Added The Kingdom Come** (not in the PDF) with a proposed subtitle
+  `A Narrative Journey of Christian Witness` — confirm the subtitle.
+- **`<PublishingLicensing>`** — shared copyright/licensing text supplied by Steve: first line
+  `Series: A Narrative Journey`, then © 2026 / CC BY-SA / Noble Imprint+Collective / BSB public
+  domain. **Corrected the license URL** `…/licenses/bysa/4.0/` → `…/licenses/by-sa/4.0/`
+  (Steve's message had `bysa`; the working CC URL is `by-sa`) — confirm.
+
+### Book front matter restructure (both Essentials books, 2026-07-28, per Steve)
+- New top-of-front-matter order: `## Introductory Quotes` (empty placeholder) → `## A Narrative
+  Journey Series` (@include NarrativeJourneySeriesList) → `## Publishing and Licensing`
+  (`_<Title>_, Pre-Release Edition` + @include PublishingLicensing) → `## Series Introduction`
+  → `## Session Overview`.
+- **Removed** the old `## <Title>` / subtitle / "Narrative Journey Series · Essentials" title
+  block and the old `## Copyright` block. ← the title-page block was dropped since the new
+  order (series list + Publishing line) covers that identification; say if you want a title
+  page kept.
+- © year is now **2026** (was the `2024` placeholder).
 - Corrected a volume title in the table: `The Story Behind it All` → `The Story Behind It All`.
 - Typo fix (in the now-included Essentials descriptor): `Christiain belief` → `Christian belief`.
 - Merged two paragraphs the PDF had split across a page break into single paragraphs: the
