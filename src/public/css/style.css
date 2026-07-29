@@ -5584,3 +5584,7 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .session-content .cc-table { table-layout: fixed; }
 .session-content .cc-table th:nth-child(1), .session-content .cc-table td:nth-child(1) { width: 32%; }
 .session-content .cc-table th:nth-child(2), .session-content .cc-table td:nth-child(2) { width: 68%; }
+
+/* Recall Learning Plan tables (Selected Passages / Recommended Reading): keep the
+   "Session N" label in the first column on one line so it doesn't wrap. */
+.session-content .lp-table th:first-child, .session-content .lp-table td:first-child { white-space: nowrap; }

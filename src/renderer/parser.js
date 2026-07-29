@@ -866,6 +866,13 @@ function renderMarkdown(content, options = {}) {
     '<table class="cc-table">$1'
   );
 
+  // Tag the Recall's Learning Plan tables (Session + Topic headers — Selected Passages /
+  // Recommended Reading) so CSS can keep the "Session N" label from wrapping.
+  html = html.replace(
+    /<table>(\s*<thead>\s*<tr>\s*<th[^>]*>Session<\/th>\s*<th[^>]*>Topic<\/th>)/g,
+    '<table class="lp-table">$1'
+  );
+
   // External links (autolinked URLs + explicit http(s) links) open in a new tab.
   html = html.replace(
     /<a href="(https?:\/\/[^"]*)"/g,
