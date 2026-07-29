@@ -5588,3 +5588,12 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 /* Recall Learning Plan tables (Selected Passages / Recommended Reading): keep the
    "Session N" label in the first column on one line so it doesn't wrap. */
 .session-content .lp-table th:first-child, .session-content .lp-table td:first-child { white-space: nowrap; }
+
+/* Further Resources reading-plan tables: 4 equal-width Week columns (5 rows = 5 days).
+   On phones the table scrolls horizontally inside .rp-scroll rather than crushing. */
+.session-content .rp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.session-content .rp-table { table-layout: fixed; width: 100%; }
+.session-content .rp-table th, .session-content .rp-table td { width: 25%; }
+@media (max-width: 640px) {
+  .session-content .rp-table { min-width: 34rem; }
+}

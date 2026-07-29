@@ -873,6 +873,18 @@ function renderMarkdown(content, options = {}) {
     '<table class="lp-table">$1'
   );
 
+  // Tag the Further Resources reading-plan tables (first header "Week N") for fixed
+  // equal column widths, then wrap each in a scroll container so it can scroll
+  // horizontally on narrow (phone) screens instead of crushing the columns.
+  html = html.replace(
+    /<table>(\s*<thead>\s*<tr>\s*<th[^>]*>Week \d+<\/th>)/g,
+    '<table class="rp-table">$1'
+  );
+  html = html.replace(
+    /<table class="rp-table">([\s\S]*?)<\/table>/g,
+    '<div class="rp-scroll"><table class="rp-table">$1</table></div>'
+  );
+
   // External links (autolinked URLs + explicit http(s) links) open in a new tab.
   html = html.replace(
     /<a href="(https?:\/\/[^"]*)"/g,
