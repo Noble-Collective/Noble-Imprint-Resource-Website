@@ -5571,3 +5571,10 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .audio-tap-banner svg {
   flex-shrink: 0;
 }
+
+/* Planning Calendar (Opening): fixed columns so the empty Teacher/Date columns
+   get real width and the (now-stacked) Biblical Passage column stays compact. */
+.session-content .pc-table { table-layout: fixed; }
+.session-content .pc-table th:nth-child(1), .session-content .pc-table td:nth-child(1) { width: 32%; }
+.session-content .pc-table th:nth-child(2), .session-content .pc-table td:nth-child(2) { width: 50%; }
+.session-content .pc-table th:nth-child(3), .session-content .pc-table td:nth-child(3) { width: 18%; }

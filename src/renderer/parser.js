@@ -851,6 +851,14 @@ function renderMarkdown(content, options = {}) {
     '$1\n</thead>'
   );
 
+  // Tag the Planning Calendar table (identified by its "Biblical Passage" header)
+  // so CSS can fix its column widths — otherwise the wide passage cell starves the
+  // empty Teacher/Date columns.
+  html = html.replace(
+    /<table>(\s*<thead>\s*<tr>\s*<th[^>]*>Biblical Passage<\/th>)/g,
+    '<table class="pc-table">$1'
+  );
+
   // External links (autolinked URLs + explicit http(s) links) open in a new tab.
   html = html.replace(
     /<a href="(https?:\/\/[^"]*)"/g,
