@@ -41,6 +41,17 @@ function saveToCache(id, data) {
   }
 }
 
+// The USFM \h book name occasionally differs from the references.json verse-key name
+// (e.g. \h "Psalms" vs key "Psalm"; \h "Song" vs "Song of Solomon"). Resolve \h to the
+// references.json name so paragraph/heading flags key-match the verse objects — otherwise
+// those books silently get no paragraph breaks or section headings.
+function resolveRefBookName(hName, books) {
+  if (books.has(hName)) return hName;
+  if (hName === 'Psalms' && books.has('Psalm')) return 'Psalm';
+  for (const b of books.keys()) if (b.startsWith(hName + ' ')) return b; // "Song" → "Song of Solomon"
+  return hName;
+}
+
 async function loadBibles() {
   if (loaded) return;
 
@@ -134,11 +145,17 @@ async function loadBibles() {
             for (const line of usfmContent.split('\n')) {
               const trimmed = line.trim();
               if (trimmed.startsWith('\\h ')) {
-                currentBook = trimmed.substring(3).trim();
+                currentBook = resolveRefBookName(trimmed.substring(3).trim(), books);
               } else if (trimmed.startsWith('\\c ')) {
                 currentChapter = parseInt(trimmed.substring(3));
                 nextVerseStartsParagraph = true;
-              } else if (/^\\(p|pmo?|m|q\d?|pi)\s*$/.test(trimmed) || trimmed === '\\b') {
+              } else if (/^\\(p|pmo?|m|pi)\s*$/.test(trimmed) || trimmed === '\\b') {
+                // Poetry line markers (\q1/\q2) are intentionally NOT paragraph breaks —
+                // otherwise every poetic line becomes its own paragraph (the old
+                // "one verse per line" look). Poetry groups into stanzas separated by \b;
+                // prose still breaks on \p/\m/\pm/\pmo/\pi. This matches the audiobook
+                // converter's grouping and drives both the /bible reader and the inline
+                // verse-reference popup (both render bible.getVerses paragraphStart flags).
                 nextVerseStartsParagraph = true;
               } else if (/^\\s[12]\s+/.test(trimmed)) {
                 pendingHeading = trimmed.replace(/^\\s[12]\s+/, '').trim();
