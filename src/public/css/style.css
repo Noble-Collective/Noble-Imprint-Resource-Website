@@ -1207,7 +1207,7 @@ body.text-mode .home-text {
   font-weight: 600;
   text-align: left;
   padding: 10px 14px;
-  background: #f5f3ef;
+  background: #eae6df;
   border: 1px solid #ddd;
   color: var(--color-charcoal);
 }
@@ -1351,7 +1351,9 @@ body.text-mode .home-text {
   color: color-mix(in srgb, var(--accent) 75%, black);
 }
 /* Tables: heading bar + even rows tinted from the accent */
-.session-content.accent-themed .table-heading-row {
+.session-content.accent-themed .table-heading-row,
+.session-content.accent-themed th,
+.reading-content.accent-themed th {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: color-mix(in srgb, var(--accent) 80%, black);
 }
