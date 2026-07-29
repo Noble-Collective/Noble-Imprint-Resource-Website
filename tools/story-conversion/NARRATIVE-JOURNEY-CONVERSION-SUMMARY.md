@@ -10,9 +10,11 @@ pipeline/process, see `CONVERSION.md`.
 - **Convention:** "typos in source Docs" = present in the manuscript and reproduced verbatim;
   fix them at the source. "Editorial callouts" = decisions, placeholders, or omissions.
 
-_Last updated: 2026-07-28 (book 3 converted & verified; The Recall shared-content refactor —
-17 shared blocks, Growth-Evaluation rubric tables, Next Steps questions; parser now allows
-underscore/dash keys)._
+_Last updated: 2026-07-29 (The Opening shared-content refactor — 16 `Opening_*` blocks, the
+book-colored Five Movements SVG, Bond-style Core-Content / Planning-Calendar tables, each book's
+creed dropped into the Opening Overview; applied across books 1–3. Follows the 2026-07-28 book-3
+conversion + The Recall 17-block refactor. Book 4 "The Bond Between Us" inputs gathered — see its
+section below.)_
 
 ---
 
@@ -148,6 +150,45 @@ objective, columns = Exemplary/Mature/Developing/Emerging/Unsound, cells = 25 de
   metric objectives, connectives like "grounded in core biblical teaching as a countercultural
   worldview"). Book 2's living-specific wording is to be filled into the 42 blanks later.
 - Both rubric tables render as a wide 6-column HTML table (horizontal scroll on mobile).
+
+### `commonSeries.md` → The Opening shared framework (2026-07-29, per Steve)
+The Opening (`00-The-Opening.md`) duplicated the same directions/framework text inline across
+books 1–3 (same pattern as The Recall). Extracted the identical framework into **16 new
+`commonSeries.md` blocks** and wired books 1–3 to `@include` them (headings stay inline):
+`Opening_BookOverview_Directions`, `Opening_CoreContent_Directions`, `Opening_KeyIdea_Directions`,
+`Opening_PersonalInterest_Directions`, `Opening_FaithFoundation_Directions`,
+`Opening_Discussion_Directions`, `Opening_SignificantQuote_Directions`,
+`Opening_LearningPlan_Directions`, `Opening_SessionFramework_Intro`,
+`Opening_PlanningCalendar_Directions`, `Opening_CoreProject_Directions`,
+`Opening_ImaginativeStorytelling_Directions`, `Opening_FaithPractice_Directions`,
+`Opening_GrowthOutcomes_Directions`, `Opening_FocusedArea_Directions`,
+`Opening_CommunityPrayer_Directions`. Book-specific parts stay inline: Key Elements, the tables,
+and the creed (see below).
+- **`Opening_SessionFrameworkInfographic` — the Five Movements cycle SVG.** Built a self-contained
+  inline SVG (5 nodes on a dashed ring with clockwise arrows; icons book/users/compass/feather/globe;
+  bold dark titles + gray italic captions) modeled on the Bond PDF p.30 diagram. It uses
+  `style="color: var(--accent, #8D4449)"` + `currentColor`, so it **auto-renders in each book's
+  accent color** — nothing per-book. (Superseded an earlier accent-card attempt that Steve
+  rejected as not matching the PDF; also an over-grab of book-specific prompts was reverted.)
+- **Core Content → Bond-style table** (all 3 books): scripture refs moved onto their **own line
+  inside the cell** (`<br>(Ref)`) per Steve. **Planning Calendar → Bond-style table** too.
+- **Creed dropped into the Opening Overview** (books 2 & 3; book 1 already had its creed): each
+  book's creed is **book-common** (`commonBook.md`, pulled via `@include: {CREED_KEY}`), NOT
+  series-common — confirmed with Steve. Book 3's Project Preview → `Coming soon.`, "Example Creed"
+  → "Example ____", the Lord's-Prayer placeholder → `Coming soon.`, and the Recall Conclusion →
+  `Coming soon.` (Steve's edits, 2026-07-29).
+- Verified a pure refactor (resolved output content-identical to the pre-refactor Openings apart
+  from the intended table/creed/SVG additions).
+
+### `src/renderer/parser.js` + `style.css` → Opening/Recall render support (2026-07-29)
+- **Single-chapter Bible refs now link** (Jude / Philemon / 2 John / 3 John / Obadiah): a new pass
+  emits `data-ref="Jude 1:3"` (implicit chapter 1) so the verse popup's `Book Chapter:Verse` API
+  lookup resolves. (Fixed a "verse not found" on "Jude 3" in book 1's Scripture Memory.)
+- **`.pc-table`** class auto-tagged onto tables whose first header is "Biblical Passage"
+  (Planning Calendar), giving fixed column widths (Biblical Passage narrower, Teacher wider) per
+  Steve. **Table header rows now use the darker accent** (`.session-content th` / `.reading-content
+  th` bg `#f5f3ef`→`#eae6df`; `.accent-themed th` accent-tinted) so plain tables (Growth Evaluation)
+  match the merged-heading tables. CSS cache-buster bumped to `v=81`.
 
 ### History (superseded within this session, not in the committed content)
 - I first built `<SeriesIntroduction>` / `<SessionOverview>` from **book 1's abbreviated front
@@ -343,6 +384,113 @@ Series Introduction / Session Overview / series list / Publishing & Licensing) w
 verbatim via `@include`. Hence no new entries in the shared change log above.
 
 ---
+
+## Book 4 — The Bond Between Us  (Christian Community · A Christian Community Covenant)
+
+**Status:** **DEPLOYED + PUBLIC 2026-07-29** (content repo `2aa69f1`, pushed to main →
+notify-website.yml auto-refresh + manual `/api/refresh`; all 16 pages live 200). Built the final
+shared-content format IN PLACE in `Essentials/The Bond Between Us/` (`status: public`, banner
+`Pre-Release`, accent `#de6d36`, `order` 4). Old preview `session1.md` (was book-3 "The Temple")
+removed.
+- **12 sessions** (`01-The-Household … 12-The-Other`): `completeness.py` 11/12 at 100%; **S6** shows
+  a benign 2-word delta — the source Doc heading is `**Observ**ation Questions` (first-letters-bold
+  export artifact); the converter normalized it correctly to "Observation Questions" (same category
+  as book-2 S2's `**u**ltimate`). Structural sweep clean (5 infographics + 5 movement intros + 1
+  `CommunityCovenant` creed each; 0 stray tags; 12–18 `<Question>`).
+- **Creed:** `<CommunityCovenant>` in `commonBook.md`, built from interior PDF p.20 via
+  `scratchpad/build_creed.py` (two stanzas separated by a blank blockquote line, hard breaks,
+  attribution `<< A Christian Community Covenant`).
+- **The Opening & The Recall:** commonized per §2c (templated off book 3; all `Opening_*`/`Recall_*`
+  includes + Five Movements SVG reused). Book 4 is the **home book** for genuine matter — first
+  genuine Recall since book 2, and the **FIRST fully-populated community Growth-Evaluation rubric**
+  (extracted from PDF p.408 via `scratchpad/build_matter.py`, 5 metrics × 5 levels, all
+  relationship-themed; books 1–2 shipped blanks/skeletons).
+- **Front Matter:** §12 structure; Introductory Quotes = **PDF p.1** (Augustine / Pascal / Donne /
+  Baxter — all community-themed). ⚠ The kickoff/§13 said "1 Tim 3:14–15 + Spurgeon" for the
+  front-matter quotes, but that pair is actually the **Opening's intro epigraphs (PDF p.21)**; used
+  there. Publishing line "The Bond Between Us: A Narrative Journey of Christian Community".
+- **Verification:** all 16 files resolve every `@include` + `renderMarkdown` via the REAL parser (0
+  leftovers, 0 throws). Built via `scratchpad/build_matter.py` (pulls prose verbatim from Doc
+  exports, rubric from PDF) — `convert_matter.py` was NOT run for Opening/Recall (still old format).
+
+**Missing / incomplete (LIVE placeholders):**
+- **Further Resources — heading-only placeholder** (Steve's call): its Doc's Reading Plan is stale
+  **book-1** content (The Battle…Finale, 48-week Job/Genesis/Revelation). The Doc's **bibliography IS
+  genuine book-4** (real per-session commentaries) and is available to convert later.
+- **Opening Project Preview** → "Coming soon."; **Growth Outcomes + Imaginative Storytelling** left as
+  the belief/truth-themed boilerplate (identical to what book 3 shipped) — flag for community-specific
+  authoring.
+- **Recall Core Project** — the Doc had an unauthored "Community Covenant: instructions" capstone
+  subsection; kept book-3 structure (Journal Reflection include only). Recall Catechism set to the
+  community Q/A (Doc had none).
+- **Passage Outlines:** headings present, content empty in the manuscripts (all sessions).
+
+**Corrected stale carryover:** Opening **Planning Calendar** was stale **book-1** sessions
+(The Battle…Finale) → rebuilt from the genuine Core Content (book-4 sessions/passages). Opening
+**Example Covenant** = PDF **p.33** text ("write your own community covenant" — the Doc's version said
+stale "mission manifesto") + the `CommunityCovenant` include (Steve's call to drop in the real
+example).
+
+**Typos in source Docs (reproduced faithfully — fix in the Google Docs):**
+- S1: "not be afriad" → **CORRECTED** to "afraid" (Steve's call, in both output + `docs/session1.md`);
+  synopsis ref "18:12 15" → **CORRECTED** to "18:12–15". Source Doc still has both — fix there too.
+- S6: heading `**Observ**ation Questions` first-letters-bold export artifact (converter normalized).
+- Recall conclusion: passage refs disagree with the Opening/sessions — "Nehemiah 1:1–7:73" (Opening
+  uses 1:1–7:4) and "Acts 16:11–17:33" for Session 11 (Opening uses 16:11–18:17).
+
+**Shared / common content:** NOTHING in `commonSeries.md` was changed for this book — all shared
+blocks (infographics, movement intros, question sets, Opening_*/Recall_*, Series Introduction /
+Session Overview / series list / Publishing) reused verbatim via `@include`. No new shared change-log
+entries. (Original build inputs preserved below.)
+
+**Inputs (confirmed):**
+- **Accent** `#de6d36` (orange) — from the interior PDF. Set all heading colors to it (mirror
+  books 1–3); `meta.json` `"accent"`, `"banner": "Pre-Release"`.
+- **Creed** = **A Christian Community Covenant** (interior PDF p.19 — the analog of book 3's
+  Lord's-Prayer creed page). `CREED_KEY = "CommunityCovenant"`, book-level in `commonBook.md` as
+  `<CommunityCovenant>`. Two stanzas (a 6-line "We prize…" stanza + a "We confess the church as
+  Christ's family, a family called to:" stanza with 5 clauses). Attribution
+  `<< A Christian Community Covenant`. Build it from the PDF with a small script (keep verse/creed
+  text out of model output, per the book-2 content-filter lesson).
+- **The Opening Key Elements** (PDF p.20): Key Passage = *Preview*; Scripture Memory = "We … are
+  one body in Christ, and individually members one of another." (Romans 12:5); Catechism Q: "How
+  are Christians to relate to one another?" A: **Community**.
+- **The Opening Introductory Quotes / Introduction** (PDF pp.1, 21): epigraphs 1 Timothy 3:14–15 +
+  Charles Spurgeon, *Satanic Hindrances*. (Front-matter Introductory Quotes come from PDF p.1.)
+- `ID_PREFIX = "TheBondBetweenUs"`.
+- **Interior PDF**: `The Bond Between Us_Interior_v15 (bleed).pdf` in `Downloads/` — this is the
+  SAME PDF that the shared Series Introduction / Session Overview / Growth-Evaluation grid were
+  extracted from, so book 4 is the "home" book for that shared content (expect a strong match).
+
+**Google Doc IDs** (curl `…/document/d/<ID>/export?format=md`; folder
+`drive.google.com/drive/folders/19rQmEYkWAdO-rS1I0nowZalAKSn7Aijl`):
+
+| # | Title | Google Doc ID |
+|---|-------|---------------|
+| 1 | The Household | 1qeRqtUciqb7XpIS9WUA1G3sDdbVhbCK2K-C6PjCJw08 |
+| 2 | The Union     | 1McymF6omw8Vwo3OFHyLGPcTXt6b377xsHWkafUg8d-M |
+| 3 | The Offspring | 1H3EtUrhcRjOcYQT4UXQ1chI2S9d6fJrP5LM2r-NdB2k |
+| 4 | The Bond      | 1QusIwP5Eim_4ycJpzP35Hy5o9Oe-AZS15n7hP9LO9V4 |
+| 5 | The Public    | 1Vpf6G0ZLiWNp7F8SPVUAtlb9NwlWlHZ_LHF_EXI1Xqk |
+| 6 | The Work      | 1TeedWNJiI81z6bK8IKlm2Qn1OKweCfmS6R54qg-tjxs |
+| 7 | The Church    | 1ZraeTRZSI2lGw7r5VPXK6ig_Qml3Vru4i5_9saZWy3A |
+| 8 | The Community | 1OERhiXPpYAmRQ4JHN5Iqk1xV1mntJQvEPYPmm5X83mQ |
+| 9 | The Commons   | 1wRrHrC_Yy2SjO4sloSTB3jGv9cilYFgS0l7-3Jvxvlo |
+| 10 | The Network  | 1jtasHb7_q7Jblgbd6UFc4iRVzifQ8FXNeVdl8uSY-YM |
+| 11 | The Worlds   | 1b0izW46my27a_AnoTyQEcLYeXSdc49sXpLGZd2I0th4 |
+| 12 | The Other    | 1qGR-uhet3p1F5HAB4oY51LBc48LdE-Tb8M1Uk0ZRq5Q |
+
+Matter: Opening `1u8_Sv1aqGhE7Zh0xcSpG6dzuHf5SXAzV2J3YBgqvQeM`, Recall
+`1nhNvnyEoBgnsFDGnBDR-rxQGbKkxwEFPSur8LltdGUI`, Further
+`1EutVos8p72dHxXqSo5ACUvtIY0MarUQtH1eD0jyXlqo`. Filenames: `01-The-Household … 12-The-Other`,
+`00-Front-Matter`, `00-The-Opening`, `13-The-Recall`, `14-Further-Resources`.
+
+**Watch for (per Steve's book-4 strategy):** sessions 1–12 reuse ALL common elements + grab only
+unique manuscript prose; front matter / Opening / Recall get special handling (copy the shared
+content, grab any unique bits from the manuscript) — and **if any "unique" content looks
+copy-pasted from books 1–3, flag it and check with Steve** before shipping (every prior book had
+at least one stale matter Doc). Convert **Session 1 (The Household) first as a calibration pass**
+for Steve's review before doing 2–12.
 
 ## Cross-book / tooling notes
 - Converter fixes made during book 2 that also help book 1: `split_attr` now handles author

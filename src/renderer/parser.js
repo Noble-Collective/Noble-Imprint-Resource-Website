@@ -859,6 +859,13 @@ function renderMarkdown(content, options = {}) {
     '<table class="pc-table">$1'
   );
 
+  // Tag the Opening's Core Content table (identified by its "Session" + "Focus" headers)
+  // so CSS gives the Session column real width instead of letting it collapse to content.
+  html = html.replace(
+    /<table>(\s*<thead>\s*<tr>\s*<th[^>]*>Session<\/th>\s*<th[^>]*>Focus<\/th>)/g,
+    '<table class="cc-table">$1'
+  );
+
   // External links (autolinked URLs + explicit http(s) links) open in a new tab.
   html = html.replace(
     /<a href="(https?:\/\/[^"]*)"/g,

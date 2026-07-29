@@ -5,10 +5,17 @@ markdown used by the Noble Imprint website/app. Built for **"The Story Behind It
 All"** (Narrative Journey Series → Essentials); the same pipeline is meant
 to be reused for the rest of the series.
 
-_Last updated: 2026-07-28 — book 1 ("The Story Behind It All") & book 2 ("The Best Possible
-Life") complete & live; book 3 ("The Open Invitation", Formation / Lord's Prayer) converted &
-verified (12 sessions + front matter + Opening; Recall/Further shipped as placeholders — both
-their Docs were stale book-1 content). Per-book callouts in
+_Last updated: 2026-07-29 — books 1–3 complete & live (book 3 = "The Open Invitation",
+Formation / Lord's Prayer). The Opening AND The Recall are now **commonized**: identical
+framework text across all 3 books lives once in `commonSeries.md` as 16 `Opening_*` + 17
+`Recall_*` blocks (plus a book-colored Five Movements SVG, Bond-style Core-Content / Planning-
+Calendar / Selected-Passages / Recommended-Reading / Growth-Evaluation tables, and each book's
+creed dropped into the Opening Overview). **⚠ `convert_matter.py` does NOT yet emit this
+commonized matter** — it still produces the old flat format; the matter for books 1–4 was
+hand-finished after conversion (book 4 via `scratchpad/build_matter.py`). See §2c. Book 4 = "The Bond
+Between Us" (Community / A Christian Community Covenant, accent `#de6d36`) — **DEPLOYED + PUBLIC
+2026-07-29** (content `2aa69f1`); it is the "home" book for the genuine Recall + community
+Growth-Evaluation rubric (PDF p.408). Per-book callouts in
 `NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md`._
 
 ---
@@ -48,10 +55,13 @@ the website repo (`src/renderer/parser.js`) and deploys via its own CI on push.
 
 ## 2b. Converting a NEW book (checklist) — CURRENT as of 2026-07-28
 
-The pipeline is reusable across the whole Narrative Journey → Essentials series. Two books are
-done (The Story Behind It All, The Best Possible Life). Remaining Essentials books: **The Open
-Invitation** (Formation / Lord's Prayer), **The Bond Between Us** (Community), **The Glory Due
-His Name** (Devotion), **The Kingdom Come** (Witness). Read §11 (book-2 log) for a worked example.
+The pipeline is reusable across the whole Narrative Journey → Essentials series. Four books are
+done (The Story Behind It All, The Best Possible Life, The Open Invitation, The Bond Between Us).
+Remaining Essentials books: **The Glory Due His Name** (Devotion), **The Kingdom Come** (Witness).
+Read §11 (book-2 log) for a worked session example and **§2c for the commonized front/back matter**
+(the current state of the Opening/Recall). Book 4 (`BOOK4-KICKOFF.md`) added a reusable
+`scratchpad/build_matter.py` that assembles the commonized Opening/Recall directly (pulls prose from
+the Doc exports, rubric from the interior PDF) — a stopgap until `convert_matter.py` is upgraded.
 
 **Inputs to get from Steve first:** which book; the 12 session Google-Doc IDs + the 3 matter
 Doc IDs (Opening/Recall/Further); the book's **interior PDF** in `Downloads/` (used ONLY for:
@@ -76,9 +86,13 @@ Steps:
 5. `python convert.py <N>` per session → place as `NN-Title.md` in `sessions/` (zero-padded
    descriptive; nav strips the `NN-` prefix; see §5). Watch WARN lines (empty Passage Outline
    is expected/benign).
-6. `python convert_matter.py` → Opening/Recall/Further. **⚠ Verify the source Docs are actually
-   THIS book's** — book 1's Further-Resources Doc still held stale book-1 content, so we shipped
-   a heading-only placeholder. If a matter Doc is stale, ship a placeholder and flag it.
+6. **Matter (Opening / Recall / Further) — see §2c.** The Opening & Recall are now COMMONIZED
+   (shared `Opening_*` / `Recall_*` blocks + tables + SVG + creed-in-Overview). `convert_matter.py`
+   still emits the OLD flat format, so the matter is currently built by **copying book 3's matter
+   files as the template** and grabbing only the book-specific bits from the manuscript. **⚠ Verify
+   the source Docs are actually THIS book's** — books 1–3 each had a stale Further-Resources (and
+   book-3 had a stale Recall) Doc holding book-1 content; if a matter Doc is stale, ship a
+   heading-only placeholder and flag it.
 7. **Front Matter** — build `sessions/00-Front-Matter.md` in the CURRENT structure (see §12):
    `# Front Matter` → `## Introductory Quotes` (from interior PDF p.1) → `## A Narrative Journey
    Series` + `<!-- @include: NarrativeJourneySeriesList -->` → `## Publishing and Licensing`
@@ -111,6 +125,70 @@ book, so nothing series-level changes per new book. Book-specific only: the cree
 a scripture ref (`…willing." Isaiah 30:15`); an unstyled first line under Spiritual Practice is
 promoted to a `####` title. Steve's standing decisions in §4 apply (no per-session creed bold /
 active practice dot unless he specifies).
+
+## 2c. Commonized front/back matter (The Opening & The Recall) — CURRENT as of 2026-07-29
+
+The Opening and The Recall were **almost entirely identical framework text** across books 1–3
+(only a handful of book-specific slots differ). That identical text now lives once in
+`commonSeries.md` and is pulled into each book via `@include`. **This is the biggest change since
+the book-2 log and it is NOT reflected in `convert_matter.py` — do the matter by templating off
+book 3, not by running the matter converter.**
+
+**What's shared (in `commonSeries.md`, pulled via `@include`) — do NOT recreate:**
+- **The Opening — 16 `Opening_*` blocks:** `Opening_BookOverview_Directions`,
+  `Opening_CoreContent_Directions`, `Opening_KeyIdea_Directions`, `Opening_PersonalInterest_Directions`,
+  `Opening_FaithFoundation_Directions`, `Opening_Discussion_Directions`,
+  `Opening_SignificantQuote_Directions`, `Opening_LearningPlan_Directions`,
+  `Opening_SessionFramework_Intro`, `Opening_PlanningCalendar_Directions`,
+  `Opening_CoreProject_Directions`, `Opening_ImaginativeStorytelling_Directions`,
+  `Opening_FaithPractice_Directions`, `Opening_GrowthOutcomes_Directions`,
+  `Opening_FocusedArea_Directions`, `Opening_CommunityPrayer_Directions` — plus
+  **`Opening_SessionFrameworkInfographic`** (the self-contained **Five Movements cycle SVG**;
+  it uses `style="color: var(--accent, …)"` + `currentColor` so it auto-takes each book's accent —
+  nothing per-book to change).
+- **The Recall — 17 `Recall_*` blocks:** `Recall_BookOverview_{Directions,KeyIdea,StoryRetell,NarrativeReview}`,
+  `Recall_FaithFoundation_{Directions,DiscussionDirections,DiscussionQuestions,SignificantInsights}`,
+  `Recall_LearningPlan_{Directions,SelectedPassages,RecommendedReading}`,
+  `Recall_CoreProject_{Directions,JournalReflection}`,
+  `Recall_FaithPractice_{Directions,GrowthEvaluation,NextSteps,CommunityPrayer}`.
+  `Recall_FaithFoundation_DiscussionQuestions` and `Recall_FaithPractice_NextSteps` take an
+  `id="{Book}Recall-…"` param (REQUIRED once `{id}` is present, or the page throws).
+
+**What stays book-specific (inline in each book's `00-The-Opening.md` / `13-The-Recall.md`):**
+- **Key Elements** (Key Passage / Scripture Memory / Catechism — from the interior PDF's Opening page).
+- **The creed**, dropped into the Opening **Overview** (book-common — it lives in the book's
+  `commonBook.md`, pulled via `<!-- @include: {CREED_KEY} -->`, NOT series-common).
+- **Tables** (markdown, currently authored/placeholder per book):
+  - Opening **Core Content** — 3 cols; scripture refs go on their **own line inside the cell**
+    (`<br>(Ref)`); Bond-style.
+  - Opening **Planning Calendar** — Bond-style table.
+  - Recall **Selected Passages** — `Session | Topic | Passages`; Topic column intentionally
+    **blank** (author fills later); leave unknown cells empty (no `_____`).
+  - Recall **Recommended Reading** — `Session | Topic | Recommended Reading`; multiple books in a
+    cell separated by **`<br>`**, not `;`.
+  - Recall **Growth Evaluation** — wide 6-col rubric (`Objective | Exemplary | Mature | Developing
+    | Emerging | Unsound`), 5 metric rows (Conviction/Commitment/Conduct/Community/Character);
+    unknown per-book cells left as short `____` placeholders (see §11 history + the summary doc).
+- **Conclusion / Project Preview / Example ___ / Core Project body** — usually `Coming soon.` or a
+  short `____` placeholder until authored. **Never leave a standalone `__________` on its own line
+  — it renders as an `<hr>`.**
+
+**How to build book N's matter now (until `convert_matter.py` is upgraded):**
+1. Copy book 3's `00-The-Opening.md` + `13-The-Recall.md` as the structural template (all the
+   `@include`s, headings, and table skeletons are already correct and book-agnostic).
+2. Replace the book-specific bits: Key Elements (from the PDF Opening page), the creed `@include`
+   key (→ this book's `CREED_KEY`), the `id="{Book}Recall-…"` params, and the table
+   contents/placeholders. Grab any genuinely book-specific Opening/Recall prose from the
+   manuscript Docs.
+3. **Flag copy-paste:** if a matter Doc's "unique" content looks lifted from books 1–3 (books
+   1–3 all had at least one stale matter Doc), STOP and confirm with Steve before shipping;
+   default to a heading-only placeholder for a stale Doc.
+4. Further Resources: still convert via `convert_matter.py` OR ship a heading-only placeholder if
+   its Doc is stale (all 3 prior books shipped Further as a placeholder).
+
+**TODO (tooling debt):** upgrade `convert_matter.py` to emit this commonized structure directly
+(inject the `Opening_*`/`Recall_*` includes at the right spots, build the tables, drop the creed
+include into Overview, apply the placeholder conventions) so books 5–7 come out right in one pass.
 
 ## 3. Doc IDs
 
@@ -440,13 +518,16 @@ _<Full Title: A Narrative Journey of Christian X>_, Pre-Release Edition
 >
 > DO: follow CONVERSION.md §2b end to end — back up the prior book's `docs/`, curl the 15 Docs,
 > set the per-book values in the 3 scripts, build `commonBook.md` (creed) + `meta.json`
-> (accent/green headings/banner "Pre-Release"), convert + place all 12 sessions, do the matter
-> (verify the Docs are THIS book's, not stale), build the front matter in the §12 structure
-> reusing ALL shared blocks via `@include` (do NOT recreate the infographics, movement intros,
-> question sets, Series Introduction/Session Overview/series list/copyright). Render every
-> infographic with the standard shared `<Infographic>`. Verify: `completeness.py` 12/12 100% +
-> structural sweep + resolve all `@include` keys with the real parser + a `renderMarkdown`
-> spot-check. Then deploy: commit the CONTENT repo + `POST /api/refresh`.
+> (accent/headings/banner "Pre-Release"), convert + place all 12 sessions, do the matter
+> **per §2c** (Opening & Recall are now COMMONIZED — template off book 3's `00-The-Opening.md` /
+> `13-The-Recall.md`, reuse the 16 `Opening_*` + 17 `Recall_*` shared blocks + the Five Movements
+> SVG via `@include`, keep only Key Elements / creed-in-Overview / the tables book-specific; do
+> NOT run `convert_matter.py` for Opening/Recall, it still emits the old flat format), build the
+> front matter in the §12 structure reusing ALL shared blocks via `@include` (do NOT recreate the
+> infographics, movement intros, question sets, Series Introduction/Session Overview/series
+> list/copyright). Render every session infographic with the standard shared `<Infographic>`.
+> Verify: `completeness.py` 12/12 100% + structural sweep + resolve all `@include` keys with the
+> real parser + a `renderMarkdown` spot-check. Then deploy: commit the CONTENT repo + `POST /api/refresh`.
 >
 > GUARDRAILS: convert Session 1 first as a calibration pass and let me review before doing 2–12;
 > present options before consequential/irreversible decisions; keep the shared-element change log

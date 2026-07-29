@@ -16,7 +16,7 @@ import re, sys, os, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(HERE, 'docs')
-BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Open Invitation/sessions'
+BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Bond Between Us/sessions'
 
 def norm(s):
     s = s.replace('’',"'").replace('‘',"'").replace('“','"').replace('”','"')
@@ -66,9 +66,9 @@ def check(n, src_path, out_path):
     return (n, dropped == 0, len(S), len(O), gaps)
 
 # map session number -> output filename
-titles = {1:'01-The-Temple',2:'02-The-Meal',3:'03-The-Retreat',4:'04-The-Well',
- 5:'05-The-Towel',6:'06-The-Garden',7:'07-The-Mountain',8:'08-The-Treasure',
- 9:'09-The-Flask',10:'10-The-Scroll',11:'11-The-Wilderness',12:'12-The-Sabbath'}
+titles = {1:'01-The-Household',2:'02-The-Union',3:'03-The-Offspring',4:'04-The-Bond',
+ 5:'05-The-Public',6:'06-The-Work',7:'07-The-Church',8:'08-The-Community',
+ 9:'09-The-Commons',10:'10-The-Network',11:'11-The-Worlds',12:'12-The-Other'}
 
 allok = True
 for n in range(1,13):

@@ -7,7 +7,7 @@ format conversion. Writes out/<name>.md.
 import re, os, sys
 HERE=os.path.dirname(os.path.abspath(__file__))
 DOCS=os.path.join(HERE,'docs'); OUT=os.path.join(HERE,'out'); os.makedirs(OUT,exist_ok=True)
-ID_PREFIX = "TheOpenInvitation"  # PER-BOOK: question-id prefix
+ID_PREFIX = "TheBondBetweenUs"  # PER-BOOK: question-id prefix
 
 def italic_to_us(s):
     s=s.replace('**','\x00'); s=re.sub(r'\*([^\*\x00]+?)\*', r'_\1_', s); return s.replace('\x00','**')

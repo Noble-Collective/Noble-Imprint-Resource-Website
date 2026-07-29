@@ -18,12 +18,13 @@ OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
 # PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
-ID_PREFIX = "TheOpenInvitation"
+ID_PREFIX = "TheBondBetweenUs"
 # PER-BOOK setting: the include key for this book's Creedal Statement block (lives
 # in the book's commonBook.md). "The Story Behind It All" = ApostlesCreed; "The Best
 # Possible Life" (Christian Living) = TenCommandments; "The Open Invitation"
-# (Christian Formation) = LordsPrayer.
-CREED_KEY = "LordsPrayer"
+# (Christian Formation) = LordsPrayer; "The Bond Between Us" (Christian Community)
+# = CommunityCovenant.
+CREED_KEY = "CommunityCovenant"
 
 warnings = []
 def warn(m): warnings.append(m)
