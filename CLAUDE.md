@@ -103,6 +103,8 @@ Super admin is hardcoded: `steve@noblecollective.org` in `auth.js`.
 
 Audio is generated in a separate repo (`Noble-Imprint-Audiobooks`) via ElevenLabs TTS. This website serves audio via GCS signed URLs. The `audio-player.js` provides a floating icon → sticky bottom bar player with sentence-level text sync from timestamp data.
 
+**Bible audiobooks** (`/bible` reader): chapters with generated audio (e.g. Proverbs, 2 Timothy) render as paragraphs with the player + synced highlighting. Serving path: `audio.js` `getBibleAudioManifest`/`getBibleAudioChapter` (GCS `audio/bible/{tx}/{book-slug}/`), `bible.js` `getAudioChapterBlocks` (renders from `usfm-audio.js` — a CommonJS port of the audiobook converter that MUST stay byte-parity with `Noble-Imprint-Audiobooks/src/usfm-to-markdown.js`), and `bible-chapter.ejs` (audio-fab gated on `audioSession`). Poetry grouping + the `\h`↔references.json name fix (`resolveRefBookName`) live in `bible.js` `loadBibles`; after changing that parsing, rebuild + commit `.bible-cache/*.json`. **Full architecture + runbook for adding books: `Noble-Imprint-Audiobooks/docs/BIBLE-AUDIOBOOKS.md`.**
+
 ### Firestore Conventions
 
 Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`.
