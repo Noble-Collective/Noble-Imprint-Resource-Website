@@ -10,7 +10,9 @@ pipeline/process, see `CONVERSION.md`.
 - **Convention:** "typos in source Docs" = present in the manuscript and reproduced verbatim;
   fix them at the source. "Editorial callouts" = decisions, placeholders, or omissions.
 
-_Last updated: 2026-07-28 (book 3, The Open Invitation, converted & verified)._
+_Last updated: 2026-07-28 (book 3 converted & verified; The Recall shared-content refactor —
+17 shared blocks, Growth-Evaluation rubric tables, Next Steps questions; parser now allows
+underscore/dash keys)._
 
 ---
 
@@ -105,6 +107,48 @@ reformatting, reflow, omissions, rewordings, structural choices. Source in paren
   the range; the PDF wrote a hyphen (`20:1-17`).
 - Added two trailing spaces per line (markdown hard line breaks), matching the ApostlesCreed block.
 
+### `commonSeries.md` → The Recall shared framework (2026-07-28, per Steve)
+The Recall (`13-The-Recall.md`) previously duplicated ~44% identical framework text inline across
+books 1 & 2 with **zero** `@include` use. Extracted the identical framework into **17 new
+`commonSeries.md` blocks** and wired books 1 & 2 to `@include` them (headings stay inline for
+readability; book-specific parts — Conclusion, Key Elements, the Selected Passages / Recommended
+Reading lists, Creedal Confession/Code of Conduct, and the Growth-Evaluation rubric — stay inline).
+Verified a **pure refactor**: resolved output byte-identical (book 1) / content-identical (book 2)
+to the originals. Blocks (underscore-keyed — see the parser change in tooling notes):
+`Recall_BookOverview_{Directions,KeyIdea,StoryRetell,NarrativeReview}`,
+`Recall_FaithFoundation_{Directions,DiscussionDirections,DiscussionQuestions,SignificantInsights}`,
+`Recall_LearningPlan_{Directions,SelectedPassages,RecommendedReading}`,
+`Recall_CoreProject_{Directions,JournalReflection}`,
+`Recall_FaithPractice_{Directions,GrowthEvaluation,NextSteps,CommunityPrayer}`.
+- **`Recall_FaithFoundation_DiscussionQuestions`** holds the 4 review questions with `{id}-Qn`;
+  each book passes `id="{Book}Recall-Discussion"` (question text was identical across books; only
+  ids differed).
+- **`Recall_FaithPractice_NextSteps`** — the flat "Individual Family Church World" line was turned
+  into **4 id-tagged `<Question id={id}-Qn>` blocks** (Individual/Family/Church/World); each book
+  passes `id="{Book}Recall-NextSteps"`. (Once `{id}` is present the parser REQUIRES the param, so
+  BOTH books' includes must pass an id or the page throws.)
+- **`Recall_FaithPractice_GrowthEvaluation`** was later **trimmed to just the intro directions**
+  (the 5-metric objective list moved into each book's rubric table — see below).
+
+### The Recall — Growth-Evaluation rubric tables (2026-07-28, per Steve)
+**Finding:** the Growth-Evaluation rubric had been stored as 5 flattened by-level paragraphs and
+was **mis-themed**. Recovered the canonical grid from **The Bond Between Us PDF p.408**
+(`find_tables`): rows = 5 metrics (Conviction/Commitment/Conduct/Community/Character) + an
+objective, columns = Exemplary/Mature/Developing/Emerging/Unsound, cells = 25 descriptions.
+- **Book 1 (The Story Behind It All):** its 4 columns Mature/Developing/Emerging/Unsound were
+  genuinely belief-themed (reconstructed into grid cells by segmenting the flattened paragraphs);
+  but its **Exemplary column had been overwritten with The Bond Between Us's community text**.
+  Rebuilt as a markdown **table**; the Exemplary column is left as fill-in placeholders
+  (`deep understanding of __________`, etc.) rather than fabricated. Metric names moved into the
+  row labels (`**Conviction:** establish a mature Christian understanding of core Christian belief`).
+- **Book 2 (The Best Possible Life):** its manuscript rubric was a **byte-for-byte copy of book 1's
+  belief text** (a carry-over error), NOT living content. Per Steve, built book 2's table as the
+  **common skeleton across the Bond (community) and Story (belief) grids** — every book-specific
+  slot blanked as `__________` (a fill-in template), keeping only the frame common to both (levels,
+  metric objectives, connectives like "grounded in core biblical teaching as a countercultural
+  worldview"). Book 2's living-specific wording is to be filled into the 42 blanks later.
+- Both rubric tables render as a wide 6-column HTML table (horizontal scroll on mobile).
+
 ### History (superseded within this session, not in the committed content)
 - I first built `<SeriesIntroduction>` / `<SessionOverview>` from **book 1's abbreviated front
   matter**, then **replaced** them with the authoritative Bond-PDF versions above once we found
@@ -128,6 +172,11 @@ Things I noticed but deliberately left alone — for you to inspect/decide.
   there too, or a re-export/re-conversion of book 2's Opening reintroduces it.
 - **Sessions 2–12 (book 2) were not line-by-line proofread** — only completeness-verified
   (100% word coverage). More source-Doc typos may exist beyond the ones listed per book.
+- **Recall Growth-Evaluation rubric has unfilled blanks (LIVE, both books).** Book 1's Exemplary
+  column = 5 fill-in placeholders (`deep understanding of __________`, etc.) — its real Exemplary
+  content was the mis-pasted Bond community text and was never recovered. Book 2's whole rubric =
+  a 42-blank common skeleton awaiting its living-specific wording. Both are intentional fill-in
+  templates on live pages; fill them when the real per-book cell text is available.
 - ~~Test Book churn~~ / ~~dropped subseries descriptors~~ — resolved: churn is harmless
   (no action needed); descriptors are now included in the three subseries tables.
 
@@ -303,6 +352,14 @@ verbatim via `@include`. Hence no new entries in the shared change log above.
   normalizes any `Catechism…` run-in label to just "**Catechism**" so the bold term is uniform
   across books (per Steve). Books 1–2 already wrote "Catechism"; book 3's Docs wrote "Catechism
   Question".
+- [2026-07-28, per Steve] **Website parser change — `@include` block keys may now contain
+  underscores/dashes.** Extended the key charset `[A-Za-z][A-Za-z0-9]*` → `[A-Za-z][A-Za-z0-9_-]*`
+  in all four regexes (`resolveIncludes` + `resolveIncludesTracked` directive parsers in
+  `src/renderer/parser.js`; `parseCommonBlocks` + `parseCommonBlocksTracked` block-tag parsers in
+  `src/server/content.js`), so keys can be grounded in their section hierarchy for readability
+  (e.g. `Recall_BookOverview_KeyIdea`). Backward-compatible (existing alphanumeric keys unaffected);
+  added a unit test in `tests/unit/segment-map.test.js`. Deployed (website `5e20cc1`). This
+  unblocked the underscore-keyed Recall blocks above.
 - Shared content (5 infographics, 5 movement intros, section directions, shared question
   sets) lives once in `Narrative Journey Series/commonSeries.md` and is `@include`d by every
   book — nothing is recreated per book. Each book's creed is book-level in its `commonBook.md`.
