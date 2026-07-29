@@ -303,7 +303,7 @@ app.get('/bible/:translationId', (req, res) => {
   res.render('bible-books', { translation: t, ot, nt, title: t.title });
 });
 
-app.get('/bible/:translationId/:bookName', (req, res) => {
+app.get('/bible/:translationId/:bookName', async (req, res) => {
   const t = bible.getTranslation(req.params.translationId);
   if (!t) return res.status(404).render('error', { title: 'Not Found', message: 'Bible translation not found.' });
   const bookName = decodeURIComponent(req.params.bookName);
@@ -313,12 +313,36 @@ app.get('/bible/:translationId/:bookName', (req, res) => {
   const books = bible.getBookList(req.params.translationId);
   const bookInfo = books.find(b => b.name === bookName);
   const totalChapters = bookInfo ? bookInfo.chapterCount : 1;
+
+  // Audio: if this chapter has a generated audiobook, render from the converter's
+  // blocks (matching the timestamps) and enable the player. Degrades to text-only.
+  let audioSession = null;
+  let audioBlocks = null;
+  let audioBookPath = null;
+  try {
+    audioSession = await audio.getBibleAudioChapter(req.params.translationId, bookName, chapter);
+    if (audioSession) {
+      // bookPath is "bibles/{tx}/{CODE}" — the 3-letter USFM code is the last segment.
+      const code = String(audioSession.bookPath || '').split('/').pop();
+      audioBlocks = code ? await bible.getAudioChapterBlocks(req.params.translationId, code, chapter) : null;
+      if (!audioBlocks) audioSession = null; // no blocks → fall back to text-only
+      else audioBookPath = `bible/${req.params.translationId}/${audioSession.bookSlug}`;
+    }
+  } catch (err) {
+    console.error('[bible] audio lookup failed:', err.message);
+    audioSession = null;
+  }
+
   res.render('bible-chapter', {
     translation: t,
     bookName,
     chapter,
     totalChapters,
     verses,
+    audioSession,
+    audioBlocks,
+    audioBookPath,
+    audioFormatDuration: audio.formatDuration,
     title: `${bookName} ${chapter} — ${t.title}`,
   });
 });

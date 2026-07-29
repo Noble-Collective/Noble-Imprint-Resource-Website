@@ -1,9 +1,16 @@
 const github = require('./github');
+const usfmAudio = require('./usfm-audio');
 const fs = require('fs');
 const path = require('path');
 
 const translations = {};
 let loaded = false;
+
+// Lazy caches for audio-chapter rendering (independent of the bible disk cache):
+//  - contentListingCache: translationId → github dir listing of bibles/{tx}/content
+//  - audioBlocksCache: `${translationId}/${filename}` → parsed { bookName, chapters }
+const contentListingCache = {};
+const audioBlocksCache = {};
 
 const CACHE_DIR = path.join(__dirname, '../../.bible-cache');
 const CACHE_VERSION = 1;
@@ -332,6 +339,49 @@ function getChapter(translationId, bookName, chapter) {
   return verses;
 }
 
+// Resolve a book's USFM filename from its 3-letter code via a cached content-dir listing.
+// BSB files look like "562TIBSB.SFM"; KJV like "59-2TIeng-kjv.usfm" — match by code.
+async function resolveUsfmFilename(translationId, code) {
+  let listing = contentListingCache[translationId];
+  if (!listing) {
+    listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
+    contentListingCache[translationId] = listing;
+  }
+  const upper = code.toUpperCase();
+  const marker = translationId === 'kjv' ? 'ENG-KJV' : 'BSB';
+  const hit = listing.find(f => {
+    const u = f.name.toUpperCase();
+    return (u.endsWith('.SFM') || u.endsWith('.USFM')) && u.includes(upper) && u.includes(marker);
+  });
+  return hit ? hit.name : null;
+}
+
+/**
+ * Blocks for rendering an audio-enabled chapter (section headings + stanza paragraphs
+ * with <sup> verse numbers), produced by the SAME parser the audio timestamps came from
+ * (usfm-audio.js) so the DOM block order matches. `code` is the 3-letter USFM book code
+ * (from the audio manifest's bookPath). Returns [{type,text}] or null. Fetches + parses
+ * the book's USFM on first use, then serves from an in-memory cache.
+ */
+async function getAudioChapterBlocks(translationId, code, chapter) {
+  try {
+    const filename = await resolveUsfmFilename(translationId, code);
+    if (!filename) return null;
+    const key = `${translationId}/${filename}`;
+    let parsed = audioBlocksCache[key];
+    if (!parsed) {
+      const { content } = await github.getFileContent(`bibles/${translationId}/content/${filename}`);
+      parsed = usfmAudio.parseUsfmBook(content);
+      audioBlocksCache[key] = parsed;
+    }
+    const ch = parsed.chapters.find(c => c.num === chapter);
+    return ch ? ch.blocks : null;
+  } catch (err) {
+    console.error(`[bible] Failed to load USFM audio blocks (${translationId}/${code}):`, err.message);
+    return null;
+  }
+}
+
 const NT_BOOKS = new Set([
   'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans',
   '1 Corinthians', '2 Corinthians', 'Galatians', 'Ephesians',
@@ -381,4 +431,5 @@ module.exports = {
   getBookList,
   getBookListGrouped,
   getChapter,
+  getAudioChapterBlocks,
 };

@@ -82,6 +82,44 @@ async function getAudioSession(bookRepoPath, sessionFilename) {
 }
 
 /**
+ * Bible-audiobook manifest, stored at audio/bible/{tx}/{book-slug}/manifest.json
+ * (the audiobook pipeline's Bible path). book-slug is slugify(bookName), matching the
+ * generation side. Returns null if the book has no audio.
+ */
+async function getBibleAudioManifest(translationId, bookName) {
+  const bookSlug = slugify(bookName);
+  const cacheKey = `bible-audio-manifest:${translationId}/${bookSlug}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const file = getBucket().file(`audio/bible/${translationId}/${bookSlug}/manifest.json`);
+  try {
+    const [contents] = await file.download();
+    const manifest = JSON.parse(contents.toString());
+    cache.set(cacheKey, manifest, MANIFEST_TTL);
+    return manifest;
+  } catch (err) {
+    if (err.code === 404) return null;
+    console.error(`[audio] Failed to load bible manifest for ${translationId}/${bookSlug}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Audio session for a single Bible chapter. Chapters are stored as "NNN.md" sessions
+ * (zero-padded chapter number). Returns the session entry (audioFile, timestampsFile,
+ * durationSeconds, …) plus bookPath/bookSlug, or null if that chapter has no audio.
+ */
+async function getBibleAudioChapter(translationId, bookName, chapter) {
+  const manifest = await getBibleAudioManifest(translationId, bookName);
+  if (!manifest) return null;
+  const sessionFile = `${String(chapter).padStart(3, '0')}.md`;
+  const session = manifest.sessions.find(s => s.sessionFile === sessionFile);
+  if (!session) return null;
+  return { ...session, bookPath: manifest.bookPath, bookSlug: slugify(bookName) };
+}
+
+/**
  * Voice-comparison test data. Reads voice-test/{slug}/manifest.json from the
  * audiobook bucket and returns it with a signed URL per voice sample. Used by
  * the /voice-test page for side-by-side voice review. Returns null if absent.
@@ -134,6 +172,8 @@ module.exports = {
   getAudioManifest,
   getSignedUrl,
   getAudioSession,
+  getBibleAudioManifest,
+  getBibleAudioChapter,
   getVoiceCompareData,
   clearCache,
   formatDuration,
