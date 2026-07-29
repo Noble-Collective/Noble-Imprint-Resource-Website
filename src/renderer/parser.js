@@ -801,11 +801,13 @@ function renderMarkdown(content, options = {}) {
     if (isInsideTagAttribute(scm.index)) continue;
     const before = html.substring(Math.max(0, scm.index - 1), scm.index);
     if (before === '"' || before === '=' || before === '/') continue;
+    // Single-chapter books live under chapter 1 in the verse data; the display
+    // text stays "Jude 3" but the lookup ref needs the implicit chapter ("Jude 1:3").
     replacements.push({
       start: scm.index,
       end: scm.index + scm[0].length,
       original: scm[0],
-      ref: scm[0],
+      ref: `${scm[1]} 1:${scm[2]}`,
     });
   }
 
