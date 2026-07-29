@@ -18,13 +18,14 @@ OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
 # PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
-ID_PREFIX = "TheBondBetweenUs"
+ID_PREFIX = "TheGloryDueHisName"
 # PER-BOOK setting: the include key for this book's Creedal Statement block (lives
 # in the book's commonBook.md). "The Story Behind It All" = ApostlesCreed; "The Best
 # Possible Life" (Christian Living) = TenCommandments; "The Open Invitation"
 # (Christian Formation) = LordsPrayer; "The Bond Between Us" (Christian Community)
-# = CommunityCovenant.
-CREED_KEY = "CommunityCovenant"
+# = CommunityCovenant; "The Glory Due His Name" (Christian Devotion) = DevotionCreed
+# (PLACEHOLDER — no creed source yet; commonBook.md ships "<DevotionCreed>Coming soon.</DevotionCreed>").
+CREED_KEY = "DevotionCreed"
 
 warnings = []
 def warn(m): warnings.append(m)
@@ -126,9 +127,12 @@ def qnum(p):
     return (int(m.group(1)), m.group(2)) if m else None
 
 def convert_question(text):
-    m = re.match(r'^\*\*(.+?)\*\*:\s*(.*)$', text)
+    # Run-in label: "**Label**: rest" OR "**Label:** rest" (some book-5 Docs put the
+    # colon INSIDE the bold). Normalize both to <Accent>Label:</Accent> (house style).
+    m = re.match(r'^\*\*(.+?):?\*\*:?\s+(.*)$', text)
     if m:
-        return f"<Accent>{clean(m.group(1))}:</Accent> {clean(m.group(2))}"
+        label = clean(m.group(1)).rstrip(':')
+        return f"<Accent>{label}:</Accent> {clean(m.group(2))}"
     return clean(text)
 
 def flush_heading(level, text, extra=None):
@@ -267,6 +271,8 @@ while i < len(paras):
                 practice_titled = False
                 while i < len(paras) and not (hd(paras[i]) and hd(paras[i])[0] <= 2):
                     pp = paras[i]; i += 1
+                    if re.fullmatch(r'#{1,6}', pp.strip()):
+                        continue  # stray empty-heading artifact (e.g. a bare "###" left in the Doc)
                     hh = hd(pp)
                     if hh:
                         flush_heading(max(4, hh[0]), hh[1]); practice_titled = True; continue

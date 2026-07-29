@@ -5,18 +5,20 @@ markdown used by the Noble Imprint website/app. Built for **"The Story Behind It
 All"** (Narrative Journey Series → Essentials); the same pipeline is meant
 to be reused for the rest of the series.
 
-_Last updated: 2026-07-29 — books 1–3 complete & live (book 3 = "The Open Invitation",
-Formation / Lord's Prayer). The Opening AND The Recall are now **commonized**: identical
-framework text across all 3 books lives once in `commonSeries.md` as 16 `Opening_*` + 17
-`Recall_*` blocks (plus a book-colored Five Movements SVG, Bond-style Core-Content / Planning-
-Calendar / Selected-Passages / Recommended-Reading / Growth-Evaluation tables, and each book's
-creed dropped into the Opening Overview). **⚠ `convert_matter.py` does NOT yet emit this
-commonized matter** — it still produces the old flat format; the matter for books 1–4 was
-hand-finished after conversion (book 4 via `scratchpad/build_matter.py`). See §2c. Book 4 = "The Bond
-Between Us" (Community / A Christian Community Covenant, accent `#de6d36`) — **DEPLOYED + PUBLIC
-2026-07-29** (content `2aa69f1`); it is the "home" book for the genuine Recall + community
-Growth-Evaluation rubric (PDF p.408). Per-book callouts in
-`NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md`._
+_Last updated: 2026-07-29 — **books 1–4 complete & live** (book 4 = "The Bond Between Us",
+Community / A Christian Community Covenant, accent `#de6d36`, DEPLOYED + PUBLIC; the "home" book for
+the genuine Recall + community Growth-Evaluation rubric extracted from its PDF p.408). The Opening AND
+The Recall are **commonized**: identical framework text lives once in `commonSeries.md` as 16
+`Opening_*` + 17 `Recall_*` blocks (plus a book-colored Five Movements SVG, Bond-style Core-Content /
+Planning-Calendar / Selected-Passages / Recommended-Reading / Growth-Evaluation tables, and each
+book's creed dropped into the Opening Overview). **⚠ `convert_matter.py` does NOT emit this commonized
+matter** — it still produces the old flat format; book-4 matter was built by the reusable
+`scratchpad/build_*.py` scripts (creed/matter/further/learning-plan, all reading the interior PDF).
+See §2c, and **§2d for the "matter-less book" pattern (book 5 — no PDF, no Opening/Recall/Further
+Docs).** Book 5 = "The Glory Due His Name" (Devotion, accent `#25a9ad`, placeholder `DevotionCreed`) —
+**converted & verified locally 2026-07-29 (16 files, S1 completeness 100%, all @include resolve);
+deploy pending Steve's go-ahead.** Kickoff in `BOOK5-KICKOFF.md`; per-book callouts (incl. the S2–S12
+draft-appendix finding + S1 typos) in `NARRATIVE-JOURNEY-CONVERSION-SUMMARY.md`._
 
 ---
 
@@ -189,6 +191,60 @@ book 3, not by running the matter converter.**
 **TODO (tooling debt):** upgrade `convert_matter.py` to emit this commonized structure directly
 (inject the `Opening_*`/`Recall_*` includes at the right spots, build the tables, drop the creed
 include into Overview, apply the placeholder conventions) so books 5–7 come out right in one pass.
+
+### Book-4 build learnings (the reusable `scratchpad/build_*.py` scripts) — 2026-07-29
+
+Book 4's matter was assembled by four small PDF-reading scripts (kept in
+`tools/story-conversion/scratchpad/`). They pull prose/refs verbatim from the interior PDF/Doc
+exports so nothing is transcribed by hand. Reuse them for any book that HAS a PDF:
+- **`build_creed.py`** — reads the PDF creed page, writes `commonBook.md`'s `<CREED_KEY>` block
+  (blockquote lines, markdown hard breaks, straight quotes, `<< Attribution`). Keeps verse/creed text
+  out of model output (the book-2 content-filter lesson). Two stanzas → separate with a blank `>` line.
+- **`build_matter.py`** — builds `00-Front-Matter.md` + `00-The-Opening.md` + `13-The-Recall.md` by
+  templating off book 3/4 and pulling book-specific prose from the Doc exports (`docs/opening.md`,
+  `docs/recall.md`) via `convert_matter.py`'s helpers (`clean`, `split_attr`, `paras`) + the
+  Growth-Evaluation rubric from the PDF (`find_tables`). Does NOT run `convert_matter.py` for
+  Opening/Recall.
+- **`build_further.py`** — `14-Further-Resources.md`: bibliography (per-block reconstruction — **each
+  PDF text block = one citation**, so italics can't cross-contaminate) with **book titles italicized
+  from the PDF's own `*-Italic` font runs** (`span["flags"] & 2`); reading plan as **per-session
+  5-row × 4-week-column tables** (transpose the 4 weeks × 5 daily readings). Fix source ref typos in
+  a `clean_ref()` (e.g. `Book; 8:14`→`Book 8:14`, `…14: Romans`→`…14; Romans`).
+- **`build_learningplan.py`** — fills the Recall **Selected Passages + Recommended Reading** tables
+  from the PDF (Topic column IS in the PDF — populate it); Recommended-Reading books joined with
+  `<br>`, titles italicized. Idempotent (regex-replaces the existing table).
+
+**Website render support added for book 4** (`src/renderer/parser.js` + `style.css`, cache-buster now
+`v=84`): the renderer auto-tags matter tables by their header so CSS can size them —
+`.pc-table` (Planning Calendar, "Biblical Passage"), `.cc-table` (Opening Core Content,
+"Session"+"Focus" → 32%/68%), `.lp-table` (Recall Selected Passages / Recommended Reading,
+"Session"+"Topic" → first col `white-space:nowrap`), `.rp-table` (reading plan, "Week N" → fixed 25%
+cols, wrapped in a `.rp-scroll` div that scrolls horizontally on ≤640px phones).
+
+**Passage-ref reconciliation:** when a session's Bible ref disagrees across the session/Opening/Recall
+Docs, check ALL occurrences in the PDF — the PDF is usually internally consistent except a lone typo;
+align to its dominant value (Steve confirms). Never guess a range; it's an author call. Fix in the
+output AND flag the Google Docs (a re-export reverts).
+
+## 2d. The "matter-less" book (no PDF, no Opening/Recall/Further Docs) — book 5 pattern
+
+Some books arrive as **only the 12 session Docs** — no interior PDF and no Opening/Recall/Further
+manuscript Docs (book 5, "The Glory Due His Name"). Handle it like this:
+- **Sessions 1–12:** convert exactly as normal (`convert.py`). Key Elements come from each session
+  Doc. **The creed block must still exist** — `convert.py` emits `@include: {CREED_KEY}` for every
+  session's Creedal Statement even when the Doc's creed body is an unfilled placeholder, so put a
+  placeholder `<CREED_KEY>Coming soon.</CREED_KEY>` in `commonBook.md` (or the real creed if provided)
+  or the page throws on an undefined key.
+- **The 4 non-session files:** build from the shared `@include` blocks (Front Matter's 4 series
+  includes; the 16 `Opening_*` + 17 `Recall_*` + Five-Movements SVG) exactly as books 3–4, and fill
+  every book-specific slot with a **heading / "Coming soon." / `____` placeholder** — there's no source
+  to fill them. EXCEPTION: the Opening **Core Content** and **Planning Calendar** tables can still be
+  built from the 12 session **titles + Key Passages** (present in the session Docs); leave the Focus /
+  Teacher / Date cells blank. Further Resources → heading-only placeholder (as books 1–3).
+- **Inputs that normally come from the PDF must come from Steve:** accent hex (try `cover.svg` for a
+  candidate), the creed, Introductory Quotes. Flag these up front.
+- **Do NOT run the `build_*.py` scripts** — they read the PDF, which doesn't exist. Hand-build the
+  matter by templating off book 4 with placeholders.
 
 ## 3. Doc IDs
 

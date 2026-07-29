@@ -492,6 +492,109 @@ copy-pasted from books 1–3, flag it and check with Steve** before shipping (ev
 at least one stale matter Doc). Convert **Session 1 (The Household) first as a calibration pass**
 for Steve's review before doing 2–12.
 
+**Matter polish pass (2026-07-29, deploys 2–5 — all live):**
+- **Recall Learning Plan tables filled from PDF pp.404–405** — Selected Passages + Recommended
+  Reading, with the **Topic column populated** (Family…Outsiders); Recommended-Reading books joined
+  with `<br>`.
+- **All book titles italicized** (Recall Recommended Reading + Further bibliography) from the PDF's
+  own `AGaramondPro-Italic` font runs, reconstructed **per PDF block** (each block = one citation, so
+  no cross-entry collision); the one title the PDF left plain (S6 Banks) italicized for consistency.
+- **Further Resources reading plan = per-session 5-row × 4-week-column tables** (transposed from the
+  PDF's 4-week × 5-day grid), fixed 25% columns, horizontal-scroll on ≤640px phones.
+- **Passage-ref reconciliation** (checked every PDF occurrence): S6 The Work = **Nehemiah 1:1–7:4**
+  (Recall conclusion's "7:73" was a lone PDF typo); S11 The Worlds = **Acts 16:6–18:17** everywhere
+  (per Steve; Opening said 16:11, Recall said 16:11–17:33). Reading-plan ref typos fixed:
+  `Ecclesiastes; 8:14`→`Ecclesiastes 8:14`, `Nehemiah; 5:1`→`Nehemiah 5:1`, `Ezekiel 6:1–14: Romans`
+  →`…; Romans`, `6:1–22 Genesis`→`6:1–22; Genesis`. **Book 3 Recall Catechism** set to copy its
+  Opening ("Faith") instead of `____`.
+- **Still open (source Docs):** the Opening/Recall Google Docs still carry the old passage refs
+  (`16:11`, `7:73`, `17:33`) + `Philppians` — fix at source or a re-export reverts. S4 Selected
+  Passages had `Philppians` (fixed in output). Growth Outcomes / Imaginative Storytelling remain the
+  belief-themed boilerplate (matches book 3 — flag for community authoring).
+
+---
+
+## Book 5 — The Glory Due His Name  (Christian Devotion)
+
+**Status:** **DEPLOYED + PUBLIC 2026-07-29** (content repo `edf5184`, pushed to main →
+notify-website.yml auto-refresh + manual `/api/refresh` OK; all 16 pages live 200, accent `#25a9ad`
+rendering, `DevotionCreed` placeholder shows "Coming soon.", 0 unresolved `@include`). Built the
+final shared-content format IN PLACE in `Essentials/The Glory Due His Name/` (`status: public`, banner
+`Pre-Release`, accent `#25a9ad`, `order` 5). Stale preview `session1.md` (+ a `.DS_Store`) removed.
+(Website-repo tooling changes — `convert.py`/`completeness.py` fixes + these docs — are saved on disk
+but NOT pushed: no `src/` change, so no Cloud Run redeploy per the standing guardrail.)
+`series.order` = 5. **This is the "matter-less" book (see CONVERSION.md §2d): NO interior PDF and NO
+Opening/Recall/Further Docs — only the 12 session Docs.**
+
+- **12 sessions** (`01-The-Water … 12-The-Banquet`): converted with **zero WARN lines**;
+  `completeness.py` = **S1 100% (0 unmatched)**. S2–S12 each show a large end-block "unmatched" delta
+  that is **entirely an author draft appendix** (see the ⚠ finding below), NOT dropped finished
+  content — the finished bodies matched 100% up to the appendix boundary (verified: every gap is one
+  contiguous end-region; S1, which has no appendix, is a clean 100%). Structural sweep clean on all 12
+  (5 infographics + 5 movement intros + 1 `DevotionCreed` creed each; 0 stray `<Item>`/`<Infographic>`;
+  0 open `@include`; 0 `active=`/`bold=`; 12–20 inline `<Question>`).
+- **All 16 files** resolve every `@include` via the REAL parser (`resolveIncludes` +
+  `parseCommonBlocks`, series+book blocks) — **303 directives, 0 undefined, 0 leftover** — and
+  `renderMarkdown` cleanly (0 throws, 0 stray custom tags). `DevotionCreed` placeholder resolves to
+  "Coming soon."
+- **Creed:** placeholder `<DevotionCreed>Coming soon.</DevotionCreed>` in `commonBook.md`
+  (`CREED_KEY="DevotionCreed"`, real creed TBD — each session Doc's Creedal Statement is an unfilled
+  "Statement"). **Rename the key everywhere if a real creed is provided later.**
+- **Accent:** `#25a9ad` (teal, from `cover.svg`); all six heading `color` levels set to it + `accent` key.
+- **Front Matter:** §12 structure; Introductory Quotes = **"Coming soon."** (no PDF p.1). Publishing
+  line "The Glory Due His Name: A Narrative Journey of Christian Devotion".
+- **The Opening / The Recall:** commonized per §2c (templated off book 3's placeholder matter; all
+  `Opening_*`/`Recall_*` includes + Five Movements SVG reused). Book-specific slots are placeholders:
+  Opening/Recall Key Elements (`Key Passage` = Preview/Review; Scripture Memory + Catechism = `____`),
+  Introduction/Conclusion/Key Idea/Discussion/Personal-Interest/Significant Quote/Project Preview/
+  Example Creed → "Coming soon."; Growth Outcomes + Imaginative Storytelling kept as the shared
+  belief-themed boilerplate (as books 3–4); Recall Growth-Evaluation = book-3's generic `____` rubric
+  skeleton; Selected Passages / Recommended Reading = blank 3-col tables (Session rows only). Recall
+  Core-Project capstone → placeholder `### Devotion Creed` "Coming soon." **Opening Core Content +
+  Planning Calendar tables ARE built** from the 12 session titles + Key Passages (Focus/Teacher/Date
+  blank).
+- **Further Resources:** heading-only placeholder (per-session `#### Session N: <title>` under
+  Bibliography + Reading Plan), as books 1–3.
+
+**Decisions (Steve, 2026-07-29):** accent `#25a9ad`; creed = placeholder `DevotionCreed`;
+`status: public`; **leave both "The Water" sessions as-is** (see standing flag below).
+
+**⚠ STANDING FLAG — S1 and S5 are BOTH titled "The Water"** (S1 = Genesis 6:1–9:17 flood; S5 = Acts
+8:1–40 baptism). Per Steve (2026-07-29): **left both as "The Water"** → files `01-The-Water.md` +
+`05-The-Water.md`; the nav shows two identical "The Water" entries. Not renamed — flagged here to
+revisit later (cf. book-3 S10 "The Temple" mislabel). A 13th folder Doc ("Header 1") is not a
+session — ignored.
+
+**⚠ SESSION DRAFT APPENDICES (dropped by the converter — real prose NOT on the live pages).**
+Every session Doc **2–12** (NOT S1) carries an author working-notes appendix **below the finished
+session** (after "Insert Movement 5 template."), which the converter drops (`skip_to_h2` runs to EOF —
+same behavior as book-1 S1's trailing heading-skeleton, §7). This is why `completeness.py` reports
+600–1,650 "unmatched" source words per session — all benign, all in the appendix. Contents per
+session (varies): **"Long Story Short (400-word retell; 200-word summary)" → "The Story Retold:
+<title>"** (a ~400-word sample retelling — Storycraft material; the finished session uses the shared
+`StoryRetellQuestion` prompt instead), **"Thinking It Through"** (reflection prose), **"Seeing the
+Design"** (the biblical-book-context boilerplate), plus stray fragments ("Genesis", "??", "Extras",
+"Dire"). Some go further: **S6** "Future Vision"; **S7/S8/S9** draft *outlines* with authoring specs
+(**"Spiritual Practice (180 words; 1 quote, 1 verse)"** with draft practice content like "Pledge of
+Allegiance" / "Free At Last" — note the finished Spiritual Practice sections are EMPTY, so if any of
+this is intended liturgy it needs to be moved up per Steve's standing "include practice content where
+the manuscript has it" rule); **S9** draft movement outlines (Providential Provision / Corporate
+Ministry / Witness the Text); **S11/S12** a partial **"Bibliography"** (2–3 citations) + "Extras" /
+"The Recall". **Decision default: dropped + flagged (reversible — the prose stays in the source Docs).
+Revisit whether the retellings, the S7/S8 practice drafts, or the S11/S12 bibliography should be
+promoted into the finished sessions.**
+
+**Typos in source Docs (reproduced faithfully — fix in the Google Docs, not the converter):**
+> ⚠️ Incidental findings. Session 1 reviewed closely; S2–S12 completeness-verified (100% of finished
+> body) but not line-by-line proofed, so more may exist.
+- **S1 (The Water):** intro (1 Peter 3:18–22) "the pledge **off** a clear conscience" → *of*; Passage
+  Outline #5 "Waters **Receed**" → *Recede*; commentary "God promised to never again **to** destroy
+  humanity" (double *to*); `in Noah's day— **be** fruitful and multiply"` (missing opening quote before
+  *be*); synopsis "Faithfulness" row "**blamlessness**" → *blamelessness*; commentary "A Divine Deluge"
+  `…flood of waters came upon the earth**"**` (stray closing quote, no opening); synopsis "Faith and
+  Trust in God" row cites **(9:21)** for "saves people from divine judgment and curse" (9:21 is Noah's
+  drunkenness — looks like a wrong ref, left as-is, author call).
+
 ## Cross-book / tooling notes
 - Converter fixes made during book 2 that also help book 1: `split_attr` now handles author
   names with leading initials ("J. C. Ryle") and a closing quote/paren between terminal
@@ -500,6 +603,16 @@ for Steve's review before doing 2–12.
   normalizes any `Catechism…` run-in label to just "**Catechism**" so the bold term is uniform
   across books (per Steve). Books 1–2 already wrote "Catechism"; book 3's Docs wrote "Catechism
   Question".
+- **Converter changes made during book 5 (benefit all books):** (1) `convert_question` now also
+  matches the **colon-inside-bold** run-in label form `**Label:**` (not just `**Label**:`) and
+  normalizes both to `<Accent>Label:</Accent>` — book-5 Docs S4–S8 mixed the two forms within a
+  session, so ~23 questions were rendering as plain bold instead of the accent house style. (2) The
+  Spiritual-Practice loop now skips a **bare empty-heading artifact** (a stray `###` with no text) —
+  book-5 Docs S3–S12 each left an empty `### ` heading between Spiritual Practice and Ministry
+  Practice, which the "promote first plain line to a `####` title" rule was turning into a broken
+  `#### ###` heading. Both are pure normalizations (no effect on the already-correct books 1–4:
+  their Docs use the colon-outside form and have no empty-heading artifacts — re-running them is a
+  no-op).
 - [2026-07-28, per Steve] **Website parser change — `@include` block keys may now contain
   underscores/dashes.** Extended the key charset `[A-Za-z][A-Za-z0-9]*` → `[A-Za-z][A-Za-z0-9_-]*`
   in all four regexes (`resolveIncludes` + `resolveIncludesTracked` directive parsers in
