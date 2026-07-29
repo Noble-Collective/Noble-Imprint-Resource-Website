@@ -789,6 +789,26 @@ function renderMarkdown(content, options = {}) {
     }
   }
 
+  // Single-chapter books cited without a chapter (e.g. "Jude 3", "Philemon 6",
+  // "2 John 4-6", "Obadiah 15") — the colon-based patterns above require a
+  // chapter:verse and miss these. The (?!:) guard avoids stealing the chapter of
+  // a rare "Jude 1:3"-style ref (which the full-ref pass already handles).
+  const singleChapterBooks = ['Obadiah', 'Philemon', '2 John', '3 John', 'Jude'];
+  const scBookPat = singleChapterBooks.map(b => b.replace(/\s/g, '\\s')).join('|');
+  const scPat = new RegExp(`(${scBookPat})\\s(\\d+(?:[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*)(?!:)`, 'g');
+  let scm;
+  while ((scm = scPat.exec(html)) !== null) {
+    if (isInsideTagAttribute(scm.index)) continue;
+    const before = html.substring(Math.max(0, scm.index - 1), scm.index);
+    if (before === '"' || before === '=' || before === '/') continue;
+    replacements.push({
+      start: scm.index,
+      end: scm.index + scm[0].length,
+      original: scm[0],
+      ref: scm[0],
+    });
+  }
+
   // Sort by position descending and apply replacements
   replacements.sort((a, b) => b.start - a.start);
 
