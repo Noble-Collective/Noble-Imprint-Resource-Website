@@ -623,9 +623,13 @@ function renderMarkdown(content, options = {}) {
         (_, text) => { markers.push(text); return ''; }
       );
       if (markers.length === 0) return match;
-      const pullquotes = markers.map(text =>
-        `<aside class="pullquote"><p>${inlineMd.renderInline(text)}</p></aside>`
-      ).join('');
+      const pullquotes = markers.map(text => {
+        // A callout pulled from mid-sentence begins lowercase in the manuscript;
+        // capitalize the first letter for the standalone pullquote display only
+        // (the inline text and the source file are left unchanged).
+        const display = text.replace(/^([_*"'“‘([]*)([a-z])/, (_, pre, ch) => pre + ch.toUpperCase());
+        return `<aside class="pullquote"><p>${inlineMd.renderInline(display)}</p></aside>`;
+      }).join('');
       return `${open}${cleaned}${close}\n${pullquotes}`;
     }
   );
