@@ -115,6 +115,11 @@ async function loadBook(bookPath, dirName) {
     sessions,
     audiobook: meta.audiobook || null,
     maxNavHeadingLevel: meta.maxNavHeadingLevel || 2,
+    // Optional manual nav-number overrides, keyed by session filename:
+    //   "sessionNumbers": { "03-Wisdom-Calls-Out.md": 1, "01-Front-Matter.md": false }
+    // A number forces that badge; false/null suppresses it; a missing key falls
+    // back to auto-detection from the H1 title (sessionNumber()).
+    sessionNumbers: meta.sessionNumbers || null,
     repoPath: bookPath,
   };
 }
@@ -328,18 +333,32 @@ async function loadSessionTitles(book) {
   await Promise.all(promises);
 }
 
-// Count sessions that get a number in the nav / book page — i.e. whose H1 title
-// (displayName, after loadSessionTitles) contains a number, matching the numbering
-// rule in book.ejs. Front/back-matter pages (Front Matter, The Opening, The Recall,
-// Further Resources, Series Orientation, etc.) have no number and are excluded.
-const _SESSION_NUM_WORDS = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve';
+// The nav number badge for a session. A per-book meta override
+// (book.sessionNumbers, keyed by session filename) wins: a number forces that
+// badge, false/null suppresses it. With no override entry, fall back to
+// auto-detection — the first Arabic numeral or number-word (one–twelve) in the
+// H1 title (displayName). Returns a string ('' = no number). Single source of
+// truth for book.ejs, session-sidebar.ejs, and numberedSessionCount.
+const _WORDNUMS = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
+function sessionNumber(book, session) {
+  const ov = book && book.sessionNumbers;
+  const key = session && (session.filename || session.name);
+  if (ov && key && Object.prototype.hasOwnProperty.call(ov, key)) {
+    const v = ov[key];
+    return (v === false || v === null || v === '') ? '' : String(v);
+  }
+  const dn = (session && session.displayName) || '';
+  const m = dn.match(/\b(\d+)\b/) || dn.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
+  if (!m) return '';
+  return String(_WORDNUMS[m[1].toLowerCase()] || m[1]);
+}
+
+// Count sessions that get a number in the nav / book page (override or auto-detected).
+// Front/back-matter pages (Front Matter, Introduction, Conclusion, Bibliography, etc.)
+// have no number and are excluded.
 function numberedSessionCount(book) {
   if (!book || !book.sessions) return 0;
-  const wordRe = new RegExp('\\b(' + _SESSION_NUM_WORDS + ')\\b', 'i');
-  return book.sessions.filter(s => {
-    const dn = s.displayName || '';
-    return /\b\d+\b/.test(dn) || wordRe.test(dn);
-  }).length;
+  return book.sessions.filter(s => sessionNumber(book, s) !== '').length;
 }
 
 // Load H1 titles for every book in a tree so numberedSessionCount is accurate on
@@ -574,6 +593,7 @@ module.exports = {
   loadSessionTitles,
   loadAllSessionTitles,
   numberedSessionCount,
+  sessionNumber,
   gatherCommonContent,
   parseCommonBlocks,
   gatherCommonBlocks,

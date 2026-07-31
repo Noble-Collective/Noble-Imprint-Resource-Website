@@ -15,9 +15,7 @@
     <div class="sidebar-sessions-title">Sessions</div>
     <ul class="nav-session-list">
       <% book.sessions.forEach(function(s, i) {
-        var wordNums = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
-        var numMatch = s.displayName.match(/\b(\d+)\b/) || s.displayName.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
-        var sessionNum = numMatch ? (wordNums[numMatch[1].toLowerCase()] || numMatch[1]) : '';
+        var sessionNum = content.sessionNumber(book, s);
       %>
         <li>
           <a href="<%= content.sessionUrl(series, subseries, book, s) %>" class="nav-session-item">
@@ -84,9 +82,7 @@
       <div class="sessions-heading-label">Sessions</div>
       <ul class="session-list">
         <% book.sessions.forEach(function(s, i) {
-          var wordNums = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
-          var numMatch = s.displayName.match(/\b(\d+)\b/) || s.displayName.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
-          var sessionNum = numMatch ? (wordNums[numMatch[1].toLowerCase()] || numMatch[1]) : '';
+          var sessionNum = content.sessionNumber(book, s);
         %>
           <li>
             <a href="<%= content.sessionUrl(series, subseries, book, s) %>">
