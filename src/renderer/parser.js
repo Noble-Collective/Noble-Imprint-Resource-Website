@@ -500,14 +500,20 @@ function preprocess(raw, options = {}) {
     });
   }
 
-  // ── Standard markdown images ![alt](name) — convert to <img> with proxy URL ──
+  // ── Standard markdown images ![alt](name "optional caption") — convert to <img>.
+  // An optional title becomes the <figcaption> (may contain <br> for multi-line
+  // credits); alt stays the accessible short text. Only [ \t] before EOL (not \s)
+  // so the blank line after the image is preserved — otherwise the following
+  // paragraph gets absorbed into this figure's HTML block by markdown-it. Output
+  // is wrapped in blank lines for safe block separation.
   text = text.replace(
-    /^!\[([^\]]*)\]\(([^)]+)\)\s*$/gm,
-    (_, alt, name) => {
+    /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)[ \t]*$/gm,
+    (_, alt, name, title) => {
       const imgName = name.trim();
       const src = imageUrl(imgName);
-      const caption = alt || imgName.replace(/_/g, ' ');
-      return `<figure class="session-image"><img src="${src}" alt="${caption}" loading="lazy"><figcaption>${caption}</figcaption></figure>`;
+      const caption = (title && title.trim()) || alt || imgName.replace(/_/g, ' ');
+      const altText = (alt || imgName.replace(/_/g, ' ')).replace(/<br\s*\/?>/gi, ' ').trim();
+      return `\n<figure class="session-image"><img src="${src}" alt="${altText}" loading="lazy"><figcaption>${caption}</figcaption></figure>\n`;
     }
   );
 
