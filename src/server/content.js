@@ -105,6 +105,7 @@ async function loadBook(bookPath, dirName) {
     slug: slugify(meta.title || dirName),
     title: meta.title || dirName,
     subtitle: meta.subtitle || '',
+    author: meta.author || '',
     order: meta.order || 99,
     banner: meta.banner || null,
     status,

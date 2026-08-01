@@ -10,6 +10,9 @@
       <% if (book.subtitle) { %>
         <div class="sidebar-book-subtitle"><%= book.subtitle %></div>
       <% } %>
+      <% if (book.author) { %>
+        <div class="sidebar-book-author">by <%= book.author %></div>
+      <% } %>
     </div>
 
     <div class="sidebar-sessions-title">Sessions</div>
@@ -55,6 +58,9 @@
           <h1 class="page-title"><%= book.title %></h1>
           <% if (book.subtitle) { %>
             <p class="book-detail-subtitle"><%= book.subtitle %></p>
+          <% } %>
+          <% if (book.author) { %>
+            <p class="book-detail-author">by <%= book.author %></p>
           <% } %>
 
           <% if (typeof audioManifest !== 'undefined' && audioManifest) { %>

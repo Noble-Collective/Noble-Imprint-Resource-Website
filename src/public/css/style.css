@@ -458,6 +458,14 @@ img {
   color: var(--color-text-light);
 }
 
+.sidebar-book-author {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.72rem;
+  color: var(--color-text-light);
+  margin-top: 0.3rem;
+}
+
 .sidebar-sessions-title {
   font-family: var(--font-sans);
   font-size: 0.7rem;
@@ -1007,6 +1015,14 @@ body.text-mode .home-text {
   font-size: 1rem;
   color: var(--color-text-light);
   margin-bottom: 0.75rem;
+}
+
+.book-detail-author {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  margin: 0 0 0.85rem;
 }
 
 .book-detail-meta {
