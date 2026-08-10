@@ -455,10 +455,13 @@ async function getSessionPageData(req, resolvedRoute) {
   // Content is already cached after loadSessionTitles, so this is fast.
   function extractHeadings(rawContent) {
     const items = [];
+    // Ignore headings inside HTML comments (e.g. commented-out sections) so they
+    // don't create phantom sidebar/nav entries that link to nothing on the page.
+    const src = String(rawContent).replace(/<!--[\s\S]*?-->/g, '');
     const pattern = /^(#{1,6})\s+(.+)$/gm;
     const counts = {};
     let m;
-    while ((m = pattern.exec(rawContent)) !== null) {
+    while ((m = pattern.exec(src)) !== null) {
       const level = m[1].length;
       if (level < 2 || level > maxNavHeadingLevel) continue;
       const text = m[2].trim();
