@@ -1355,15 +1355,19 @@ body.text-mode .home-text {
 .session-content.accent-themed .bible-ref:hover {
   color: color-mix(in srgb, var(--accent) 75%, black);
 }
-/* External (http) links in prose render like the book's other links: underline +
-   the book accent when themed (matches .bible-ref). */
-.session-content a[href^="http"] {
+/* External (http) and internal (root-relative "/…") links in prose render like
+   the book's other links: underline + the book accent when themed (matches
+   .bible-ref). Bible refs (href="#") and footnotes (href="#fn…") are unaffected. */
+.session-content a[href^="http"],
+.session-content a[href^="/"] {
   text-decoration: underline;
 }
-.session-content.accent-themed a[href^="http"] {
+.session-content.accent-themed a[href^="http"],
+.session-content.accent-themed a[href^="/"] {
   color: var(--accent);
 }
-.session-content.accent-themed a[href^="http"]:hover {
+.session-content.accent-themed a[href^="http"]:hover,
+.session-content.accent-themed a[href^="/"]:hover {
   color: color-mix(in srgb, var(--accent) 75%, black);
 }
 /* Tables: heading bar + even rows tinted from the accent */
