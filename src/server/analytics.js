@@ -184,6 +184,7 @@ function resolveContent(ev) {
   if (c && typeof c === 'object' && VALID_CONTENT_TYPES.has(c.content_type)) {
     return {
       content_type: str(c.content_type, 32),
+      content_id: str(c.content_id, 64),
       series: str(c.series, 256),
       subseries: str(c.subseries, 256),
       book: str(c.book, 256),
@@ -193,7 +194,7 @@ function resolveContent(ev) {
       bible_chapter: str(c.bible_chapter, 32),
     };
   }
-  return { ...parsePath(ev && ev.path), subseries: null };
+  return { ...parsePath(ev && ev.path), subseries: null, content_id: null };
 }
 
 // --- field coercion ------------------------------------------------------------

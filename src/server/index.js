@@ -439,6 +439,7 @@ app.use('/api/notifications', notificationRoutes.api);
 
 // --- Analytics ingestion (public beacon) ---
 const analytics = require('./analytics');
+const contentRegistry = require('./content-registry');
 app.post('/api/analytics/collect', analytics.collect);
 
 // Homepage
@@ -815,6 +816,12 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
 
       res.locals.analyticsContext = {
         content_type: 'book_index',
+        content_id: await contentRegistry.contentIdFor('book', book.repoPath, {
+          title: book.title,
+          series: series && series.title,
+          subseries: subseries && subseries.title,
+          book: book.title,
+        }),
         series: series && series.title,
         subseries: subseries && subseries.title,
         book: book && book.title,
@@ -834,6 +841,13 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
 
       res.locals.analyticsContext = {
         content_type: 'book_session',
+        content_id: await contentRegistry.contentIdFor('session', data.session && data.session.path, {
+          title: data.session && data.session.title,
+          series: data.series && data.series.title,
+          subseries: data.subseries && data.subseries.title,
+          book: data.book && data.book.title,
+          sessionNumber: content.sessionNumber(data.book, data.session),
+        }),
         series: data.series && data.series.title,
         subseries: data.subseries && data.subseries.title,
         book: data.book && data.book.title,
@@ -865,6 +879,7 @@ app.use((err, req, res, next) => {
 // Start server immediately so Cloud Run health check passes, then load bibles
 app.listen(PORT, () => {
   console.log(`Noble Imprint Resource Website running on port ${PORT}`);
+  contentRegistry.init(); // load stable content ids into memory (best-effort)
   bible.loadBibles().then(() => {
     console.log('Bibles loaded successfully');
   }).catch(err => {
