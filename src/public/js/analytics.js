@@ -100,4 +100,16 @@
     ctx = window.__analyticsContext || null;
     send({ event_type: 'pageview', referrer: document.referrer || '' });
   };
+
+  // Audio listen events, called by audio-player.js. type is
+  // audio_play | audio_pause | audio_progress | audio_ended. Attributed to the
+  // current page context (the session / bible chapter being played).
+  window.__analyticsAudio = function (type, data) {
+    var d = data || {};
+    var pos = (typeof d.position === 'number' && isFinite(d.position)) ? d.position : null;
+    var dur = (typeof d.duration === 'number' && isFinite(d.duration) && d.duration > 0) ? d.duration : null;
+    var pct = (pos != null && dur) ? Math.max(0, Math.min(1, pos / dur)) : null;
+    ctx = window.__analyticsContext || ctx; // reflect the current chapter after AJAX advance
+    send({ event_type: type, audio_position_sec: pos, audio_duration_sec: dur, audio_percent: pct });
+  };
 })();
