@@ -3721,6 +3721,21 @@ body.drawer-open {
 .admin-badge--modified { background: #d1ecf1; color: #0c5460; }
 .admin-badge--added { background: #d4edda; color: #155724; }
 .admin-badge--removed { background: #f8d7da; color: #721c24; }
+
+/* Bible Validation */
+.admin-badge--ok { background: #d4edda; color: #155724; }
+.admin-badge--warn { background: #fff3cd; color: #856404; } /* amber: "Diffs Detected" */
+.admin-badge--err { background: #f8d7da; color: #721c24; }
+.admin-card {
+  border: 1px solid #e5e0d5;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #fcfbf7;
+}
+.admin-error { color: #721c24; }
+.bv-change ins { background: #d4edda; text-decoration: none; }
+.bv-change del { background: #f8d7da; }
+.bv-change-status { margin-left: 8px; }
 .admin-diff-loading {
   text-align: center;
   padding: 40px;

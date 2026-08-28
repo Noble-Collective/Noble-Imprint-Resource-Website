@@ -6,6 +6,8 @@ const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
 const suggestions = require('./suggestions');
 const notifications = require('./notifications');
+const bibleValidationRunner = require('./bible-validation-runner');
+const bibleSync = require('./bible-sync');
 const { patienceDiffPlus } = require('./patience-diff');
 
 // Convert patienceDiffPlus output to rawChunks format [{type, text}]
@@ -680,6 +682,60 @@ api.post('/diff-report-upload', async (req, res) => {
     res.json({ bookPath, from: 'uploaded file', to: toRef, files });
   } catch (err) {
     console.error('Diff report upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Bible text validation ---
+// Runs synchronously (like /diff-report): fetch the official BSB master from
+// bereanbible.com, compare against our stored copy, persist a summary to
+// Firestore, and return it. Guarded by requireAdmin via the router mount.
+api.post('/bible-validation/run', async (req, res) => {
+  try {
+    const translationId = (req.body && req.body.translationId) || 'bsb';
+    const footnotes = !(req.body && req.body.footnotes === false);
+    const result = await bibleValidationRunner.runValidation({ translationId, footnotes });
+    const runBy = (req.user && req.user.email) || 'unknown';
+    const saved = await firestore.saveValidationRun({ ...result, runBy });
+    res.json({ id: saved.id, runBy, ...result });
+  } catch (err) {
+    console.error('Bible validation run error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+api.get('/bible-validation/runs', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
+    res.json({ runs: await firestore.getValidationRuns(limit) });
+  } catch (err) {
+    console.error('Bible validation history error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Scan for changes needed to bring our copy (and library quotations) up to the
+// latest official BSB. Read-only — proposes changes, applies nothing.
+api.get('/bible-validation/sync-scan', async (req, res) => {
+  try {
+    const translationId = req.query.translationId || 'bsb';
+    res.json(await bibleSync.detectSyncChanges({ translationId }));
+  } catch (err) {
+    console.error('Bible sync scan error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Apply ONE accepted change (a single scoped commit). The client sends back the
+// exact change object from the scan.
+api.post('/bible-validation/apply-change', async (req, res) => {
+  try {
+    const change = req.body && req.body.change;
+    if (!change || !change.type) return res.status(400).json({ error: 'change is required' });
+    const result = await bibleSync.applyChange(change);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Bible sync apply error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

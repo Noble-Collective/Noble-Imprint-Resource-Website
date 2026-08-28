@@ -168,8 +168,39 @@ async function shouldNotify(email, bookPath) {
   return true;
 }
 
+// --- BSB text-validation run history ---
+
+function validationRunsCollection() {
+  return getDb().collection('bibleValidationRuns');
+}
+
+// Persist a completed validation run. Returns { id }.
+async function saveValidationRun(run) {
+  const ref = await validationRunsCollection().add({
+    ...run,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { id: ref.id };
+}
+
+// Most-recent runs first. Firestore Timestamps are converted to ISO strings so
+// the client can render them directly.
+async function getValidationRuns(limit = 25) {
+  const snap = await validationRunsCollection().orderBy('createdAt', 'desc').limit(limit).get();
+  return snap.docs.map(doc => {
+    const d = doc.data();
+    return {
+      id: doc.id,
+      ...d,
+      createdAt: d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toISOString() : null,
+    };
+  });
+}
+
 module.exports = {
   getUser,
+  saveValidationRun,
+  getValidationRuns,
   createOrUpdateUser,
   createUser,
   setGlobalRole,

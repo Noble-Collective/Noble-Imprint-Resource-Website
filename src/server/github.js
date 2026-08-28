@@ -202,6 +202,20 @@ async function listTags() {
   return tags;
 }
 
+// List every path in the repo in a single API call (recursive git tree).
+// Returns [{ path, type: 'blob'|'tree', sha }]. Cached 5 min.
+async function getTreeRecursive(ref = 'main') {
+  const cacheKey = 'git-tree:' + ref;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  const { data } = await loggedApiCall(`GET tree ${ref}`, () =>
+    getOctokit().rest.git.getTree({ owner: OWNER, repo: REPO, tree_sha: ref, recursive: 'true' })
+  );
+  const tree = (data.tree || []).map(t => ({ path: t.path, type: t.type, sha: t.sha }));
+  cache.set(cacheKey, tree, 5 * 60 * 1000);
+  return tree;
+}
+
 async function updateFileContent(filePath, content, sha, message) {
   const res = await loggedApiCall(`PUT file ${filePath}`, () =>
     getOctokit().rest.repos.createOrUpdateFileContents({
@@ -233,4 +247,4 @@ function clearDiskCache() {
   } catch (err) { console.error('[GITHUB] Error clearing disk cache:', err.message); }
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getRateLimitReset, clearDiskCache, OWNER, REPO };
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getTreeRecursive, getRateLimitReset, clearDiskCache, OWNER, REPO };
