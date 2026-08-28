@@ -427,6 +427,10 @@ const notificationRoutes = require('./notification-routes');
 app.use('/notifications', notificationRoutes.page);
 app.use('/api/notifications', notificationRoutes.api);
 
+// --- Analytics ingestion (public beacon) ---
+const analytics = require('./analytics');
+app.post('/api/analytics/collect', analytics.collect);
+
 // Homepage
 app.get('/', async (req, res, next) => {
   try {
