@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
@@ -21,11 +22,23 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
 // Middleware
+// Compress text responses (HTML, CSS, JS, JSON). The app served everything
+// uncompressed before; gzip takes the ~124KB stylesheet down to ~20KB over the
+// wire and shrinks every HTML/JS/JSON payload too. No build step, no source
+// changes — the compression happens at request time.
+app.use(compression());
 app.use(cookieParser());
 app.use(express.json({ limit: '2mb' }));
 
-// Static files
-app.use('/static', express.static(path.join(__dirname, '../public')));
+// Static files. All /static assets are cache-busted with ?v=N in the templates,
+// so a changed file always gets a new URL — which makes it safe to tell browsers
+// to hold each asset for a year (immutable). This removes the per-navigation
+// revalidation round-trip (notably for the 124KB style.css). IMPORTANT: keep
+// bumping ?v=N whenever an asset changes, or clients will serve the stale copy.
+app.use('/static', express.static(path.join(__dirname, '../public'), {
+  maxAge: '1y',
+  immutable: true,
+}));
 
 // Attach user to every request
 app.use(auth.attachUser);
@@ -413,6 +426,10 @@ app.use('/api/suggestions', suggestionRoutes);
 const notificationRoutes = require('./notification-routes');
 app.use('/notifications', notificationRoutes.page);
 app.use('/api/notifications', notificationRoutes.api);
+
+// --- Analytics ingestion (public beacon) ---
+const analytics = require('./analytics');
+app.post('/api/analytics/collect', analytics.collect);
 
 // Homepage
 app.get('/', async (req, res, next) => {
