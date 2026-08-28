@@ -16,6 +16,12 @@
 
 const crypto = require('crypto');
 const { BigQuery } = require('@google-cloud/bigquery');
+const ip3country = require('ip3country');
+
+// Country geo (P1). ip3country is IPv4-only and self-contained (~0.5MB, no
+// external calls, no MaxMind account) — IPv6 clients resolve to null country.
+let geoReady = false;
+try { ip3country.init(); geoReady = true; } catch (err) { console.error('[ANALYTICS] geo init failed:', err && err.message); }
 
 const DATASET = process.env.BQ_ANALYTICS_DATASET || 'analytics';
 const TABLE = process.env.BQ_ANALYTICS_TABLE || 'events';
@@ -82,17 +88,26 @@ function parsePath(rawPath) {
     content_type: 'other', series: null, book: null, session: null,
     bible_translation: null, bible_book: null, bible_chapter: null,
   };
-  const clean = String(rawPath || '/').split('?')[0].split('#')[0];
+  const raw = String(rawPath || '/');
+  const qs = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : '';
+  const clean = raw.split('?')[0].split('#')[0];
   const segs = clean.split('/').filter(Boolean).map((s) => { try { return decodeURIComponent(s); } catch { return s; } });
 
   if (segs.length === 0) { out.content_type = 'home'; return out; }
 
   const first = segs[0].toLowerCase();
   if (first === 'bible') {
+    // Real route: /bible/:tx/:book?chapter=N (chapter is a query param, default 1);
+    // /bible or /bible/:tx are index/book-list pages.
     out.bible_translation = segs[1] || null;
     out.bible_book = segs[2] || null;
-    out.bible_chapter = segs[3] || null;
-    out.content_type = segs.length >= 4 ? 'bible_chapter' : (segs.length === 3 ? 'bible_book' : 'bible_index');
+    if (segs.length >= 3) {
+      const m = /(?:^|&)chapter=(\d+)/.exec(qs);
+      out.bible_chapter = m ? m[1] : '1';
+      out.content_type = 'bible_chapter';
+    } else {
+      out.content_type = 'bible_index';
+    }
     return out;
   }
   if (RESERVED_FIRST_SEG.has(first)) { out.content_type = first; return out; }
@@ -113,6 +128,72 @@ function parsePath(rawPath) {
     out.content_type = 'book_session';
   }
   return out;
+}
+
+// Country from IP. Strips IPv4-mapped-IPv6 prefix; returns null for private/
+// IPv6/unknown addresses. Best-effort — never throws.
+function lookupCountry(ip) {
+  if (!geoReady || !ip) return null;
+  try {
+    const v4 = String(ip).replace(/^::ffff:/i, '');
+    return ip3country.lookupStr(v4) || null;
+  } catch { return null; }
+}
+
+// Coarse device/browser/os buckets from the User-Agent. Homegrown (no dep):
+// good enough for dashboard grouping; unknowns fall to 'other'. Order matters —
+// Edge/Opera/Chrome UAs all contain the "Safari"/"Chrome" tokens.
+function parseUserAgent(ua) {
+  const u = String(ua || '').toLowerCase();
+
+  let device_type = 'desktop';
+  if (/ipad|tablet|kindle|silk|playbook|(android(?!.*mobile))/.test(u)) device_type = 'tablet';
+  else if (/mobile|iphone|ipod|android|blackberry|iemobile|opera mini|windows phone/.test(u)) device_type = 'mobile';
+
+  let os = 'other';
+  if (/windows phone/.test(u)) os = 'Windows Phone';
+  else if (/iphone|ipad|ipod/.test(u)) os = 'iOS';           // before macOS: iOS UAs say "like Mac OS X"
+  else if (/android/.test(u)) os = 'Android';
+  else if (/windows nt|windows/.test(u)) os = 'Windows';
+  else if (/cros/.test(u)) os = 'ChromeOS';
+  else if (/mac os x|macintosh/.test(u)) os = 'macOS';
+  else if (/linux/.test(u)) os = 'Linux';
+
+  let browser = 'other';
+  if (/edg(a|ios)?\//.test(u)) browser = 'Edge';
+  else if (/opr\/|opera/.test(u)) browser = 'Opera';
+  else if (/samsungbrowser/.test(u)) browser = 'Samsung Internet';
+  else if (/firefox|fxios/.test(u)) browser = 'Firefox';
+  else if (/chrome|crios/.test(u)) browser = 'Chrome';       // before Safari: Chrome UA contains "Safari"
+  else if (/safari/.test(u)) browser = 'Safari';
+
+  return { device_type, browser, os };
+}
+
+const VALID_CONTENT_TYPES = new Set([
+  'home', 'book_session', 'book_index', 'series_index',
+  'bible_chapter', 'bible_book', 'bible_index', 'other',
+]);
+
+// Canonical content identity. Prefers the server-injected `window.__analyticsContext`
+// (echoed back by the client) — that carries real series/book/session titles and an
+// exact content_type. Falls back to the coarse path parse for bots / no-JS / any page
+// that didn't inject a context.
+function resolveContent(ev) {
+  const c = ev && ev.context;
+  if (c && typeof c === 'object' && VALID_CONTENT_TYPES.has(c.content_type)) {
+    return {
+      content_type: str(c.content_type, 32),
+      series: str(c.series, 256),
+      subseries: str(c.subseries, 256),
+      book: str(c.book, 256),
+      session: str(c.session, 256),
+      bible_translation: str(c.bible_translation, 64),
+      bible_book: str(c.bible_book, 128),
+      bible_chapter: str(c.bible_chapter, 32),
+    };
+  }
+  return { ...parsePath(ev && ev.path), subseries: null };
 }
 
 // --- field coercion ------------------------------------------------------------
@@ -142,7 +223,7 @@ function cleanReferrer(ref, host) {
 function record(req, ev) {
   if (!ENABLED || !ev || typeof ev !== 'object') return;
   const ua = req.get('user-agent') || '';
-  const parsed = parsePath(ev.path);
+  const { device_type, browser, os } = parseUserAgent(ua);
   const row = {
     event_id: str(ev.event_id, 64) || crypto.randomUUID(),
     ts: new Date().toISOString(),
@@ -151,16 +232,16 @@ function record(req, ev) {
     event_type: str(ev.event_type, 32) || 'unknown',
     path: str(ev.path, 1024),
     referrer: cleanReferrer(ev.referrer, req.get('host')),
-    ...parsed,
+    ...resolveContent(ev),
     dwell_ms: int(ev.dwell_ms),
     scroll_depth: flt(ev.scroll_depth),
     audio_position_sec: flt(ev.audio_position_sec),
     audio_duration_sec: flt(ev.audio_duration_sec),
     audio_percent: flt(ev.audio_percent),
-    device_type: null, // P1
-    browser: null,     // P1
-    os: null,          // P1
-    country: null,     // P1
+    device_type,
+    browser,
+    os,
+    country: lookupCountry(req.ip),
     is_bot: isBot(ua),
     ip_hash: hashIp(req.ip),
     user_email: (req.user && req.user.email) || null,
@@ -183,4 +264,8 @@ function collect(req, res) {
   res.status(204).end();
 }
 
-module.exports = { collect, record, flush, parsePath, isBot, _table: `${DATASET}.${TABLE}` };
+module.exports = {
+  collect, record, flush, parsePath, isBot,
+  parseUserAgent, lookupCountry, resolveContent,
+  _table: `${DATASET}.${TABLE}`,
+};
