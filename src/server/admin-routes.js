@@ -6,6 +6,7 @@ const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
 const suggestions = require('./suggestions');
 const notifications = require('./notifications');
+const analyticsAdmin = require('./analytics-admin');
 const { patienceDiffPlus } = require('./patience-diff');
 
 // Convert patienceDiffPlus output to rawChunks format [{type, text}]
@@ -100,6 +101,20 @@ page.get('/', async (req, res, next) => {
 
 // --- API routes ---
 const api = express.Router();
+
+// Analytics dashboard data (admin-gated by the router mount). Returns all views
+// in one payload for a range ('7d'|'30d'|'90d'|'365d'|'all') + bot policy.
+api.get('/analytics', async (req, res) => {
+  try {
+    const range = req.query.range || '30d';
+    const includeBots = req.query.includeBots === '1' || req.query.includeBots === 'true';
+    const data = await analyticsAdmin.getDashboard(range, { includeBots });
+    res.json(data);
+  } catch (err) {
+    console.error('[admin] analytics error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // List all users
 api.get('/users', async (req, res) => {

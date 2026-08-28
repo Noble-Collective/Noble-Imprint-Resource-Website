@@ -5617,3 +5617,33 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 @media (max-width: 640px) {
   .session-content .rp-table { min-width: 34rem; }
 }
+
+/* ===== Admin Analytics dashboard (P3) ===== */
+.an-controls { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+.an-range { display:inline-flex; border:1px solid #e0ddd4; border-radius:8px; overflow:hidden; }
+.an-range-btn { background:#fff; border:none; padding:6px 14px; font:inherit; font-size:13px; color:#6b6b66; cursor:pointer; border-right:1px solid #e0ddd4; }
+.an-range-btn:last-child { border-right:none; }
+.an-range-btn--active { background:#be9d26; color:#fff; font-weight:600; }
+.an-bots { font-size:13px; color:#6b6b66; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+.an-status { font-size:13px; }
+.an-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px; }
+.an-tiles--audio { margin-bottom:8px; }
+.an-tile { background:#fff; border:1px solid #ece9e0; border-radius:10px; padding:16px 18px; }
+.an-tile-val { font-family:'Poppins',sans-serif; font-size:26px; font-weight:600; color:#2f2f2d; line-height:1.1; }
+.an-tile-label { font-size:12px; color:#8a8a86; margin-top:4px; text-transform:uppercase; letter-spacing:.03em; }
+.an-tile-sub { display:block; text-transform:none; letter-spacing:0; color:#b0aea6; font-size:11px; }
+.an-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+.an-card-title { font-family:'Poppins',sans-serif; font-size:15px; font-weight:600; color:#2f2f2d; margin:0 0 14px; }
+.an-card-sub { font-weight:400; color:#a7a59d; font-size:12px; margin-left:6px; }
+.an-subhead { font-family:'Poppins',sans-serif; font-size:13px; font-weight:600; color:#4a4a47; margin:18px 0 10px; }
+.an-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:820px){ .an-grid { grid-template-columns:1fr; } }
+.an-chart-box { position:relative; height:300px; }
+.an-chart-box--sm { height:230px; }
+.an-table-box { overflow-x:auto; }
+.an-table { width:100%; border-collapse:collapse; font-size:13px; }
+.an-table th { text-align:left; color:#8a8a86; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; padding:6px 10px; border-bottom:1px solid #ece9e0; }
+.an-table td { padding:7px 10px; border-bottom:1px solid #f4f2ec; color:#3a3a38; }
+.an-table td.an-num { text-align:right; font-variant-numeric:tabular-nums; color:#2f2f2d; }
+.an-table tr:last-child td { border-bottom:none; }
+.an-empty { color:#a7a59d; font-size:13px; padding:8px 2px; }

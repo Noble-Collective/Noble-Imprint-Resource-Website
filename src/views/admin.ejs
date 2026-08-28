@@ -9,6 +9,7 @@
       <button class="admin-tab" data-admin-tab="books">Books</button>
       <button class="admin-tab" data-admin-tab="reviews">Reviews<% if (typeof pendingSuggestionCount !== 'undefined' && pendingSuggestionCount > 0) { %> <span class="admin-tab-badge"><%= pendingSuggestionCount %></span><% } %></button>
       <button class="admin-tab" data-admin-tab="diff-reports">Diff Reports</button>
+      <button class="admin-tab" data-admin-tab="analytics">Analytics</button>
     </div>
 
     <!-- ===== USERS TAB ===== -->
@@ -186,6 +187,79 @@
       <div id="diff-report-output"></div>
     </div>
 
+    <!-- ===== ANALYTICS TAB ===== -->
+    <div class="admin-panel admin-panel--hidden" id="panel-analytics">
+      <div class="an-controls">
+        <div class="an-range" role="group" aria-label="Date range">
+          <button class="an-range-btn" data-range="7d">7d</button>
+          <button class="an-range-btn an-range-btn--active" data-range="30d">30d</button>
+          <button class="an-range-btn" data-range="90d">90d</button>
+          <button class="an-range-btn" data-range="365d">1y</button>
+          <button class="an-range-btn" data-range="all">All</button>
+        </div>
+        <label class="an-bots"><input type="checkbox" id="an-include-bots"> Include bots</label>
+        <span class="an-status text-muted" id="an-status"></span>
+      </div>
+
+      <div class="an-tiles" id="an-tiles"></div>
+
+      <div class="an-card an-card--wide">
+        <h3 class="an-card-title">Traffic <span class="an-card-sub">pageviews &amp; unique visitors per day</span></h3>
+        <div class="an-chart-box"><canvas id="an-trend"></canvas></div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an-card">
+          <h3 class="an-card-title">Bible vs Books</h3>
+          <div class="an-chart-box an-chart-box--sm"><canvas id="an-split"></canvas></div>
+        </div>
+        <div class="an-card">
+          <h3 class="an-card-title">Devices</h3>
+          <div class="an-chart-box an-chart-box--sm"><canvas id="an-devices"></canvas></div>
+        </div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an-card">
+          <h3 class="an-card-title">Top Bible chapters</h3>
+          <div class="an-chart-box"><canvas id="an-bible"></canvas></div>
+        </div>
+        <div class="an-card">
+          <h3 class="an-card-title">Top sessions</h3>
+          <div class="an-table-box" id="an-sessions"></div>
+        </div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an-card">
+          <h3 class="an-card-title">Browsers</h3>
+          <div class="an-chart-box an-chart-box--sm"><canvas id="an-browsers"></canvas></div>
+        </div>
+        <div class="an-card">
+          <h3 class="an-card-title">Operating systems</h3>
+          <div class="an-chart-box an-chart-box--sm"><canvas id="an-os"></canvas></div>
+        </div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an-card">
+          <h3 class="an-card-title">Top countries <span class="an-card-sub">by unique visitors</span></h3>
+          <div class="an-table-box" id="an-countries"></div>
+        </div>
+        <div class="an-card">
+          <h3 class="an-card-title">Top referrers</h3>
+          <div class="an-table-box" id="an-referrers"></div>
+        </div>
+      </div>
+
+      <div class="an-card">
+        <h3 class="an-card-title">Audio listening</h3>
+        <div class="an-tiles an-tiles--audio" id="an-audio-tiles"></div>
+        <h4 class="an-subhead">Most-engaged sessions <span class="an-card-sub">avg time on page</span></h4>
+        <div class="an-table-box" id="an-dwell"></div>
+      </div>
+    </div>
+
     <!-- ===== MODALS ===== -->
 
     <!-- Add User Modal -->
@@ -293,5 +367,7 @@
   }).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
 </script>
 <script src="/static/js/admin.js?v=1"></script>
+<script src="/static/js/vendor/chart.umd.js?v=1"></script>
+<script src="/static/js/admin-analytics.js?v=1"></script>
 
 <%- include('partials/footer') %>
