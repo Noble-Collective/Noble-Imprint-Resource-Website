@@ -52,7 +52,7 @@ jobs:
             --image gcr.io/noble-imprint-website/resource-website \
             --platform managed \
             --region us-central1 \
-            --min-instances=1 \
+            --min-instances=0 \
             --project=noble-imprint-website
 
       # Content cache refresh not needed on deploy — new containers start with
