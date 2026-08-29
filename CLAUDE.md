@@ -33,13 +33,15 @@ npx playwright test -g "suggestion auto-saves to Firestore"
 
 ### Content Pipeline
 
-Content lives in a separate GitHub repo (`Noble-Collective/Noble-Imprint-Resources`), organized as `series/{Series}/{Subseries?}/{Book}/sessions/{NN-Name.md}`. This website reads content via the GitHub API with a 3-tier caching strategy:
+Content lives in a separate GitHub repo (`Noble-Collective/Noble-Imprint-Resources`), organized as `series/{Series}/{Subseries?}/{Book}/sessions/{NN-Name.md}`. This website reads content via the GitHub API with a layered caching strategy:
 
-1. **In-memory cache** (30s TTL) — fastest, cleared on `/api/refresh`
-2. **Disk file cache** (`src/.file-cache/`) — survives container restarts, committed to git, refreshed nightly by GitHub Actions
-3. **Content tree disk fallback** (`.content-tree-cache.json`) — serves the full navigation tree during API outages
+1. **In-memory cache** — file contents 30s TTL, content tree 10min TTL; cleared on `/api/refresh` (or `?scope=files` for files-only)
+2. **Disk file cache** (`src/.file-cache/`) — committed to git so Docker images ship warm; refreshed nightly by GitHub Actions. Read **only as a fallback when the GitHub API errors** (rate limit/outage), not on a normal cold start.
+3. **Content tree snapshot** (`src/.content-tree-cache.json`, **committed**) — `buildContentTree()` serves this snapshot **immediately** when the in-memory cache is empty and refreshes from GitHub in the **background** (stale-while-revalidate). This is what makes cold starts fast: without it, the first request on a fresh container blocked ~13s on ~90 sequential GitHub directory calls + a per-session H1 fetch. `rebuildContentTree()` bakes H1 titles into the snapshot so a cold home doesn't re-fan-out for titles; `warmDiskCache()` and the nightly job force a fresh rebuild and re-commit it. The snapshot holds **only navigation structure, never page content** (which is always loaded fresh per request), so worst-case staleness is briefly-old nav that self-heals within seconds. It also doubles as the API-outage fallback.
 
-When content comes from disk cache (GitHub API is rate-limited), editing is disabled — the `fromDiskCache` flag prevents stale edits.
+When content comes from the disk **file** cache (GitHub API is rate-limited), editing is disabled — the `fromDiskCache` flag prevents stale edits. This flag is on file reads, **not** the tree snapshot, so serving the snapshot on a cold start does not disable editing.
+
+**Cloud Run** scales to zero (`--min-instances=0` in `deploy.yml`) — the snapshot above keeps cold starts to ~2s of container boot, so an always-warm instance isn't paid for. Bump to `1` if cold-start latency becomes annoying.
 
 ### Server-Side Rendering
 
