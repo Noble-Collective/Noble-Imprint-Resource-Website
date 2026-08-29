@@ -219,6 +219,15 @@
       <button class="admin-btn admin-btn--primary" id="bv-scan-btn">Scan for BSB Updates</button>
       <div id="bv-sync-output"></div>
 
+      <h3 style="margin-top:28px">Quotation Audit</h3>
+      <p class="text-muted" style="margin-bottom:12px">
+        Compare every Scripture quotation in the library against the current Bible text.
+        Findings are grouped by how much review they need: cosmetic (e.g. "Lord" vs "LORD") is
+        counted but set aside; genuine wording differences are listed for review.
+      </p>
+      <button class="admin-btn admin-btn--primary" id="qa-run-btn">Run Quotation Audit</button>
+      <div id="qa-output"></div>
+
       <h3 style="margin-top:28px">Run History</h3>
       <div id="bv-history"><p class="text-muted">Loading history&hellip;</p></div>
     </div>
@@ -329,6 +338,6 @@
     }),
   }).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
 </script>
-<script src="/static/js/admin.js?v=2"></script>
+<script src="/static/js/admin.js?v=3"></script>
 
 <%- include('partials/footer') %>

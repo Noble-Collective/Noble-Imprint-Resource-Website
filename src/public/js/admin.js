@@ -1476,6 +1476,60 @@
       });
     }
 
+    // --- Quotation Audit (all quotes vs current Bible) ---
+    var qaBtn = document.getElementById('qa-run-btn');
+    var qaOutput = document.getElementById('qa-output');
+
+    function qaTier(title, note, items, truncated) {
+      if (!items.length) return '';
+      var rows = items.map(function (f) {
+        var off = f.onlyInQuote && f.onlyInQuote.length
+          ? '<div class="text-muted">quote has (not in Bible): <strong>' + esc(f.onlyInQuote.join(', ')) + '</strong></div>' : '';
+        return '<div class="admin-card" style="margin:8px 0;padding:10px">'
+          + '<div><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · <code>' + esc(f.file) + '</code></span></div>'
+          + off
+          + '<div style="margin:4px 0"><span class="text-muted">quoted:</span> ' + esc(f.quote) + '</div>'
+          + '<div style="margin:4px 0"><span class="text-muted">Bible:</span> ' + esc(f.verse) + '</div></div>';
+      }).join('');
+      var more = truncated ? '<p class="text-muted">(list capped — run again after fixing some)</p>' : '';
+      return '<details style="margin-top:10px"' + (items.length <= 20 ? ' open' : '') + '><summary><strong>' + esc(title) + '</strong> (' + items.length + ')</summary>'
+        + '<p class="text-muted">' + esc(note) + '</p>' + rows + more + '</details>';
+    }
+
+    function renderQuoteAudit(d) {
+      var c = d.counts || {};
+      var row = function (k, label) { return '<tr><td>' + esc(label) + '</td><td>' + esc(c[k] || 0) + '</td></tr>'; };
+      var html = '<div class="admin-card" style="margin-top:12px">'
+        + '<p>Scanned <strong>' + esc(d.scannedFiles) + '</strong> files, checked <strong>' + esc(d.checked) + '</strong> quotations against the ' + esc(d.comparedAgainst || 'current Bible') + '.</p>'
+        + '<table class="admin-table"><tbody>'
+        + row('exact', '✅ Exact match')
+        + row('case-only', 'Cosmetic — “Lord” vs “LORD”')
+        + row('format-only', 'Cosmetic — punctuation/spacing')
+        + row('word-difference', 'TIER 1 — review (small wording differences)')
+        + row('footnote-artifact', 'TIER 2 — footnote-marker leak')
+        + row('ellipsis-omission', 'TIER 2 — ellipsis omission')
+        + row('editorial-bracket', 'TIER 2 — editorial [brackets]')
+        + row('heavy-difference', 'TIER 3 — likely a different translation')
+        + row('paraphrase', 'Paraphrase (ignored)')
+        + '</tbody></table></div>';
+      html += qaTier('TIER 1 — Review (genuine wording differences)', 'A few words differ from the current Bible — likely misquotes or older wording. Worth a look.', d.tiers.review, d.truncated && d.truncated.review);
+      html += qaTier('TIER 2 — Minor / likely-mechanical', 'Footnote-marker leaks, ellipses, and editorial brackets — usually intentional or trivial.', d.tiers.minor, d.truncated && d.truncated.minor);
+      html += qaTier('TIER 3 — Likely a different translation', 'Heavy differences — the quotation probably comes from another translation, not the BSB.', d.tiers.differentTranslation, d.truncated && d.truncated.differentTranslation);
+      qaOutput.innerHTML = html;
+    }
+
+    if (qaBtn) {
+      qaBtn.addEventListener('click', function () {
+        var translationId = document.getElementById('bv-translation-select').value;
+        qaBtn.disabled = true;
+        qaOutput.innerHTML = '<p class="text-muted">Auditing every quotation in the library&hellip; this can take a while.</p>';
+        apiCall('POST', '/api/admin/bible-quote-audit/run', { translationId: translationId })
+          .then(renderQuoteAudit)
+          .catch(function (e) { qaOutput.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; })
+          .then(function () { qaBtn.disabled = false; });
+      });
+    }
+
     // Lazy-load history when the tab is first opened.
     var tabBtn = document.querySelector('[data-admin-tab="bible-validation"]');
     if (tabBtn) tabBtn.addEventListener('click', function () { if (!historyLoaded) loadHistory(); });

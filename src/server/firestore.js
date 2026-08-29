@@ -197,10 +197,30 @@ async function getValidationRuns(limit = 25) {
   });
 }
 
+// --- Quotation-audit run history ---
+
+async function saveQuoteAuditRun(run) {
+  const ref = await getDb().collection('quoteAuditRuns').add({
+    ...run,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { id: ref.id };
+}
+
+async function getQuoteAuditRuns(limit = 25) {
+  const snap = await getDb().collection('quoteAuditRuns').orderBy('createdAt', 'desc').limit(limit).get();
+  return snap.docs.map(doc => {
+    const d = doc.data();
+    return { id: doc.id, ...d, createdAt: d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toISOString() : null };
+  });
+}
+
 module.exports = {
   getUser,
   saveValidationRun,
   getValidationRuns,
+  saveQuoteAuditRun,
+  getQuoteAuditRuns,
   createOrUpdateUser,
   createUser,
   setGlobalRole,

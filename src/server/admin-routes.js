@@ -8,6 +8,7 @@ const suggestions = require('./suggestions');
 const notifications = require('./notifications');
 const bibleValidationRunner = require('./bible-validation-runner');
 const bibleSync = require('./bible-sync');
+const quoteAudit = require('./bible-quote-audit');
 const { patienceDiffPlus } = require('./patience-diff');
 
 // Convert patienceDiffPlus output to rawChunks format [{type, text}]
@@ -736,6 +737,36 @@ api.post('/bible-validation/apply-change', async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error('Bible sync apply error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Library-wide quotation-integrity audit: compare every cited quotation against
+// our current stored Bible. Read-only. Persists a summary to Firestore history.
+api.post('/bible-quote-audit/run', async (req, res) => {
+  try {
+    const translationId = (req.body && req.body.translationId) || 'bsb';
+    const result = await quoteAudit.auditLibraryQuotations({ translationId });
+    const runBy = (req.user && req.user.email) || 'unknown';
+    // Store a compact summary (counts + tier sizes), not the full findings.
+    firestore.saveQuoteAuditRun({
+      translationId, runBy, scannedFiles: result.scannedFiles, checked: result.checked,
+      counts: result.counts,
+      tierSizes: { review: result.tiers.review.length, minor: result.tiers.minor.length, differentTranslation: result.tiers.differentTranslation.length },
+    }).catch(err => console.warn('quote-audit history save failed:', err.message));
+    res.json({ ...result, runBy });
+  } catch (err) {
+    console.error('Quote audit run error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+api.get('/bible-quote-audit/runs', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
+    res.json({ runs: await firestore.getQuoteAuditRuns(limit) });
+  } catch (err) {
+    console.error('Quote audit history error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
