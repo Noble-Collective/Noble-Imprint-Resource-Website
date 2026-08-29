@@ -446,6 +446,19 @@
     audioEl = new Audio(url);
     audioEl.preload = 'auto';
 
+    // Analytics: emit listen events to the first-party hook (no-op if absent).
+    // Uses native media events so it fires however play/pause is triggered.
+    let lastAudioProgress = 0;
+    function emitAudio(type) {
+      if (!window.__analyticsAudio) return;
+      window.__analyticsAudio(type, {
+        position: audioEl.currentTime,
+        duration: (audioEl.duration && isFinite(audioEl.duration)) ? audioEl.duration : getTotalDuration(),
+      });
+    }
+    audioEl.addEventListener('play', () => emitAudio('audio_play'));
+    audioEl.addEventListener('pause', () => { if (!audioEl.ended) emitAudio('audio_pause'); });
+
     const saved = localStorage.getItem(getStorageKey());
     if (saved) {
       const pos = parseFloat(saved);
@@ -458,6 +471,8 @@
         currentTimeEl.textContent = formatTime(audioEl.currentTime);
       }
       localStorage.setItem(getStorageKey(), audioEl.currentTime.toFixed(1));
+      const _now = Date.now();
+      if (_now - lastAudioProgress >= 30000) { lastAudioProgress = _now; emitAudio('audio_progress'); }
     });
 
     audioEl.addEventListener('loadedmetadata', () => {
@@ -465,6 +480,7 @@
     });
 
     audioEl.addEventListener('ended', () => {
+      emitAudio('audio_ended');
       showPaused();
       localStorage.removeItem(getStorageKey());
       var currentNextUrl = getNextUrl();

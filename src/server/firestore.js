@@ -235,4 +235,15 @@ module.exports = {
   getNotificationPrefs,
   updateNotificationPrefs,
   shouldNotify,
+  getDb,
+  contentRegistryCollection,
+  serverTimestamp,
 };
+
+function contentRegistryCollection() {
+  return getDb().collection('contentRegistry');
+}
+
+function serverTimestamp() {
+  return admin.firestore.FieldValue.serverTimestamp();
+}

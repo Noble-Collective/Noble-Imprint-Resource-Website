@@ -67,6 +67,10 @@ app.use((req, res, next) => {
   res.locals.firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY || '',
   };
+  // Canonical analytics content identity — set per content route below, echoed
+  // into the page as window.__analyticsContext (see footer.ejs). null by default
+  // (non-content pages fall back to the server's coarse path parse).
+  res.locals.analyticsContext = null;
   next();
 });
 
@@ -346,6 +350,12 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
     audioSession = null;
   }
 
+  res.locals.analyticsContext = {
+    content_type: 'bible_chapter',
+    bible_translation: req.params.translationId,
+    bible_book: bookName,
+    bible_chapter: String(chapter),
+  };
   res.render('bible-chapter', {
     translation: t,
     bookName,
@@ -429,6 +439,7 @@ app.use('/api/notifications', notificationRoutes.api);
 
 // --- Analytics ingestion (public beacon) ---
 const analytics = require('./analytics');
+const contentRegistry = require('./content-registry');
 app.post('/api/analytics/collect', analytics.collect);
 
 // Homepage
@@ -438,6 +449,7 @@ app.get('/', async (req, res, next) => {
     const filtered = await content.filterContentTree(tree, req.user);
     await content.loadAllSessionTitles(filtered); // so numberedSessionCount is accurate on the cards
     const bibles = bible.getAllTranslations();
+    res.locals.analyticsContext = { content_type: 'home' };
     res.render('home', {
       tree: filtered,
       content,
@@ -802,6 +814,18 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         try { audioManifest = await audio.getAudioManifest(book.repoPath); } catch { /* no audio */ }
       }
 
+      res.locals.analyticsContext = {
+        content_type: 'book_index',
+        content_id: await contentRegistry.contentIdFor('book', book.repoPath, {
+          title: book.title,
+          series: series && series.title,
+          subseries: subseries && subseries.title,
+          book: book.title,
+        }, tree),
+        series: series && series.title,
+        subseries: subseries && subseries.title,
+        book: book && book.title,
+      };
       res.render('book', {
         series,
         subseries: subseries || null,
@@ -815,6 +839,20 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
     } else if (resolved.type === 'session') {
       const data = await getSessionPageData(req, resolved);
 
+      res.locals.analyticsContext = {
+        content_type: 'book_session',
+        content_id: await contentRegistry.contentIdFor('session', data.session && data.session.path, {
+          title: data.session && data.session.title,
+          series: data.series && data.series.title,
+          subseries: data.subseries && data.subseries.title,
+          book: data.book && data.book.title,
+          sessionNumber: content.sessionNumber(data.book, data.session),
+        }, tree),
+        series: data.series && data.series.title,
+        subseries: data.subseries && data.subseries.title,
+        book: data.book && data.book.title,
+        session: data.session && data.session.title,
+      };
       res.render('session', {
         ...data,
         content,
@@ -841,6 +879,7 @@ app.use((err, req, res, next) => {
 // Start server immediately so Cloud Run health check passes, then load bibles
 app.listen(PORT, () => {
   console.log(`Noble Imprint Resource Website running on port ${PORT}`);
+  contentRegistry.init(); // load stable content ids into memory (best-effort)
   bible.loadBibles().then(() => {
     console.log('Bibles loaded successfully');
   }).catch(err => {

@@ -33,13 +33,15 @@ npx playwright test -g "suggestion auto-saves to Firestore"
 
 ### Content Pipeline
 
-Content lives in a separate GitHub repo (`Noble-Collective/Noble-Imprint-Resources`), organized as `series/{Series}/{Subseries?}/{Book}/sessions/{NN-Name.md}`. This website reads content via the GitHub API with a 3-tier caching strategy:
+Content lives in a separate GitHub repo (`Noble-Collective/Noble-Imprint-Resources`), organized as `series/{Series}/{Subseries?}/{Book}/sessions/{NN-Name.md}`. This website reads content via the GitHub API with a layered caching strategy:
 
-1. **In-memory cache** (30s TTL) — fastest, cleared on `/api/refresh`
-2. **Disk file cache** (`src/.file-cache/`) — survives container restarts, committed to git, refreshed nightly by GitHub Actions
-3. **Content tree disk fallback** (`.content-tree-cache.json`) — serves the full navigation tree during API outages
+1. **In-memory cache** — file contents 30s TTL, content tree 10min TTL; cleared on `/api/refresh` (or `?scope=files` for files-only)
+2. **Disk file cache** (`src/.file-cache/`) — committed to git so Docker images ship warm; refreshed nightly by GitHub Actions. Read **only as a fallback when the GitHub API errors** (rate limit/outage), not on a normal cold start.
+3. **Content tree snapshot** (`src/.content-tree-cache.json`, **committed**) — `buildContentTree()` serves this snapshot **immediately** when the in-memory cache is empty and refreshes from GitHub in the **background** (stale-while-revalidate). This is what makes cold starts fast: without it, the first request on a fresh container blocked ~13s on ~90 sequential GitHub directory calls + a per-session H1 fetch. `rebuildContentTree()` bakes H1 titles into the snapshot so a cold home doesn't re-fan-out for titles; `warmDiskCache()` and the nightly job force a fresh rebuild and re-commit it. The snapshot holds **only navigation structure, never page content** (which is always loaded fresh per request), so worst-case staleness is briefly-old nav that self-heals within seconds. It also doubles as the API-outage fallback.
 
-When content comes from disk cache (GitHub API is rate-limited), editing is disabled — the `fromDiskCache` flag prevents stale edits.
+When content comes from the disk **file** cache (GitHub API is rate-limited), editing is disabled — the `fromDiskCache` flag prevents stale edits. This flag is on file reads, **not** the tree snapshot, so serving the snapshot on a cold start does not disable editing.
+
+**Cloud Run** scales to zero (`--min-instances=0` in `deploy.yml`) — the snapshot above keeps cold starts to ~2s of container boot, so an always-warm instance isn't paid for. Bump to `1` if cold-start latency becomes annoying.
 
 ### Server-Side Rendering
 
@@ -105,9 +107,20 @@ Audio is generated in a separate repo (`Noble-Imprint-Audiobooks`) via ElevenLab
 
 **Bible audiobooks** (`/bible` reader): chapters with generated audio (e.g. Proverbs, 2 Timothy) render as paragraphs with the player + synced highlighting. Serving path: `audio.js` `getBibleAudioManifest`/`getBibleAudioChapter` (GCS `audio/bible/{tx}/{book-slug}/`), `bible.js` `getAudioChapterBlocks` (renders from `usfm-audio.js` — a CommonJS port of the audiobook converter that MUST stay byte-parity with `Noble-Imprint-Audiobooks/src/usfm-to-markdown.js`), and `bible-chapter.ejs` (audio-fab gated on `audioSession`). Poetry grouping + the `\h`↔references.json name fix (`resolveRefBookName`) live in `bible.js` `loadBibles`; after changing that parsing, rebuild + commit `.bible-cache/*.json`. **Full architecture + runbook for adding books: `Noble-Imprint-Audiobooks/docs/BIBLE-AUDIOBOOKS.md`.**
 
+### Analytics (first-party, BigQuery)
+
+Privacy-clean usage analytics owned entirely in GCP, surfaced in the admin console. Plan: `plans/2026-08-28-first-party-analytics.md`.
+
+- **Collector:** `src/public/js/analytics.js` (client beacon — pageview + visibility-aware dwell + audio events, `navigator.sendBeacon`, honors DNT/GPC) → `POST /api/analytics/collect` → `src/server/analytics.js` (buffered BigQuery streaming insert). Server enriches with fields the client must NOT be trusted for: device/browser/OS (homegrown UA parse), country (`geoip-country`, IPv4+IPv6), salted `ip_hash` (raw IP never stored — `ANALYTICS_IP_SALT` env), bot flag, logged-in email, canonical content identity. Best-effort — never throws into a render/request.
+- **Audio events:** `audio-player.js` emits native media events (play/pause/progress/ended) to `window.__analyticsAudio` in analytics.js, attributed to the current page context.
+- **Content identity (rename-proof):** each content route sets `res.locals.analyticsContext`, emitted as `window.__analyticsContext` (footer.ejs) and echoed by the client. `src/server/content-registry.js` assigns a stable forever `content_id` per book/session in Firestore `contentRegistry` (**never in the content repo**) and reconciles renames automatically — lazy structural match of a new path against "orphaned" (disappeared) registered paths, zero GitHub calls. Bible pages use no content_id (book+chapter already stable).
+- **Storage:** BigQuery `analytics.events` (project `noble-imprint-website`, day-partitioned on `ts`, no expiry). `@google-cloud/bigquery` + `geoip-country` are runtime **`dependencies`** (Dockerfile runs `npm ci --omit=dev` — a missing runtime dep crashes the container: this exact class of bug happened once).
+- **Dashboard:** `/admin` → Analytics tab. `src/server/analytics-admin.js` (`getDashboard` / `getBooksComparison` / `getBookFunnel` — parallel BQ aggregations, grouped by `content_id`) + `/api/admin/analytics[/books|/funnel]` (admin-gated). `src/public/js/admin-analytics.js` renders with vendored Chart.js (`src/public/js/vendor/chart.umd.js`, no CDN); Okabe-Ito CVD-safe palette (light-only). Two sub-tabs: **Resource Analytics** (content-focused — headline tiles, sortable book leaderboard, reach-vs-engagement scatter, momentum overlay, top books/Bible chapters, top sessions, audio, Bible-vs-Books; a book filter scopes it and reveals a session drop-off funnel, hiding the cross-book/cross-content panels) and **Basic Analytics** (generic, site-wide — traffic trend, devices, browsers, OS, top countries, top referrers). `loadResource` fetches `getDashboard` + `getBooksComparison` together; `loadBasic` fetches `getDashboard`.
+- **⚠ LOCAL DEV MUST set `BQ_ANALYTICS_TABLE=events_dev`** (in `.env`) or local testing writes into the **production** `events` table. BigQuery `DELETE` is blocked by the streaming buffer (~90 min); use `TRUNCATE TABLE` to clear. Bump the `?v=N` cache-buster on `analytics.js` / `admin-analytics.js` / `style.css` when changed (static assets are cached 1y immutable).
+
 ### Firestore Conventions
 
-Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`.
+Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`. Analytics uses a `contentRegistry` collection (stable `content_id` per book/session).
 
 ## Key Patterns
 

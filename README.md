@@ -157,6 +157,12 @@ Firebase Auth with Google sign-in. Session cookies (httpOnly, 5-day expiry). API
 
 Roles are managed in the admin console (`/admin`) and stored in Firestore.
 
+### Analytics
+
+First-party, privacy-clean usage analytics owned entirely in GCP (no third-party trackers). A lightweight client beacon (`analytics.js`) records pageviews, dwell time, and audio-listening events via `navigator.sendBeacon` (no cookies; honors Do-Not-Track). The server enriches each event (device/browser/OS, country via `geoip-country`, salted IP hash — raw IP never stored) and streams it into BigQuery (`analytics.events`). Each book/session carries a stable `content_id` (Firestore `contentRegistry`, never in the content repo) so analytics survives content renames automatically.
+
+Admins see it at **`/admin` → Analytics**: traffic, top books/chapters, dwell, device/referrer/country, audio completion, a sortable **book leaderboard**, a reach-vs-engagement scatter, a momentum trend, and a per-book **session drop-off funnel**. See `CLAUDE.md` → Analytics for the architecture and the local-dev `BQ_ANALYTICS_TABLE=events_dev` requirement.
+
 ---
 
 ## Project Structure
@@ -272,6 +278,8 @@ src/
 | `PORT` | Cloud Run sets automatically | Server port (defaults to 8080) |
 | `BUILD_TIME` | Docker build arg | Displayed in footer as "last updated" |
 | `NODE_ENV` | Dockerfile sets to `production` | Disables test-login endpoint in prod |
+| `ANALYTICS_IP_SALT` | Cloud Run env (secret) | Salt for hashing visitor IPs (raw IP never stored) |
+| `BQ_ANALYTICS_TABLE` | `.env` **local only** | **Set to `events_dev` locally** so dev testing doesn't write to the prod `analytics.events` table. Prod omits it (defaults to `events`). |
 
 ### Rebuilding the CodeMirror Bundle
 
