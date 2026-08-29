@@ -1281,11 +1281,8 @@
 
   // --- Bible Validation tab ---
   (function initBibleValidation() {
-    var runBtn = document.getElementById('bv-run-btn');
-    if (!runBtn) return;
-    var output = document.getElementById('bv-output');
-    var historyEl = document.getElementById('bv-history');
-    var historyLoaded = false;
+    var panel = document.getElementById('panel-bible-validation');
+    if (!panel) return;
 
     function esc(s) {
       return String(s == null ? '' : s)
@@ -1293,180 +1290,154 @@
         .replace(/"/g, '&quot;');
     }
 
-    function badge(status) {
-      var map = {
-        pass: { text: 'Match', cls: 'admin-badge--ok' },
-        fail: { text: 'Diffs Detected', cls: 'admin-badge--warn' },
-        error: { text: 'Error', cls: 'admin-badge--err' },
-      };
-      var m = map[status] || { text: String(status), cls: 'admin-badge--warn' };
-      return '<span class="admin-badge ' + m.cls + '">' + esc(m.text) + '</span>';
-    }
-
-    // Render a capped example block ({ total, truncated, items }) with a formatter.
-    function examples(title, capObj, fmt) {
-      if (!capObj || !capObj.total) return '';
-      var rows = capObj.items.map(fmt).join('');
-      var more = capObj.truncated ? '<p class="text-muted">&hellip; and ' + (capObj.total - capObj.items.length) + ' more</p>' : '';
-      return '<details style="margin-top:8px"><summary>' + esc(title) + ' (' + capObj.total + ')</summary>' + rows + more + '</details>';
-    }
-
-    function renderResult(r) {
-      var v = r.verseCheck, s = r.structureCheck;
-      var vt = v.totals, st = s.totals;
-      var html = '<div class="admin-card" style="margin-top:16px">';
-      html += '<h3>' + badge(r.status) + ' ' + esc((r.translationId || 'bsb').toUpperCase()) + ' &mdash; ' + esc(r.durationMs) + 'ms</h3>';
-      if (r.upstream && r.upstream.bsbTxt) html += '<p class="text-muted">Upstream bsb.txt: ' + esc(r.upstream.bsbTxt.lastModified || r.upstream.bsbTxt.etag || 'unknown') + '</p>';
-
-      html += '<h4>Verse text</h4><ul>';
-      html += '<li>' + esc(vt.matched) + ' / ' + esc(vt.official) + ' verses match exactly</li>';
-      html += '<li>Real differences: <strong>' + esc(vt.textMismatch) + '</strong> &nbsp; Cosmetic-only: ' + esc(vt.cosmeticOnly) + '</li>';
-      html += '<li>Missing here: ' + esc(vt.missingInOurs) + ' &nbsp; Extra here: ' + esc(vt.extraInOurs) + '</li></ul>';
-      html += examples('Text mismatches', v.textMismatch, function (x) {
-        return '<div style="margin:6px 0"><strong>' + esc(x.ref) + '</strong>'
-          + '<div class="text-muted">ours: ' + esc(x.ours) + '</div>'
-          + '<div class="text-muted">official: ' + esc(x.official) + '</div></div>';
+    // ── Sub-tab switching (Compare / Quotation Audit / Version & History) ──
+    var versionHistoryLoaded = false;
+    panel.querySelectorAll('[data-bv-sub]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        panel.querySelectorAll('.bv-subtab').forEach(function (b) { b.classList.remove('bv-subtab--active'); });
+        panel.querySelectorAll('.bv-sub').forEach(function (s) { s.classList.add('bv-sub--hidden'); });
+        btn.classList.add('bv-subtab--active');
+        var sub = btn.getAttribute('data-bv-sub');
+        var el = document.getElementById('bv-sub-' + sub);
+        if (el) el.classList.remove('bv-sub--hidden');
+        if (sub === 'version' && !versionHistoryLoaded) { versionHistoryLoaded = true; loadVersion(); loadHistory(); }
       });
-      html += examples('Missing verses', v.missingInOurs, function (x) { return '<div>' + esc(x.ref) + '</div>'; });
-      html += examples('Extra verses', v.extraInOurs, function (x) { return '<div>' + esc(x.ref) + '</div>'; });
-
-      html += '<h4>Structure (headings' + (r.footnotesChecked ? ' + footnotes' : '') + ')</h4><ul>';
-      html += '<li>' + esc(st.booksMatched) + ' / ' + esc(st.booksChecked) + ' books match exactly</li>';
-      html += '<li>Headings: ' + esc(st.headings.ours) + ' vs ' + esc(st.headings.official) + ' (' + esc(st.booksWithHeadingDiffs) + ' books differ)</li>';
-      if (r.footnotesChecked) html += '<li>Footnotes: ' + esc(st.footnotes.ours) + ' vs ' + esc(st.footnotes.official) + ' (' + esc(st.booksWithFootnoteDiffs) + ' books differ)</li>';
-      html += '<li>Missing books: ' + esc(st.missingBooks) + ' &nbsp; Extra books: ' + esc(st.extraBooks) + '</li></ul>';
-      if (s.books && s.books.length) {
-        html += examples('Books with structural differences', { total: st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs, truncated: s.booksTruncated, items: s.books }, function (b) {
-          var lines = '';
-          if (b.headings.onlyInOfficial.length || b.headings.onlyInOurs.length)
-            lines += '<div class="text-muted">headings &mdash; ours: ' + esc(b.headings.onlyInOurs.join(' | ')) + ' / official: ' + esc(b.headings.onlyInOfficial.join(' | ')) + '</div>';
-          if (b.footnotes.onlyInOfficial.length || b.footnotes.onlyInOurs.length)
-            lines += '<div class="text-muted">footnotes &mdash; +' + b.footnotes.onlyInOurs.length + ' ours / +' + b.footnotes.onlyInOfficial.length + ' official</div>';
-          return '<div style="margin:6px 0"><strong>' + esc(b.book) + '</strong>' + lines + '</div>';
-        });
-      }
-      html += '</div>';
-      output.innerHTML = html;
-    }
-
-    function renderHistory(runs) {
-      if (!runs.length) { historyEl.innerHTML = '<p class="text-muted">No validation runs yet.</p>'; return; }
-      var rows = runs.map(function (r) {
-        var vt = (r.verseCheck && r.verseCheck.totals) || {};
-        var st = (r.structureCheck && r.structureCheck.totals) || {};
-        return '<tr><td>' + esc(r.createdAt ? new Date(r.createdAt).toLocaleString() : '') + '</td>'
-          + '<td>' + badge(r.status) + '</td>'
-          + '<td>' + esc((r.translationId || '').toUpperCase()) + '</td>'
-          + '<td>' + esc(vt.textMismatch != null ? vt.textMismatch : '?') + '</td>'
-          + '<td>' + esc((st.booksWithHeadingDiffs || 0) + (st.booksWithFootnoteDiffs || 0)) + '</td>'
-          + '<td>' + esc(r.runBy || '') + '</td></tr>';
-      }).join('');
-      historyEl.innerHTML = '<table class="admin-table"><thead><tr>'
-        + '<th>When</th><th>Status</th><th>Bible</th><th>Verse diffs</th><th>Books w/ struct diffs</th><th>By</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table>';
-    }
-
-    function loadHistory() {
-      apiCall('GET', '/api/admin/bible-validation/runs')
-        .then(function (d) { historyLoaded = true; renderHistory(d.runs || []); })
-        .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
-    }
-
-    runBtn.addEventListener('click', function () {
-      var translationId = document.getElementById('bv-translation-select').value;
-      var footnotes = document.getElementById('bv-footnotes').checked;
-      runBtn.disabled = true;
-      output.innerHTML = '<p class="text-muted">Running validation (fetching official master + comparing&hellip; this can take up to a minute)&hellip;</p>';
-      apiCall('POST', '/api/admin/bible-validation/run', { translationId: translationId, footnotes: footnotes })
-        .then(function (r) { renderResult(r); loadHistory(); })
-        .catch(function (e) { output.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; })
-        .then(function () { runBtn.disabled = false; });
     });
 
-    // --- Apply Latest BSB Text (sync) ---
-    var scanBtn = document.getElementById('bv-scan-btn');
-    var syncOutput = document.getElementById('bv-sync-output');
+    // ── Compare to BSB (streaming, live checklist) ──
+    var compareBtn = document.getElementById('bv-compare-btn');
+    var checklistEl = document.getElementById('bv-checklist');
+    var compareOut = document.getElementById('bv-compare-output');
     var changesById = {};
+    var STEP_ORDER = ['download-verses', 'download-usfm', 'load-ours', 'compare', 'structure', 'library'];
+    var STEP_LABELS = {
+      'download-verses': 'Download official verse text from bereanbible.com',
+      'download-usfm': 'Download official structure (headings + footnotes)',
+      'load-ours': 'Load our stored copy',
+      'compare': 'Compare every book, verse by verse',
+      'structure': 'Check section headings & footnotes',
+      'library': 'Scan the library for affected quotations'
+    };
+
+    function renderChecklist(steps, books) {
+      var rows = STEP_ORDER.map(function (k) {
+        var s = steps[k];
+        var icon = !s ? '<span class="bv-ck bv-ck--pending">○</span>'
+          : s.status === 'done' ? '<span class="bv-ck bv-ck--done">✓</span>'
+            : '<span class="bv-ck bv-ck--run">◐</span>';
+        var detail = s && s.detail ? ' <span class="text-muted">— ' + esc(s.detail) + '</span>' : '';
+        return '<div class="bv-step">' + icon + '<span>' + esc(STEP_LABELS[k] || k) + detail + '</span></div>';
+      }).join('');
+      var grid = '';
+      if (books.length) {
+        grid = '<div class="bv-books">' + books.map(function (b) {
+          var diff = (b.changed || 0) + (b.missing || 0);
+          return '<span class="bv-book ' + (diff ? 'bv-book--diff' : 'bv-book--ok') + '" title="' + esc(b.name) + ' — ' + b.verses + ' verses, ' + (b.changed || 0) + ' changed">'
+            + esc(b.name) + (diff ? ' <span class="bv-book-diff">' + diff + '</span>' : ' ✓') + '</span>';
+        }).join('') + '</div>';
+      }
+      checklistEl.innerHTML = '<div class="admin-card bv-checklist-card">' + rows + grid + '</div>';
+    }
+
+    function tile(label, value, tone) {
+      return '<div class="bv-tile bv-tile--' + (tone || 'neutral') + '"><div class="bv-tile-num">' + esc(value) + '</div><div class="bv-tile-label">' + esc(label) + '</div></div>';
+    }
 
     function changeCard(c) {
       var loc = c.type === 'verse-store'
-        ? 'Verse store &mdash; <strong>' + esc(c.ref) + '</strong> in references.json'
-        : 'Library quote of <strong>' + esc(c.ref) + '</strong> in <code>' + esc(c.file) + '</code>';
-      var ctx = c.context ? '<div class="text-muted" style="margin:4px 0">&hellip;' + esc(c.context) + '&hellip;</div>' : '';
-      return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '" style="margin:10px 0;padding:10px">'
-        + '<div>' + loc + '</div>' + ctx
-        + '<div style="margin:6px 0"><span class="text-muted">old:</span> <del>' + esc(c.oldText) + '</del></div>'
-        + '<div style="margin:6px 0"><span class="text-muted">new:</span> <ins>' + esc(c.newText) + '</ins></div>'
-        + '<div class="bv-change-actions">'
-        + '<button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
-        + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button>'
-        + '<span class="bv-change-status text-muted"></span></div></div>';
+        ? 'Verse text &mdash; <strong>' + esc(c.ref) + '</strong>'
+        : 'Quotation of <strong>' + esc(c.ref) + '</strong> in <code>' + esc(c.file) + '</code>';
+      return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '">'
+        + '<div class="bv-change-loc">' + loc + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-diff-tag">was</span> <del>' + esc(c.oldText) + '</del></div>'
+        + '<div class="bv-diff-line"><span class="bv-diff-tag">now</span> <ins>' + esc(c.newText) + '</ins></div>'
+        + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
+        + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
     }
 
-    function renderSync(d) {
+    function renderCompareResult(r) {
       changesById = {};
-      var all = (d.verseChanges || []).concat(d.libraryChanges || []);
-      all.forEach(function (c) { changesById[c.id] = c; });
-      var html = '<div class="admin-card" style="margin-top:12px">'
-        + '<p>Scanned <strong>' + esc(d.scannedFiles) + '</strong> library files. '
-        + '<strong>' + esc(d.verseChanges.length) + '</strong> verse update(s), '
-        + '<strong>' + esc(d.libraryChanges.length) + '</strong> library quotation(s) behind upstream.</p>';
-      if (!all.length) html += '<p class="admin-badge admin-badge--ok">Everything is already up to date.</p>';
-      html += '</div>';
-      if (d.verseChanges.length) html += '<h4>Verse store</h4>' + d.verseChanges.map(changeCard).join('');
-      if (d.libraryChanges.length) html += '<h4>Library quotations</h4>' + d.libraryChanges.map(changeCard).join('');
+      var ch = r.changes || { verseChanges: [], libraryChanges: [], citationReview: [] };
+      (ch.verseChanges || []).concat(ch.libraryChanges || []).forEach(function (c) { changesById[c.id] = c; });
+      var v = r.verse, st = r.structure.totals;
+      var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + st.missingBooks + st.extraBooks;
+      var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0;
 
-      // Citation audit: quotations sitting next to a citation of a changed verse.
-      var review = d.citationReview || [];
-      if (review.length) {
-        html += '<h4>Cited quotations to review (' + review.length + ')</h4>'
-          + '<p class="text-muted">Places that cite a changed verse and quote it. Auto-fixable ones also appear under "Library quotations" above; the rest need a manual look.</p>';
-        html += review.map(function (r) {
-          var sb = r.status === 'stale'
-            ? '<span class="admin-badge admin-badge--warn">Stale' + (r.autoFixable ? ' (auto-fixable)' : ' (manual)') + '</span>'
-            : '<span class="admin-badge admin-badge--warn">Divergent</span>';
-          return '<div class="admin-card" style="margin:10px 0;padding:10px">'
-            + '<div>' + sb + ' <strong>' + esc(r.ref) + '</strong> cited as <code>' + esc(r.citation) + '</code> in <code>' + esc(r.file) + '</code> <span class="text-muted">(' + esc(r.kind) + ')</span></div>'
-            + '<div style="margin:6px 0"><span class="text-muted">quoted:</span> ' + esc(r.quote) + '</div>'
-            + '<div style="margin:6px 0"><span class="text-muted">current verse:</span> ' + esc(r.newText) + '</div>'
-            + '</div>';
-        }).join('');
+      var html = '<div class="admin-card">'
+        + '<div class="bv-result-head">'
+        + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
+        + ' <span class="text-muted">source updated ' + esc((r.upstream && r.upstream.lastModified) || 'unknown') + ' · checked in ' + esc(r.durationMs) + ' ms</span></div>'
+        + '<div class="bv-tiles">'
+        + tile('Verses identical', Number(v.matched).toLocaleString(), 'ok')
+        + tile('Verses changed', v.changed, v.changed ? 'warn' : 'ok')
+        + tile('Missing', v.missing, v.missing ? 'err' : 'ok')
+        + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
+        + tile('Books identical', st.booksMatched + '/' + st.booksChecked, st.booksMatched === st.booksChecked ? 'ok' : 'warn')
+        + '</div>';
+      if (clean) html += '<p class="text-muted">Our copy matches the current published BSB exactly.</p>';
+      html += '</div>';
+
+      if ((ch.verseChanges || []).length) {
+        html += '<h4>Changed verses (' + ch.verseChanges.length + ')</h4>'
+          + '<p class="text-muted">Accept to update our copy to the current BSB (one commit each). Reject to keep ours.</p>'
+          + ch.verseChanges.map(changeCard).join('');
       }
-      syncOutput.innerHTML = html;
+      if ((ch.libraryChanges || []).length) {
+        html += '<h4>Affected library quotations (' + ch.libraryChanges.length + ')</h4>'
+          + '<p class="text-muted">Places in our books that quote the old wording.</p>'
+          + ch.libraryChanges.map(changeCard).join('');
+      }
+      var sBooks = r.structure.books || [];
+      if (sBooks.length) {
+        html += '<details style="margin-top:14px"><summary><strong>Heading &amp; footnote differences</strong> (' + sBooks.length + ' books)</summary>'
+          + sBooks.map(function (b) {
+            var lines = '';
+            if (b.headings.onlyInOurs.length || b.headings.onlyInOfficial.length)
+              lines += '<div class="text-muted">headings — ours: ' + esc(b.headings.onlyInOurs.join(' | ')) + ' / official: ' + esc(b.headings.onlyInOfficial.join(' | ')) + '</div>';
+            if (b.footnotes.onlyInOurs.length || b.footnotes.onlyInOfficial.length)
+              lines += '<div class="text-muted">footnotes — +' + b.footnotes.onlyInOurs.length + ' ours / +' + b.footnotes.onlyInOfficial.length + ' official</div>';
+            return '<div style="margin:6px 0"><strong>' + esc(b.book) + '</strong>' + lines + '</div>';
+          }).join('') + '</details>';
+      }
+      compareOut.innerHTML = html;
     }
 
-    if (scanBtn) {
-      scanBtn.addEventListener('click', function () {
+    if (compareBtn) {
+      compareBtn.addEventListener('click', function () {
         var translationId = document.getElementById('bv-translation-select').value;
-        scanBtn.disabled = true;
-        syncOutput.innerHTML = '<p class="text-muted">Scanning (validating + searching the whole library&hellip; this can take a while)&hellip;</p>';
-        apiCall('GET', '/api/admin/bible-validation/sync-scan?translationId=' + encodeURIComponent(translationId))
-          .then(renderSync)
-          .catch(function (e) { syncOutput.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; })
-          .then(function () { scanBtn.disabled = false; });
+        compareBtn.disabled = true;
+        compareOut.innerHTML = '';
+        var steps = {}, books = [];
+        renderChecklist(steps, books);
+        var es = new EventSource('/api/admin/bible-compare/stream?translationId=' + encodeURIComponent(translationId));
+        es.onmessage = function (ev) {
+          var e; try { e = JSON.parse(ev.data); } catch (_) { return; }
+          if (e.type === 'step') { steps[e.key] = { status: e.status, detail: e.detail || (steps[e.key] && steps[e.key].detail) }; renderChecklist(steps, books); }
+          else if (e.type === 'book') { books.push(e); renderChecklist(steps, books); }
+          else if (e.type === 'result') { renderCompareResult(e.result); }
+          else if (e.type === 'error') { compareOut.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
+          else if (e.type === 'done') { es.close(); compareBtn.disabled = false; }
+        };
+        es.onerror = function () { es.close(); compareBtn.disabled = false; if (!compareOut.innerHTML) compareOut.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; };
       });
 
-      // Event delegation for per-change accept/reject.
-      syncOutput.addEventListener('click', function (e) {
-        var card = e.target.closest('.bv-change');
-        if (!card) return;
-        var id = card.getAttribute('data-change-id');
+      // Accept / Reject a single change.
+      compareOut.addEventListener('click', function (e) {
+        var card = e.target.closest('.bv-change'); if (!card) return;
         var statusEl = card.querySelector('.bv-change-status');
         if (e.target.classList.contains('bv-reject')) {
-          card.style.opacity = '0.5';
+          card.classList.add('bv-change--done');
           card.querySelector('.bv-change-actions').innerHTML = '<span class="text-muted">Rejected</span>';
           return;
         }
         if (e.target.classList.contains('bv-accept')) {
-          var change = changesById[id];
-          if (!change) return;
+          var change = changesById[card.getAttribute('data-change-id')]; if (!change) return;
           card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
           statusEl.textContent = ' applying…';
           apiCall('POST', '/api/admin/bible-validation/apply-change', { change: change })
             .then(function (r) {
-              card.style.opacity = '0.6';
-              card.querySelector('.bv-change-actions').innerHTML =
-                '<span class="admin-badge admin-badge--ok">Applied</span> <span class="text-muted">' + esc((r.sha || '').slice(0, 7)) + '</span>';
+              card.classList.add('bv-change--done');
+              card.querySelector('.bv-change-actions').innerHTML = '<span class="admin-badge admin-badge--ok">Applied</span> <span class="text-muted">' + esc((r.sha || '').slice(0, 7)) + '</span>';
             })
             .catch(function (err) {
               card.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
@@ -1474,6 +1445,51 @@
             });
         }
       });
+    }
+
+    // ── Version & History ──
+    var versionEl = document.getElementById('bv-version');
+    var historyEl = document.getElementById('bv-history');
+
+    function loadVersion() {
+      apiCall('GET', '/api/admin/bible-version?translationId=bsb').then(function (d) {
+        var v = d.version;
+        if (!v) { versionEl.innerHTML = '<div class="admin-card"><p class="text-muted">No version pinned yet.</p></div>'; return; }
+        versionEl.innerHTML = '<div class="admin-card"><h3>Our pinned copy</h3>'
+          + '<p><strong>' + esc(v.printing || '—') + '</strong> · pinned ' + esc(v.pinnedAt || '—') + '</p>'
+          + (v.note ? '<p class="text-muted">' + esc(v.note) + '</p>' : '')
+          + (v.upstreamLastSeen && v.upstreamLastSeen.lastModified ? '<p class="text-muted">Publisher last seen: ' + esc(v.upstreamLastSeen.lastModified) + '</p>' : '')
+          + '</div>';
+      }).catch(function (e) { versionEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
+    }
+
+    function statusBadge(s) {
+      return s === 'pass' ? '<span class="admin-badge admin-badge--ok">Up to date</span>'
+        : s === 'error' ? '<span class="admin-badge admin-badge--err">Error</span>'
+          : '<span class="admin-badge admin-badge--warn">Differences</span>';
+    }
+
+    function renderHistory(runs) {
+      if (!runs.length) { historyEl.innerHTML = '<p class="text-muted">No comparisons run yet.</p>'; return; }
+      var rows = runs.map(function (r) {
+        var changed = r.verse ? r.verse.changed : (r.verseCheck && r.verseCheck.totals ? r.verseCheck.totals.textMismatch : '?');
+        var structg = r.structureDiffBooks != null ? r.structureDiffBooks
+          : (r.structureCheck && r.structureCheck.totals ? (r.structureCheck.totals.booksWithHeadingDiffs || 0) + (r.structureCheck.totals.booksWithFootnoteDiffs || 0) : 0);
+        return '<tr><td>' + esc(r.createdAt ? new Date(r.createdAt).toLocaleString() : '') + '</td>'
+          + '<td>' + statusBadge(r.status) + '</td>'
+          + '<td>' + esc((r.translationId || '').toUpperCase()) + '</td>'
+          + '<td>' + esc(changed) + '</td><td>' + esc(structg) + '</td>'
+          + '<td>' + esc(r.runBy || '') + '</td></tr>';
+      }).join('');
+      historyEl.innerHTML = '<table class="admin-table"><thead><tr>'
+        + '<th>When</th><th>Result</th><th>Bible</th><th>Verses changed</th><th>Books w/ struct diffs</th><th>By</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function loadHistory() {
+      apiCall('GET', '/api/admin/bible-validation/runs')
+        .then(function (d) { renderHistory(d.runs || []); })
+        .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
     }
 
     // --- Quotation Audit (all quotes vs current Bible) ---
@@ -1530,9 +1546,6 @@
       });
     }
 
-    // Lazy-load history when the tab is first opened.
-    var tabBtn = document.querySelector('[data-admin-tab="bible-validation"]');
-    if (tabBtn) tabBtn.addEventListener('click', function () { if (!historyLoaded) loadHistory(); });
   })();
 
 })();

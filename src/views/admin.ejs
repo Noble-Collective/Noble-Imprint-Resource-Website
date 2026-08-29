@@ -190,47 +190,48 @@
 
     <!-- ===== BIBLE VALIDATION PANEL ===== -->
     <div class="admin-panel admin-panel--hidden" id="panel-bible-validation">
-      <p class="text-muted" style="margin-bottom:16px">
-        Independently verify our stored Bible text against the official public-domain master at
-        <strong>bereanbible.com</strong> &mdash; verse text (references.json vs bsb.txt) and semantic
-        structure (section headings + footnotes vs the official USFM). Confirms our copy is faithful
-        and complete; it does not judge the translation itself.
-      </p>
-      <div class="admin-diff-controls">
-        <div class="admin-diff-row">
+      <div class="bv-subtabs">
+        <button class="bv-subtab bv-subtab--active" data-bv-sub="compare">Compare to BSB</button>
+        <button class="bv-subtab" data-bv-sub="audit">Quotation Audit</button>
+        <button class="bv-subtab" data-bv-sub="version">Version &amp; History</button>
+      </div>
+
+      <!-- Sub-tab: Compare to BSB -->
+      <section class="bv-sub" id="bv-sub-compare">
+        <p class="text-muted bv-lede">
+          Independently compare our stored Bible against the live official text at
+          <strong>bereanbible.com</strong>, book by book. This is a deterministic check — not AI —
+          that walks every book and reports exactly what differs. Read-only: nothing changes until
+          you Accept a specific difference below.
+        </p>
+        <div class="bv-toolbar">
           <label class="admin-label">Translation</label>
           <select class="admin-select" id="bv-translation-select">
             <option value="bsb">Berean Standard Bible (BSB)</option>
           </select>
+          <button class="admin-btn admin-btn--primary" id="bv-compare-btn">Compare to current BSB</button>
         </div>
-        <div class="admin-diff-row">
-          <label class="admin-label"><input type="checkbox" id="bv-footnotes" checked> Compare footnotes</label>
-        </div>
-        <button class="admin-btn admin-btn--primary" id="bv-run-btn">Run Validation</button>
-      </div>
-      <div id="bv-output"></div>
+        <div id="bv-checklist"></div>
+        <div id="bv-compare-output"></div>
+      </section>
 
-      <h3 style="margin-top:28px">Apply Latest BSB Text</h3>
-      <p class="text-muted" style="margin-bottom:12px">
-        Scan for verses where our copy is behind current upstream, plus any place in the library that
-        quotes the old wording verbatim. Each change is listed explicitly with old &rarr; new text and
-        applied only when you click <strong>Accept</strong> (one commit per change). Nothing is changed
-        until you accept it.
-      </p>
-      <button class="admin-btn admin-btn--primary" id="bv-scan-btn">Scan for BSB Updates</button>
-      <div id="bv-sync-output"></div>
+      <!-- Sub-tab: Quotation Audit -->
+      <section class="bv-sub bv-sub--hidden" id="bv-sub-audit">
+        <p class="text-muted bv-lede">
+          Compare every Scripture quotation in the library against our current Bible text.
+          Cosmetic differences (e.g. &ldquo;Lord&rdquo; vs &ldquo;LORD&rdquo;) are counted but set
+          aside; genuine wording differences are grouped for review.
+        </p>
+        <button class="admin-btn admin-btn--primary" id="qa-run-btn">Run Quotation Audit</button>
+        <div id="qa-output"></div>
+      </section>
 
-      <h3 style="margin-top:28px">Quotation Audit</h3>
-      <p class="text-muted" style="margin-bottom:12px">
-        Compare every Scripture quotation in the library against the current Bible text.
-        Findings are grouped by how much review they need: cosmetic (e.g. "Lord" vs "LORD") is
-        counted but set aside; genuine wording differences are listed for review.
-      </p>
-      <button class="admin-btn admin-btn--primary" id="qa-run-btn">Run Quotation Audit</button>
-      <div id="qa-output"></div>
-
-      <h3 style="margin-top:28px">Run History</h3>
-      <div id="bv-history"><p class="text-muted">Loading history&hellip;</p></div>
+      <!-- Sub-tab: Version & History -->
+      <section class="bv-sub bv-sub--hidden" id="bv-sub-version">
+        <div id="bv-version"><p class="text-muted">Loading version&hellip;</p></div>
+        <h3 style="margin-top:24px">Run History</h3>
+        <div id="bv-history"><p class="text-muted">Loading history&hellip;</p></div>
+      </section>
     </div>
 
     <!-- ===== ANALYTICS TAB ===== -->
@@ -450,7 +451,7 @@
     }),
   }).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
 </script>
-<script src="/static/js/admin.js?v=3"></script>
+<script src="/static/js/admin.js?v=4"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
 <script src="/static/js/admin-analytics.js?v=4"></script>
 

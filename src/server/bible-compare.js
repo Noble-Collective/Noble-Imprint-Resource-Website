@@ -1,0 +1,117 @@
+// Streaming "Compare to current BSB" — the consolidated check that replaces the
+// old Run-Validation + Scan buttons. It fetches the publisher's live text ONCE,
+// walks every book of the Bible comparing our stored copy against the source,
+// and emits progress events so the admin UI can render a live checklist proving
+// a deterministic (non-AI) program is systematically verifying each book. At the
+// end it assembles the actionable Accept/Reject changes.
+
+const crypto = require('crypto');
+const github = require('./github');
+const v = require('./bible-validation');
+const sync = require('./bible-sync');
+
+const BSB_TXT_URL = 'https://bereanbible.com/bsb.txt';
+const BSB_USFM_ZIP_URL = 'https://bereanbible.com/bsb_usfm.zip';
+
+// Group a ref→text Map into Map<bookName, [{ref,text}]> preserving file order.
+function groupByBook(map) {
+  const books = new Map();
+  for (const [ref, text] of map) {
+    const m = ref.match(/^(.+?)\s+\d+:\d+$/);
+    if (!m) continue;
+    const book = m[1];
+    if (!books.has(book)) books.set(book, []);
+    books.get(book).push({ ref, text });
+  }
+  return books;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// opts.emit(event) is called for each progress event. opts.bookDelayMs paces the
+// per-book stream so the checklist is visibly systematic (default 18ms).
+async function runStreamingCompare(opts = {}) {
+  const emit = opts.emit || (() => {});
+  const translationId = opts.translationId || 'bsb';
+  const bookDelayMs = opts.bookDelayMs != null ? opts.bookDelayMs : 18;
+  const t0 = Date.now();
+
+  // 1. Official verse text
+  emit({ type: 'step', key: 'download-verses', label: 'Downloading official verse text from bereanbible.com', status: 'running' });
+  const txtRes = await fetch(BSB_TXT_URL);
+  if (!txtRes.ok) throw new Error(`bsb.txt fetch failed: ${txtRes.status}`);
+  const txt = await txtRes.text();
+  const lastModified = txtRes.headers.get('last-modified');
+  const sha256 = crypto.createHash('sha256').update(txt).digest('hex');
+  const officialVerses = v.parseBsbTxt(txt);
+  emit({ type: 'step', key: 'download-verses', status: 'done', detail: `${officialVerses.size.toLocaleString()} verses · source updated ${lastModified || 'unknown'}` });
+
+  // 2. Official structure (USFM)
+  emit({ type: 'step', key: 'download-usfm', label: 'Downloading official structure (headings + footnotes) from bereanbible.com', status: 'running' });
+  const zipBuf = Buffer.from(await (await fetch(BSB_USFM_ZIP_URL)).arrayBuffer());
+  const officialUsfm = v.parseZip(zipBuf);
+  emit({ type: 'step', key: 'download-usfm', status: 'done', detail: `${officialUsfm.size} books` });
+
+  // 3. Our stored copy
+  emit({ type: 'step', key: 'load-ours', label: 'Loading our stored copy from the content repository', status: 'running' });
+  const raw = await github.getFileRaw(`bibles/${translationId}/references.json`);
+  const oursStr = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
+  const oursVerses = v.parseReferences(oursStr);
+  const listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
+  const oursUsfm = new Map();
+  for (const f of listing) {
+    if (/\.(sfm|usfm)$/i.test(f.name)) {
+      const { content } = await github.getFileContent(`bibles/${translationId}/content/${f.name}`);
+      oursUsfm.set(f.name, content);
+    }
+  }
+  emit({ type: 'step', key: 'load-ours', status: 'done', detail: `${oursVerses.size.toLocaleString()} verses · ${oursUsfm.size} books` });
+
+  // 4. Book-by-book verse comparison (streamed)
+  emit({ type: 'step', key: 'compare', label: 'Comparing every book, verse by verse, against the source', status: 'running' });
+  const officialByBook = groupByBook(officialVerses);
+  const drifted = [];       // real (non-cosmetic) verse changes
+  let matched = 0, cosmetic = 0, missing = 0, extra = 0;
+
+  for (const [book, verses] of officialByBook) {
+    let bChanged = 0, bCosmetic = 0, bMissing = 0;
+    for (const { ref, text } of verses) {
+      if (!oursVerses.has(ref)) { bMissing++; missing++; continue; }
+      const ours = oursVerses.get(ref);
+      if (ours === text) { matched++; }
+      else if (v.normalizeVerse(ours) === v.normalizeVerse(text)) { bCosmetic++; cosmetic++; }
+      else { bChanged++; drifted.push({ ref, ours, official: text }); }
+    }
+    emit({ type: 'book', name: book, verses: verses.length, changed: bChanged, cosmetic: bCosmetic, missing: bMissing });
+    if (bookDelayMs) await sleep(bookDelayMs);
+  }
+  for (const ref of oursVerses.keys()) if (!officialVerses.has(ref)) extra++;
+  emit({ type: 'step', key: 'compare', status: 'done', detail: `${matched.toLocaleString()} verses identical · ${drifted.length} changed · ${missing} missing · ${extra} extra` });
+
+  // 5. Structure (headings + footnotes)
+  emit({ type: 'step', key: 'structure', label: 'Checking section headings and footnotes', status: 'running' });
+  const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true });
+  emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote differences` });
+
+  // 6. Library scan for quotations of changed verses
+  emit({ type: 'step', key: 'library', label: 'Scanning the library for quotations of changed verses', status: 'running' });
+  const changes = await sync.buildChangesFromDrift(drifted, translationId);
+  emit({ type: 'step', key: 'library', status: 'done', detail: `${changes.scannedFiles} files scanned · ${changes.libraryChanges.length} quotation(s) affected` });
+
+  const result = {
+    translationId,
+    durationMs: Date.now() - t0,
+    upstream: { lastModified, sha256, contentLength: txt.length, checkedAt: new Date().toISOString() },
+    verse: { total: officialVerses.size, matched, cosmetic, changed: drifted.length, missing, extra },
+    structure: {
+      totals: structure.totals,
+      books: structure.books.slice(0, 40),
+    },
+    changes,
+  };
+  emit({ type: 'result', result });
+  emit({ type: 'done' });
+  return result;
+}
+
+module.exports = { runStreamingCompare, groupByBook };

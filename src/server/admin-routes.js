@@ -9,6 +9,7 @@ const notifications = require('./notifications');
 const bibleValidationRunner = require('./bible-validation-runner');
 const bibleSync = require('./bible-sync');
 const quoteAudit = require('./bible-quote-audit');
+const bibleCompare = require('./bible-compare');
 const analyticsAdmin = require('./analytics-admin');
 const { patienceDiffPlus } = require('./patience-diff');
 
@@ -809,6 +810,56 @@ api.get('/bible-quote-audit/runs', async (req, res) => {
   } catch (err) {
     console.error('Quote audit history error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Streaming "Compare to current BSB" (Server-Sent Events). Emits a live
+// checklist (download → load → per-book → structure → library) then the full
+// result with Accept/Reject changes. Read-only. Auth via the admin session
+// cookie (EventSource sends same-origin cookies).
+api.get('/bible-compare/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // don't let any proxy buffer the stream
+  if (res.flushHeaders) res.flushHeaders();
+  const emit = (evt) => {
+    if (res.writableEnded) return;
+    res.write(`data: ${JSON.stringify(evt)}\n\n`);
+    if (res.flush) res.flush(); // push past the compression middleware's buffer
+  };
+  try {
+    const translationId = req.query.translationId || 'bsb';
+    const result = await bibleCompare.runStreamingCompare({ translationId, emit });
+    // Persist a compact summary to run history (fire-and-forget).
+    const st = result.structure.totals;
+    const structureDiffBooks = (st.booksWithHeadingDiffs || 0) + (st.booksWithFootnoteDiffs || 0) + (st.missingBooks || 0) + (st.extraBooks || 0);
+    const clean = result.verse.changed === 0 && result.verse.missing === 0 && result.verse.extra === 0 && structureDiffBooks === 0;
+    firestore.saveValidationRun({
+      translationId,
+      runBy: (req.user && req.user.email) || 'unknown',
+      status: clean ? 'pass' : 'fail',
+      verse: result.verse,
+      structureDiffBooks,
+      upstreamLastModified: result.upstream.lastModified,
+      durationMs: result.durationMs,
+    }).catch(err => console.warn('compare history save failed:', err.message));
+  } catch (err) {
+    console.error('Bible compare stream error:', err.message);
+    emit({ type: 'error', error: err.message });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+});
+
+// Read the pinned version label for a translation (or null if not pinned yet).
+api.get('/bible-version', async (req, res) => {
+  const translationId = req.query.translationId || 'bsb';
+  try {
+    const { content } = await github.getFileContent(`bibles/${translationId}/version.json`);
+    res.json({ version: JSON.parse(content) });
+  } catch {
+    res.json({ version: null });
   }
 });
 

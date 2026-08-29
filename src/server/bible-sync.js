@@ -94,11 +94,16 @@ async function listLibraryMarkdown() {
 // Returns { verseChanges, libraryChanges, drifted, scannedFiles }.
 async function detectSyncChanges(opts = {}) {
   const translationId = opts.translationId || 'bsb';
-
   // 1. Which verses drifted (real text differences present in both copies).
   const result = await runValidation({ translationId, footnotes: false });
-  const drifted = result.verseCheck.textMismatch.items; // [{ ref, ours, official, ... }]
+  return buildChangesFromDrift(result.verseCheck.textMismatch.items, translationId);
+}
 
+// Given the drifted verses ([{ ref, ours, official }]) already computed by a
+// comparison, scan the library and assemble the actionable Accept/Reject changes.
+// Separated from detectSyncChanges so the streaming compare can reuse it without
+// fetching/validating upstream a second time.
+async function buildChangesFromDrift(drifted, translationId = 'bsb') {
   // 2. Verse-store changes: one per drifted verse.
   const verseChanges = drifted.map(d => ({
     type: 'verse-store',
@@ -210,5 +215,6 @@ module.exports = {
   changeId,
   listLibraryMarkdown,
   detectSyncChanges,
+  buildChangesFromDrift,
   applyChange,
 };

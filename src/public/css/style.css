@@ -3736,6 +3736,53 @@ body.drawer-open {
 .bv-change ins { background: #d4edda; text-decoration: none; }
 .bv-change del { background: #f8d7da; }
 .bv-change-status { margin-left: 8px; }
+
+/* Bible Validation — sub-tabs */
+.bv-subtabs { display: flex; gap: 4px; border-bottom: 2px solid #eae4d6; margin-bottom: 18px; }
+.bv-subtab {
+  background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
+  padding: 8px 14px; font-size: 14px; font-weight: 600; color: #8a7f66; cursor: pointer;
+}
+.bv-subtab:hover { color: #5a4e32; }
+.bv-subtab--active { color: #5a4e32; border-bottom-color: #d7b44a; }
+.bv-sub--hidden { display: none; }
+.bv-lede { max-width: 70ch; margin-bottom: 16px; line-height: 1.5; }
+.bv-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.bv-toolbar .admin-label { margin: 0; }
+
+/* Live checklist */
+.bv-checklist-card { margin-top: 8px; }
+.bv-step { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: 14px; }
+.bv-ck { display: inline-block; width: 1.1em; text-align: center; font-weight: 700; }
+.bv-ck--pending { color: #c7bfa8; }
+.bv-ck--run { color: #d7b44a; animation: bv-spin 1s linear infinite; }
+.bv-ck--done { color: #1e7e34; }
+@keyframes bv-spin { to { transform: rotate(360deg); } }
+.bv-books { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #eae4d6; }
+.bv-book { font-size: 12px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.bv-book--ok { background: #eef6ee; color: #2c6b34; }
+.bv-book--diff { background: #fff3cd; color: #856404; font-weight: 600; }
+.bv-book-diff { background: #856404; color: #fff; border-radius: 8px; padding: 0 5px; font-size: 11px; }
+
+/* Result summary tiles */
+.bv-result-head { margin-bottom: 12px; }
+.bv-tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px; }
+.bv-tile { flex: 1 1 110px; min-width: 100px; border-radius: 8px; padding: 10px 12px; text-align: center; border: 1px solid #e5e0d5; background: #fff; }
+.bv-tile-num { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.bv-tile-label { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: #8a7f66; margin-top: 2px; }
+.bv-tile--ok .bv-tile-num { color: #1e7e34; }
+.bv-tile--warn { background: #fffdf5; border-color: #f0e2b8; }
+.bv-tile--warn .bv-tile-num { color: #9a7d16; }
+.bv-tile--err { background: #fdf5f5; border-color: #f0c8c8; }
+.bv-tile--err .bv-tile-num { color: #b02a37; }
+
+/* Change cards */
+.bv-change { margin: 10px 0; padding: 12px; }
+.bv-change-loc { margin-bottom: 6px; }
+.bv-diff-line { margin: 3px 0; line-height: 1.5; }
+.bv-diff-tag { display: inline-block; width: 34px; font-size: 11px; text-transform: uppercase; color: #8a7f66; }
+.bv-change--done { opacity: .6; }
+.bv-change-actions { margin-top: 8px; }
 .admin-diff-loading {
   text-align: center;
   padding: 40px;
