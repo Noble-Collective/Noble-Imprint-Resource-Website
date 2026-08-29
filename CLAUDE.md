@@ -105,9 +105,20 @@ Audio is generated in a separate repo (`Noble-Imprint-Audiobooks`) via ElevenLab
 
 **Bible audiobooks** (`/bible` reader): chapters with generated audio (e.g. Proverbs, 2 Timothy) render as paragraphs with the player + synced highlighting. Serving path: `audio.js` `getBibleAudioManifest`/`getBibleAudioChapter` (GCS `audio/bible/{tx}/{book-slug}/`), `bible.js` `getAudioChapterBlocks` (renders from `usfm-audio.js` — a CommonJS port of the audiobook converter that MUST stay byte-parity with `Noble-Imprint-Audiobooks/src/usfm-to-markdown.js`), and `bible-chapter.ejs` (audio-fab gated on `audioSession`). Poetry grouping + the `\h`↔references.json name fix (`resolveRefBookName`) live in `bible.js` `loadBibles`; after changing that parsing, rebuild + commit `.bible-cache/*.json`. **Full architecture + runbook for adding books: `Noble-Imprint-Audiobooks/docs/BIBLE-AUDIOBOOKS.md`.**
 
+### Analytics (first-party, BigQuery)
+
+Privacy-clean usage analytics owned entirely in GCP, surfaced in the admin console. Plan: `plans/2026-08-28-first-party-analytics.md`.
+
+- **Collector:** `src/public/js/analytics.js` (client beacon — pageview + visibility-aware dwell + audio events, `navigator.sendBeacon`, honors DNT/GPC) → `POST /api/analytics/collect` → `src/server/analytics.js` (buffered BigQuery streaming insert). Server enriches with fields the client must NOT be trusted for: device/browser/OS (homegrown UA parse), country (`geoip-country`, IPv4+IPv6), salted `ip_hash` (raw IP never stored — `ANALYTICS_IP_SALT` env), bot flag, logged-in email, canonical content identity. Best-effort — never throws into a render/request.
+- **Audio events:** `audio-player.js` emits native media events (play/pause/progress/ended) to `window.__analyticsAudio` in analytics.js, attributed to the current page context.
+- **Content identity (rename-proof):** each content route sets `res.locals.analyticsContext`, emitted as `window.__analyticsContext` (footer.ejs) and echoed by the client. `src/server/content-registry.js` assigns a stable forever `content_id` per book/session in Firestore `contentRegistry` (**never in the content repo**) and reconciles renames automatically — lazy structural match of a new path against "orphaned" (disappeared) registered paths, zero GitHub calls. Bible pages use no content_id (book+chapter already stable).
+- **Storage:** BigQuery `analytics.events` (project `noble-imprint-website`, day-partitioned on `ts`, no expiry). `@google-cloud/bigquery` + `geoip-country` are runtime **`dependencies`** (Dockerfile runs `npm ci --omit=dev` — a missing runtime dep crashes the container: this exact class of bug happened once).
+- **Dashboard:** `/admin` → Analytics tab. `src/server/analytics-admin.js` (`getDashboard` / `getBooksComparison` / `getBookFunnel` — parallel BQ aggregations, grouped by `content_id`) + `/api/admin/analytics[/books|/funnel]` (admin-gated). `src/public/js/admin-analytics.js` renders with vendored Chart.js (`src/public/js/vendor/chart.umd.js`, no CDN); Okabe-Ito CVD-safe palette (light-only). Sub-tabs: **Dashboard** (scoped by a book filter + session drop-off funnel) and **Compare** (sortable leaderboard, reach-vs-engagement scatter, momentum overlay).
+- **⚠ LOCAL DEV MUST set `BQ_ANALYTICS_TABLE=events_dev`** (in `.env`) or local testing writes into the **production** `events` table. BigQuery `DELETE` is blocked by the streaming buffer (~90 min); use `TRUNCATE TABLE` to clear. Bump the `?v=N` cache-buster on `analytics.js` / `admin-analytics.js` / `style.css` when changed (static assets are cached 1y immutable).
+
 ### Firestore Conventions
 
-Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`.
+Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`. Analytics uses a `contentRegistry` collection (stable `content_id` per book/session).
 
 ## Key Patterns
 

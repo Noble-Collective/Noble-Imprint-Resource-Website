@@ -397,6 +397,10 @@ Noble-Imprint-Resource-Website/
 └── ARCHITECTURE.md
 ```
 
+### Analytics
+
+First-party, privacy-clean usage analytics owned entirely in GCP — no third-party trackers, no cookies, visitor IPs hashed with a salt and never stored raw. A client beacon (`analytics.js`) records pageviews, dwell time, and audio-listening events; the server enriches each event (device/browser/OS, country, content identity) and streams it into BigQuery (`analytics.events`, day-partitioned, retained indefinitely). Each book/session is assigned a stable `content_id` held in Firestore (never in the content repo) so analytics survive content renames — a lazy structural matcher re-links a renamed path to its existing id automatically. Admins get a charts dashboard at `/admin → Analytics` (traffic, top content, engagement, device/geo, audio completion, a book leaderboard, reach-vs-engagement scatter, momentum trend, and a per-book session drop-off funnel). Full detail in `CLAUDE.md` → Analytics.
+
 ### Technology choices
 
 | Component | Technology | Why |
