@@ -16,12 +16,10 @@
 
 const crypto = require('crypto');
 const { BigQuery } = require('@google-cloud/bigquery');
-const ip3country = require('ip3country');
-
-// Country geo (P1). ip3country is IPv4-only and self-contained (~0.5MB, no
-// external calls, no MaxMind account) — IPv6 clients resolve to null country.
-let geoReady = false;
-try { ip3country.init(); geoReady = true; } catch (err) { console.error('[ANALYTICS] geo init failed:', err && err.message); }
+const geoip = require('geoip-country');
+// Country geo. geoip-country is self-contained (~9MB, data bundled, no external
+// calls, no MaxMind account) and resolves IPv4 AND IPv6 (incl. IPv4-mapped
+// ::ffff: addresses).
 
 const DATASET = process.env.BQ_ANALYTICS_DATASET || 'analytics';
 const TABLE = process.env.BQ_ANALYTICS_TABLE || 'events';
@@ -133,10 +131,10 @@ function parsePath(rawPath) {
 // Country from IP. Strips IPv4-mapped-IPv6 prefix; returns null for private/
 // IPv6/unknown addresses. Best-effort — never throws.
 function lookupCountry(ip) {
-  if (!geoReady || !ip) return null;
+  if (!ip) return null;
   try {
-    const v4 = String(ip).replace(/^::ffff:/i, '');
-    return ip3country.lookupStr(v4) || null;
+    const g = geoip.lookup(String(ip));
+    return (g && g.country) || null;
   } catch { return null; }
 }
 
