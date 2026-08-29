@@ -115,3 +115,25 @@ test('replaceHeadingInUsfm returns changed=false when the heading is not present
   const r = s.replaceHeadingInUsfm('\\s1 The Creation\n\\v 1 x', 'Not a heading here', 'x');
   assert.strictEqual(r.changed, false);
 });
+
+// ── replaceFootnoteInUsfm (Accept for structure footnote diffs) ────────────────
+test('replaceFootnoteInUsfm rebuilds the footnote prose, keeping caller + \\fr', () => {
+  const usfm = '\\c 94\n\\v 11 The LORD knows\\f + \\fr 94:11 \\ft Psalms 94:11\\f* the thoughts of man.';
+  const r = s.replaceFootnoteInUsfm(usfm, '94:11', 'Psalms 94:11', 'Psalm 94:11');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('\\f + \\fr 94:11 \\ft Psalm 94:11\\f*'));
+  assert.ok(r.content.includes('the thoughts of man.')); // surrounding verse text intact
+});
+
+test('replaceFootnoteInUsfm matches on normalized prose (curly vs straight) at the right verse', () => {
+  const usfm = '\\c 1\n\\v 5 ...day.\\f + \\fr 1:5 \\ft Literally day one\\f*\n\\v 6 ...\\f + \\fr 1:6 \\ft Or a canopy\\f*';
+  const r = s.replaceFootnoteInUsfm(usfm, '1:6', 'Or a canopy', 'Or a firmament');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('\\fr 1:6 \\ft Or a firmament\\f*'));
+  assert.ok(r.content.includes('\\ft Literally day one\\f*')); // the 1:5 footnote untouched
+});
+
+test('replaceFootnoteInUsfm returns changed=false when no footnote matches', () => {
+  const r = s.replaceFootnoteInUsfm('\\c 1\n\\v 1 x\\f + \\fr 1:1 \\ft Note\\f*', '1:1', 'Different note', 'x');
+  assert.strictEqual(r.changed, false);
+});

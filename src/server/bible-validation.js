@@ -291,16 +291,23 @@ function extractFootnotes(usfm) {
   while ((m = re.exec(s)) !== null) {
     if (m[1] !== undefined) { ch = parseInt(m[1], 10); continue; }
     if (m[2] !== undefined) { vs = parseInt(m[2], 10); continue; }
-    const text = m[0]
-      .replace(/\\f\s*[+\-?]?\s*/, ' ')                    // opening marker + caller symbol
-      .replace(/\\fr\s+\S+/g, ' ')                         // origin reference, e.g. "1:3"
-      .replace(/\\ref\s+([^|\\]*)\|[^\\]*\\ref\*/g, '$1')  // \ref Genesis 5:32|GEN 5:32\ref* → "Genesis 5:32"
-      .replace(/\\f\*/g, ' ')                              // closing marker
-      .replace(/\\f[a-z]+\*?/g, ' ');                      // \ft \fq \fqa \fk … and their closers
-    const n = normalizeVerse(text).replace(/\s+([.,;:!?])/g, '$1');
+    const n = footnoteText(m[0]);
     if (n) out.push({ text: n, ref: ch + ':' + vs });
   }
   return out;
+}
+
+// Normalized prose of a single "\f … \f*" footnote span — the caller, \fr origin
+// reference, and all sub-markers stripped, \ref reduced to display text. Shared
+// by the compare (extractFootnotes) and the sync apply so they agree exactly.
+function footnoteText(span) {
+  const text = String(span)
+    .replace(/\\f\s*[+\-?]?\s*/, ' ')                    // opening marker + caller symbol
+    .replace(/\\fr\s+\S+/g, ' ')                         // origin reference, e.g. "1:3"
+    .replace(/\\ref\s+([^|\\]*)\|[^\\]*\\ref\*/g, '$1')  // \ref Genesis 5:32|GEN 5:32\ref* → "Genesis 5:32"
+    .replace(/\\f\*/g, ' ')                              // closing marker
+    .replace(/\\f[a-z]+\*?/g, ' ');                      // \ft \fq \fqa \fk … and their closers
+  return normalizeVerse(text).replace(/\s+([.,;:!?])/g, '$1');
 }
 
 // Strip inline character markers (\add \wj \nd \it …, opening and closing) from
@@ -449,6 +456,7 @@ module.exports = {
   bookCode,
   extractHeadings,
   extractFootnotes,
+  footnoteText,
   stripInlineMarkers,
   multisetDiff,
   multisetDiffBy,

@@ -1456,16 +1456,23 @@
         var best = -1, bestScore = 0;
         for (var i = 0; i < official.length; i++) {
           if (usedOff[i]) continue;
-          var sc = wordSim(o.text, official[i].text);
+          // Prefer a match at the same verse (big bonus), then word similarity.
+          var sc = wordSim(o.text, official[i].text) + (official[i].ref === o.ref ? 1 : 0);
           if (sc > bestScore) { bestScore = sc; best = i; }
         }
-        if (best >= 0 && bestScore >= 0.4) {
+        var paired = best >= 0 && (official[best].ref === o.ref || wordSim(o.text, official[best].text) >= 0.4);
+        if (paired) {
           usedOff[best] = true;
-          var actions = '';
-          var idAttr = '';
-          if (isHeading) {
-            var id = 'heading:' + bookCode + ':' + o.ref + ':' + (structSeq++);
-            changesById[id] = { id: id, type: 'usfm-heading', translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: official[best].text };
+          var sameRef = official[best].ref === o.ref;
+          // Footnotes are verse-anchored — only offer Accept when the match is at
+          // the SAME verse (avoids applying a different verse's footnote). Headings
+          // can move, so Accept is offered for any confident heading pair.
+          var canAccept = isHeading || sameRef;
+          var actions = '', idAttr = '';
+          if (canAccept) {
+            var type = isHeading ? 'usfm-heading' : 'usfm-footnote';
+            var id = type + ':' + bookCode + ':' + o.ref + ':' + (structSeq++);
+            changesById[id] = { id: id, type: type, translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: official[best].text };
             idAttr = ' data-change-id="' + esc(id) + '"';
             actions = '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
               + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div>';

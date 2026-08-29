@@ -186,6 +186,29 @@ function replaceHeadingInUsfm(content, oldText, newText) {
   return { content, changed: false };
 }
 
+// Replace a footnote's text in raw USFM, matching by verse ref + normalized
+// prose. Our footnotes are all the simple form "\f <caller> \fr <ref> \ft <prose>\f*"
+// (verified: no \fq/\fk/multi-part), so we rebuild that canonical form with the
+// new prose, preserving the caller and \fr. Matching uses the SAME normalization
+// as the compare (v.footnoteText) so encoding differences don't defeat it.
+function replaceFootnoteInUsfm(content, ref, oldText, newText) {
+  const s = String(content);
+  const re = /\\c\s+(\d+)|\\v\s+(\d+)|\\f\s[\s\S]*?\\f\*/g;
+  let ch = 0, vs = 0, m;
+  while ((m = re.exec(s)) !== null) {
+    if (m[1] !== undefined) { ch = parseInt(m[1], 10); continue; }
+    if (m[2] !== undefined) { vs = parseInt(m[2], 10); continue; }
+    if (ref && ch + ':' + vs !== ref) continue;
+    const span = m[0];
+    if (v.footnoteText(span) !== oldText) continue;
+    const caller = (span.match(/\\f\s*([+\-?])/) || [null, '+'])[1];
+    const fr = (span.match(/\\fr\s+(\S+)/) || [null, ''])[1];
+    const rebuilt = '\\f ' + caller + (fr ? ' \\fr ' + fr : '') + ' \\ft ' + newText + '\\f*';
+    return { content: s.slice(0, m.index) + rebuilt + s.slice(m.index + span.length), changed: true };
+  }
+  return { content, changed: false };
+}
+
 // Resolve our on-disk USFM path for a book code (e.g. "1CH" → bibles/bsb/content/131CHBSB.SFM).
 async function resolveOurUsfmPath(translationId, code) {
   const listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
@@ -196,15 +219,19 @@ async function resolveOurUsfmPath(translationId, code) {
 // ── Apply a single accepted change (GitHub write) ──────────────────────────────
 
 async function applyChange(change) {
-  if (change.type === 'usfm-heading') {
+  if (change.type === 'usfm-heading' || change.type === 'usfm-footnote') {
+    const isHeading = change.type === 'usfm-heading';
+    const kind = isHeading ? 'heading' : 'footnote';
     const translationId = change.translationId || 'bsb';
     const file = await resolveOurUsfmPath(translationId, change.bookCode);
     if (!file) throw new Error(`No USFM file found for ${change.bookCode}`);
     const { content, sha } = await github.getFileContent(file);
-    const { content: updated, changed } = replaceHeadingInUsfm(content, change.oldText, change.newText);
-    if (!changed) throw new Error(`Heading "${change.oldText}" not found in ${file} (already updated?)`);
+    const { content: updated, changed } = isHeading
+      ? replaceHeadingInUsfm(content, change.oldText, change.newText)
+      : replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText);
+    if (!changed) throw new Error(`${kind} "${change.oldText}" not found in ${file} (already updated?)`);
     const res = await github.updateFileContent(file, updated, sha,
-      `Update ${change.bookCode} heading at ${change.ref} to match latest BSB`);
+      `Update ${change.bookCode} ${kind} at ${change.ref} to match latest BSB`);
     return { file, ref: change.ref, sha: res.sha };
   }
 
@@ -236,6 +263,7 @@ module.exports = {
   updateReferenceValue,
   changeId,
   replaceHeadingInUsfm,
+  replaceFootnoteInUsfm,
   listLibraryMarkdown,
   detectSyncChanges,
   buildChangesFromDrift,
