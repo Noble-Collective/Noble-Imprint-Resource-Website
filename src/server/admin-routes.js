@@ -108,7 +108,8 @@ api.get('/analytics', async (req, res) => {
   try {
     const range = req.query.range || '30d';
     const includeBots = req.query.includeBots === '1' || req.query.includeBots === 'true';
-    const data = await analyticsAdmin.getDashboard(range, { includeBots });
+    const book = req.query.book ? String(req.query.book).slice(0, 300) : null;
+    const data = await analyticsAdmin.getDashboard(range, { includeBots, book });
     res.json(data);
   } catch (err) {
     console.error('[admin] analytics error:', err.message);

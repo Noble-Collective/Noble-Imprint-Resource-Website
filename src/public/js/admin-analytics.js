@@ -15,6 +15,7 @@
   var loaded = false;
   var range = '30d';
   var includeBots = false;
+  var book = ''; // '' = all content; otherwise a single book's title
   var reqSeq = 0; // guards against out-of-order responses clobbering fresh data
 
   function el(id) { return document.getElementById(id); }
@@ -34,7 +35,7 @@
     var mySeq = ++reqSeq;
     var status = el('an-status');
     if (status) status.textContent = 'Loading…';
-    fetch('/api/admin/analytics?range=' + range + '&includeBots=' + (includeBots ? '1' : '0'), { credentials: 'same-origin' })
+    fetch('/api/admin/analytics?range=' + range + '&includeBots=' + (includeBots ? '1' : '0') + (book ? '&book=' + encodeURIComponent(book) : ''), { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (mySeq !== reqSeq) return; // a newer request superseded this one
@@ -45,11 +46,13 @@
   }
 
   function render(d) {
+    applyScope(d.book);
     renderTiles(d);
     destroy();
     trend(d.trend || []);
     doughnut('an-split', pluck(d.contentSplit, 'category'), pluck(d.contentSplit, 'pageviews'));
     doughnut('an-devices', pluck(d.devices, 'label'), pluck(d.devices, 'pageviews'));
+    hbar('an-books', pluck(d.topBooks, 'label'), pluck(d.topBooks, 'pageviews'));
     hbar('an-bible', pluck(d.topBible, 'label'), pluck(d.topBible, 'pageviews'));
     hbar('an-browsers', pluck(d.browsers, 'label'), pluck(d.browsers, 'pageviews'));
     hbar('an-os', pluck(d.os, 'label'), pluck(d.os, 'pageviews'));
@@ -58,6 +61,19 @@
     kvTable('an-referrers', d.referrers || [], 'label', 'pageviews', 'Source', 'Views');
     audioTiles(d.audio || {});
     dwellTable(d.dwellTop || []);
+  }
+
+  // When one book is selected, cross-content panels (Bible-vs-Books, all-Books,
+  // Top-Bible-chapters) aren't meaningful — hide them and label the scope.
+  function applyScope(bookName) {
+    var scoped = !!bookName;
+    ['an-card-split', 'an-card-books', 'an-card-bible'].forEach(function (id) {
+      var c = el(id); if (c) c.style.display = scoped ? 'none' : '';
+    });
+    var title = el('an-scope-title');
+    if (title) { title.textContent = scoped ? '📖 ' + bookName : ''; title.style.display = scoped ? '' : 'none'; }
+    var st = el('an-sessions-title');
+    if (st) st.textContent = scoped ? 'Sessions in this book' : 'Top sessions';
   }
 
   function pluck(arr, key) { return (arr || []).map(function (r) { return r[key]; }); }
@@ -172,5 +188,7 @@
     });
     var bots = el('an-include-bots');
     if (bots) bots.addEventListener('change', function () { includeBots = bots.checked; ensureLoaded(); });
+    var bookSel = el('an-book');
+    if (bookSel) bookSel.addEventListener('change', function () { book = bookSel.value; ensureLoaded(); });
   });
 })();

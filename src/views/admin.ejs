@@ -197,10 +197,17 @@
           <button class="an-range-btn" data-range="365d">1y</button>
           <button class="an-range-btn" data-range="all">All</button>
         </div>
+        <select class="admin-select an-book-select" id="an-book" aria-label="Filter by book">
+          <option value="">All content</option>
+          <% books.forEach(function(book) { %>
+            <option value="<%= book.title %>"><%= book.title %><%= book.seriesTitle ? ' — ' + book.seriesTitle : '' %></option>
+          <% }); %>
+        </select>
         <label class="an-bots"><input type="checkbox" id="an-include-bots"> Include bots</label>
         <span class="an-status text-muted" id="an-status"></span>
       </div>
 
+      <h2 class="an-scope-title" id="an-scope-title" style="display:none"></h2>
       <div class="an-tiles" id="an-tiles"></div>
 
       <div class="an-card an-card--wide">
@@ -209,7 +216,7 @@
       </div>
 
       <div class="an-grid">
-        <div class="an-card">
+        <div class="an-card" id="an-card-split">
           <h3 class="an-card-title">Bible vs Books</h3>
           <div class="an-chart-box an-chart-box--sm"><canvas id="an-split"></canvas></div>
         </div>
@@ -220,14 +227,19 @@
       </div>
 
       <div class="an-grid">
-        <div class="an-card">
+        <div class="an-card" id="an-card-books">
+          <h3 class="an-card-title">Books <span class="an-card-sub">pageviews per book</span></h3>
+          <div class="an-chart-box"><canvas id="an-books"></canvas></div>
+        </div>
+        <div class="an-card" id="an-card-bible">
           <h3 class="an-card-title">Top Bible chapters</h3>
           <div class="an-chart-box"><canvas id="an-bible"></canvas></div>
         </div>
-        <div class="an-card">
-          <h3 class="an-card-title">Top sessions</h3>
-          <div class="an-table-box" id="an-sessions"></div>
-        </div>
+      </div>
+
+      <div class="an-card an-card--wide">
+        <h3 class="an-card-title" id="an-sessions-title">Top sessions</h3>
+        <div class="an-table-box" id="an-sessions"></div>
       </div>
 
       <div class="an-grid">
@@ -368,6 +380,6 @@
 </script>
 <script src="/static/js/admin.js?v=1"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
-<script src="/static/js/admin-analytics.js?v=1"></script>
+<script src="/static/js/admin-analytics.js?v=2"></script>
 
 <%- include('partials/footer') %>

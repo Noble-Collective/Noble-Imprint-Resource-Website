@@ -36,41 +36,45 @@ function whereOf(...cond) {
   return c.length ? 'WHERE ' + c.join(' AND ') : '';
 }
 
-async function q(sql) {
-  const [rows] = await client().query({ query: sql, location: 'US' });
+async function q(sql, params) {
+  const [rows] = await client().query({ query: sql, location: 'US', params: params || {} });
   return rows;
 }
 
 async function getDashboard(range = '30d', opts = {}) {
   const includeBots = !!opts.includeBots;
   if (range !== 'all' && !RANGE_DAYS[range]) range = '30d';
+  const book = opts.book ? String(opts.book) : null; // filter to one book's title
   const base = baseConditions(range, includeBots);
+  if (book) base.push('book = @book');
+  const params = book ? { book } : undefined;
+  const run = (sql) => q(sql, params); // thread the @book param through every query
 
   const [
     totals, trend, topBooks, topSessions, topBible, contentSplit,
     devices, browsers, os, countries, referrers, audio, dwellTop,
   ] = await Promise.all([
     // headline totals
-    q(`SELECT
+    run(`SELECT
          COUNTIF(event_type='pageview') AS pageviews,
          COUNT(DISTINCT visitor_id) AS visitors,
          COUNT(DISTINCT session_id) AS sessions,
          ROUND(SUM(IFNULL(dwell_ms,0))/60000, 1) AS engaged_minutes
        FROM ${FQ} ${whereOf(base)}`),
     // daily traffic trend
-    q(`SELECT FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
+    run(`SELECT FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day,
               COUNTIF(event_type='pageview') AS pageviews,
               COUNT(DISTINCT visitor_id) AS visitors
        FROM ${FQ} ${whereOf(base)} GROUP BY day ORDER BY day`),
     // top books
-    q(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS label,
+    run(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS label,
               COUNTIF(event_type='pageview') AS pageviews,
               COUNT(DISTINCT visitor_id) AS visitors
        FROM ${FQ} ${whereOf(base, "content_type='book_session'", 'book IS NOT NULL')}
        GROUP BY COALESCE(content_id, book)
        ORDER BY pageviews DESC LIMIT 15`),
     // top sessions
-    q(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS book,
+    run(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS book,
               ARRAY_AGG(session ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS session,
               COUNTIF(event_type='pageview') AS pageviews,
               COUNT(DISTINCT visitor_id) AS visitors
@@ -78,14 +82,14 @@ async function getDashboard(range = '30d', opts = {}) {
        GROUP BY COALESCE(content_id, CONCAT(IFNULL(book,''),'|',IFNULL(session,'')))
        ORDER BY pageviews DESC LIMIT 15`),
     // top bible chapters
-    q(`SELECT CONCAT(IFNULL(bible_book,'?'), ' ', IFNULL(bible_chapter,'')) AS label,
+    run(`SELECT CONCAT(IFNULL(bible_book,'?'), ' ', IFNULL(bible_chapter,'')) AS label,
               ANY_VALUE(bible_translation) AS translation,
               COUNTIF(event_type='pageview') AS pageviews,
               COUNT(DISTINCT visitor_id) AS visitors
        FROM ${FQ} ${whereOf(base, "content_type='bible_chapter'", 'bible_book IS NOT NULL')}
        GROUP BY label ORDER BY pageviews DESC LIMIT 15`),
     // content split (Bible vs Books vs Home vs Other)
-    q(`SELECT
+    run(`SELECT
          CASE
            WHEN content_type IN ('bible_chapter','bible_book','bible_index') THEN 'Bible'
            WHEN content_type IN ('book_session','book_index','series_index') THEN 'Books'
@@ -95,26 +99,26 @@ async function getDashboard(range = '30d', opts = {}) {
          COUNTIF(event_type='pageview') AS pageviews
        FROM ${FQ} ${whereOf(base)} GROUP BY category ORDER BY pageviews DESC`),
     // device / browser / os / country / referrer
-    q(`SELECT IFNULL(device_type,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
+    run(`SELECT IFNULL(device_type,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
        FROM ${FQ} ${whereOf(base)} GROUP BY label ORDER BY pageviews DESC`),
-    q(`SELECT IFNULL(browser,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
+    run(`SELECT IFNULL(browser,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
        FROM ${FQ} ${whereOf(base)} GROUP BY label ORDER BY pageviews DESC LIMIT 8`),
-    q(`SELECT IFNULL(os,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
+    run(`SELECT IFNULL(os,'unknown') AS label, COUNTIF(event_type='pageview') AS pageviews
        FROM ${FQ} ${whereOf(base)} GROUP BY label ORDER BY pageviews DESC LIMIT 8`),
-    q(`SELECT IFNULL(country,'unknown') AS label, COUNT(DISTINCT visitor_id) AS visitors
+    run(`SELECT IFNULL(country,'unknown') AS label, COUNT(DISTINCT visitor_id) AS visitors
        FROM ${FQ} ${whereOf(base)} GROUP BY label ORDER BY visitors DESC LIMIT 12`),
-    q(`SELECT referrer AS label, COUNTIF(event_type='pageview') AS pageviews
+    run(`SELECT referrer AS label, COUNTIF(event_type='pageview') AS pageviews
        FROM ${FQ} ${whereOf(base, 'referrer IS NOT NULL')}
        GROUP BY label ORDER BY pageviews DESC LIMIT 10`),
     // audio: plays, listeners, completions, avg % heard on end
-    q(`SELECT
+    run(`SELECT
          COUNTIF(event_type='audio_play') AS plays,
          COUNT(DISTINCT IF(event_type='audio_play', visitor_id, NULL)) AS listeners,
          COUNTIF(event_type='audio_ended') AS completions,
          ROUND(AVG(IF(event_type='audio_ended', audio_percent, NULL)), 3) AS avg_pct_on_end
        FROM ${FQ} ${whereOf(base)}`),
     // dwell per top content (avg engaged seconds per pageview)
-    q(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS book,
+    run(`SELECT ARRAY_AGG(book ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS book,
               ARRAY_AGG(session ORDER BY ts DESC LIMIT 1)[OFFSET(0)] AS session,
               ROUND(SUM(IFNULL(dwell_ms,0))/1000.0 / NULLIF(COUNTIF(event_type='pageview'),0), 0) AS avg_dwell_sec,
               COUNTIF(event_type='pageview') AS pageviews
@@ -124,7 +128,7 @@ async function getDashboard(range = '30d', opts = {}) {
   ]);
 
   return {
-    range, includeBots,
+    range, includeBots, book: book || null,
     totals: totals[0] || {},
     trend, topBooks, topSessions, topBible, contentSplit,
     devices, browsers, os, countries, referrers,
