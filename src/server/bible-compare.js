@@ -53,35 +53,35 @@ async function runStreamingCompare(opts = {}) {
   const bookDelayMs = opts.bookDelayMs != null ? opts.bookDelayMs : 0; // client paces the reveal
   const t0 = Date.now();
 
-  // 1. Official verse text
+  // 1 & 2. Download official verse text + structure concurrently.
   emit({ type: 'step', key: 'download-verses', label: 'Downloading official verse text from bereanbible.com', status: 'running' });
-  const txtRes = await fetch(BSB_TXT_URL);
+  emit({ type: 'step', key: 'download-usfm', label: 'Downloading official structure (headings + footnotes) from bereanbible.com', status: 'running' });
+  const [txtRes, zipRes] = await Promise.all([fetch(BSB_TXT_URL), fetch(BSB_USFM_ZIP_URL)]);
   if (!txtRes.ok) throw new Error(`bsb.txt fetch failed: ${txtRes.status}`);
+  if (!zipRes.ok) throw new Error(`bsb_usfm.zip fetch failed: ${zipRes.status}`);
   const txt = await txtRes.text();
   const lastModified = txtRes.headers.get('last-modified');
   const sha256 = crypto.createHash('sha256').update(txt).digest('hex');
   const officialVerses = v.parseBsbTxt(txt);
   emit({ type: 'step', key: 'download-verses', status: 'done', detail: `${officialVerses.size.toLocaleString()} verses · source updated ${lastModified || 'unknown'}` });
-
-  // 2. Official structure (USFM)
-  emit({ type: 'step', key: 'download-usfm', label: 'Downloading official structure (headings + footnotes) from bereanbible.com', status: 'running' });
-  const zipBuf = Buffer.from(await (await fetch(BSB_USFM_ZIP_URL)).arrayBuffer());
+  const zipBuf = Buffer.from(await zipRes.arrayBuffer());
   const officialUsfm = v.parseZip(zipBuf);
   emit({ type: 'step', key: 'download-usfm', status: 'done', detail: `${officialUsfm.size} books` });
 
-  // 3. Our stored copy
+  // 3. Our stored copy — read the 66 USFM files in parallel with live progress
+  //    (sequential reads were the ~17s cold-start stall before books appeared).
   emit({ type: 'step', key: 'load-ours', label: 'Loading our stored copy from the content repository', status: 'running' });
   const raw = await github.getFileRaw(`bibles/${translationId}/references.json`);
   const oursStr = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
   const oursVerses = v.parseReferences(oursStr);
   const listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
+  const usfmNames = listing.filter(f => /\.(sfm|usfm)$/i.test(f.name)).map(f => f.name);
+  let lastPct = -1;
+  const contents = await v.mapLimit(usfmNames, 16,
+    n => github.getFileContent(`bibles/${translationId}/content/${n}`).then(r => r.content),
+    (d, t) => { const pct = Math.floor(d / t * 100); if (pct - lastPct >= 20 || d === t) { lastPct = pct; emit({ type: 'step', key: 'load-ours', status: 'running', detail: `loaded ${d}/${t} books` }); } });
   const oursUsfm = new Map();
-  for (const f of listing) {
-    if (/\.(sfm|usfm)$/i.test(f.name)) {
-      const { content } = await github.getFileContent(`bibles/${translationId}/content/${f.name}`);
-      oursUsfm.set(f.name, content);
-    }
-  }
+  usfmNames.forEach((n, i) => { if (contents[i] != null) oursUsfm.set(n, contents[i]); });
   emit({ type: 'step', key: 'load-ours', status: 'done', detail: `${oursVerses.size.toLocaleString()} verses · ${oursUsfm.size} books` });
 
   // 4. Book-by-book verse comparison (streamed)
@@ -110,9 +110,12 @@ async function runStreamingCompare(opts = {}) {
   const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true });
   emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote differences` });
 
-  // 6. Library scan for quotations of changed verses
+  // 6. Library scan for quotations of changed verses (parallel + live progress)
   emit({ type: 'step', key: 'library', label: 'Scanning the library for quotations of changed verses', status: 'running' });
-  const changes = await sync.buildChangesFromDrift(drifted, translationId);
+  let libPct = -1;
+  const changes = await sync.buildChangesFromDrift(drifted, translationId, {
+    onProgress: (d, t) => { const pct = Math.floor(d / t * 100); if (pct - libPct >= 20 || d === t) { libPct = pct; emit({ type: 'step', key: 'library', status: 'running', detail: `scanned ${d}/${t} files` }); } },
+  });
   emit({ type: 'step', key: 'library', status: 'done', detail: `${changes.scannedFiles} files scanned · ${changes.libraryChanges.length} quotation(s) affected` });
 
   const result = {

@@ -388,7 +388,27 @@ function overallStatus(verse, structure) {
   return (verseClean && structureClean) ? 'pass' : 'fail';
 }
 
+// Run async `fn` over `items` with at most `limit` in flight. Results keep input
+// order; a failing item becomes null. onProgress(done, total) fires per completion.
+async function mapLimit(items, limit, fn, onProgress) {
+  const results = new Array(items.length);
+  let idx = 0, done = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      try { results[i] = await fn(items[i], i); } catch { results[i] = null; }
+      done++;
+      if (onProgress) onProgress(done, items.length);
+    }
+  }
+  const workers = [];
+  for (let w = 0; w < Math.min(limit, items.length); w++) workers.push(worker());
+  await Promise.all(workers);
+  return results;
+}
+
 module.exports = {
+  mapLimit,
   isVerseKey,
   parseBsbTxt,
   parseReferences,

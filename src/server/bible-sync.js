@@ -103,7 +103,8 @@ async function detectSyncChanges(opts = {}) {
 // comparison, scan the library and assemble the actionable Accept/Reject changes.
 // Separated from detectSyncChanges so the streaming compare can reuse it without
 // fetching/validating upstream a second time.
-async function buildChangesFromDrift(drifted, translationId = 'bsb') {
+async function buildChangesFromDrift(drifted, translationId = 'bsb', opts = {}) {
+  const onProgress = opts.onProgress;
   // 2. Verse-store changes: one per drifted verse.
   const verseChanges = drifted.map(d => ({
     type: 'verse-store',
@@ -120,57 +121,42 @@ async function buildChangesFromDrift(drifted, translationId = 'bsb') {
     .map(d => ({ ref: d.ref, ...computeChangeAnchor(d.ours, d.official) }))
     .filter(a => a.changed);
 
-  const libraryChanges = [];
   const files = await listLibraryMarkdown();
-  // 4. Citation-anchored audit: for every parenthetical/`<<` citation of a
-  //    changed verse, diff the quoted passage beside it against the verse.
-  //    Complements the span search — catches quotes whose encoding differs from
-  //    the anchor (missed by verbatim search) and flags divergent paraphrases.
-  const citationReview = [];
 
-  for (const path of files) {
-    let content;
-    try { ({ content } = await github.getFileContent(path)); }
-    catch { continue; }
-
-    // Span search → actionable snaps (works for cited and uncited quotes alike).
+  // Scan one file: span search (→ library-quote changes) + citation audit
+  // (→ citationReview). Runs per-file so files can be scanned in parallel.
+  function scanFile(path, content) {
+    const libraryChanges = [], citationReview = [];
     for (const a of anchors) {
-      const hits = findOccurrences(content, a.oldAnchor);
-      hits.forEach((hit, i) => {
-        libraryChanges.push({
-          type: 'library-quote',
-          ref: a.ref,
-          file: path,
-          occurrenceIndex: i,
-          oldText: a.oldAnchor,
-          newText: a.newAnchor,
-          context: hit.context,
-        });
+      findOccurrences(content, a.oldAnchor).forEach((hit, i) => {
+        libraryChanges.push({ type: 'library-quote', ref: a.ref, file: path, occurrenceIndex: i, oldText: a.oldAnchor, newText: a.newAnchor, context: hit.context });
       });
     }
-
-    // Citation audit → targeted diff of quotations of the changed verses.
-    const cites = citations.detectFullCitations(content);
-    for (const c of cites) {
+    for (const c of citations.detectFullCitations(content)) {
       for (const d of drifted) {
         if (!citations.citationCoversRef(c.refString, d.ref)) continue;
         const q = citations.quoteForCitation(content, c.index);
         if (!q) continue;
         const cls = citations.classifyQuote(q.quote, d.ours, d.official);
         if (!cls || cls.status === 'current') continue;
-        citationReview.push({
-          ref: d.ref,
-          file: path,
-          citation: c.refString,
-          kind: q.kind,
-          status: cls.status,          // 'stale' | 'divergent'
-          autoFixable: !!cls.apply,    // a matching span change exists to Accept
-          quote: q.quote,
-          oldText: d.ours,
-          newText: d.official,
-        });
+        citationReview.push({ ref: d.ref, file: path, citation: c.refString, kind: q.kind, status: cls.status, autoFixable: !!cls.apply, quote: q.quote, oldText: d.ours, newText: d.official });
       }
     }
+    return { libraryChanges, citationReview };
+  }
+
+  // Read + scan files in parallel (was sequential — a major cold-start stall).
+  const perFile = await v.mapLimit(files, 20, async (path) => {
+    let content;
+    try { ({ content } = await github.getFileContent(path)); } catch { return null; }
+    return scanFile(path, content);
+  }, onProgress);
+
+  const libraryChanges = [], citationReview = [];
+  for (const r of perFile) {
+    if (!r) continue;
+    for (const c of r.libraryChanges) libraryChanges.push(c);
+    for (const c of r.citationReview) citationReview.push(c);
   }
 
   const tag = c => ({ ...c, id: changeId(c) });
