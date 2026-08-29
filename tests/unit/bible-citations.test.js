@@ -118,3 +118,32 @@ test('auditQuoteAgainstText: unrelated text is paraphrase', () => {
     'For God so loved the world that He gave His one and only Son');
   assert.strictEqual(r.status, 'paraphrase');
 });
+
+test('auditQuoteAgainstText: punctuation-only difference is format-only, not a deviation', () => {
+  const r = c.auditQuoteAgainstText('the world has hated them; for they are not of the world',
+    'the world has hated them. For they are not of the world, just as I am not');
+  assert.strictEqual(r.status, 'format-only');
+});
+
+test('auditQuoteAgainstText: a few off words → word-difference (review tier)', () => {
+  const r = c.auditQuoteAgainstText('Then the little children were brought to Jesus for Him',
+    'Then little children were brought to Jesus for Him to place His hands');
+  assert.strictEqual(r.reason, 'word-difference');
+  assert.strictEqual(r.tier, 'review');
+  assert.deepStrictEqual(r.onlyInQuote, ['the']);
+});
+
+test('auditQuoteAgainstText: many off words but high overlap → heavy-difference (different translation)', () => {
+  const r = c.auditQuoteAgainstText(
+    'The Lord is my shepherd I lack nothing He makes me lie down in green meadows and leads me beside quiet waters',
+    'The LORD is my shepherd, I shall not want. He makes me lie down in green pastures, He leads me beside still waters.');
+  assert.strictEqual(r.reason, 'heavy-difference');
+  assert.strictEqual(r.tier, 'different-translation');
+  assert.ok(r.onlyInQuote.length > 4);
+});
+
+test('auditQuoteAgainstText: markdown emphasis underscores do not count as differences', () => {
+  const r = c.auditQuoteAgainstText('_by the grace of God I am what I am_',
+    'But by the grace of God I am what I am, and His grace to me was not in vain.');
+  assert.strictEqual(r.status, 'exact');
+});

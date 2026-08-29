@@ -176,6 +176,31 @@ function wordLcs(a, b) {
   return dp[b.length];
 }
 
+// Word-level diff via LCS backtrack. Returns the words present only in `a`
+// (the quote) and only in `b` (the verse).
+function diffWords(a, b) {
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++)
+    for (let j = 1; j <= m; j++)
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+  const onlyA = [], onlyB = [];
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) { i--; j--; }
+    else if (dp[i - 1][j] >= dp[i][j - 1]) { onlyA.unshift(a[--i]); }
+    else { onlyB.unshift(b[--j]); }
+  }
+  while (i > 0) onlyA.unshift(a[--i]);
+  while (j > 0) onlyB.unshift(b[--j]);
+  return { onlyA, onlyB };
+}
+
+// Strip to bare lowercase words (drop all punctuation) for a format-only check.
+function bareWords(s) {
+  return normalizeVerse(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // Audit a quotation against the current verse text it cites.
 //   exact       — normalized quote is a substring of the verse(s): faithful
 //   deviation   — high word overlap but NOT exact: a near-verbatim quote that
@@ -195,12 +220,25 @@ function auditQuoteAgainstText(quote, verseText, opts = {}) {
   if (nv.includes(nq)) {
     // Matches word-for-word case-insensitively. Distinguish a truly exact quote
     // from one that differs only in casing (e.g. "the Lord" vs the BSB "LORD").
-    return { status: nvO.includes(nqO) ? 'exact' : 'case-only', quote: nqO, verse: nvO };
+    return { status: nvO.includes(nqO) ? 'exact' : 'case-only', tier: nvO.includes(nqO) ? 'faithful' : 'cosmetic', quote: nqO, verse: nvO };
+  }
+  // Punctuation/whitespace/dash/quote differences only (words all match).
+  if (bareWords(nv).includes(bareWords(nq))) {
+    return { status: 'format-only', tier: 'cosmetic', quote: nqO, verse: nvO };
   }
   const qw = nq.split(' ');
-  const coverage = wordLcs(qw, nv.split(' ')) / qw.length;
-  if (coverage >= minCoverage) return { status: 'deviation', coverage, quote: nqO, verse: nvO };
-  return { status: 'paraphrase', coverage };
+  const { onlyA, onlyB } = diffWords(qw, nv.split(' '));
+  const coverage = (qw.length - onlyA.length) / qw.length;
+  if (coverage < minCoverage) return { status: 'paraphrase', tier: 'ignore', coverage };
+
+  // Word-level deviation — sub-classify by what the offending words look like.
+  let reason, tier;
+  if (onlyA.length && onlyA.every(w => /^[a-z0-9]$/.test(w))) { reason = 'footnote-artifact'; tier = 'minor'; }
+  else if (/[[\]]/.test(nqO)) { reason = 'editorial-bracket'; tier = 'minor'; }
+  else if (/\.\.\.|…/.test(nqO)) { reason = 'ellipsis-omission'; tier = 'minor'; }
+  else if (onlyA.length <= 4) { reason = 'word-difference'; tier = 'review'; }   // a few words off → likely misquote/older wording
+  else { reason = 'heavy-difference'; tier = 'different-translation'; }           // many words off → probably a different translation
+  return { status: 'deviation', reason, tier, coverage, onlyInQuote: onlyA, quote: nqO, verse: nvO };
 }
 
 module.exports = {
@@ -211,5 +249,6 @@ module.exports = {
   classifyQuote,
   expandCitationRefs,
   wordLcs,
+  diffWords,
   auditQuoteAgainstText,
 };

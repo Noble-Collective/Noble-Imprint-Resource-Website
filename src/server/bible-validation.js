@@ -69,6 +69,8 @@ function normalizeVerse(s) {
     .replace(/…/g, '...')
     // zero-width characters (ZWSP, ZWNJ, ZWJ, BOM) → removed entirely
     .replace(/[​‌‍﻿]/g, '')
+    // markdown emphasis markers (never appear in scripture text) → removed
+    .replace(/[_*]/g, '')
     // collapse all whitespace — JS \s already covers NBSP, thin/narrow spaces,
     // ideographic space, tabs, newlines — into a single normal space
     .replace(/\s+/g, ' ')
