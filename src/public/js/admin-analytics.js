@@ -16,7 +16,7 @@
   var range = '30d';
   var includeBots = false;
   var book = ''; // '' = all content; otherwise a single book's title
-  var subTab = 'dashboard';
+  var subTab = 'resource';
   var compareData = null;
   var lbSort = { key: 'pageviews', dir: -1 };
   var reqSeq = 0; // guards against out-of-order responses clobbering fresh data
@@ -35,44 +35,64 @@
     plugins: { legend: { labels: { color: INK, font: { family: 'inherit' }, boxWidth: 12, boxHeight: 12 } } },
   };
 
-  function load() {
+  // Resource Analytics tab: content-focused views + the book-comparison views.
+  // Needs both the dashboard aggregates and the book-comparison payload.
+  function loadResource() {
+    var status = el('an-status'); if (status) status.textContent = 'Loading…';
     var mySeq = ++reqSeq;
-    var status = el('an-status');
-    if (status) status.textContent = 'Loading…';
-    fetch('/api/admin/analytics?range=' + range + '&includeBots=' + (includeBots ? '1' : '0') + (book ? '&book=' + encodeURIComponent(book) : ''), { credentials: 'same-origin' })
+    Promise.all([
+      fetch('/api/admin/analytics?range=' + range + '&includeBots=' + (includeBots ? '1' : '0') + (book ? '&book=' + encodeURIComponent(book) : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+      fetch('/api/admin/analytics/books?range=' + range + '&includeBots=' + (includeBots ? '1' : '0'), { credentials: 'same-origin' }).then(function (r) { return r.json(); }),
+    ]).then(function (res) {
+      if (mySeq !== reqSeq) return;
+      var d = res[0], cmp = res[1] || {};
+      if (d.error) throw new Error(d.error);
+      renderResource(d, cmp); if (status) status.textContent = '';
+    }).catch(function (e) { if (mySeq === reqSeq && status) status.textContent = 'Error: ' + e.message; });
+  }
+
+  // Basic Analytics tab: generic web-analytics views (site-wide, no book scope).
+  function loadBasic() {
+    var status = el('an-status'); if (status) status.textContent = 'Loading…';
+    var mySeq = ++reqSeq;
+    fetch('/api/admin/analytics?range=' + range + '&includeBots=' + (includeBots ? '1' : '0'), { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (mySeq !== reqSeq) return; // a newer request superseded this one
-        if (d.error) throw new Error(d.error);
-        render(d); if (status) status.textContent = '';
-      })
+      .then(function (d) { if (mySeq !== reqSeq) return; if (d.error) throw new Error(d.error); renderBasic(d); if (status) status.textContent = ''; })
       .catch(function (e) { if (mySeq === reqSeq && status) status.textContent = 'Error: ' + e.message; });
   }
 
-  function render(d) {
-    applyScope(d.book);
-    renderTiles(d);
+  function renderResource(d, cmp) {
+    compareData = cmp || {};
+    applyScopeResource(d.book);
     destroy();
-    trend(d.trend || []);
-    doughnut('an-split', pluck(d.contentSplit, 'category'), pluck(d.contentSplit, 'pageviews'));
-    doughnut('an-devices', pluck(d.devices, 'label'), pluck(d.devices, 'pageviews'));
+    renderTiles(d);
+    renderLeaderboard((cmp && cmp.leaderboard) || []);
+    scatter((cmp && cmp.leaderboard) || []);
+    multitrend((cmp && cmp.trend) || [], (cmp && cmp.topBooks) || []);
     hbar('an-books', pluck(d.topBooks, 'label'), pluck(d.topBooks, 'pageviews'));
     hbar('an-bible', pluck(d.topBible, 'label'), pluck(d.topBible, 'pageviews'));
-    hbar('an-browsers', pluck(d.browsers, 'label'), pluck(d.browsers, 'pageviews'));
-    hbar('an-os', pluck(d.os, 'label'), pluck(d.os, 'pageviews'));
     sessionsTable(d.topSessions || []);
-    kvTable('an-countries', d.countries || [], 'label', 'visitors', 'Country', 'Visitors');
-    kvTable('an-referrers', d.referrers || [], 'label', 'pageviews', 'Source', 'Views');
     audioTiles(d.audio || {});
     dwellTable(d.dwellTop || []);
+    doughnut('an-split', pluck(d.contentSplit, 'category'), pluck(d.contentSplit, 'pageviews'));
     if (d.book) loadFunnel(d.book); else hideFunnel();
   }
 
-  // When one book is selected, cross-content panels (Bible-vs-Books, all-Books,
-  // Top-Bible-chapters) aren't meaningful — hide them and label the scope.
-  function applyScope(bookName) {
+  function renderBasic(d) {
+    destroy();
+    trend(d.trend || []);
+    doughnut('an-devices', pluck(d.devices, 'label'), pluck(d.devices, 'pageviews'));
+    hbar('an-browsers', pluck(d.browsers, 'label'), pluck(d.browsers, 'pageviews'));
+    hbar('an-os', pluck(d.os, 'label'), pluck(d.os, 'pageviews'));
+    kvTable('an-countries', d.countries || [], 'label', 'visitors', 'Country', 'Visitors');
+    kvTable('an-referrers', d.referrers || [], 'label', 'pageviews', 'Source', 'Views');
+  }
+
+  // When one book is selected, the cross-book comparison + cross-content panels
+  // aren't meaningful — hide them, show the drop-off funnel, label the scope.
+  function applyScopeResource(bookName) {
     var scoped = !!bookName;
-    ['an-card-split', 'an-card-books', 'an-card-bible'].forEach(function (id) {
+    ['an-card-leaderboard', 'an-card-scatter', 'an-card-momentum', 'an-card-books', 'an-card-bible', 'an-card-split'].forEach(function (id) {
       var c = el(id); if (c) c.style.display = scoped ? 'none' : '';
     });
     var title = el('an-scope-title');
@@ -200,22 +220,7 @@
     }).join('');
   }
 
-  // --- Compare tab: leaderboard + scatter + multi-book trend ---
-  function loadCompare() {
-    var status = el('an-status'); if (status) status.textContent = 'Loading…';
-    var mySeq = ++reqSeq;
-    fetch('/api/admin/analytics/books?range=' + range + '&includeBots=' + (includeBots ? '1' : '0'), { credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) { if (mySeq !== reqSeq) return; if (d.error) throw new Error(d.error); renderCompare(d); if (status) status.textContent = ''; })
-      .catch(function (e) { if (mySeq === reqSeq && status) status.textContent = 'Error: ' + e.message; });
-  }
-  function renderCompare(d) {
-    compareData = d;
-    [charts['an-scatter'], charts['an-multitrend']].forEach(function (c) { if (c) c.destroy(); });
-    renderLeaderboard(d.leaderboard || []);
-    scatter(d.leaderboard || []);
-    multitrend(d.trend || [], d.topBooks || []);
-  }
+  // --- book-comparison views (rendered on the Resource tab) ---
   function renderLeaderboard(rows) {
     var cols = [['book', 'Book'], ['readers', 'Readers'], ['pageviews', 'Views'], ['sessions_viewed', 'Sessions'], ['avg_dwell_sec', 'Avg time'], ['audio_plays', 'Audio'], ['avg_pct_heard', '% heard']];
     var sorted = rows.slice().sort(function (a, b) {
@@ -284,12 +289,11 @@
   function drillIntoBook(bookName) {
     book = bookName;
     var sel = el('an-book'); if (sel) sel.value = bookName;
-    var dashTab = document.querySelector('.an-subtab[data-an-sub="dashboard"]');
-    if (dashTab) dashTab.click();
+    loadResource(); // already on the Resource tab (leaderboard lives there)
   }
 
   // --- wiring ---
-  function reloadActive() { if (subTab === 'compare') loadCompare(); else load(); }
+  function reloadActive() { if (subTab === 'basic') loadBasic(); else loadResource(); }
 
   document.addEventListener('DOMContentLoaded', function () {
     var tabBtn = document.querySelector('[data-admin-tab="analytics"]');
@@ -300,10 +304,10 @@
         document.querySelectorAll('.an-subtab').forEach(function (x) { x.classList.remove('an-subtab--active'); });
         b.classList.add('an-subtab--active');
         subTab = b.getAttribute('data-an-sub');
-        var dash = el('an-sub-dashboard'), cmp = el('an-sub-compare');
-        if (dash) dash.classList.toggle('an-sub--hidden', subTab !== 'dashboard');
-        if (cmp) cmp.classList.toggle('an-sub--hidden', subTab !== 'compare');
-        var bookSel = el('an-book'); if (bookSel) bookSel.style.display = (subTab === 'compare') ? 'none' : '';
+        var res = el('an-sub-resource'), basic = el('an-sub-basic');
+        if (res) res.classList.toggle('an-sub--hidden', subTab !== 'resource');
+        if (basic) basic.classList.toggle('an-sub--hidden', subTab !== 'basic');
+        var bookSel = el('an-book'); if (bookSel) bookSel.style.display = (subTab === 'basic') ? 'none' : '';
         loaded = true;
         reloadActive();
       });
@@ -320,6 +324,6 @@
     var bots = el('an-include-bots');
     if (bots) bots.addEventListener('change', function () { includeBots = bots.checked; loaded = true; reloadActive(); });
     var bookSel = el('an-book');
-    if (bookSel) bookSel.addEventListener('change', function () { book = bookSel.value; loaded = true; load(); });
+    if (bookSel) bookSel.addEventListener('change', function () { book = bookSel.value; loaded = true; loadResource(); });
   });
 })();

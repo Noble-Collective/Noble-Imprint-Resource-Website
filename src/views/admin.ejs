@@ -208,17 +208,28 @@
       </div>
 
       <div class="an-subtabs" role="tablist">
-        <button class="an-subtab an-subtab--active" data-an-sub="dashboard">Dashboard</button>
-        <button class="an-subtab" data-an-sub="compare">Compare books</button>
+        <button class="an-subtab an-subtab--active" data-an-sub="resource">Resource Analytics</button>
+        <button class="an-subtab" data-an-sub="basic">Basic Analytics</button>
       </div>
 
-      <div class="an-sub" id="an-sub-dashboard">
+      <div class="an-sub" id="an-sub-resource">
       <h2 class="an-scope-title" id="an-scope-title" style="display:none"></h2>
       <div class="an-tiles" id="an-tiles"></div>
 
-      <div class="an-card an-card--wide">
-        <h3 class="an-card-title">Traffic <span class="an-card-sub">pageviews &amp; unique visitors per day</span></h3>
-        <div class="an-chart-box"><canvas id="an-trend"></canvas></div>
+      <div class="an-card an-card--wide" id="an-card-leaderboard">
+        <h3 class="an-card-title">Book leaderboard <span class="an-card-sub">click a column to sort · click a row to drill in</span></h3>
+        <div class="an-table-box" id="an-leaderboard"></div>
+      </div>
+
+      <div class="an-grid">
+        <div class="an-card" id="an-card-scatter">
+          <h3 class="an-card-title">Reach vs engagement <span class="an-card-sub">readers × avg time on page; bubble = pageviews</span></h3>
+          <div class="an-chart-box"><canvas id="an-scatter"></canvas></div>
+        </div>
+        <div class="an-card" id="an-card-momentum">
+          <h3 class="an-card-title">Momentum <span class="an-card-sub">pageviews over time, top books</span></h3>
+          <div class="an-chart-box"><canvas id="an-multitrend"></canvas></div>
+        </div>
       </div>
 
       <div class="an-grid">
@@ -237,28 +248,6 @@
         <div class="an-table-box" id="an-sessions"></div>
       </div>
 
-      <div class="an-grid">
-        <div class="an-card">
-          <h3 class="an-card-title">Browsers</h3>
-          <div class="an-chart-box an-chart-box--sm"><canvas id="an-browsers"></canvas></div>
-        </div>
-        <div class="an-card">
-          <h3 class="an-card-title">Operating systems</h3>
-          <div class="an-chart-box an-chart-box--sm"><canvas id="an-os"></canvas></div>
-        </div>
-      </div>
-
-      <div class="an-grid">
-        <div class="an-card">
-          <h3 class="an-card-title">Top countries <span class="an-card-sub">by unique visitors</span></h3>
-          <div class="an-table-box" id="an-countries"></div>
-        </div>
-        <div class="an-card">
-          <h3 class="an-card-title">Top referrers</h3>
-          <div class="an-table-box" id="an-referrers"></div>
-        </div>
-      </div>
-
       <div class="an-card">
         <h3 class="an-card-title">Audio listening</h3>
         <div class="an-tiles an-tiles--audio" id="an-audio-tiles"></div>
@@ -271,34 +260,42 @@
         <div class="an-table-box" id="an-funnel"></div>
       </div>
 
-      <div class="an-grid">
-        <div class="an-card" id="an-card-split">
-          <h3 class="an-card-title">Bible vs Books</h3>
-          <div class="an-chart-box an-chart-box--sm"><canvas id="an-split"></canvas></div>
-        </div>
-        <div class="an-card">
-          <h3 class="an-card-title">Devices</h3>
-          <div class="an-chart-box an-chart-box--sm"><canvas id="an-devices"></canvas></div>
-        </div>
+      <div class="an-card" id="an-card-split">
+        <h3 class="an-card-title">Bible vs Books</h3>
+        <div class="an-chart-box an-chart-box--sm"><canvas id="an-split"></canvas></div>
       </div>
-      </div><!-- /an-sub-dashboard -->
+      </div><!-- /an-sub-resource -->
 
-      <div class="an-sub an-sub--hidden" id="an-sub-compare">
+      <div class="an-sub an-sub--hidden" id="an-sub-basic">
         <div class="an-card an-card--wide">
-          <h3 class="an-card-title">Book leaderboard <span class="an-card-sub">click a column to sort · click a row to drill in</span></h3>
-          <div class="an-table-box" id="an-leaderboard"></div>
+          <h3 class="an-card-title">Traffic <span class="an-card-sub">pageviews &amp; unique visitors per day</span></h3>
+          <div class="an-chart-box"><canvas id="an-trend"></canvas></div>
         </div>
         <div class="an-grid">
           <div class="an-card">
-            <h3 class="an-card-title">Reach vs engagement <span class="an-card-sub">readers × avg time on page; bubble = pageviews</span></h3>
-            <div class="an-chart-box"><canvas id="an-scatter"></canvas></div>
+            <h3 class="an-card-title">Devices</h3>
+            <div class="an-chart-box an-chart-box--sm"><canvas id="an-devices"></canvas></div>
           </div>
           <div class="an-card">
-            <h3 class="an-card-title">Momentum <span class="an-card-sub">pageviews over time, top books</span></h3>
-            <div class="an-chart-box"><canvas id="an-multitrend"></canvas></div>
+            <h3 class="an-card-title">Browsers</h3>
+            <div class="an-chart-box an-chart-box--sm"><canvas id="an-browsers"></canvas></div>
           </div>
         </div>
-      </div>
+        <div class="an-grid">
+          <div class="an-card">
+            <h3 class="an-card-title">Operating systems</h3>
+            <div class="an-chart-box an-chart-box--sm"><canvas id="an-os"></canvas></div>
+          </div>
+          <div class="an-card">
+            <h3 class="an-card-title">Top countries <span class="an-card-sub">by unique visitors</span></h3>
+            <div class="an-table-box" id="an-countries"></div>
+          </div>
+        </div>
+        <div class="an-card an-card--wide">
+          <h3 class="an-card-title">Top referrers</h3>
+          <div class="an-table-box" id="an-referrers"></div>
+        </div>
+      </div><!-- /an-sub-basic -->
     </div>
 
     <!-- ===== MODALS ===== -->
@@ -409,6 +406,6 @@
 </script>
 <script src="/static/js/admin.js?v=1"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
-<script src="/static/js/admin-analytics.js?v=3"></script>
+<script src="/static/js/admin-analytics.js?v=4"></script>
 
 <%- include('partials/footer') %>
