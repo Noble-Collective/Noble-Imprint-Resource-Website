@@ -16,7 +16,11 @@
   var range = '30d';
   var includeBots = false;
   var book = ''; // '' = all content; otherwise a single book's title
+  var subTab = 'dashboard';
+  var compareData = null;
+  var lbSort = { key: 'pageviews', dir: -1 };
   var reqSeq = 0; // guards against out-of-order responses clobbering fresh data
+  var funnelSeq = 0;
 
   function el(id) { return document.getElementById(id); }
   function num(n) { return (n == null) ? '—' : Number(n).toLocaleString(); }
@@ -61,6 +65,7 @@
     kvTable('an-referrers', d.referrers || [], 'label', 'pageviews', 'Source', 'Views');
     audioTiles(d.audio || {});
     dwellTable(d.dwellTop || []);
+    if (d.book) loadFunnel(d.book); else hideFunnel();
   }
 
   // When one book is selected, cross-content panels (Bible-vs-Books, all-Books,
@@ -171,24 +176,150 @@
     }));
   }
 
+  // --- within-book drop-off funnel (Dashboard tab, when a book is selected) ---
+  function hideFunnel() { var c = el('an-card-funnel'); if (c) c.style.display = 'none'; }
+  function loadFunnel(bookName) {
+    var c = el('an-card-funnel'); if (c) c.style.display = '';
+    var mySeq = ++funnelSeq;
+    fetch('/api/admin/analytics/funnel?range=' + range + '&includeBots=' + (includeBots ? '1' : '0') + '&book=' + encodeURIComponent(bookName), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (mySeq === funnelSeq && !d.error) renderFunnel(d); })
+      .catch(function () {});
+  }
+  function renderFunnel(d) {
+    var steps = d.steps || [];
+    if (!steps.length) { el('an-funnel').innerHTML = '<p class="an-empty">No session data for this book.</p>'; return; }
+    var max = Math.max.apply(null, steps.map(function (s) { return s.readers; }).concat([1]));
+    var first = steps[0].readers || 0;
+    el('an-funnel').innerHTML = steps.map(function (s) {
+      var w = Math.round((s.readers / max) * 100);
+      var ret = first ? Math.round((s.readers / first) * 100) : 0;
+      return '<div class="an-funnel-row"><div class="an-funnel-label">' + (s.n ? 'S' + esc(s.n) + ' · ' : '') + esc(s.title) + '</div>' +
+        '<div class="an-funnel-bar-wrap"><div class="an-funnel-bar" style="width:' + w + '%"></div></div>' +
+        '<div class="an-funnel-val">' + num(s.readers) + '<span class="an-funnel-ret">' + ret + '%</span></div></div>';
+    }).join('');
+  }
+
+  // --- Compare tab: leaderboard + scatter + multi-book trend ---
+  function loadCompare() {
+    var status = el('an-status'); if (status) status.textContent = 'Loading…';
+    var mySeq = ++reqSeq;
+    fetch('/api/admin/analytics/books?range=' + range + '&includeBots=' + (includeBots ? '1' : '0'), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (mySeq !== reqSeq) return; if (d.error) throw new Error(d.error); renderCompare(d); if (status) status.textContent = ''; })
+      .catch(function (e) { if (mySeq === reqSeq && status) status.textContent = 'Error: ' + e.message; });
+  }
+  function renderCompare(d) {
+    compareData = d;
+    [charts['an-scatter'], charts['an-multitrend']].forEach(function (c) { if (c) c.destroy(); });
+    renderLeaderboard(d.leaderboard || []);
+    scatter(d.leaderboard || []);
+    multitrend(d.trend || [], d.topBooks || []);
+  }
+  function renderLeaderboard(rows) {
+    var cols = [['book', 'Book'], ['readers', 'Readers'], ['pageviews', 'Views'], ['sessions_viewed', 'Sessions'], ['avg_dwell_sec', 'Avg time'], ['audio_plays', 'Audio'], ['avg_pct_heard', '% heard']];
+    var sorted = rows.slice().sort(function (a, b) {
+      var k = lbSort.key, av = a[k], bv = b[k];
+      if (k === 'book') return lbSort.dir * String(av || '').localeCompare(String(bv || ''));
+      return lbSort.dir * ((av == null ? -1 : av) - (bv == null ? -1 : bv));
+    });
+    var head = '<tr>' + cols.map(function (c) {
+      var arrow = lbSort.key === c[0] ? (lbSort.dir < 0 ? ' ▾' : ' ▴') : '';
+      return '<th class="an-sortable' + (c[0] === 'book' ? ' an-th-left' : '') + '" data-sort="' + c[0] + '">' + esc(c[1]) + arrow + '</th>';
+    }).join('') + '</tr>';
+    var body = sorted.map(function (r) {
+      return '<tr class="an-lb-row" data-book="' + esc(r.book) + '"><td>' + esc(r.book) + '</td><td class="an-num">' + num(r.readers) +
+        '</td><td class="an-num">' + num(r.pageviews) + '</td><td class="an-num">' + num(r.sessions_viewed) +
+        '</td><td class="an-num">' + mins(r.avg_dwell_sec) + '</td><td class="an-num">' + num(r.audio_plays) +
+        '</td><td class="an-num">' + pct(r.avg_pct_heard) + '</td></tr>';
+    }).join('');
+    var host = el('an-leaderboard');
+    host.innerHTML = '<table class="an-table an-lb"><thead>' + head + '</thead><tbody>' + (body || '<tr><td>No data</td></tr>') + '</tbody></table>';
+    host.querySelectorAll('.an-sortable').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var k = th.getAttribute('data-sort');
+        if (lbSort.key === k) lbSort.dir *= -1; else { lbSort.key = k; lbSort.dir = (k === 'book') ? 1 : -1; }
+        renderLeaderboard(compareData.leaderboard || []);
+      });
+    });
+    host.querySelectorAll('.an-lb-row').forEach(function (tr) {
+      tr.addEventListener('click', function () { drillIntoBook(tr.getAttribute('data-book')); });
+    });
+  }
+  function scatter(rows) {
+    var c = el('an-scatter'); if (!c) return;
+    var pts = rows.filter(function (r) { return r.readers > 0; }).map(function (r) {
+      return { x: r.readers, y: r.avg_dwell_sec || 0, r: Math.max(6, Math.min(30, Math.sqrt(r.pageviews || 1) * 3)), book: r.book };
+    });
+    charts['an-scatter'] = new Chart(c, {
+      type: 'bubble',
+      data: { datasets: [{ data: pts, backgroundColor: PAL[0] + '99', borderColor: PAL[0] }] },
+      options: Object.assign({}, COMMON, {
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (ctx) { var p = ctx.raw; return p.book + ' — ' + p.x + ' readers, ' + mins(p.y); } } } },
+        scales: {
+          x: { title: { display: true, text: 'Readers', color: MUTED }, beginAtZero: true, grid: { color: GRID }, ticks: { color: MUTED, precision: 0 } },
+          y: { title: { display: true, text: 'Avg time on page', color: MUTED }, beginAtZero: true, grid: { color: GRID }, ticks: { color: MUTED, callback: function (v) { return mins(v); } } },
+        },
+      }),
+    });
+  }
+  function multitrend(rows, books) {
+    var c = el('an-multitrend'); if (!c) return;
+    var days = []; var seen = {};
+    rows.forEach(function (r) { if (!seen[r.day]) { seen[r.day] = 1; days.push(r.day); } });
+    days.sort();
+    var byBook = {};
+    rows.forEach(function (r) { (byBook[r.book] = byBook[r.book] || {})[r.day] = r.pageviews; });
+    var datasets = (books || []).slice(0, 6).map(function (b, i) {
+      return { label: b, data: days.map(function (d) { return (byBook[b] && byBook[b][d]) || 0; }), borderColor: PAL[i % PAL.length], backgroundColor: PAL[i % PAL.length], borderWidth: 2, tension: 0.25, pointRadius: days.length > 40 ? 0 : 2, fill: false };
+    });
+    charts['an-multitrend'] = new Chart(c, {
+      type: 'line', data: { labels: days, datasets: datasets },
+      options: Object.assign({}, COMMON, {
+        interaction: { mode: 'index', intersect: false },
+        scales: { x: { grid: { color: GRID }, ticks: { color: MUTED, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }, y: { beginAtZero: true, grid: { color: GRID }, ticks: { color: MUTED, precision: 0 } } },
+      }),
+    });
+  }
+  function drillIntoBook(bookName) {
+    book = bookName;
+    var sel = el('an-book'); if (sel) sel.value = bookName;
+    var dashTab = document.querySelector('.an-subtab[data-an-sub="dashboard"]');
+    if (dashTab) dashTab.click();
+  }
+
   // --- wiring ---
-  function ensureLoaded() { if (!loaded) { loaded = true; } load(); }
+  function reloadActive() { if (subTab === 'compare') loadCompare(); else load(); }
 
   document.addEventListener('DOMContentLoaded', function () {
     var tabBtn = document.querySelector('[data-admin-tab="analytics"]');
-    if (tabBtn) tabBtn.addEventListener('click', function () { if (!loaded) ensureLoaded(); });
+    if (tabBtn) tabBtn.addEventListener('click', function () { if (!loaded) { loaded = true; reloadActive(); } });
+
+    document.querySelectorAll('.an-subtab').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.an-subtab').forEach(function (x) { x.classList.remove('an-subtab--active'); });
+        b.classList.add('an-subtab--active');
+        subTab = b.getAttribute('data-an-sub');
+        var dash = el('an-sub-dashboard'), cmp = el('an-sub-compare');
+        if (dash) dash.classList.toggle('an-sub--hidden', subTab !== 'dashboard');
+        if (cmp) cmp.classList.toggle('an-sub--hidden', subTab !== 'compare');
+        var bookSel = el('an-book'); if (bookSel) bookSel.style.display = (subTab === 'compare') ? 'none' : '';
+        loaded = true;
+        reloadActive();
+      });
+    });
 
     document.querySelectorAll('.an-range-btn').forEach(function (b) {
       b.addEventListener('click', function () {
         document.querySelectorAll('.an-range-btn').forEach(function (x) { x.classList.remove('an-range-btn--active'); });
         b.classList.add('an-range-btn--active');
         range = b.getAttribute('data-range');
-        ensureLoaded();
+        loaded = true; reloadActive();
       });
     });
     var bots = el('an-include-bots');
-    if (bots) bots.addEventListener('change', function () { includeBots = bots.checked; ensureLoaded(); });
+    if (bots) bots.addEventListener('change', function () { includeBots = bots.checked; loaded = true; reloadActive(); });
     var bookSel = el('an-book');
-    if (bookSel) bookSel.addEventListener('change', function () { book = bookSel.value; ensureLoaded(); });
+    if (bookSel) bookSel.addEventListener('change', function () { book = bookSel.value; loaded = true; load(); });
   });
 })();

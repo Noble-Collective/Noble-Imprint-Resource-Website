@@ -207,6 +207,12 @@
         <span class="an-status text-muted" id="an-status"></span>
       </div>
 
+      <div class="an-subtabs" role="tablist">
+        <button class="an-subtab an-subtab--active" data-an-sub="dashboard">Dashboard</button>
+        <button class="an-subtab" data-an-sub="compare">Compare books</button>
+      </div>
+
+      <div class="an-sub" id="an-sub-dashboard">
       <h2 class="an-scope-title" id="an-scope-title" style="display:none"></h2>
       <div class="an-tiles" id="an-tiles"></div>
 
@@ -269,6 +275,29 @@
         <div class="an-tiles an-tiles--audio" id="an-audio-tiles"></div>
         <h4 class="an-subhead">Most-engaged sessions <span class="an-card-sub">avg time on page</span></h4>
         <div class="an-table-box" id="an-dwell"></div>
+      </div>
+
+      <div class="an-card an-card--wide" id="an-card-funnel" style="display:none">
+        <h3 class="an-card-title">Session drop-off <span class="an-card-sub">unique readers who reached each session</span></h3>
+        <div class="an-table-box" id="an-funnel"></div>
+      </div>
+      </div><!-- /an-sub-dashboard -->
+
+      <div class="an-sub an-sub--hidden" id="an-sub-compare">
+        <div class="an-card an-card--wide">
+          <h3 class="an-card-title">Book leaderboard <span class="an-card-sub">click a column to sort · click a row to drill in</span></h3>
+          <div class="an-table-box" id="an-leaderboard"></div>
+        </div>
+        <div class="an-grid">
+          <div class="an-card">
+            <h3 class="an-card-title">Reach vs engagement <span class="an-card-sub">readers × avg time on page; bubble = pageviews</span></h3>
+            <div class="an-chart-box"><canvas id="an-scatter"></canvas></div>
+          </div>
+          <div class="an-card">
+            <h3 class="an-card-title">Momentum <span class="an-card-sub">pageviews over time, top books</span></h3>
+            <div class="an-chart-box"><canvas id="an-multitrend"></canvas></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -380,6 +409,6 @@
 </script>
 <script src="/static/js/admin.js?v=1"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
-<script src="/static/js/admin-analytics.js?v=2"></script>
+<script src="/static/js/admin-analytics.js?v=3"></script>
 
 <%- include('partials/footer') %>

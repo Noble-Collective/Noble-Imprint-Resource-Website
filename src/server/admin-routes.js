@@ -117,6 +117,31 @@ api.get('/analytics', async (req, res) => {
   }
 });
 
+// Book comparison: leaderboard + multi-book trend.
+api.get('/analytics/books', async (req, res) => {
+  try {
+    const range = req.query.range || '30d';
+    const includeBots = req.query.includeBots === '1' || req.query.includeBots === 'true';
+    res.json(await analyticsAdmin.getBooksComparison(range, { includeBots }));
+  } catch (err) {
+    console.error('[admin] analytics/books error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Within-book drop-off funnel.
+api.get('/analytics/funnel', async (req, res) => {
+  try {
+    const range = req.query.range || '30d';
+    const includeBots = req.query.includeBots === '1' || req.query.includeBots === 'true';
+    const book = req.query.book ? String(req.query.book).slice(0, 300) : null;
+    res.json(await analyticsAdmin.getBookFunnel(range, { includeBots }, book));
+  } catch (err) {
+    console.error('[admin] analytics/funnel error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // List all users
 api.get('/users', async (req, res) => {
   try {

@@ -136,4 +136,85 @@ async function getDashboard(range = '30d', opts = {}) {
   };
 }
 
-module.exports = { getDashboard };
+// ---- Book comparison (leaderboard + scatter + multi-book trend) ----
+
+function findBookByTitle(tree, title) {
+  for (const s of (tree.series || [])) {
+    for (const child of (s.children || [])) {
+      if (child.type === 'book' && child.title === title) return child;
+      if (child.type === 'subseries') {
+        for (const b of (child.books || [])) if (b.title === title) return b;
+      }
+    }
+  }
+  return null;
+}
+
+async function getBooksComparison(range = '30d', opts = {}) {
+  const includeBots = !!opts.includeBots;
+  if (range !== 'all' && !RANGE_DAYS[range]) range = '30d';
+  const base = baseConditions(range, includeBots);
+
+  // One row per book (grouped by title). readers=unique visitors, depth via
+  // distinct sessions viewed + avg dwell, plus audio.
+  const leaderboard = await q(`
+    SELECT book,
+      COUNT(DISTINCT visitor_id) AS readers,
+      COUNTIF(event_type='pageview') AS pageviews,
+      COUNT(DISTINCT session) AS sessions_viewed,
+      ROUND(SUM(IFNULL(dwell_ms,0))/1000.0 / NULLIF(COUNTIF(event_type='pageview'),0), 0) AS avg_dwell_sec,
+      COUNTIF(event_type='audio_play') AS audio_plays,
+      ROUND(AVG(IF(event_type='audio_ended', audio_percent, NULL)), 3) AS avg_pct_heard
+    FROM ${FQ} ${whereOf(base, "content_type='book_session'", 'book IS NOT NULL')}
+    GROUP BY book ORDER BY pageviews DESC`);
+
+  // Daily traffic for the top books, for the overlay chart.
+  const top = leaderboard.slice(0, 8).map((r) => r.book);
+  let trend = [];
+  if (top.length) {
+    trend = await q(`
+      SELECT book, FORMAT_DATE('%Y-%m-%d', DATE(ts)) AS day, COUNTIF(event_type='pageview') AS pageviews
+      FROM ${FQ} ${whereOf(base, "content_type='book_session'", 'book IN UNNEST(@books)')}
+      GROUP BY book, day ORDER BY day`, { books: top });
+  }
+  return { range, includeBots, leaderboard, trend, topBooks: top };
+}
+
+// ---- Within-book drop-off funnel (session-by-session retention) ----
+
+async function getBookFunnel(range = '30d', opts = {}, bookTitle = null) {
+  const includeBots = !!opts.includeBots;
+  if (!bookTitle) return { book: null, steps: [] };
+  if (range !== 'all' && !RANGE_DAYS[range]) range = '30d';
+  const base = baseConditions(range, includeBots);
+  base.push('book = @book');
+
+  const rows = await q(`
+    SELECT session, COUNT(DISTINCT visitor_id) AS readers, COUNTIF(event_type='pageview') AS pageviews
+    FROM ${FQ} ${whereOf(base, "content_type='book_session'", 'session IS NOT NULL')}
+    GROUP BY session`, { book: bookTitle });
+  const byTitle = {};
+  rows.forEach((r) => { byTitle[r.session] = r; });
+
+  // Order by the book's real session sequence (from the content tree), so even
+  // never-viewed sessions show the drop to zero.
+  const content = require('./content');
+  const tree = await content.buildContentTree();
+  const bookNode = findBookByTitle(tree, bookTitle);
+  let steps = [];
+  if (bookNode) {
+    await content.loadSessionTitles(bookNode);
+    steps = (bookNode.sessions || [])
+      .map((s) => ({ num: content.sessionNumber(bookNode, s), title: s.title || s.displayName }))
+      .filter((s) => s.num !== '' && s.num != null)
+      .sort((a, b) => parseInt(a.num, 10) - parseInt(b.num, 10))
+      .map((s) => ({ n: String(s.num), title: s.title, readers: byTitle[s.title] ? byTitle[s.title].readers : 0, pageviews: byTitle[s.title] ? byTitle[s.title].pageviews : 0 }));
+  }
+  if (!steps.length) {
+    // Fallback: whatever sessions have data, by pageviews (unordered).
+    steps = rows.sort((a, b) => b.pageviews - a.pageviews).map((r) => ({ n: '', title: r.session, readers: r.readers, pageviews: r.pageviews }));
+  }
+  return { book: bookTitle, steps };
+}
+
+module.exports = { getDashboard, getBooksComparison, getBookFunnel };
