@@ -253,6 +253,16 @@ async function applyChange(change) {
     return { file: change.file, ref: change.ref, sha: res.sha };
   }
 
+  if (change.type === 'library-fix') {
+    // Fix a quotation from the audit: replace the verbatim quoted text with the
+    // corrected scripture wording (first occurrence). oldText is the exact quote.
+    const { content, sha } = await github.getFileContent(change.file);
+    const updated = replaceNthOccurrence(content, change.oldText, change.newText, 0);
+    const res = await github.updateFileContent(change.file, updated, sha,
+      `Fix ${change.ref} quotation to match BSB in ${change.file}`);
+    return { file: change.file, ref: change.ref, sha: res.sha };
+  }
+
   throw new Error(`Unknown change type: ${change.type}`);
 }
 

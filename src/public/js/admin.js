@@ -1690,6 +1690,7 @@
     // --- Quotation Audit (streaming, grouped by book) ---
     var qaBtn = document.getElementById('qa-run-btn');
     var qaOutput = document.getElementById('qa-output');
+    var qaFixes = {}, qaFixSeq = 0;
 
     function coverImg(coverPath) {
       return coverPath
@@ -1707,15 +1708,34 @@
         + '<div class="text-muted">' + esc(b.series || '') + ' · ' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact</div></div>'
         + bookBadge(b.diffs) + '</div>';
     }
+    // Highlight the words that differ (onlyInQuote) inside the quoted text.
+    function highlightWords(text, words) {
+      if (!words || !words.length) return esc(text);
+      var set = {}; words.forEach(function (w) { set[String(w).toLowerCase()] = true; });
+      return String(text).split(/(\s+)/).map(function (tok) {
+        if (!tok.trim()) return tok;
+        var norm = tok.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return (set[norm] || set[tok.toLowerCase()]) ? '<mark>' + esc(tok) + '</mark>' : esc(tok);
+      }).join('');
+    }
+
     function findingRow(f) {
-      var off = f.onlyInQuote && f.onlyInQuote.length
-        ? '<div class="text-muted">quote has (not in Bible): <strong>' + esc(f.onlyInQuote.join(', ')) + '</strong></div>' : '';
       var tierLbl = f.tier === 'review' ? 'Review' : f.tier === 'different-translation' ? 'Different translation' : 'Minor';
-      return '<div class="admin-card" style="margin:8px 0;padding:10px">'
-        + '<div><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · ' + esc(tierLbl) + ' · <code>' + esc(f.file) + '</code></span> '
-        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">View context</a></div>' + off
-        + '<div style="margin:4px 0"><span class="text-muted">quoted:</span> ' + esc(f.quote) + '</div>'
-        + '<div style="margin:4px 0"><span class="text-muted">Bible:</span> ' + esc(f.verse) + '</div></div>';
+      var links = '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a>'
+        + (f.sessionUrl ? ' · <a href="' + esc(f.sessionUrl) + '" target="_blank" rel="noopener">Show session</a>' : '');
+      var where = f.sessionTitle ? esc(f.sessionTitle) : '<code>' + esc((f.file || '').split('/').pop()) + '</code>';
+      var fixBtn = '';
+      if (f.fix && f.fix.ok) {
+        var fid = 'fix:' + (qaFixSeq++);
+        qaFixes[fid] = { type: 'library-fix', file: f.file, ref: f.ref, oldText: f.quote, newText: f.fix.newText };
+        fixBtn = '<div class="qa-fix-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button>'
+          + '<span class="bv-fix-status text-muted"></span></div>';
+      }
+      return '<div class="admin-card qa-finding">'
+        + '<div class="qa-finding-head"><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · ' + esc(tierLbl) + ' · ' + where + '</span> ' + links + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-side">Quoted</span> ' + highlightWords(f.quote, f.onlyInQuote) + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB</span> ' + esc(f.verse) + '</div>'
+        + fixBtn + '</div>';
     }
     // A collapsible result card per book, with cover + counts + findings.
     function qaResultBook(b) {
@@ -1727,10 +1747,11 @@
       var body = (b.findings && b.findings.length)
         ? b.findings.map(findingRow).join('')
         : '<p class="text-muted">No differences — all quotations match the current Bible.</p>';
-      return '<details class="qa-book"' + (diffs && diffs <= 12 ? ' open' : '') + '>' + summary + '<div class="qa-book-body">' + body + '</div></details>';
+      return '<details class="qa-book">' + summary + '<div class="qa-book-body">' + body + '</div></details>';
     }
 
     function renderQaResult(result) {
+      qaFixes = {}; qaFixSeq = 0;
       var c = result.counts || {};
       var row = function (k, label) { return '<tr><td>' + esc(label) + '</td><td>' + esc(c[k] || 0) + '</td></tr>'; };
       var overview = '<div class="admin-card" style="margin:12px 0">'
@@ -1744,8 +1765,9 @@
       // Books with the most to review first, then the rest.
       var withDiffs = result.books.filter(function (b) { return (b.review + b.minor + b.diffTransl) > 0; }).sort(function (a, bb) { return (bb.review + bb.minor + bb.diffTransl) - (a.review + a.minor + a.diffTransl); });
       var clean = result.books.filter(function (b) { return (b.review + b.minor + b.diffTransl) === 0; });
-      var html = overview + '<h4>Books with differences (' + withDiffs.length + ')</h4>' + withDiffs.map(qaResultBook).join('');
+      var html = '<h4>Books with differences (' + withDiffs.length + ')</h4>' + withDiffs.map(qaResultBook).join('');
       if (clean.length) html += '<h4 style="margin-top:16px">Clean books (' + clean.length + ')</h4>' + clean.map(qaResultBook).join('');
+      html += '<h4 style="margin-top:20px">Summary</h4>' + overview;
       qaResults.innerHTML = html;
     }
 
@@ -1785,9 +1807,18 @@
         es.onerror = function () { es.close(); if (!resultEvt && !failed) { failed = true; streamDone = true; if (!qaResults.innerHTML) qaResults.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; } };
       });
 
-      // "View context" inside audit results.
+      // "Show scripture" popup + "Fix quote" apply inside audit results.
       qaOutput.addEventListener('click', function (e) {
-        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); }
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
+        if (e.target.classList.contains('bv-fix')) {
+          var btn = e.target, change = qaFixes[btn.getAttribute('data-fix-id')];
+          if (!change) return;
+          var actions = btn.parentElement, statusEl = actions.querySelector('.bv-fix-status');
+          btn.disabled = true; statusEl.textContent = ' applying…';
+          apiCall('POST', '/api/admin/bible-validation/apply-change', { change: change })
+            .then(function (r) { actions.innerHTML = '<span class="admin-badge admin-badge--ok">Fixed</span> <span class="text-muted">' + esc((r.sha || '').slice(0, 7)) + '</span>'; })
+            .catch(function (err) { btn.disabled = false; statusEl.innerHTML = ' <span class="admin-error">' + esc(err.message) + '</span>'; });
+        }
       });
     }
 
