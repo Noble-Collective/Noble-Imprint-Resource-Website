@@ -1384,9 +1384,9 @@
     // highlighted — reuses the public /api/verses endpoint (same data the
     // on-site verse-citation popup uses).
     function openChapterPopup(ref) {
-      var m = String(ref).match(/^(.+?)\s+(\d+):(\d+)/);
+      var m = String(ref).match(/^(.+?)\s+(\d+)(?::(\d+))?/);
       if (!m) return;
-      var book = m[1], chapter = m[2], target = parseInt(m[3], 10);
+      var book = m[1], chapter = m[2], target = m[3] ? parseInt(m[3], 10) : -1;
       var overlay = document.getElementById('bv-ctx-overlay');
       if (!overlay) {
         overlay = document.createElement('div');
@@ -1426,32 +1426,61 @@
         + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
     }
 
-    // Render heading/footnote differences for one book. When the two sides have
-    // equal counts they're paired and highlighted (a reworded heading); otherwise
-    // listed under "Current only" / "BSB Site only".
+    // Word-overlap similarity (0..1) — used to pair a reworded heading/footnote
+    // with its counterpart even when their verse refs differ.
+    function wordSim(a, b) {
+      var aw = String(a).toLowerCase().split(/\s+/).filter(Boolean);
+      var bw = String(b).toLowerCase().split(/\s+/).filter(Boolean);
+      if (!aw.length || !bw.length) return 0;
+      var cnt = {}; bw.forEach(function (w) { cnt[w] = (cnt[w] || 0) + 1; });
+      var shared = 0; aw.forEach(function (w) { if (cnt[w] > 0) { shared++; cnt[w]--; } });
+      return shared / Math.max(aw.length, bw.length);
+    }
+    function ctxLink(bookName, ref) {
+      return '<a href="#" class="bv-context" data-ctx-ref="' + esc(bookName + ' ' + ref) + '">View context</a>';
+    }
+    var structSeq = 0;
+
     // Render heading/footnote differences for one book. Items are { text, ref }.
-    // Pair items at the same verse (a reworded heading/footnote) and highlight
-    // the wording change; list unpaired ones as present on only one side. Every
-    // row shows the verse location so the change has context.
-    function structRows(bookName, label, ours, official) {
+    // A reworded item (best word-similarity match on the other side) is shown as
+    // ONE row: location + Current + BSB Site, highlighted — with Accept for
+    // headings. Unmatched items are listed as present on only one side.
+    function structRows(bookName, bookCode, translationId, label, ours, official) {
       ours = (ours || []).slice(); official = (official || []).slice();
       if (!ours.length && !official.length) return '';
-      var loc = function (ref) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span>'; };
-      var rows = [];
-      var usedOff = {};
+      var isHeading = label === 'Heading';
+      var loc = function (ref) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref); };
+      var rows = [], usedOff = {};
+
       ours.forEach(function (o) {
-        var mi = -1;
-        for (var i = 0; i < official.length; i++) { if (!usedOff[i] && official[i].ref === o.ref) { mi = i; break; } }
-        if (mi >= 0) {
-          usedOff[mi] = true;
-          rows.push('<div class="bv-struct-item">' + loc(o.ref) + diffPair(o.text, official[mi].text) + '</div>');
+        var best = -1, bestScore = 0;
+        for (var i = 0; i < official.length; i++) {
+          if (usedOff[i]) continue;
+          var sc = wordSim(o.text, official[i].text);
+          if (sc > bestScore) { bestScore = sc; best = i; }
+        }
+        if (best >= 0 && bestScore >= 0.4) {
+          usedOff[best] = true;
+          var actions = '';
+          var idAttr = '';
+          if (isHeading) {
+            var id = 'heading:' + bookCode + ':' + o.ref + ':' + (structSeq++);
+            changesById[id] = { id: id, type: 'usfm-heading', translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: official[best].text };
+            idAttr = ' data-change-id="' + esc(id) + '"';
+            actions = '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
+              + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div>';
+          }
+          rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + '><div class="bv-change-loc">' + loc(o.ref) + '</div>'
+            + diffPair(o.text, official[best].text) + actions + '</div>');
         } else {
-          rows.push('<div class="bv-struct-item">' + loc(o.ref) + '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + esc(o.text) + '</div></div>');
+          rows.push('<div class="bv-struct-item"><div class="bv-change-loc">' + loc(o.ref) + '</div>'
+            + '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + esc(o.text) + '</div></div>');
         }
       });
       official.forEach(function (f, i) {
         if (usedOff[i]) return;
-        rows.push('<div class="bv-struct-item">' + loc(f.ref) + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + esc(f.text) + '</div></div>');
+        rows.push('<div class="bv-struct-item"><div class="bv-change-loc">' + loc(f.ref) + '</div>'
+          + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + esc(f.text) + '</div></div>');
       });
       return '<div class="bv-struct-kind">' + esc(label) + 's</div>' + rows.join('');
     }
@@ -1495,8 +1524,8 @@
           + sBooks.map(function (b) {
             var bn = b.bookName || b.book;
             return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
-              + structRows(bn, 'Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
-              + structRows(bn, 'Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
+              + structRows(bn, b.code, r.translationId, 'Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
+              + structRows(bn, b.code, r.translationId, 'Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
               + '</div>';
           }).join('') + '</details>';
       }

@@ -101,3 +101,17 @@ test('changeId is stable and distinct per change', () => {
     s.changeId({ type: 'library-quote', file: 'series/S/Book/s1.md', occurrenceIndex: 2, ref: 'Acts 22:2' }),
     'lib:series/S/Book/s1.md:2:Acts 22:2');
 });
+
+// ── replaceHeadingInUsfm (Accept for structure heading diffs) ──────────────────
+test('replaceHeadingInUsfm swaps heading prose, matching normalized (curly vs straight)', () => {
+  const usfm = '\\c 16\n\\s1 David’s Psalms of Thanksgiving\n\\v 7 On that day David first appointed...';
+  const r = s.replaceHeadingInUsfm(usfm, "David's Psalms of Thanksgiving", "David's Psalm of Thanksgiving");
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes("\\s1 David's Psalm of Thanksgiving"));
+  assert.ok(r.content.includes('\\v 7 On that day')); // rest untouched
+});
+
+test('replaceHeadingInUsfm returns changed=false when the heading is not present', () => {
+  const r = s.replaceHeadingInUsfm('\\s1 The Creation\n\\v 1 x', 'Not a heading here', 'x');
+  assert.strictEqual(r.changed, false);
+});

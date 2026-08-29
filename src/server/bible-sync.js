@@ -170,9 +170,45 @@ async function buildChangesFromDrift(drifted, translationId = 'bsb', opts = {}) 
   };
 }
 
+// Replace a section-heading's text in raw USFM, matching on NORMALIZED prose
+// (so curly/straight-quote and marker-encoding differences don't defeat it).
+// Preserves the leading marker + indentation and any trailing CR. Pure/testable.
+function replaceHeadingInUsfm(content, oldText, newText) {
+  const want = v.normalizeVerse(v.stripInlineMarkers(oldText));
+  const lines = String(content).split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*\\s[1-4]?\s+)(.+?)(\r?)$/);
+    if (m && v.normalizeVerse(v.stripInlineMarkers(m[2])) === want) {
+      lines[i] = m[1] + newText + m[3];
+      return { content: lines.join('\n'), changed: true };
+    }
+  }
+  return { content, changed: false };
+}
+
+// Resolve our on-disk USFM path for a book code (e.g. "1CH" → bibles/bsb/content/131CHBSB.SFM).
+async function resolveOurUsfmPath(translationId, code) {
+  const listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
+  const hit = listing.find(f => /\.(sfm|usfm)$/i.test(f.name) && v.bookCode(f.name) === code);
+  return hit ? `bibles/${translationId}/content/${hit.name}` : null;
+}
+
 // ── Apply a single accepted change (GitHub write) ──────────────────────────────
 
 async function applyChange(change) {
+  if (change.type === 'usfm-heading') {
+    const translationId = change.translationId || 'bsb';
+    const file = await resolveOurUsfmPath(translationId, change.bookCode);
+    if (!file) throw new Error(`No USFM file found for ${change.bookCode}`);
+    const { content, sha } = await github.getFileContent(file);
+    const { content: updated, changed } = replaceHeadingInUsfm(content, change.oldText, change.newText);
+    if (!changed) throw new Error(`Heading "${change.oldText}" not found in ${file} (already updated?)`);
+    const res = await github.updateFileContent(file, updated, sha,
+      `Update ${change.bookCode} heading at ${change.ref} to match latest BSB`);
+    return { file, ref: change.ref, sha: res.sha };
+  }
+
+
   if (change.type === 'verse-store') {
     const { content, sha } = await github.getFileContent(change.file);
     const { json, changed } = updateReferenceValue(content, change.ref, change.oldText, change.newText);
@@ -199,6 +235,7 @@ module.exports = {
   computeChangeAnchor,
   updateReferenceValue,
   changeId,
+  replaceHeadingInUsfm,
   listLibraryMarkdown,
   detectSyncChanges,
   buildChangesFromDrift,
