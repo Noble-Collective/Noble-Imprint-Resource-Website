@@ -1687,57 +1687,107 @@
         .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
     }
 
-    // --- Quotation Audit (all quotes vs current Bible) ---
+    // --- Quotation Audit (streaming, grouped by book) ---
     var qaBtn = document.getElementById('qa-run-btn');
     var qaOutput = document.getElementById('qa-output');
 
-    function qaTier(title, note, items, truncated) {
-      if (!items.length) return '';
-      var rows = items.map(function (f) {
-        var off = f.onlyInQuote && f.onlyInQuote.length
-          ? '<div class="text-muted">quote has (not in Bible): <strong>' + esc(f.onlyInQuote.join(', ')) + '</strong></div>' : '';
-        return '<div class="admin-card" style="margin:8px 0;padding:10px">'
-          + '<div><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · <code>' + esc(f.file) + '</code></span></div>'
-          + off
-          + '<div style="margin:4px 0"><span class="text-muted">quoted:</span> ' + esc(f.quote) + '</div>'
-          + '<div style="margin:4px 0"><span class="text-muted">Bible:</span> ' + esc(f.verse) + '</div></div>';
-      }).join('');
-      var more = truncated ? '<p class="text-muted">(list capped — run again after fixing some)</p>' : '';
-      return '<details style="margin-top:10px"' + (items.length <= 20 ? ' open' : '') + '><summary><strong>' + esc(title) + '</strong> (' + items.length + ')</summary>'
-        + '<p class="text-muted">' + esc(note) + '</p>' + rows + more + '</details>';
+    function coverImg(coverPath) {
+      return coverPath
+        ? '<img class="qa-cover" src="/cover/' + esc(encodeURI(coverPath)) + '" alt="" loading="lazy">'
+        : '<span class="qa-cover qa-cover--none">📖</span>';
+    }
+    function bookBadge(diffs) {
+      return diffs ? '<span class="admin-badge admin-badge--warn">' + diffs + ' to review</span>'
+        : '<span class="admin-badge admin-badge--ok">clean</span>';
+    }
+    // A live progress row while a book is being analyzed.
+    function qaLiveRow(b) {
+      return '<div class="qa-book-row">' + coverImg(b.coverPath)
+        + '<div class="qa-book-meta"><div class="qa-book-title">' + esc(b.title) + '</div>'
+        + '<div class="text-muted">' + esc(b.series || '') + ' · ' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact</div></div>'
+        + bookBadge(b.diffs) + '</div>';
+    }
+    function findingRow(f) {
+      var off = f.onlyInQuote && f.onlyInQuote.length
+        ? '<div class="text-muted">quote has (not in Bible): <strong>' + esc(f.onlyInQuote.join(', ')) + '</strong></div>' : '';
+      var tierLbl = f.tier === 'review' ? 'Review' : f.tier === 'different-translation' ? 'Different translation' : 'Minor';
+      return '<div class="admin-card" style="margin:8px 0;padding:10px">'
+        + '<div><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · ' + esc(tierLbl) + ' · <code>' + esc(f.file) + '</code></span> '
+        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">View context</a></div>' + off
+        + '<div style="margin:4px 0"><span class="text-muted">quoted:</span> ' + esc(f.quote) + '</div>'
+        + '<div style="margin:4px 0"><span class="text-muted">Bible:</span> ' + esc(f.verse) + '</div></div>';
+    }
+    // A collapsible result card per book, with cover + counts + findings.
+    function qaResultBook(b) {
+      var diffs = (b.review || 0) + (b.minor || 0) + (b.diffTransl || 0);
+      var summary = '<summary class="qa-book-summary">' + coverImg(b.coverPath)
+        + '<div class="qa-book-meta"><div class="qa-book-title">' + esc(b.title) + '</div>'
+        + '<div class="text-muted">' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact · ' + esc(b.caseOnly + b.formatOnly) + ' cosmetic · <strong>' + esc(b.review) + '</strong> to review</div></div>'
+        + bookBadge(diffs) + '</summary>';
+      var body = (b.findings && b.findings.length)
+        ? b.findings.map(findingRow).join('')
+        : '<p class="text-muted">No differences — all quotations match the current Bible.</p>';
+      return '<details class="qa-book"' + (diffs && diffs <= 12 ? ' open' : '') + '>' + summary + '<div class="qa-book-body">' + body + '</div></details>';
     }
 
-    function renderQuoteAudit(d) {
-      var c = d.counts || {};
+    function renderQaResult(result) {
+      var c = result.counts || {};
       var row = function (k, label) { return '<tr><td>' + esc(label) + '</td><td>' + esc(c[k] || 0) + '</td></tr>'; };
-      var html = '<div class="admin-card" style="margin-top:12px">'
-        + '<p>Scanned <strong>' + esc(d.scannedFiles) + '</strong> files, checked <strong>' + esc(d.checked) + '</strong> quotations against the ' + esc(d.comparedAgainst || 'current Bible') + '.</p>'
+      var overview = '<div class="admin-card" style="margin:12px 0">'
+        + '<p><strong>' + esc(result.checked) + '</strong> quotations checked across <strong>' + esc(result.books.length) + '</strong> books against the ' + esc(result.comparedAgainst || 'current Bible') + '.</p>'
         + '<table class="admin-table"><tbody>'
-        + row('exact', '✅ Exact match')
-        + row('case-only', 'Cosmetic — “Lord” vs “LORD”')
-        + row('format-only', 'Cosmetic — punctuation/spacing')
+        + row('exact', '✅ Exact match') + row('case-only', 'Cosmetic — “Lord” vs “LORD”') + row('format-only', 'Cosmetic — punctuation/spacing')
         + row('word-difference', 'TIER 1 — review (small wording differences)')
-        + row('footnote-artifact', 'TIER 2 — footnote-marker leak')
-        + row('ellipsis-omission', 'TIER 2 — ellipsis omission')
-        + row('editorial-bracket', 'TIER 2 — editorial [brackets]')
-        + row('heavy-difference', 'TIER 3 — likely a different translation')
-        + row('paraphrase', 'Paraphrase (ignored)')
+        + row('footnote-artifact', 'TIER 2 — footnote-marker leak') + row('ellipsis-omission', 'TIER 2 — ellipsis omission') + row('editorial-bracket', 'TIER 2 — editorial [brackets]')
+        + row('heavy-difference', 'TIER 3 — likely a different translation') + row('paraphrase', 'Paraphrase (ignored)')
         + '</tbody></table></div>';
-      html += qaTier('TIER 1 — Review (genuine wording differences)', 'A few words differ from the current Bible — likely misquotes or older wording. Worth a look.', d.tiers.review, d.truncated && d.truncated.review);
-      html += qaTier('TIER 2 — Minor / likely-mechanical', 'Footnote-marker leaks, ellipses, and editorial brackets — usually intentional or trivial.', d.tiers.minor, d.truncated && d.truncated.minor);
-      html += qaTier('TIER 3 — Likely a different translation', 'Heavy differences — the quotation probably comes from another translation, not the BSB.', d.tiers.differentTranslation, d.truncated && d.truncated.differentTranslation);
-      qaOutput.innerHTML = html;
+      // Books with the most to review first, then the rest.
+      var withDiffs = result.books.filter(function (b) { return (b.review + b.minor + b.diffTransl) > 0; }).sort(function (a, bb) { return (bb.review + bb.minor + bb.diffTransl) - (a.review + a.minor + a.diffTransl); });
+      var clean = result.books.filter(function (b) { return (b.review + b.minor + b.diffTransl) === 0; });
+      var html = overview + '<h4>Books with differences (' + withDiffs.length + ')</h4>' + withDiffs.map(qaResultBook).join('');
+      if (clean.length) html += '<h4 style="margin-top:16px">Clean books (' + clean.length + ')</h4>' + clean.map(qaResultBook).join('');
+      qaResults.innerHTML = html;
     }
 
+    var qaChecklist, qaResults;
     if (qaBtn) {
       qaBtn.addEventListener('click', function () {
         var translationId = document.getElementById('bv-translation-select').value;
-        qaBtn.disabled = true;
-        qaOutput.innerHTML = '<p class="text-muted">Auditing every quotation in the library&hellip; this can take a while.</p>';
-        apiCall('POST', '/api/admin/bible-quote-audit/run', { translationId: translationId })
-          .then(renderQuoteAudit)
-          .catch(function (e) { qaOutput.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; })
-          .then(function () { qaBtn.disabled = false; });
+        var orig = qaBtn.textContent;
+        qaBtn.disabled = true; qaBtn.textContent = 'Auditing…';
+        qaOutput.innerHTML = '<div id="qa-checklist"></div><div id="qa-results"></div>';
+        qaChecklist = qaOutput.querySelector('#qa-checklist');
+        qaResults = qaOutput.querySelector('#qa-results');
+        var books = [], queue = [], loadDetail = '', scanning = false, resultEvt = null, streamDone = false, failed = false;
+
+        function renderProgress() {
+          var head = streamDone
+            ? '<div class="bv-step bv-step--done"><span class="bv-ck bv-ck--done">✓</span><span>Audit complete</span></div>'
+            : '<div class="bv-step bv-step--run"><span class="bv-ck bv-ck--run">◐</span><span>' + (scanning ? 'Auditing quotations, book by book' : 'Loading the Bible and indexing the library') + (loadDetail ? ' — ' + esc(loadDetail) : '') + '</span></div>';
+          qaChecklist.innerHTML = '<div class="admin-card bv-checklist-card">' + head + '<div class="qa-live-books">' + books.map(qaLiveRow).join('') + '</div></div>';
+        }
+        renderProgress();
+
+        var timer = setInterval(function () {
+          if (queue.length) { books.push(queue.shift()); renderProgress(); return; }
+          if (streamDone) { clearInterval(timer); renderProgress(); if (!failed && resultEvt) renderQaResult(resultEvt.result); qaBtn.disabled = false; qaBtn.textContent = orig; }
+        }, 40);
+
+        var es = new EventSource('/api/admin/bible-quote-audit/stream?translationId=' + encodeURIComponent(translationId));
+        es.onmessage = function (ev) {
+          var e; try { e = JSON.parse(ev.data); } catch (_) { return; }
+          if (e.type === 'book') { queue.push(e); }
+          else if (e.type === 'step') { if (e.key === 'load' && e.detail) loadDetail = e.detail; if (e.key === 'scan' && e.status === 'running') scanning = true; }
+          else if (e.type === 'result') { resultEvt = e; }
+          else if (e.type === 'done') { streamDone = true; es.close(); }
+          else if (e.type === 'error') { failed = true; streamDone = true; es.close(); qaResults.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
+        };
+        es.onerror = function () { es.close(); if (!resultEvt && !failed) { failed = true; streamDone = true; if (!qaResults.innerHTML) qaResults.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; } };
+      });
+
+      // "View context" inside audit results.
+      qaOutput.addEventListener('click', function (e) {
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); }
       });
     }
 

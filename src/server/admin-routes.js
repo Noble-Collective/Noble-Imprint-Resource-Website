@@ -852,6 +852,30 @@ api.get('/bible-compare/stream', async (req, res) => {
   }
 });
 
+// Streaming Quotation Audit (Server-Sent Events): per-book progress + a
+// book-grouped result. Read-only.
+api.get('/bible-quote-audit/stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (res.flushHeaders) res.flushHeaders();
+  const emit = (evt) => { if (res.writableEnded) return; res.write(`data: ${JSON.stringify(evt)}\n\n`); if (res.flush) res.flush(); };
+  try {
+    const translationId = req.query.translationId || 'bsb';
+    const result = await quoteAudit.runStreamingQuoteAudit({ translationId, emit });
+    firestore.saveQuoteAuditRun({
+      translationId, runBy: (req.user && req.user.email) || 'unknown',
+      checked: result.checked, counts: result.counts, books: result.books.length,
+    }).catch(err => console.warn('quote-audit history save failed:', err.message));
+  } catch (err) {
+    console.error('Quote audit stream error:', err.message);
+    emit({ type: 'error', error: err.message });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+});
+
 // Read the pinned version label for a translation (or null if not pinned yet).
 api.get('/bible-version', async (req, res) => {
   const translationId = req.query.translationId || 'bsb';

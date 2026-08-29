@@ -5758,3 +5758,16 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 @media (max-width:640px){ .an-funnel-label { flex-basis:120px; } }
 
 .bv-struct-card { margin: 8px 0; }
+
+/* Quotation Audit — per-book progress + results */
+.qa-cover { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; flex: 0 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,.2); background: #efe9db; }
+.qa-cover--none { display: inline-flex; align-items: center; justify-content: center; font-size: 22px; }
+.qa-live-books { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 320px; overflow-y: auto; }
+.qa-book-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px; }
+.qa-book-row:nth-child(odd) { background: #faf7ef; }
+.qa-book-meta { flex: 1 1 auto; min-width: 0; }
+.qa-book-title { font-weight: 600; }
+.qa-book { border: 1px solid #e5e0d5; border-radius: 8px; margin: 8px 0; background: #fff; }
+.qa-book-summary { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.qa-book-summary::-webkit-details-marker { display: none; }
+.qa-book-body { padding: 0 12px 12px; }
