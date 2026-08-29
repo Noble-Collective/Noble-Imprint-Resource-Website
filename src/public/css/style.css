@@ -3783,6 +3783,17 @@ body.drawer-open {
 .bv-diff-tag { display: inline-block; width: 34px; font-size: 11px; text-transform: uppercase; color: #8a7f66; }
 .bv-change--done { opacity: .6; }
 .bv-change-actions { margin-top: 8px; }
+
+/* Diff highlighting + side labels (Current vs BSB Site) */
+.bv-diff-line { margin: 4px 0; line-height: 1.55; }
+.bv-side { display: inline-block; min-width: 68px; margin-right: 6px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .3px; color: #8a7f66; vertical-align: baseline; }
+.bv-side--new { color: #1e7e34; }
+.bv-change mark, .bv-struct-book mark { background: #ffe89a; color: inherit; padding: 0 2px; border-radius: 2px; font-weight: 600; }
+.bv-struct-book { margin: 10px 0; padding: 8px 10px; border: 1px solid #eee6d3; border-radius: 6px; background: #fff; }
+.bv-struct-title { font-weight: 700; margin-bottom: 2px; }
+.bv-struct-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: #8a7f66; margin-top: 8px; }
+.admin-btn:disabled { opacity: .55; cursor: default; }
 .admin-diff-loading {
   text-align: center;
   padding: 40px;

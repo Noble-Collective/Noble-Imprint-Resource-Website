@@ -1343,16 +1343,67 @@
       return '<div class="bv-tile bv-tile--' + (tone || 'neutral') + '"><div class="bv-tile-num">' + esc(value) + '</div><div class="bv-tile-label">' + esc(label) + '</div></div>';
     }
 
+    // Word-level inline diff → { oldHtml, newHtml } with only the changed words
+    // wrapped in <mark>. Whitespace is kept so text reflows naturally.
+    function inlineDiff(oldText, newText) {
+      var a = String(oldText == null ? '' : oldText).split(/(\s+)/);
+      var b = String(newText == null ? '' : newText).split(/(\s+)/);
+      var n = a.length, m = b.length, i, j;
+      var dp = []; for (i = 0; i <= n; i++) { dp[i] = []; for (j = 0; j <= m; j++) dp[i][j] = 0; }
+      for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--)
+        dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      var aMark = [], bMark = []; i = 0; j = 0;
+      while (i < n && j < m) {
+        if (a[i] === b[j]) { aMark.push(false); bMark.push(false); i++; j++; }
+        else if (dp[i + 1][j] >= dp[i][j + 1]) { aMark.push(true); i++; }
+        else { bMark.push(true); j++; }
+      }
+      while (i < n) { aMark.push(true); i++; }
+      while (j < m) { bMark.push(true); j++; }
+      function build(tokens, marks) {
+        var out = '', run = '';
+        for (var k = 0; k < tokens.length; k++) {
+          if (marks[k]) { run += tokens[k]; }
+          else { if (run) { out += '<mark>' + esc(run) + '</mark>'; run = ''; } out += esc(tokens[k]); }
+        }
+        if (run) out += '<mark>' + esc(run) + '</mark>';
+        return out;
+      }
+      return { oldHtml: build(a, aMark), newHtml: build(b, bMark) };
+    }
+
+    // Two labelled, highlighted lines: Current (ours) vs BSB Site (official).
+    function diffPair(oldText, newText) {
+      var d = inlineDiff(oldText, newText);
+      return '<div class="bv-diff-line"><span class="bv-side">Current</span> ' + d.oldHtml + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site</span> ' + d.newHtml + '</div>';
+    }
+
     function changeCard(c) {
       var loc = c.type === 'verse-store'
         ? 'Verse text &mdash; <strong>' + esc(c.ref) + '</strong>'
         : 'Quotation of <strong>' + esc(c.ref) + '</strong> in <code>' + esc(c.file) + '</code>';
       return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '">'
         + '<div class="bv-change-loc">' + loc + '</div>'
-        + '<div class="bv-diff-line"><span class="bv-diff-tag">was</span> <del>' + esc(c.oldText) + '</del></div>'
-        + '<div class="bv-diff-line"><span class="bv-diff-tag">now</span> <ins>' + esc(c.newText) + '</ins></div>'
+        + diffPair(c.oldText, c.newText)
         + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
         + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
+    }
+
+    // Render heading/footnote differences for one book. When the two sides have
+    // equal counts they're paired and highlighted (a reworded heading); otherwise
+    // listed under "Current only" / "BSB Site only".
+    function structRows(label, ours, official) {
+      ours = ours || []; official = official || [];
+      if (!ours.length && !official.length) return '';
+      var out = '<div class="bv-struct-kind">' + esc(label) + 's</div>';
+      if (ours.length === official.length) {
+        for (var k = 0; k < ours.length; k++) out += diffPair(ours[k], official[k]);
+      } else {
+        if (ours.length) out += '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + ours.map(esc).join(' &middot; ') + '</div>';
+        if (official.length) out += '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + official.map(esc).join(' &middot; ') + '</div>';
+      }
+      return out;
     }
 
     function renderCompareResult(r) {
@@ -1390,13 +1441,12 @@
       var sBooks = r.structure.books || [];
       if (sBooks.length) {
         html += '<details style="margin-top:14px"><summary><strong>Heading &amp; footnote differences</strong> (' + sBooks.length + ' books)</summary>'
+          + '<p class="text-muted">Section headings and footnotes that differ between our copy and the BSB site.</p>'
           + sBooks.map(function (b) {
-            var lines = '';
-            if (b.headings.onlyInOurs.length || b.headings.onlyInOfficial.length)
-              lines += '<div class="text-muted">headings — ours: ' + esc(b.headings.onlyInOurs.join(' | ')) + ' / official: ' + esc(b.headings.onlyInOfficial.join(' | ')) + '</div>';
-            if (b.footnotes.onlyInOurs.length || b.footnotes.onlyInOfficial.length)
-              lines += '<div class="text-muted">footnotes — +' + b.footnotes.onlyInOurs.length + ' ours / +' + b.footnotes.onlyInOfficial.length + ' official</div>';
-            return '<div style="margin:6px 0"><strong>' + esc(b.book) + '</strong>' + lines + '</div>';
+            return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(b.bookName || b.book) + '</div>'
+              + structRows('Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
+              + structRows('Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
+              + '</div>';
           }).join('') + '</details>';
       }
       compareOut.innerHTML = html;
@@ -1405,20 +1455,48 @@
     if (compareBtn) {
       compareBtn.addEventListener('click', function () {
         var translationId = document.getElementById('bv-translation-select').value;
+        var origLabel = compareBtn.textContent;
         compareBtn.disabled = true;
+        compareBtn.textContent = 'Comparing…';
         compareOut.innerHTML = '';
-        var steps = {}, books = [];
+        var steps = {}, books = [], queue = [], resultEvt = null, streamDone = false, failed = false;
         renderChecklist(steps, books);
+
+        function finish() {
+          compareBtn.disabled = false;
+          compareBtn.textContent = origLabel;
+        }
+
+        // Paced reveal: apply one queued event per tick so the checklist visibly
+        // progresses (ticking each book) even when the network delivers the
+        // whole stream in a burst (proxies often buffer Server-Sent Events).
+        var timer = setInterval(function () {
+          if (queue.length) {
+            var e = queue.shift();
+            if (e.type === 'step') { steps[e.key] = { status: e.status, detail: e.detail || (steps[e.key] && steps[e.key].detail) }; renderChecklist(steps, books); }
+            else if (e.type === 'book') { books.push(e); renderChecklist(steps, books); }
+            return;
+          }
+          if (streamDone) {
+            clearInterval(timer);
+            if (!failed && resultEvt) renderCompareResult(resultEvt.result);
+            finish();
+          }
+        }, 26);
+
         var es = new EventSource('/api/admin/bible-compare/stream?translationId=' + encodeURIComponent(translationId));
         es.onmessage = function (ev) {
           var e; try { e = JSON.parse(ev.data); } catch (_) { return; }
-          if (e.type === 'step') { steps[e.key] = { status: e.status, detail: e.detail || (steps[e.key] && steps[e.key].detail) }; renderChecklist(steps, books); }
-          else if (e.type === 'book') { books.push(e); renderChecklist(steps, books); }
-          else if (e.type === 'result') { renderCompareResult(e.result); }
-          else if (e.type === 'error') { compareOut.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
-          else if (e.type === 'done') { es.close(); compareBtn.disabled = false; }
+          if (e.type === 'result') { resultEvt = e; }
+          else if (e.type === 'done') { streamDone = true; es.close(); }
+          else if (e.type === 'error') { failed = true; streamDone = true; queue.length = 0; es.close(); compareOut.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
+          else { queue.push(e); }
         };
-        es.onerror = function () { es.close(); compareBtn.disabled = false; if (!compareOut.innerHTML) compareOut.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; };
+        es.onerror = function () {
+          es.close();
+          // If the stream broke before delivering a result, stop and report.
+          if (!resultEvt && !failed) { streamDone = true; failed = true; if (!compareOut.innerHTML) compareOut.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; }
+        };
       });
 
       // Accept / Reject a single change.
