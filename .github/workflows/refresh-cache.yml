@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/.file-cache/
+          git add src/.file-cache/ src/.content-tree-cache.json
           if git diff --staged --quiet; then
             echo "No cache changes — skipping commit"
           else

@@ -9,8 +9,9 @@ mockups/
 # Firebase
 .firebase/
 
-# Content tree cache (rebuilt at runtime)
-.content-tree-cache.json
+# Content tree cache — committed so a freshly deployed container ships a warm
+# snapshot and serves it instantly (stale-while-revalidate) instead of blocking
+# the first request on a full GitHub rebuild. Refreshed nightly by refresh-cache.yml.
 
 # Test
 test-results/

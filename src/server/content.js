@@ -185,11 +185,27 @@ async function loadSubseriesOrBooks(parentPath) {
   return results;
 }
 
-async function buildContentTree() {
-  const cached = cache.get(TREE_CACHE_KEY);
-  if (cached) return cached;
-
+// Read the committed on-disk tree snapshot, or null if absent/unreadable.
+// `.content-tree-cache.json` is committed to the repo and refreshed nightly, so a
+// freshly deployed container ships with a warm snapshot to serve instantly.
+function readTreeSnapshot() {
   try {
+    const parsed = JSON.parse(fs.readFileSync(TREE_DISK_PATH, 'utf8'));
+    return (parsed && Array.isArray(parsed.series)) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+let treeRebuildInFlight = null;
+
+// The real build: hits the GitHub API (~90 directory calls + per-book meta),
+// enriches every session with its H1 title (so the snapshot AND the in-memory
+// tree are fully populated and the home route's loadAllSessionTitles is a no-op),
+// then caches in memory + on disk. This is the SLOW path (~seconds) — it must not
+// run on a user's request thread while a snapshot is available (see
+// buildContentTree's stale-while-revalidate).
+async function rebuildContentTree() {
   console.log('Building content tree from GitHub API...');
   const seriesItems = await github.getDirectoryContents('series');
   const seriesDirs = seriesItems.filter(i => i.type === 'dir' && !i.name.startsWith('.'));
@@ -223,24 +239,62 @@ async function buildContentTree() {
   }
 
   series.sort((a, b) => a.order - b.order);
-
   const tree = { series };
+
+  // Bake H1 titles into the tree so the snapshot is complete — otherwise a cold
+  // page load would still fan out one GitHub call per session to fill them in,
+  // which is most of the cold-start cost this whole mechanism exists to avoid.
+  try { await loadAllSessionTitles(tree); } catch (e) { console.error('Title enrichment failed:', e.message); }
+
   cache.set(TREE_CACHE_KEY, tree, TREE_TTL);
-  // Persist to disk so the tree survives rate limits and container restarts
+  // Persist to disk so the tree survives rate limits/restarts AND so a freshly
+  // deployed container can serve it instantly (this file is committed to the repo).
   try { fs.writeFileSync(TREE_DISK_PATH, JSON.stringify(tree)); } catch { /* ignore disk errors */ }
   console.log(`Content tree built: ${series.length} series, ${series.reduce((n, s) => n + s.bookCount, 0)} books`);
   return tree;
+}
+
+// Kick off a background rebuild if one isn't already running. Never rejects.
+function triggerTreeRebuild() {
+  if (!treeRebuildInFlight) {
+    treeRebuildInFlight = rebuildContentTree()
+      .catch(err => { console.error('Background content tree rebuild failed:', err.message); return null; })
+      .finally(() => { treeRebuildInFlight = null; });
+  }
+  return treeRebuildInFlight;
+}
+
+// Public accessor used by every page. Stale-while-revalidate:
+//   1. in-memory cache hit         → return it (fast path on warm instances)
+//   2. committed disk snapshot     → return it IMMEDIATELY and refresh from GitHub
+//                                     in the background (turns a ~13s cold build
+//                                     into a single file read)
+//   3. no snapshot (first-ever build / missing file) → block on a full rebuild
+// The snapshot only holds navigation structure (never page content, which is
+// always loaded fresh per request), so the only cost of staleness is briefly-old
+// nav that self-heals within seconds of the background rebuild completing.
+async function buildContentTree() {
+  const cached = cache.get(TREE_CACHE_KEY);
+  if (cached) return cached;
+
+  const snapshot = readTreeSnapshot();
+  if (snapshot) {
+    cache.set(TREE_CACHE_KEY, snapshot, 60 * 1000); // short TTL — the rebuild replaces it
+    triggerTreeRebuild();
+    return snapshot;
+  }
+
+  // No snapshot available: block on a full rebuild (first deploy / snapshot gone).
+  try {
+    return await rebuildContentTree();
   } catch (err) {
     console.error('Content tree build failed:', err.message);
-    // Fall back to disk cache — serves the last successful tree so all pages
-    // keep working during rate limits or GitHub outages
-    try {
-      const diskData = fs.readFileSync(TREE_DISK_PATH, 'utf8');
-      const diskTree = JSON.parse(diskData);
-      console.log('Content tree loaded from disk fallback');
-      cache.set(TREE_CACHE_KEY, diskTree, 60 * 1000); // short TTL — retry API in 1 min
-      return diskTree;
-    } catch { /* no disk cache available */ }
+    // Last-ditch: re-check for a snapshot (e.g. written by a concurrent rebuild).
+    const fallback = readTreeSnapshot();
+    if (fallback) {
+      cache.set(TREE_CACHE_KEY, fallback, 60 * 1000);
+      return fallback;
+    }
     return { series: [] };
   }
 }
@@ -554,7 +608,9 @@ function getAllBooks(tree) {
 // before a rate limit can hit. Fetches sequentially to avoid spiking API usage.
 async function warmDiskCache() {
   try {
-    const tree = await buildContentTree();
+    // Force a fresh build (not the snapshot-first path) so the nightly refresh job
+    // regenerates and re-commits .content-tree-cache.json with current content.
+    const tree = await rebuildContentTree();
     const books = getAllBooks(tree);
     let sessions = 0, covers = 0;
     for (const book of books) {
@@ -586,6 +642,7 @@ async function warmDiskCache() {
 
 module.exports = {
   buildContentTree,
+  rebuildContentTree,
   resolveRoute,
   bookUrl,
   sessionUrl,
