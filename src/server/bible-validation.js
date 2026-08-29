@@ -254,28 +254,43 @@ function bookCode(name) {
 // apparatus the sites actually consume — section headings (this reader) and
 // footnotes (the Coram Deo study app) — and compare those per book.
 
-// Ordered list of normalized section-heading texts (\s, \s1..\s4) in a book.
-// Split on \r?\n so Windows line endings (our on-disk files) don't leave a
-// trailing \r that would defeat the end anchor.
+// Section headings (\s, \s1..\s4) as { text, ref } where ref is the "chapter:verse"
+// the heading introduces (the verse that follows it) — so the UI can show where
+// each heading difference lives instead of a bare, context-free string.
 function extractHeadings(usfm) {
   const out = [];
+  let ch = 0, pending = [];
   for (const line of String(usfm).split(/\r?\n/)) {
-    const m = line.match(/^\s*\\s[1-4]?\s+(.+)$/);
-    if (m) out.push(normalizeVerse(stripInlineMarkers(m[1])));
+    const cm = line.match(/^\s*\\c\s+(\d+)/);
+    if (cm) { ch = parseInt(cm[1], 10); continue; }
+    const hm = line.match(/^\s*\\s[1-4]?\s+(.+)$/);
+    if (hm) { pending.push(normalizeVerse(stripInlineMarkers(hm[1]))); continue; }
+    const vm = line.match(/^\s*\\v\s+(\d+)/);
+    if (vm && pending.length) {
+      const ref = ch + ':' + vm[1];
+      for (const t of pending) out.push({ text: t, ref });
+      pending = [];
+    }
   }
+  for (const t of pending) out.push({ text: t, ref: ch ? ch + ':?' : '?' });
   return out;
 }
 
-// Ordered list of normalized footnote texts in a book. Each footnote is the
-// span from "\f " to "\f*"; we strip the caller, the \fr origin reference, and
-// all footnote sub-markers (\ft, \fq, \fqa, \fk, closers), keeping the prose.
-// The official USFM wraps scripture references in \ref display|target\ref*
-// markup where ours stores plain text, so we reduce \ref to its display text and
-// drop the space-before-punctuation that \ref* stripping leaves behind — both
-// are encoding artifacts, not content differences.
+// Footnotes as { text, ref } where ref is the "chapter:verse" the footnote sits
+// in. Each footnote is the span from "\f " to "\f*"; we strip the caller, the
+// \fr origin reference, and all footnote sub-markers, keeping the prose. The
+// official USFM wraps scripture references in \ref display|target\ref* markup
+// where ours stores plain text, so we reduce \ref to its display text and drop
+// the space-before-punctuation that \ref* stripping leaves — encoding artifacts.
+// A single ordered scan tracks \c/\v so each footnote gets its location.
 function extractFootnotes(usfm) {
   const out = [];
-  for (const m of String(usfm).matchAll(/\\f\s[\s\S]*?\\f\*/g)) {
+  const re = /\\c\s+(\d+)|\\v\s+(\d+)|\\f\s[\s\S]*?\\f\*/g;
+  const s = String(usfm);
+  let ch = 0, vs = 0, m;
+  while ((m = re.exec(s)) !== null) {
+    if (m[1] !== undefined) { ch = parseInt(m[1], 10); continue; }
+    if (m[2] !== undefined) { vs = parseInt(m[2], 10); continue; }
     const text = m[0]
       .replace(/\\f\s*[+\-?]?\s*/, ' ')                    // opening marker + caller symbol
       .replace(/\\fr\s+\S+/g, ' ')                         // origin reference, e.g. "1:3"
@@ -283,7 +298,7 @@ function extractFootnotes(usfm) {
       .replace(/\\f\*/g, ' ')                              // closing marker
       .replace(/\\f[a-z]+\*?/g, ' ');                      // \ft \fq \fqa \fk … and their closers
     const n = normalizeVerse(text).replace(/\s+([.,;:!?])/g, '$1');
-    if (n) out.push(n);
+    if (n) out.push({ text: n, ref: ch + ':' + vs });
   }
   return out;
 }
@@ -303,6 +318,20 @@ function multisetDiff(a, b) {
   for (const [k, e] of counts) {
     if (e.a > e.b) for (let i = 0; i < e.a - e.b; i++) onlyA.push(k);
     else if (e.b > e.a) for (let i = 0; i < e.b - e.a; i++) onlyB.push(k);
+  }
+  return { onlyA, onlyB };
+}
+
+// Multiset difference of two object arrays, matched by keyFn (e.g. normalized
+// text). Returns the extra OBJECTS on each side (preserving their .ref, etc.).
+function multisetDiffBy(a, b, keyFn) {
+  const counts = new Map();
+  for (const x of a) { const k = keyFn(x); const e = counts.get(k) || { a: [], b: [] }; e.a.push(x); counts.set(k, e); }
+  for (const x of b) { const k = keyFn(x); const e = counts.get(k) || { a: [], b: [] }; e.b.push(x); counts.set(k, e); }
+  const onlyA = [], onlyB = [];
+  for (const [, e] of counts) {
+    if (e.a.length > e.b.length) for (const x of e.a.slice(e.b.length)) onlyA.push(x);
+    else if (e.b.length > e.a.length) for (const x of e.b.slice(e.a.length)) onlyB.push(x);
   }
   return { onlyA, onlyB };
 }
@@ -331,13 +360,13 @@ function diffStructure(oursFiles, officialFiles, opts = {}) {
 
     const ohs = extractHeadings(oc), fhs = extractHeadings(off.content);
     headingsOurs += ohs.length; headingsOfficial += fhs.length;
-    const hd = multisetDiff(ohs, fhs);
+    const hd = multisetDiffBy(ohs, fhs, x => x.text);
 
     let fd = { onlyA: [], onlyB: [] };
     if (compareFootnotes) {
       const ofn = extractFootnotes(oc), ffn = extractFootnotes(off.content);
       footnotesOurs += ofn.length; footnotesOfficial += ffn.length;
-      fd = multisetDiff(ofn, ffn);
+      fd = multisetDiffBy(ofn, ffn, x => x.text);
     }
 
     const hasHeadingDiff = hd.onlyA.length || hd.onlyB.length;
@@ -422,6 +451,7 @@ module.exports = {
   extractFootnotes,
   stripInlineMarkers,
   multisetDiff,
+  multisetDiffBy,
   diffStructure,
   overallStatus,
 };

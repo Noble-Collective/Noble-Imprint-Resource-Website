@@ -1326,7 +1326,8 @@
           : s.status === 'done' ? '<span class="bv-ck bv-ck--done">✓</span>'
             : '<span class="bv-ck bv-ck--run">◐</span>';
         var detail = s && s.detail ? ' <span class="text-muted">— ' + esc(s.detail) + '</span>' : '';
-        return '<div class="bv-step">' + icon + '<span>' + esc(STEP_LABELS[k] || k) + detail + '</span></div>';
+        var rowCls = !s ? 'bv-step bv-step--pending' : s.status === 'done' ? 'bv-step bv-step--done' : 'bv-step bv-step--run';
+        return '<div class="' + rowCls + '">' + icon + '<span>' + esc(STEP_LABELS[k] || k) + detail + '</span></div>';
       }).join('');
       var grid = '';
       if (books.length) {
@@ -1379,12 +1380,47 @@
         + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site</span> ' + d.newHtml + '</div>';
     }
 
+    // Popup showing the whole chapter a diff comes from, with the verse
+    // highlighted — reuses the public /api/verses endpoint (same data the
+    // on-site verse-citation popup uses).
+    function openChapterPopup(ref) {
+      var m = String(ref).match(/^(.+?)\s+(\d+):(\d+)/);
+      if (!m) return;
+      var book = m[1], chapter = m[2], target = parseInt(m[3], 10);
+      var overlay = document.getElementById('bv-ctx-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'bv-ctx-overlay';
+        overlay.className = 'bv-ctx-overlay';
+        overlay.innerHTML = '<div class="bv-ctx-modal"><div class="bv-ctx-head"><h3 class="bv-ctx-title"></h3><button class="bv-ctx-close" aria-label="Close">&times;</button></div><div class="bv-ctx-body"></div></div>';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.classList.contains('bv-ctx-close')) overlay.style.display = 'none'; });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') overlay.style.display = 'none'; });
+      }
+      overlay.querySelector('.bv-ctx-title').textContent = book + ' ' + chapter;
+      var body = overlay.querySelector('.bv-ctx-body');
+      body.innerHTML = '<p class="text-muted">Loading…</p>';
+      overlay.style.display = 'flex';
+      apiCall('GET', '/api/verses?translation=bsb&ref=' + encodeURIComponent(book + ' ' + chapter + ':1-200'))
+        .then(function (d) {
+          var html = (d.verses || []).map(function (vv) {
+            if (vv.gap) return '';
+            var head = vv.sectionHeading ? '<div class="bv-ctx-heading">' + esc(vv.sectionHeading) + '</div>' : '';
+            var cls = vv.verse === target ? 'bv-ctx-verse bv-ctx-verse--hl' : 'bv-ctx-verse';
+            return head + '<p class="' + cls + '"><sup>' + esc(vv.verse) + '</sup> ' + esc(vv.text) + '</p>';
+          }).join('');
+          body.innerHTML = html || '<p class="text-muted">No text found.</p>';
+          var hl = body.querySelector('.bv-ctx-verse--hl'); if (hl) hl.scrollIntoView({ block: 'center' });
+        })
+        .catch(function (e) { body.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
+    }
+
     function changeCard(c) {
       var loc = c.type === 'verse-store'
         ? 'Verse text &mdash; <strong>' + esc(c.ref) + '</strong>'
         : 'Quotation of <strong>' + esc(c.ref) + '</strong> in <code>' + esc(c.file) + '</code>';
       return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '">'
-        + '<div class="bv-change-loc">' + loc + '</div>'
+        + '<div class="bv-change-loc">' + loc + ' <a href="#" class="bv-context" data-ctx-ref="' + esc(c.ref) + '">See context</a></div>'
         + diffPair(c.oldText, c.newText)
         + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
         + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
@@ -1393,17 +1429,31 @@
     // Render heading/footnote differences for one book. When the two sides have
     // equal counts they're paired and highlighted (a reworded heading); otherwise
     // listed under "Current only" / "BSB Site only".
-    function structRows(label, ours, official) {
-      ours = ours || []; official = official || [];
+    // Render heading/footnote differences for one book. Items are { text, ref }.
+    // Pair items at the same verse (a reworded heading/footnote) and highlight
+    // the wording change; list unpaired ones as present on only one side. Every
+    // row shows the verse location so the change has context.
+    function structRows(bookName, label, ours, official) {
+      ours = (ours || []).slice(); official = (official || []).slice();
       if (!ours.length && !official.length) return '';
-      var out = '<div class="bv-struct-kind">' + esc(label) + 's</div>';
-      if (ours.length === official.length) {
-        for (var k = 0; k < ours.length; k++) out += diffPair(ours[k], official[k]);
-      } else {
-        if (ours.length) out += '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + ours.map(esc).join(' &middot; ') + '</div>';
-        if (official.length) out += '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + official.map(esc).join(' &middot; ') + '</div>';
-      }
-      return out;
+      var loc = function (ref) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span>'; };
+      var rows = [];
+      var usedOff = {};
+      ours.forEach(function (o) {
+        var mi = -1;
+        for (var i = 0; i < official.length; i++) { if (!usedOff[i] && official[i].ref === o.ref) { mi = i; break; } }
+        if (mi >= 0) {
+          usedOff[mi] = true;
+          rows.push('<div class="bv-struct-item">' + loc(o.ref) + diffPair(o.text, official[mi].text) + '</div>');
+        } else {
+          rows.push('<div class="bv-struct-item">' + loc(o.ref) + '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + esc(o.text) + '</div></div>');
+        }
+      });
+      official.forEach(function (f, i) {
+        if (usedOff[i]) return;
+        rows.push('<div class="bv-struct-item">' + loc(f.ref) + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + esc(f.text) + '</div></div>');
+      });
+      return '<div class="bv-struct-kind">' + esc(label) + 's</div>' + rows.join('');
     }
 
     function renderCompareResult(r) {
@@ -1443,9 +1493,10 @@
         html += '<details style="margin-top:14px"><summary><strong>Heading &amp; footnote differences</strong> (' + sBooks.length + ' books)</summary>'
           + '<p class="text-muted">Section headings and footnotes that differ between our copy and the BSB site.</p>'
           + sBooks.map(function (b) {
-            return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(b.bookName || b.book) + '</div>'
-              + structRows('Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
-              + structRows('Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
+            var bn = b.bookName || b.book;
+            return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
+              + structRows(bn, 'Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
+              + structRows(bn, 'Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
               + '</div>';
           }).join('') + '</details>';
       }
@@ -1453,50 +1504,80 @@
     }
 
     if (compareBtn) {
+      // Minimum time each step visibly stays in the active "hover" state before
+      // it checks off — so the setup steps feel deliberate/systematic even though
+      // the server does them fast (and concurrently).
+      var STEP_MIN_MS = {
+        'download-verses': 3000, 'download-usfm': 3000, 'load-ours': 3000,
+        'compare': 1000, 'structure': 1200, 'library': 1000,
+      };
+
       compareBtn.addEventListener('click', function () {
         var translationId = document.getElementById('bv-translation-select').value;
         var origLabel = compareBtn.textContent;
         compareBtn.disabled = true;
         compareBtn.textContent = 'Comparing…';
         compareOut.innerHTML = '';
-        var steps = {}, books = [], queue = [], resultEvt = null, streamDone = false, failed = false;
-        renderChecklist(steps, books);
 
-        function finish() {
-          compareBtn.disabled = false;
-          compareBtn.textContent = origLabel;
-        }
+        // Server state (arrives whenever it arrives) is decoupled from the UI,
+        // which is driven sequentially below.
+        var srvStatus = {}, srvDetail = {}, bookQueue = [];
+        var resultEvt = null, streamDone = false, failed = false;
+        var uiSteps = {}, books = [];
+        renderChecklist(uiSteps, books);
 
-        // Paced reveal: apply one queued event per tick so the checklist visibly
-        // progresses (ticking each book) even when the network delivers the
-        // whole stream in a burst (proxies often buffer Server-Sent Events).
-        var timer = setInterval(function () {
-          if (queue.length) {
-            var e = queue.shift();
-            if (e.type === 'step') { steps[e.key] = { status: e.status, detail: e.detail || (steps[e.key] && steps[e.key].detail) }; renderChecklist(steps, books); }
-            else if (e.type === 'book') { books.push(e); renderChecklist(steps, books); }
-            return;
-          }
-          if (streamDone) {
-            clearInterval(timer);
-            if (!failed && resultEvt) renderCompareResult(resultEvt.result);
-            finish();
-          }
-        }, 26);
+        function finish() { compareBtn.disabled = false; compareBtn.textContent = origLabel; }
 
         var es = new EventSource('/api/admin/bible-compare/stream?translationId=' + encodeURIComponent(translationId));
         es.onmessage = function (ev) {
           var e; try { e = JSON.parse(ev.data); } catch (_) { return; }
-          if (e.type === 'result') { resultEvt = e; }
+          if (e.type === 'step') { srvStatus[e.key] = e.status; if (e.detail) srvDetail[e.key] = e.detail; }
+          else if (e.type === 'book') { bookQueue.push(e); }
+          else if (e.type === 'result') { resultEvt = e; }
           else if (e.type === 'done') { streamDone = true; es.close(); }
-          else if (e.type === 'error') { failed = true; streamDone = true; queue.length = 0; es.close(); compareOut.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
-          else { queue.push(e); }
+          else if (e.type === 'error') { failed = true; streamDone = true; es.close(); compareOut.innerHTML = '<p class="admin-error">' + esc(e.error) + '</p>'; }
         };
-        es.onerror = function () {
-          es.close();
-          // If the stream broke before delivering a result, stop and report.
-          if (!resultEvt && !failed) { streamDone = true; failed = true; if (!compareOut.innerHTML) compareOut.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; }
-        };
+        es.onerror = function () { es.close(); if (!resultEvt && !failed) { failed = true; streamDone = true; if (!compareOut.innerHTML) compareOut.innerHTML = '<p class="admin-error">Connection interrupted — please try again.</p>'; } };
+
+        // Sequential UI driver: activate one step (hover) at a time; hold it for
+        // at least STEP_MIN_MS AND until the server finished it; tick books during
+        // the compare step; then check it off and advance.
+        var idx = 0, stepStart = null, bookTimer = null;
+        var driver = setInterval(function () {
+          if (failed) { clearInterval(driver); if (bookTimer) { clearInterval(bookTimer); bookTimer = null; } finish(); return; }
+          if (idx >= STEP_ORDER.length) {
+            clearInterval(driver);
+            if (resultEvt) renderCompareResult(resultEvt.result);
+            finish();
+            return;
+          }
+          var key = STEP_ORDER[idx];
+          if (stepStart === null) {
+            stepStart = Date.now();
+            uiSteps[key] = { status: 'running', detail: srvDetail[key] };
+            renderChecklist(uiSteps, books);
+            if (key === 'compare' && !bookTimer) {
+              bookTimer = setInterval(function () {
+                if (bookQueue.length) { books.push(bookQueue.shift()); renderChecklist(uiSteps, books); }
+              }, 24);
+            }
+          }
+          if (uiSteps[key].detail !== srvDetail[key]) { uiSteps[key].detail = srvDetail[key]; renderChecklist(uiSteps, books); }
+
+          var serverFinished = srvStatus[key] === 'done' || streamDone;
+          var booksDrained = key !== 'compare' || bookQueue.length === 0;
+          if (serverFinished && booksDrained && Date.now() - stepStart >= (STEP_MIN_MS[key] || 800)) {
+            uiSteps[key] = { status: 'done', detail: srvDetail[key] };
+            renderChecklist(uiSteps, books);
+            if (key === 'compare' && bookTimer) { clearInterval(bookTimer); bookTimer = null; }
+            idx++; stepStart = null;
+          }
+        }, 100);
+      });
+
+      // "See context" → chapter popup.
+      compareOut.addEventListener('click', function (e) {
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); }
       });
 
       // Accept / Reject a single change.

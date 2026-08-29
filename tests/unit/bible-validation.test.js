@@ -170,33 +170,39 @@ test('extractHeadings pulls \\s1/\\s2 heading text and strips inline markers', (
     '\\v 3 And God said...',
   ].join('\n');
   const h = v.extractHeadings(usfm);
-  assert.deepStrictEqual(h, ['The Creation', 'The First Day']);
+  assert.deepStrictEqual(h, [
+    { text: 'The Creation', ref: '1:1' },
+    { text: 'The First Day', ref: '1:3' },
+  ]);
 });
 
-test('extractFootnotes pulls note prose and drops caller + \\fr + submarkers', () => {
-  const usfm = '\\v 3 And God said, "Let there be light," \\f + \\fr 1:3 \\ft Cited in 2 Corinthians 4:6\\f* and there was light.';
-  const f = v.extractFootnotes(usfm);
-  assert.deepStrictEqual(f, ['Cited in 2 Corinthians 4:6']);
+test('extractFootnotes pulls note prose with its verse ref, dropping caller/\\fr/submarkers', () => {
+  const usfm = '\\c 1\n\\v 3 And God said, "Let there be light," \\f + \\fr 1:3 \\ft Cited in 2 Corinthians 4:6\\f* and there was light.';
+  assert.deepStrictEqual(v.extractFootnotes(usfm), [{ text: 'Cited in 2 Corinthians 4:6', ref: '1:3' }]);
 });
 
-test('extractFootnotes handles multiple footnotes across a book', () => {
+test('extractFootnotes handles multiple footnotes across a book with refs', () => {
   const usfm = [
+    '\\c 1',
     '\\v 5 ...the first day.\\f + \\fr 1:5 \\ft Literally day one\\f*',
     '\\v 6 ...\\f + \\fr 1:6 \\ft Or a canopy\\f*',
   ].join('\n');
-  assert.deepStrictEqual(v.extractFootnotes(usfm), ['Literally day one', 'Or a canopy']);
+  assert.deepStrictEqual(v.extractFootnotes(usfm), [
+    { text: 'Literally day one', ref: '1:5' },
+    { text: 'Or a canopy', ref: '1:6' },
+  ]);
 });
 
 // ── diffStructure ─────────────────────────────────────────────────────────────
 test('diffStructure compares headings + footnotes across naming styles', () => {
   const ours = new Map([
-    ['01GENBSB.SFM', '\\s1 The Creation\n\\v 1 x\\f + \\fr 1:1 \\ft Note A\\f*'],
-    ['99EXTRABSB.SFM', '\\v 1 not a real book'],
+    ['01GENBSB.SFM', '\\c 1\n\\s1 The Creation\n\\v 1 x\\f + \\fr 1:1 \\ft Note A\\f*'],
+    ['99EXTRABSB.SFM', '\\c 1\n\\v 1 not a real book'],
   ]);
   const official = new Map([
     // Genesis: heading reworded + footnote changed → both flagged
-    ['bsb_usfm/GEN.usfm', '\\s1 The Creation Account\n\\v 1 x\\f + \\fr 1:1 \\ft Note B\\f*'],
-    ['bsb_usfm/EXO.usfm', '\\v 1 exodus'],
+    ['bsb_usfm/GEN.usfm', '\\c 1\n\\s1 The Creation Account\n\\v 1 x\\f + \\fr 1:1 \\ft Note B\\f*'],
+    ['bsb_usfm/EXO.usfm', '\\c 1\n\\v 1 exodus'],
   ]);
   const r = v.diffStructure(ours, official);
   assert.strictEqual(r.totals.booksChecked, 2);
@@ -205,9 +211,10 @@ test('diffStructure compares headings + footnotes across naming styles', () => {
   assert.strictEqual(r.totals.booksWithHeadingDiffs, 1);
   assert.strictEqual(r.totals.booksWithFootnoteDiffs, 1);
   const gen = r.books.find(b => b.book.includes('GEN'));
-  assert.match(gen.headings.onlyInOfficial[0], /Creation Account/);
-  assert.deepStrictEqual(gen.footnotes.onlyInOurs, ['Note A']);
-  assert.deepStrictEqual(gen.footnotes.onlyInOfficial, ['Note B']);
+  assert.match(gen.headings.onlyInOfficial[0].text, /Creation Account/);
+  assert.strictEqual(gen.footnotes.onlyInOurs[0].text, 'Note A');
+  assert.strictEqual(gen.footnotes.onlyInOfficial[0].text, 'Note B');
+  assert.strictEqual(gen.footnotes.onlyInOurs[0].ref, '1:1');
 });
 
 test('diffStructure with footnotes disabled ignores footnote differences', () => {
