@@ -1708,34 +1708,52 @@
         + '<div class="text-muted">' + esc(b.series || '') + ' · ' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact</div></div>'
         + bookBadge(b.diffs) + '</div>';
     }
-    // Highlight the words that differ (onlyInQuote) inside the quoted text.
-    function highlightWords(text, words) {
-      if (!words || !words.length) return esc(text);
-      var set = {}; words.forEach(function (w) { set[String(w).toLowerCase()] = true; });
+    function normWord(t) { return String(t).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    function setOf(words) { var s = {}; (words || []).forEach(function (w) { var n = normWord(w); if (n) s[n] = true; }); return s; }
+    // Bold the tokens whose normalized word is in `set`; escape everything.
+    function boldBySet(text, set) {
       return String(text).split(/(\s+)/).map(function (tok) {
-        if (!tok.trim()) return tok;
-        var norm = tok.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return (set[norm] || set[tok.toLowerCase()]) ? '<mark>' + esc(tok) + '</mark>' : esc(tok);
+        if (!tok.trim()) return esc(tok);
+        return set[normWord(tok)] ? '<strong>' + esc(tok) + '</strong>' : esc(tok);
       }).join('');
+    }
+    // Show the surrounding paragraph with the quote <mark>ed and differing words bold.
+    function markQuoteInParagraph(paragraph, quote, diffSet) {
+      var idx = paragraph.indexOf(quote);
+      if (idx < 0) return boldBySet(paragraph, diffSet);
+      return esc(paragraph.slice(0, idx)) + '<mark class="qa-q">' + boldBySet(quote, diffSet) + '</mark>' + esc(paragraph.slice(idx + quote.length));
+    }
+    // Show the full BSB verse with the quoted span <mark>ed and its differing (vs the quote) words bold.
+    function markSpanInVerse(verse, span, quoteText) {
+      var qset = setOf(String(quoteText).split(/\s+/));
+      var bibleSet = {};
+      String(span || '').split(/\s+/).forEach(function (w) { var n = normWord(w); if (n && !qset[n]) bibleSet[n] = true; });
+      var idx = span ? verse.indexOf(span) : -1;
+      if (idx < 0) return boldBySet(verse, bibleSet);
+      return esc(verse.slice(0, idx)) + '<mark class="qa-q">' + boldBySet(span, bibleSet) + '</mark>' + esc(verse.slice(idx + span.length));
     }
 
     function findingRow(f) {
       var tierLbl = f.tier === 'review' ? 'Review' : f.tier === 'different-translation' ? 'Different translation' : 'Minor';
-      var links = '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a>'
-        + (f.sessionUrl ? ' · <a href="' + esc(f.sessionUrl) + '" target="_blank" rel="noopener">Show session</a>' : '');
-      var where = f.sessionTitle ? esc(f.sessionTitle) : '<code>' + esc((f.file || '').split('/').pop()) + '</code>';
-      var fixBtn = '';
+      var sessionHead = f.sessionTitle
+        ? (f.sessionUrl ? '<a href="' + esc(f.sessionUrl) + '" target="_blank" rel="noopener">' + esc(f.sessionTitle) + '</a>' : esc(f.sessionTitle))
+        : '<code>' + esc((f.file || '').split('/').pop()) + '</code>';
+      var diffSet = setOf(f.onlyInQuote);
+      var span = (f.fix && f.fix.ok) ? f.fix.preview : null;
+      var fixBlock = '';
       if (f.fix && f.fix.ok) {
         var fid = 'fix:' + (qaFixSeq++);
-        qaFixes[fid] = { type: 'library-fix', file: f.file, ref: f.ref, oldText: f.quote, newText: f.fix.newText };
-        fixBtn = '<div class="qa-fix-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button>'
-          + '<span class="bv-fix-status text-muted"></span></div>';
+        qaFixes[fid] = { type: 'library-fix', file: f.file, ref: f.ref, oldText: f.fix.oldRaw, newText: f.fix.newRaw };
+        fixBlock = '<div class="qa-fix"><div class="qa-fix-preview"><span class="text-muted">Fix will set the quote to:</span> &ldquo;' + esc(f.fix.preview) + '&rdquo;</div>'
+          + '<button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button> <span class="bv-fix-status text-muted"></span></div>';
       }
       return '<div class="admin-card qa-finding">'
-        + '<div class="qa-finding-head"><strong>' + esc(f.ref) + '</strong> <span class="text-muted">' + esc(f.coverage) + '% overlap · ' + esc(tierLbl) + ' · ' + where + '</span> ' + links + '</div>'
-        + '<div class="bv-diff-line"><span class="bv-side">Quoted</span> ' + highlightWords(f.quote, f.onlyInQuote) + '</div>'
-        + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB</span> ' + esc(f.verse) + '</div>'
-        + fixBtn + '</div>';
+        + '<div class="qa-finding-session">' + sessionHead + '</div>'
+        + '<div class="qa-finding-head"><span class="bv-loc">' + esc(f.ref) + '</span> <span class="admin-badge admin-badge--warn">' + esc(tierLbl) + '</span> <span class="text-muted">' + esc(f.coverage) + '% overlap</span> '
+        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a></div>'
+        + '<div class="qa-block"><div class="qa-block-label">In the session</div><div class="qa-para">' + markQuoteInParagraph(f.context || f.quote, f.quote, diffSet) + '</div></div>'
+        + '<div class="qa-block"><div class="qa-block-label">BSB &mdash; ' + esc(f.ref) + '</div><div class="qa-para">' + markSpanInVerse(f.verse, span, f.quote) + '</div></div>'
+        + fixBlock + '</div>';
     }
     // A collapsible result card per book, with cover + counts + findings.
     function qaResultBook(b) {
@@ -1783,9 +1801,12 @@
         var books = [], queue = [], loadDetail = '', scanning = false, resultEvt = null, streamDone = false, failed = false;
 
         function renderProgress() {
-          var head = streamDone
-            ? '<div class="bv-step bv-step--done"><span class="bv-ck bv-ck--done">✓</span><span>Audit complete</span></div>'
-            : '<div class="bv-step bv-step--run"><span class="bv-ck bv-ck--run">◐</span><span>' + (scanning ? 'Auditing quotations, book by book' : 'Loading the Bible and indexing the library') + (loadDetail ? ' — ' + esc(loadDetail) : '') + '</span></div>';
+          if (streamDone) {
+            // Results below replace the live list — keep only a compact done line.
+            qaChecklist.innerHTML = '<div class="admin-card bv-checklist-card"><div class="bv-step bv-step--done"><span class="bv-ck bv-ck--done">✓</span><span>Audit complete</span></div></div>';
+            return;
+          }
+          var head = '<div class="bv-step bv-step--run"><span class="bv-ck bv-ck--run">◐</span><span>' + (scanning ? 'Auditing quotations, book by book' : 'Loading the Bible and indexing the library') + (loadDetail ? ' — ' + esc(loadDetail) : '') + '</span></div>';
           qaChecklist.innerHTML = '<div class="admin-card bv-checklist-card">' + head + '<div class="qa-live-books">' + books.map(qaLiveRow).join('') + '</div></div>';
         }
         renderProgress();

@@ -37,15 +37,16 @@ function correctQuote(quote, verseText) {
   return span;
 }
 
-// Can this deviation be auto-fixed by snapping the quote to scripture? Only for
-// inline quotes (verbatim in the file) with small/mechanical word differences —
-// not whole different-translation passages or paraphrases.
-function computeFix(kind, res, quote, verseText) {
-  if (kind !== 'inline' || res.status !== 'deviation') return { ok: false };
-  if (res.reason === 'heavy-difference') return { ok: false };
-  const corrected = correctQuote(quote, verseText);
-  if (!corrected || v.normalizeVerse(corrected) === v.normalizeVerse(quote)) return { ok: false };
-  return { ok: true, newText: corrected };
+// Build a "Fix" for a deviation: the scripture wording to replace the quote with.
+// Prefer the aligned span (changes only what differs); fall back to the full
+// cited verse text when the quote can't be aligned (e.g. a different-translation
+// passage). oldRaw/newRaw are the exact source text to swap; preview is shown.
+function computeFix(q, res, verseText) {
+  if (res.status !== 'deviation') return { ok: false };
+  const corrected = correctQuote(q.quote, verseText) || String(verseText).trim();
+  if (!corrected || v.normalizeVerse(corrected) === v.normalizeVerse(q.quote)) return { ok: false };
+  const newRaw = q.kind === 'attribution' ? '> ' + corrected : corrected;
+  return { ok: true, oldRaw: q.raw, newRaw: newRaw, preview: corrected };
 }
 
 // Audit every citation+quote in one file's text against the Bible.
@@ -64,9 +65,9 @@ function scanText(text, path, hasRef, getText, sessionTitle, sessionUrl) {
       status: res.status, reason: res.reason, tier: res.tier,
       coverage: res.coverage != null ? Math.round(res.coverage * 100) : undefined,
       onlyInQuote: res.onlyInQuote || [], ref: cite.refString, file: path,
-      kind: q.kind, quote: q.quote, verse: verseText,
+      kind: q.kind, quote: q.quote, verse: verseText, context: q.context || q.quote,
       sessionTitle: sessionTitle, sessionUrl: sessionUrl,
-      fix: computeFix(q.kind, res, q.quote, verseText),
+      fix: computeFix(q, res, verseText),
     });
   }
   return out;

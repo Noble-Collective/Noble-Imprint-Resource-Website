@@ -91,7 +91,13 @@ function quoteForCitation(text, index) {
     const openCh = closeCh === '”' ? '“' : closeCh;
     const openPos = text.lastIndexOf(openCh, i - 1);
     if (openPos !== -1 && i - openPos > 1) {
-      return { kind: 'inline', quote: text.slice(openPos + 1, i) };
+      const quote = text.slice(openPos + 1, i);
+      // Surrounding paragraph = the block (between blank lines) holding the quote.
+      const bStart0 = text.lastIndexOf('\n\n', openPos);
+      const bStart = bStart0 === -1 ? 0 : bStart0 + 2;
+      let bEnd = text.indexOf('\n\n', index);
+      if (bEnd === -1) bEnd = text.length;
+      return { kind: 'inline', quote, raw: quote, context: text.slice(bStart, bEnd).trim() };
     }
   }
   // attribution: citation sits on a line beginning with "<<", quote is the
@@ -100,13 +106,21 @@ function quoteForCitation(text, index) {
   if (text.slice(lineStart, index).trimStart().startsWith('<<')) {
     const before = text.slice(0, lineStart).split('\n');
     const quoteLines = [];
+    let startLine = -1, endLine = -1;
     for (let l = before.length - 1; l >= 0; l--) {
       const t = before[l].trim();
       if (t === '') { if (quoteLines.length) break; else continue; }
-      if (t.startsWith('>')) quoteLines.unshift(t.replace(/^>\s?/, ''));
+      if (t.startsWith('>')) { quoteLines.unshift(t.replace(/^>\s?/, '')); if (endLine === -1) endLine = l; startLine = l; }
       else break;
     }
-    if (quoteLines.length) return { kind: 'attribution', quote: quoteLines.join(' ') };
+    if (quoteLines.length) {
+      return {
+        kind: 'attribution',
+        quote: quoteLines.join(' '),
+        raw: before.slice(startLine, endLine + 1).join('\n'), // exact source block for a Fix
+        context: quoteLines.join('\n'),
+      };
+    }
   }
   return null;
 }
