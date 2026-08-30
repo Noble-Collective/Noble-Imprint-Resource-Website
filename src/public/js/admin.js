@@ -1777,9 +1777,13 @@
       var fixBlock = '';
       if (f.fix && f.fix.ok) {
         var fid = 'fix:' + (qaFixSeq++);
-        qaFixes[fid] = { type: 'library-fix', file: f.file, ref: f.ref, oldText: f.fix.oldRaw, newText: f.fix.newRaw };
-        fixBlock = '<div class="qa-fix"><div class="qa-fix-preview"><span class="text-muted">Fix will set the quote to:</span> &ldquo;' + esc(f.fix.preview) + '&rdquo;</div>'
-          + '<button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button> <span class="bv-fix-status text-muted"></span></div>';
+        // Store only the pieces the apply needs; the replacement text comes from
+        // the (editable) textarea at click time. kind decides blockquote prefixing.
+        qaFixes[fid] = { file: f.file, ref: f.ref, oldText: f.fix.oldRaw, kind: f.kind };
+        fixBlock = '<div class="qa-fix">'
+          + '<div class="qa-fix-label text-muted">Fix will set the quote to (edit before applying if needed):</div>'
+          + '<textarea class="qa-fix-text" rows="2" spellcheck="false">' + esc(f.fix.preview) + '</textarea>'
+          + '<div class="qa-fix-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button> <span class="bv-fix-status text-muted"></span></div></div>';
       }
       return '<div class="admin-card qa-finding">'
         + '<div class="qa-finding-session">' + sessionHead + '</div>'
@@ -1866,8 +1870,14 @@
       qaOutput.addEventListener('click', function (e) {
         if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
         if (e.target.classList.contains('bv-fix')) {
-          var btn = e.target, change = qaFixes[btn.getAttribute('data-fix-id')];
-          if (!change) return;
+          var btn = e.target, meta = qaFixes[btn.getAttribute('data-fix-id')];
+          if (!meta) return;
+          var fixCard = btn.closest('.qa-fix');
+          var ta = fixCard && fixCard.querySelector('.qa-fix-text');
+          var edited = ta ? ta.value.trim() : '';
+          if (!edited) { return; }
+          var change = { type: 'library-fix', file: meta.file, ref: meta.ref, oldText: meta.oldText,
+            newText: (meta.kind === 'attribution' ? '> ' : '') + edited };
           var actions = btn.parentElement, statusEl = actions.querySelector('.bv-fix-status');
           btn.disabled = true; statusEl.textContent = ' applying…';
           apiCall('POST', '/api/admin/bible-validation/apply-change', { change: change })
