@@ -1464,10 +1464,11 @@
         if (paired) {
           usedOff[best] = true;
           var sameRef = official[best].ref === o.ref;
-          // Footnotes are verse-anchored — only offer Accept when the match is at
-          // the SAME verse (avoids applying a different verse's footnote). Headings
-          // can move, so Accept is offered for any confident heading pair.
-          var canAccept = isHeading || sameRef;
+          // The apply matches OUR footnote by our own ref + text, so it's safe as
+          // long as the PAIRING is confident. Offer Accept for headings, same-verse
+          // pairs, or high word-similarity pairs (e.g. superscription footnotes our
+          // copy and the official put at slightly different verse numbers).
+          var canAccept = isHeading || sameRef || wordSim(o.text, official[best].text) >= 0.6;
           var actions = '', idAttr = '';
           if (canAccept) {
             var type = isHeading ? 'usfm-heading' : 'usfm-footnote';
