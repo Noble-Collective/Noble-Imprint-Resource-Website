@@ -747,6 +747,18 @@ api.post('/bible-validation/run', async (req, res) => {
   }
 });
 
+// Bulk-apply many Bible-copy changes (verses + headings + footnotes) in few commits.
+api.post('/bible-apply-batch', async (req, res) => {
+  try {
+    const changes = (req.body && req.body.changes) || [];
+    if (!Array.isArray(changes) || !changes.length) return res.status(400).json({ error: 'changes required' });
+    res.json(await bibleSync.applyBatch(changes));
+  } catch (err) {
+    console.error('Bible apply-batch error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 api.get('/bible-validation/runs', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);

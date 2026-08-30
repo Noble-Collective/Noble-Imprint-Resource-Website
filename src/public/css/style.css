@@ -5786,3 +5786,8 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .qa-q strong, .qa-para strong { background: #ffd54a; font-weight: 700; }
 .qa-fix { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #eae4d6; }
 .qa-fix-preview { margin-bottom: 6px; }
+
+/* Compare summary groups + bulk refresh */
+.bv-group-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #8a7f66; margin: 12px 0 4px; }
+.bv-math { margin-top: 8px; }
+.bv-refresh { margin: 14px 0; padding: 12px; border: 1px solid #e5e0d5; border-radius: 8px; background: #fffdf5; }

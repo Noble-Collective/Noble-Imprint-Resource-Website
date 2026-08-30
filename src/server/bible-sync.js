@@ -209,6 +209,18 @@ function replaceFootnoteInUsfm(content, ref, oldText, newText) {
   return { content, changed: false };
 }
 
+// Read a file too large for the contents API's 1MB inline limit (references.json
+// is ~4.6MB): content via getFileRaw (raw media type), sha via the git tree.
+async function readBigFile(file) {
+  const raw = await github.getFileRaw(file);
+  const content = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
+  let sha;
+  const tree = await github.getTreeRecursive();
+  const entry = tree.find(t => t.path === file);
+  if (entry) sha = entry.sha;
+  return { content, sha };
+}
+
 // Resolve our on-disk USFM path for a book code (e.g. "1CH" → bibles/bsb/content/131CHBSB.SFM).
 async function resolveOurUsfmPath(translationId, code) {
   const listing = await github.getDirectoryContents(`bibles/${translationId}/content`);
@@ -237,7 +249,7 @@ async function applyChange(change) {
 
 
   if (change.type === 'verse-store') {
-    const { content, sha } = await github.getFileContent(change.file);
+    const { content, sha } = await readBigFile(change.file); // references.json > 1MB
     const { json, changed } = updateReferenceValue(content, change.ref, change.oldText, change.newText);
     if (!changed) throw new Error(`Verse ${change.ref} not found with the expected old text (already updated?)`);
     const res = await github.updateFileContent(change.file, json, sha,
@@ -266,10 +278,53 @@ async function applyChange(change) {
   throw new Error(`Unknown change type: ${change.type}`);
 }
 
+// Apply many Bible-copy changes (verse-store + usfm-heading + usfm-footnote) in
+// as FEW commits as possible: all references.json verse edits in one commit, and
+// all heading/footnote edits per USFM file in one commit each. (Library-quote
+// changes are ignored here — they edit book content, not the Bible copy.)
+async function applyBatch(changes) {
+  let applied = 0, commits = 0, failed = 0;
+
+  // 1. Verse text → references.json (single commit).
+  const verse = changes.filter(c => c.type === 'verse-store');
+  if (verse.length) {
+    const file = verse[0].file || `bibles/${verse[0].translationId || 'bsb'}/references.json`;
+    try {
+      const { content, sha } = await readBigFile(file); // references.json > 1MB
+      let json = content, n = 0;
+      for (const c of verse) { const r = updateReferenceValue(json, c.ref, c.oldText, c.newText); if (r.changed) { json = r.json; n++; } else failed++; }
+      if (n) { await github.updateFileContent(file, json, sha, `Refresh ${n} verse(s) from BSB`); applied += n; commits++; }
+    } catch (e) { failed += verse.length; }
+  }
+
+  // 2. Headings + footnotes → one commit per USFM book.
+  const byBook = {};
+  for (const c of changes) if (c.type === 'usfm-heading' || c.type === 'usfm-footnote') (byBook[c.bookCode] = byBook[c.bookCode] || []).push(c);
+  for (const code of Object.keys(byBook)) {
+    const list = byBook[code];
+    try {
+      const file = await resolveOurUsfmPath(list[0].translationId || 'bsb', code);
+      if (!file) { failed += list.length; continue; }
+      const { content, sha } = await github.getFileContent(file);
+      let text = content, n = 0;
+      for (const c of list) {
+        const r = c.type === 'usfm-heading'
+          ? replaceHeadingInUsfm(text, c.oldText, c.newText)
+          : replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText);
+        if (r.changed) { text = r.content; n++; } else failed++;
+      }
+      if (n) { await github.updateFileContent(file, text, sha, `Refresh ${n} heading/footnote(s) in ${code} from BSB`); applied += n; commits++; }
+    } catch (e) { failed += list.length; }
+  }
+
+  return { applied, commits, failed };
+}
+
 module.exports = {
   findOccurrences,
   replaceNthOccurrence,
   computeChangeAnchor,
+  applyBatch,
   updateReferenceValue,
   changeId,
   replaceHeadingInUsfm,

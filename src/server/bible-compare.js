@@ -71,6 +71,8 @@ async function runStreamingCompare(opts = {}) {
   // 3. Our stored copy — read the 66 USFM files in parallel with live progress
   //    (sequential reads were the ~17s cold-start stall before books appeared).
   emit({ type: 'step', key: 'load-ours', label: 'Loading our stored copy from the content repository', status: 'running' });
+  // references.json is ~4.6MB — larger than the GitHub contents API's 1MB inline
+  // limit — so it must be read via getFileRaw (raw media type), not getFileContent.
   const raw = await github.getFileRaw(`bibles/${translationId}/references.json`);
   const oursStr = typeof raw === 'string' ? raw : Buffer.from(raw).toString('utf-8');
   const oursVerses = v.parseReferences(oursStr);

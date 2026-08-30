@@ -1500,19 +1500,38 @@
       var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + st.missingBooks + st.extraBooks;
       var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0;
 
+      var hdgBooks = st.booksWithHeadingDiffs || 0, ftBooks = st.booksWithFootnoteDiffs || 0;
+      var structBooksDiff = st.booksChecked - st.booksMatched; // books differing in headings and/or footnotes
       var html = '<div class="admin-card">'
         + '<div class="bv-result-head">'
         + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
         + ' <span class="text-muted">source updated ' + esc((r.upstream && r.upstream.lastModified) || 'unknown') + ' · checked in ' + esc(r.durationMs) + ' ms</span></div>'
+        // Verse text — one axis
+        + '<div class="bv-group-label">Verse text &mdash; ' + Number(v.total).toLocaleString() + ' verses</div>'
         + '<div class="bv-tiles">'
-        + tile('Verses identical', Number(v.matched).toLocaleString(), 'ok')
-        + tile('Verses changed', v.changed, v.changed ? 'warn' : 'ok')
+        + tile('Identical', Number(v.matched).toLocaleString(), 'ok')
+        + tile('Changed', v.changed, v.changed ? 'warn' : 'ok')
         + tile('Missing', v.missing, v.missing ? 'err' : 'ok')
         + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
-        + tile('Books identical', st.booksMatched + '/' + st.booksChecked, st.booksMatched === st.booksChecked ? 'ok' : 'warn')
-        + '</div>';
-      if (clean) html += '<p class="text-muted">Our copy matches the current published BSB exactly.</p>';
+        + '</div>'
+        // Structure (headings + footnotes) — a separate axis, measured per book
+        + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings &amp; footnotes)</div>'
+        + '<div class="bv-tiles">'
+        + tile('Books identical', st.booksMatched + '/' + st.booksChecked, structBooksDiff ? 'warn' : 'ok')
+        + tile('Books w/ heading diffs', hdgBooks, hdgBooks ? 'warn' : 'ok')
+        + tile('Books w/ footnote diffs', ftBooks, ftBooks ? 'warn' : 'ok')
+        + '</div>'
+        + '<p class="text-muted bv-math">' + (clean
+          ? 'Our copy matches the current published BSB exactly.'
+          : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote differences are independent — a book counts as “identical” only when its headings and footnotes all match, regardless of verse changes. Details below.')
+        + '</p>';
       html += '</div>';
+
+      if (!clean) {
+        html += '<div class="bv-refresh"><button class="admin-btn admin-btn--primary" id="bv-refresh-all">Refresh all Verses &amp; Footnotes from BSB site</button>'
+          + ' <span class="bv-refresh-status text-muted"></span>'
+          + '<div class="text-muted" style="margin-top:4px;font-size:12px">Applies every verse, heading &amp; footnote update below in one pass, then re-checks. (Library quotations are left for individual review.)</div></div>';
+      }
 
       if ((ch.verseChanges || []).length) {
         html += '<h4>Changed verses (' + ch.verseChanges.length + ')</h4>'
@@ -1611,9 +1630,23 @@
         }, 100);
       });
 
-      // "See context" → chapter popup.
+      // "See context" popup + bulk "Refresh all".
       compareOut.addEventListener('click', function (e) {
-        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); }
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
+        if (e.target.id === 'bv-refresh-all') {
+          var applicable = Object.keys(changesById).map(function (k) { return changesById[k]; })
+            .filter(function (c) { return c.type === 'verse-store' || c.type === 'usfm-heading' || c.type === 'usfm-footnote'; });
+          if (!applicable.length) return;
+          if (!window.confirm('Apply ' + applicable.length + ' update(s) to our Bible copy (verses, headings, footnotes) to match the BSB site? This commits to the content repository.')) return;
+          var btn = e.target, status = btn.parentElement.querySelector('.bv-refresh-status');
+          btn.disabled = true; status.textContent = ' applying…';
+          apiCall('POST', '/api/admin/bible-apply-batch', { changes: applicable })
+            .then(function (r) {
+              status.textContent = ' applied ' + r.applied + ' change(s) in ' + r.commits + ' commit(s) — re-checking…';
+              setTimeout(function () { document.getElementById('bv-compare-btn').click(); }, 1800);
+            })
+            .catch(function (err) { btn.disabled = false; status.innerHTML = ' <span class="admin-error">' + esc(err.message) + '</span>'; });
+        }
       });
 
       // Accept / Reject a single change.
