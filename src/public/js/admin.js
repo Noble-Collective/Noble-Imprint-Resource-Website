@@ -1549,7 +1549,7 @@
       };
 
       compareBtn.addEventListener('click', function () {
-        var translationId = document.getElementById('bv-translation-select').value;
+        var translationId = 'bsb';
         var origLabel = compareBtn.textContent;
         compareBtn.disabled = true;
         compareBtn.textContent = 'Comparing…';
@@ -1792,7 +1792,7 @@
     var qaChecklist, qaResults;
     if (qaBtn) {
       qaBtn.addEventListener('click', function () {
-        var translationId = document.getElementById('bv-translation-select').value;
+        var translationId = 'bsb';
         var orig = qaBtn.textContent;
         qaBtn.disabled = true; qaBtn.textContent = 'Auditing…';
         qaOutput.innerHTML = '<div id="qa-checklist"></div><div id="qa-results"></div>';
