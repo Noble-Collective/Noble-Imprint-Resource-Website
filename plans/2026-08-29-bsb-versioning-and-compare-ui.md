@@ -1,7 +1,7 @@
 # BSB Versioning + Consolidated Compare UI
 
 **Date:** 2026-08-29
-**Status:** In progress (building on `main`)
+**Status:** DEPLOYED (latest commit `165c416`). Compare-to-BSB (streaming checklist, verse+structure summary tiles, per-change Accept/Reject, batch "Refresh all Verses & Footnotes"), Quotation Audit (streaming per-book cards; enriched findings with paragraph context + highlighted diff + full BSB verse + editable-textarea Fix-quote), and Version & History all shipped. admin.js?v=16, style.css?v=99. Content-repo WRITE path (Accept/Refresh/Fix for real) deliberately left for a human to exercise. See CLAUDE.md "BSB Text Validation (admin)" + memory `project_bsb_validation` for the current architecture.
 
 ## Goal (from Steve, plain terms)
 - **Label our copy** with today's date — record which BSB we're pinned to; we intentionally stay behind and evaluate changes ourselves.
