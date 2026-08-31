@@ -5792,6 +5792,17 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .bv-math { margin-top: 8px; }
 .bv-refresh { margin: 14px 0; padding: 12px; border: 1px solid #e5e0d5; border-radius: 8px; background: #fffdf5; }
 
+/* Compare results — one collapsible section per difference type */
+.bv-section { margin-top: 12px; border: 1px solid #e5ddc9; border-radius: 8px; background: #fff; }
+.bv-section > summary { cursor: pointer; padding: 10px 12px; font-size: 15px; user-select: none; list-style: none; }
+.bv-section > summary::-webkit-details-marker { display: none; }
+.bv-section > summary::before { content: "\25B8"; display: inline-block; width: 1em; color: #b8ab88; transition: transform .12s ease; }
+.bv-section[open] > summary::before { transform: rotate(90deg); }
+.bv-section[open] > summary { border-bottom: 1px solid #efe9d8; }
+.bv-section > *:not(summary) { margin-left: 12px; margin-right: 12px; }
+.bv-section > .bv-refresh:first-of-type { margin-top: 12px; }
+.bv-count { color: #8a7d5a; font-weight: 400; font-size: 13px; margin-left: 4px; }
+
 /* Quotation Audit — editable fix box */
 .qa-fix-label { font-size: 12px; margin-bottom: 4px; }
 .qa-fix-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.5;

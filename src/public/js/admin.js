@@ -1494,7 +1494,32 @@
         rows.push('<div class="bv-struct-item"><div class="bv-change-loc">' + loc(f.ref) + '</div>'
           + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + esc(f.text) + '</div></div>');
       });
-      return '<div class="bv-struct-kind">' + esc(label) + 's</div>' + rows.join('');
+      return rows.join('');
+    }
+
+    // Count accepted (applyable) changes of a given type currently in the registry.
+    function countByType(t) {
+      return Object.keys(changesById).filter(function (k) { return changesById[k].type === t; }).length;
+    }
+    // A per-type refresh button — enabled only when there are applyable changes.
+    function refreshBtn(refreshType, refreshLabel) {
+      var n = countByType(refreshType);
+      return '<div class="bv-refresh"><button class="admin-btn admin-btn--primary admin-btn--sm bv-refresh-type" data-refresh-type="' + esc(refreshType) + '"' + (n ? '' : ' disabled') + '>' + esc(refreshLabel) + '</button> <span class="bv-refresh-status text-muted"></span></div>';
+    }
+    // A collapsible results section: title + count + its own refresh button + body.
+    function bvSection(title, countLabel, open, refreshType, refreshLabel, bodyHtml) {
+      return '<details class="bv-section"' + (open ? ' open' : '') + '><summary><strong>' + esc(title) + '</strong> <span class="bv-count">' + esc(countLabel) + '</span></summary>'
+        + refreshBtn(refreshType, refreshLabel) + bodyHtml + '</details>';
+    }
+    // One structure section (heading | footnote | cross-reference), grouped by book.
+    function structSection(r, label, field, refreshType, refreshLabel, bookCount) {
+      var sBooks = (r.structure.books || []).filter(function (b) { var f = b[field] || {}; return (f.onlyInOurs && f.onlyInOurs.length) || (f.onlyInOfficial && f.onlyInOfficial.length); });
+      var body = sBooks.map(function (b) {
+        var bn = b.bookName || b.book, f = b[field] || { onlyInOurs: [], onlyInOfficial: [] };
+        return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
+          + structRows(bn, b.code, r.translationId, label, f.onlyInOurs, f.onlyInOfficial) + '</div>';
+      }).join('') || '<p class="text-muted">No differences.</p>';
+      return bvSection(label + ' differences', bookCount + ' book' + (bookCount === 1 ? '' : 's'), bookCount > 0, refreshType, refreshLabel, body);
     }
 
     function renderCompareResult(r) {
@@ -1529,39 +1554,29 @@
         + '</div>'
         + '<p class="text-muted bv-math">' + (clean
           ? 'Our copy matches the current published BSB exactly.'
-          : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote differences are independent — a book counts as “identical” only when its headings and footnotes all match, regardless of verse changes. Details below.')
+          : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
         + '</p>';
       html += '</div>';
 
       if (!clean) {
-        html += '<div class="bv-refresh"><button class="admin-btn admin-btn--primary" id="bv-refresh-all">Refresh all Verses &amp; Footnotes from BSB site</button>'
-          + ' <span class="bv-refresh-status text-muted"></span>'
-          + '<div class="text-muted" style="margin-top:4px;font-size:12px">Applies every verse, heading &amp; footnote update below in one pass, then re-checks. (Library quotations are left for individual review.)</div></div>';
-      }
+        // Each difference type is its own collapsible section with its own refresh button.
+        var vChanges = ch.verseChanges || [];
+        var vBody = vChanges.length
+          ? '<p class="text-muted">Accept to update our copy to the current BSB (one commit each). Reject to keep ours.</p>' + vChanges.map(changeCard).join('')
+          : '<p class="text-muted">No verse-text differences.</p>';
+        html += bvSection('Verse text differences', String(v.changed || 0), v.changed > 0, 'verse-store', 'Refresh all verses', vBody);
 
-      if ((ch.verseChanges || []).length) {
-        html += '<h4>Changed verses (' + ch.verseChanges.length + ')</h4>'
-          + '<p class="text-muted">Accept to update our copy to the current BSB (one commit each). Reject to keep ours.</p>'
-          + ch.verseChanges.map(changeCard).join('');
-      }
-      if ((ch.libraryChanges || []).length) {
-        html += '<h4>Affected library quotations (' + ch.libraryChanges.length + ')</h4>'
-          + '<p class="text-muted">Places in our books that quote the old wording.</p>'
-          + ch.libraryChanges.map(changeCard).join('');
-      }
-      var sBooks = r.structure.books || [];
-      if (sBooks.length) {
-        html += '<details style="margin-top:14px"><summary><strong>Heading, footnote &amp; cross-reference differences</strong> (' + sBooks.length + ' books)</summary>'
-          + '<p class="text-muted">Section headings, footnotes, and parallel-passage cross-references (\\r) that differ between our copy and the BSB site.</p>'
-          + sBooks.map(function (b) {
-            var bn = b.bookName || b.book;
-            var cr = b.crossRefs || { onlyInOurs: [], onlyInOfficial: [] };
-            return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
-              + structRows(bn, b.code, r.translationId, 'Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
-              + structRows(bn, b.code, r.translationId, 'Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
-              + structRows(bn, b.code, r.translationId, 'Cross-reference', cr.onlyInOurs, cr.onlyInOfficial)
-              + '</div>';
-          }).join('') + '</details>';
+        html += structSection(r, 'Heading', 'headings', 'usfm-heading', 'Refresh all headings', hdgBooks);
+        html += structSection(r, 'Footnote', 'footnotes', 'usfm-footnote', 'Refresh all footnotes', ftBooks);
+        html += structSection(r, 'Cross-reference', 'crossRefs', 'usfm-crossref', 'Refresh all cross-references', crBooks);
+
+        // Library quotations are reviewed individually (no batch refresh).
+        var libChanges = ch.libraryChanges || [];
+        if (libChanges.length) {
+          html += '<details class="bv-section"><summary><strong>Affected library quotations</strong> <span class="bv-count">' + libChanges.length + '</span></summary>'
+            + '<p class="text-muted">Places in our books that quote the old wording — reviewed individually.</p>'
+            + libChanges.map(changeCard).join('') + '</details>';
+        }
       }
       compareOut.innerHTML = html;
     }
@@ -1638,15 +1653,18 @@
         }, 100);
       });
 
-      // "See context" popup + bulk "Refresh all".
+      // "See context" popup + per-type "Refresh all …" buttons.
       compareOut.addEventListener('click', function (e) {
         if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
-        if (e.target.id === 'bv-refresh-all') {
+        if (e.target.classList.contains('bv-refresh-type')) {
+          var btn = e.target, rtype = btn.getAttribute('data-refresh-type');
+          var nouns = { 'verse-store': 'verse', 'usfm-heading': 'heading', 'usfm-footnote': 'footnote', 'usfm-crossref': 'cross-reference' };
+          var noun = nouns[rtype] || 'change';
           var applicable = Object.keys(changesById).map(function (k) { return changesById[k]; })
-            .filter(function (c) { return c.type === 'verse-store' || c.type === 'usfm-heading' || c.type === 'usfm-footnote' || c.type === 'usfm-crossref'; });
+            .filter(function (c) { return c.type === rtype; });
           if (!applicable.length) return;
-          if (!window.confirm('Apply ' + applicable.length + ' update(s) to our Bible copy (verses, headings, footnotes) to match the BSB site? This commits to the content repository.')) return;
-          var btn = e.target, status = btn.parentElement.querySelector('.bv-refresh-status');
+          if (!window.confirm('Apply ' + applicable.length + ' ' + noun + ' update(s) to our Bible copy to match the BSB site? This commits to the content repository.')) return;
+          var status = btn.parentElement.querySelector('.bv-refresh-status');
           btn.disabled = true; status.textContent = ' applying…';
           apiCall('POST', '/api/admin/bible-apply-batch', { changes: applicable })
             .then(function (r) {
