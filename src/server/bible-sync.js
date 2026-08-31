@@ -209,6 +209,22 @@ function replaceFootnoteInUsfm(content, ref, oldText, newText) {
   return { content, changed: false };
 }
 
+// Replace a \r parallel-passage cross-reference line, matching by normalized
+// display text (our copy stores these as plain text, no \ref markup). We write the
+// official RAW display form (real dashes/parens preserved), keeping our plain-text
+// style. Matches the first \r line whose reduced+normalized text equals oldText.
+function replaceCrossRefInUsfm(content, ref, oldText, newText) {
+  const lines = String(content).split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*\\r\s+)(.+?)(\r?)$/);
+    if (m && v.normalizeVerse(v.crossRefRaw(m[2])) === oldText) {
+      lines[i] = m[1] + newText + m[3];
+      return { content: lines.join('\n'), changed: true };
+    }
+  }
+  return { content, changed: false };
+}
+
 // Read a file too large for the contents API's 1MB inline limit (references.json
 // is ~4.6MB): content via getFileRaw (raw media type), sha via the git tree.
 async function readBigFile(file) {
@@ -231,16 +247,17 @@ async function resolveOurUsfmPath(translationId, code) {
 // ── Apply a single accepted change (GitHub write) ──────────────────────────────
 
 async function applyChange(change) {
-  if (change.type === 'usfm-heading' || change.type === 'usfm-footnote') {
-    const isHeading = change.type === 'usfm-heading';
-    const kind = isHeading ? 'heading' : 'footnote';
+  if (change.type === 'usfm-heading' || change.type === 'usfm-footnote' || change.type === 'usfm-crossref') {
+    const kind = change.type === 'usfm-heading' ? 'heading' : change.type === 'usfm-footnote' ? 'footnote' : 'cross-reference';
     const translationId = change.translationId || 'bsb';
     const file = await resolveOurUsfmPath(translationId, change.bookCode);
     if (!file) throw new Error(`No USFM file found for ${change.bookCode}`);
     const { content, sha } = await github.getFileContent(file);
-    const { content: updated, changed } = isHeading
+    const { content: updated, changed } = change.type === 'usfm-heading'
       ? replaceHeadingInUsfm(content, change.oldText, change.newText)
-      : replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText);
+      : change.type === 'usfm-footnote'
+        ? replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText)
+        : replaceCrossRefInUsfm(content, change.ref, change.oldText, change.newText);
     if (!changed) throw new Error(`${kind} "${change.oldText}" not found in ${file} (already updated?)`);
     const res = await github.updateFileContent(file, updated, sha,
       `Update ${change.bookCode} ${kind} at ${change.ref} to match latest BSB`);
@@ -297,9 +314,9 @@ async function applyBatch(changes) {
     } catch (e) { failed += verse.length; }
   }
 
-  // 2. Headings + footnotes → one commit per USFM book.
+  // 2. Headings + footnotes + cross-references → one commit per USFM book.
   const byBook = {};
-  for (const c of changes) if (c.type === 'usfm-heading' || c.type === 'usfm-footnote') (byBook[c.bookCode] = byBook[c.bookCode] || []).push(c);
+  for (const c of changes) if (c.type === 'usfm-heading' || c.type === 'usfm-footnote' || c.type === 'usfm-crossref') (byBook[c.bookCode] = byBook[c.bookCode] || []).push(c);
   for (const code of Object.keys(byBook)) {
     const list = byBook[code];
     try {
@@ -310,10 +327,12 @@ async function applyBatch(changes) {
       for (const c of list) {
         const r = c.type === 'usfm-heading'
           ? replaceHeadingInUsfm(text, c.oldText, c.newText)
-          : replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText);
+          : c.type === 'usfm-footnote'
+            ? replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText)
+            : replaceCrossRefInUsfm(text, c.ref, c.oldText, c.newText);
         if (r.changed) { text = r.content; n++; } else failed++;
       }
-      if (n) { await github.updateFileContent(file, text, sha, `Refresh ${n} heading/footnote(s) in ${code} from BSB`); applied += n; commits++; }
+      if (n) { await github.updateFileContent(file, text, sha, `Refresh ${n} heading/footnote/cross-reference(s) in ${code} from BSB`); applied += n; commits++; }
     } catch (e) { failed += list.length; }
   }
 
@@ -329,6 +348,7 @@ module.exports = {
   changeId,
   replaceHeadingInUsfm,
   replaceFootnoteInUsfm,
+  replaceCrossRefInUsfm,
   listLibraryMarkdown,
   detectSyncChanges,
   buildChangesFromDrift,

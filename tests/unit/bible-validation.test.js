@@ -211,6 +211,43 @@ test('extractHeadings exposes a raw display form that preserves punctuation', ()
   assert.strictEqual(h[0].raw, 'A “Quoted” Heading—Yes');
 });
 
+// ── extractCrossRefs (\r parallel-passage lines) ──────────────────────────────
+test('extractCrossRefs reduces official \\ref markup to display text, keeping raw punctuation', () => {
+  const off = '\\c 3\n\\s1 H\n\\r (\\ref Psalm 38:1–22|PSA 38:1-22\\ref*)\n\\v 1 x';
+  assert.deepStrictEqual(v.extractCrossRefs(off), [{ text: '(Psalm 38:1-22)', raw: '(Psalm 38:1–22)', ref: '3:1' }]);
+});
+
+test('extractCrossRefs reads our plain-text \\r line with its section-start ref', () => {
+  const ours = '\\c 3\n\\s1 H\n\\r (Psalms 38:1–22)\n\\v 1 x';
+  assert.deepStrictEqual(v.extractCrossRefs(ours), [{ text: '(Psalms 38:1-22)', raw: '(Psalms 38:1–22)', ref: '3:1' }]);
+});
+
+test('extractCrossRefs treats cosmetic space just inside parens as identical (no false diff)', () => {
+  // The official BSB is inconsistent: one \r line reads "( \ref ..." with a stray space.
+  const spaced = '\\c 4\n\\s1 H\n\\r ( \\ref Matthew 11:7–19|MAT 11:7-19\\ref*)\n\\v 1 x';
+  const tight = '\\c 4\n\\s1 H\n\\r (Matthew 11:7–19)\n\\v 1 x';
+  assert.strictEqual(v.extractCrossRefs(spaced)[0].raw, '(Matthew 11:7–19)');
+  assert.strictEqual(v.extractCrossRefs(spaced)[0].text, v.extractCrossRefs(tight)[0].text);
+});
+
+test('diffStructure compares \\r cross-references (Psalms vs Psalm) by default', () => {
+  const ours = new Map([['19PSABSB.SFM', '\\c 3\n\\s1 H\n\\r (Psalms 38:1–22)\n\\v 1 x']]);
+  const off = new Map([['bsb_usfm/PSA.usfm', '\\c 3\n\\s1 H\n\\r (\\ref Psalm 38:1–22|PSA 38:1-22\\ref*)\n\\v 1 x']]);
+  const r = v.diffStructure(ours, off);
+  assert.strictEqual(r.totals.booksWithCrossRefDiffs, 1);
+  assert.strictEqual(r.totals.booksMatched, 0);            // the \r diff makes the book non-identical
+  const b = r.books[0];
+  assert.strictEqual(b.crossRefs.onlyInOurs[0].text, '(Psalms 38:1-22)');
+  assert.strictEqual(b.crossRefs.onlyInOfficial[0].raw, '(Psalm 38:1–22)');
+});
+
+test('diffStructure with crossRefs disabled ignores \\r differences', () => {
+  const ours = new Map([['19PSABSB.SFM', '\\c 3\n\\s1 H\n\\r (Psalms 38:1–22)\n\\v 1 x']]);
+  const off = new Map([['bsb_usfm/PSA.usfm', '\\c 3\n\\s1 H\n\\r (\\ref Psalm 38:1–22|PSA 38:1-22\\ref*)\n\\v 1 x']]);
+  const r = v.diffStructure(ours, off, { crossRefs: false });
+  assert.strictEqual(r.totals.booksMatched, 1);
+});
+
 // ── diffStructure ─────────────────────────────────────────────────────────────
 test('diffStructure compares headings + footnotes across naming styles', () => {
   const ours = new Map([

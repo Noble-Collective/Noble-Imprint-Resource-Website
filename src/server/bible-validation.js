@@ -326,6 +326,41 @@ function footnoteText(span) {
   return normalizeVerse(footnoteRaw(span)).replace(/\s+([.,;:!?])/g, '$1');
 }
 
+// Parallel-passage cross-references (\r lines, e.g. "(Psalm 38:1–22)") as
+// { text, raw, ref } where ref is the section-start verse the \r introduces (the
+// verse that follows, same as headings). The official USFM wraps each reference in
+// \ref display|target\ref*; we reduce to the display text. `raw` keeps the
+// publisher's punctuation (dashes/parens); `text` is normalized only for matching.
+function extractCrossRefs(usfm) {
+  const out = [];
+  let ch = 0, pending = [];
+  for (const line of String(usfm).split(/\r?\n/)) {
+    const cm = line.match(/^\s*\\c\s+(\d+)/);
+    if (cm) { ch = parseInt(cm[1], 10); continue; }
+    const rm = line.match(/^\s*\\r\s+(.+)$/);
+    if (rm) { const raw = crossRefRaw(rm[1]); pending.push({ text: normalizeVerse(raw), raw }); continue; }
+    const vm = line.match(/^\s*\\v\s+(\d+)/);
+    if (vm && pending.length) {
+      const ref = ch + ':' + vm[1];
+      for (const t of pending) out.push({ text: t.text, raw: t.raw, ref });
+      pending = [];
+    }
+  }
+  for (const t of pending) out.push({ text: t.text, raw: t.raw, ref: ch ? ch + ':1' : '?' });
+  return out;
+}
+
+// Display form of a \r line: \ref display|target\ref* reduced to its display text,
+// any stray markers dropped, whitespace collapsed — Unicode punctuation preserved.
+function crossRefRaw(s) {
+  return String(s)
+    .replace(/\\ref\s+([^|\\]*)\|[^\\]*\\ref\*/g, '$1')  // \ref Psalm 38:1–22|PSA 38:1-22\ref* → "Psalm 38:1–22"
+    .replace(/\\\+?[a-z]+\d*\*?/g, ' ')                  // any other stray USFM markers
+    .replace(/\s+/g, ' ')
+    .replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')       // drop cosmetic space just inside parens ("( Matthew" → "(Matthew")
+    .trim();
+}
+
 // Strip inline character markers (\add \wj \nd \it …, opening and closing) from
 // a heading/text fragment, leaving the plain words.
 function stripInlineMarkers(s) {
@@ -364,6 +399,7 @@ function multisetDiffBy(a, b, keyFn) {
 // opts.footnotes (default true) toggles the footnote comparison.
 function diffStructure(oursFiles, officialFiles, opts = {}) {
   const compareFootnotes = opts.footnotes !== false;
+  const compareCrossRefs = opts.crossRefs !== false;
   const ours = new Map();
   for (const [name, c] of oursFiles) ours.set(bookCode(name), { name, content: c });
   const official = new Map();
@@ -372,10 +408,11 @@ function diffStructure(oursFiles, officialFiles, opts = {}) {
   const books = [];
   const missingBooks = [];
   const extraBooks = [];
-  let booksWithHeadingDiffs = 0, booksWithFootnoteDiffs = 0;
+  let booksWithHeadingDiffs = 0, booksWithFootnoteDiffs = 0, booksWithCrossRefDiffs = 0;
   let headingOnlyOurs = 0, headingOnlyOfficial = 0;
   let footnoteOnlyOurs = 0, footnoteOnlyOfficial = 0;
-  let headingsOurs = 0, headingsOfficial = 0, footnotesOurs = 0, footnotesOfficial = 0;
+  let crossRefOnlyOurs = 0, crossRefOnlyOfficial = 0;
+  let headingsOurs = 0, headingsOfficial = 0, footnotesOurs = 0, footnotesOfficial = 0, crossRefsOurs = 0, crossRefsOfficial = 0;
 
   for (const [key, off] of official) {
     if (!ours.has(key)) { missingBooks.push(off.name); continue; }
@@ -392,15 +429,25 @@ function diffStructure(oursFiles, officialFiles, opts = {}) {
       fd = multisetDiffBy(ofn, ffn, x => x.text);
     }
 
+    let cd = { onlyA: [], onlyB: [] };
+    if (compareCrossRefs) {
+      const ocr = extractCrossRefs(oc), fcr = extractCrossRefs(off.content);
+      crossRefsOurs += ocr.length; crossRefsOfficial += fcr.length;
+      cd = multisetDiffBy(ocr, fcr, x => x.text);
+    }
+
     const hasHeadingDiff = hd.onlyA.length || hd.onlyB.length;
     const hasFootnoteDiff = fd.onlyA.length || fd.onlyB.length;
+    const hasCrossRefDiff = cd.onlyA.length || cd.onlyB.length;
     if (hasHeadingDiff) { booksWithHeadingDiffs++; headingOnlyOurs += hd.onlyA.length; headingOnlyOfficial += hd.onlyB.length; }
     if (hasFootnoteDiff) { booksWithFootnoteDiffs++; footnoteOnlyOurs += fd.onlyA.length; footnoteOnlyOfficial += fd.onlyB.length; }
-    if (hasHeadingDiff || hasFootnoteDiff) {
+    if (hasCrossRefDiff) { booksWithCrossRefDiffs++; crossRefOnlyOurs += cd.onlyA.length; crossRefOnlyOfficial += cd.onlyB.length; }
+    if (hasHeadingDiff || hasFootnoteDiff || hasCrossRefDiff) {
       books.push({
         book: off.name,
         headings: { onlyInOurs: hd.onlyA, onlyInOfficial: hd.onlyB },
         footnotes: { onlyInOurs: fd.onlyA, onlyInOfficial: fd.onlyB },
+        crossRefs: { onlyInOurs: cd.onlyA, onlyInOfficial: cd.onlyB },
       });
     }
   }
@@ -414,8 +461,10 @@ function diffStructure(oursFiles, officialFiles, opts = {}) {
       booksMatched: official.size - books.length - missingBooks.length,
       booksWithHeadingDiffs,
       booksWithFootnoteDiffs,
+      booksWithCrossRefDiffs,
       headings: { ours: headingsOurs, official: headingsOfficial, onlyOurs: headingOnlyOurs, onlyOfficial: headingOnlyOfficial },
       footnotes: { ours: footnotesOurs, official: footnotesOfficial, onlyOurs: footnoteOnlyOurs, onlyOfficial: footnoteOnlyOfficial },
+      crossRefs: { ours: crossRefsOurs, official: crossRefsOfficial, onlyOurs: crossRefOnlyOurs, onlyOfficial: crossRefOnlyOfficial },
       missingBooks: missingBooks.length,
       extraBooks: extraBooks.length,
     },
@@ -472,9 +521,11 @@ module.exports = {
   bookCode,
   extractHeadings,
   extractFootnotes,
+  extractCrossRefs,
   footnoteText,
   footnoteRaw,
   headingRaw,
+  crossRefRaw,
   stripInlineMarkers,
   multisetDiff,
   multisetDiffBy,

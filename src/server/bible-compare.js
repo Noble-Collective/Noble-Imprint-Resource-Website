@@ -108,9 +108,9 @@ async function runStreamingCompare(opts = {}) {
   emit({ type: 'step', key: 'compare', status: 'done', detail: `${matched.toLocaleString()} verses identical · ${drifted.length} changed · ${missing} missing · ${extra} extra` });
 
   // 5. Structure (headings + footnotes)
-  emit({ type: 'step', key: 'structure', label: 'Checking section headings and footnotes', status: 'running' });
-  const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true });
-  emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote differences` });
+  emit({ type: 'step', key: 'structure', label: 'Checking section headings, footnotes, and cross-references', status: 'running' });
+  const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true, crossRefs: true });
+  emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote, ${structure.totals.booksWithCrossRefDiffs} cross-reference differences` });
 
   // 6. Library scan for quotations of changed verses (parallel + live progress)
   emit({ type: 'step', key: 'library', label: 'Scanning the library for quotations of changed verses', status: 'running' });
@@ -127,7 +127,7 @@ async function runStreamingCompare(opts = {}) {
     verse: { total: officialVerses.size, matched, cosmetic, changed: drifted.length, missing, extra },
     structure: {
       totals: structure.totals,
-      books: structure.books.slice(0, 40).map(b => {
+      books: structure.books.slice(0, 66).map(b => {
         const code = v.bookCode(b.book);
         return { ...b, code, bookName: USFM_BOOK_NAMES[code] || code };
       }),

@@ -137,3 +137,17 @@ test('replaceFootnoteInUsfm returns changed=false when no footnote matches', () 
   const r = s.replaceFootnoteInUsfm('\\c 1\n\\v 1 x\\f + \\fr 1:1 \\ft Note\\f*', '1:1', 'Different note', 'x');
   assert.strictEqual(r.changed, false);
 });
+
+// ── replaceCrossRefInUsfm (Accept for \r cross-reference diffs) ─────────────────
+test('replaceCrossRefInUsfm swaps a \\r parallel-passage ref, matching normalized text', () => {
+  const usfm = '\\c 3\n\\s1 H\n\\r (Psalms 38:1–22)\n\\v 1 x';
+  const r = s.replaceCrossRefInUsfm(usfm, '3:1', '(Psalms 38:1-22)', '(Psalm 38:1–22)');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('\\r (Psalm 38:1–22)'));
+  assert.ok(r.content.includes('\\v 1 x')); // surrounding lines intact
+});
+
+test('replaceCrossRefInUsfm returns changed=false when no \\r line matches', () => {
+  const r = s.replaceCrossRefInUsfm('\\c 1\n\\r (Acts 2:1-4)\n\\v 1 x', '1:1', '(Nope 1:1)', 'x');
+  assert.strictEqual(r.changed, false);
+});

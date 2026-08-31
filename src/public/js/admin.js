@@ -1449,6 +1449,8 @@
       ours = (ours || []).slice(); official = (official || []).slice();
       if (!ours.length && !official.length) return '';
       var isHeading = label === 'Heading';
+      var isCrossRef = label === 'Cross-reference';
+      var changeType = isHeading ? 'usfm-heading' : isCrossRef ? 'usfm-crossref' : 'usfm-footnote';
       var loc = function (ref) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref); };
       var rows = [], usedOff = {};
 
@@ -1468,10 +1470,10 @@
           // long as the PAIRING is confident. Offer Accept for headings, same-verse
           // pairs, or high word-similarity pairs (e.g. superscription footnotes our
           // copy and the official put at slightly different verse numbers).
-          var canAccept = isHeading || sameRef || wordSim(o.text, official[best].text) >= 0.6;
+          var canAccept = isHeading || isCrossRef || sameRef || wordSim(o.text, official[best].text) >= 0.6;
           var actions = '', idAttr = '';
           if (canAccept) {
-            var type = isHeading ? 'usfm-heading' : 'usfm-footnote';
+            var type = changeType;
             var id = type + ':' + bookCode + ':' + o.ref + ':' + (structSeq++);
             // newText = the official RAW form (real dashes/quotes preserved); oldText
             // stays normalized so the apply's ref+normalized match still finds our span.
@@ -1500,11 +1502,11 @@
       var ch = r.changes || { verseChanges: [], libraryChanges: [], citationReview: [] };
       (ch.verseChanges || []).concat(ch.libraryChanges || []).forEach(function (c) { changesById[c.id] = c; });
       var v = r.verse, st = r.structure.totals;
-      var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + st.missingBooks + st.extraBooks;
+      var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + (st.booksWithCrossRefDiffs || 0) + st.missingBooks + st.extraBooks;
       var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0;
 
-      var hdgBooks = st.booksWithHeadingDiffs || 0, ftBooks = st.booksWithFootnoteDiffs || 0;
-      var structBooksDiff = st.booksChecked - st.booksMatched; // books differing in headings and/or footnotes
+      var hdgBooks = st.booksWithHeadingDiffs || 0, ftBooks = st.booksWithFootnoteDiffs || 0, crBooks = st.booksWithCrossRefDiffs || 0;
+      var structBooksDiff = st.booksChecked - st.booksMatched; // books differing in headings, footnotes and/or cross-references
       var html = '<div class="admin-card">'
         + '<div class="bv-result-head">'
         + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
@@ -1518,11 +1520,12 @@
         + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
         + '</div>'
         // Structure (headings + footnotes) — a separate axis, measured per book
-        + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings &amp; footnotes)</div>'
+        + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings, footnotes &amp; cross-references)</div>'
         + '<div class="bv-tiles">'
         + tile('Books identical', st.booksMatched + '/' + st.booksChecked, structBooksDiff ? 'warn' : 'ok')
         + tile('Books w/ heading diffs', hdgBooks, hdgBooks ? 'warn' : 'ok')
         + tile('Books w/ footnote diffs', ftBooks, ftBooks ? 'warn' : 'ok')
+        + tile('Books w/ cross-ref diffs', crBooks, crBooks ? 'warn' : 'ok')
         + '</div>'
         + '<p class="text-muted bv-math">' + (clean
           ? 'Our copy matches the current published BSB exactly.'
@@ -1548,13 +1551,15 @@
       }
       var sBooks = r.structure.books || [];
       if (sBooks.length) {
-        html += '<details style="margin-top:14px"><summary><strong>Heading &amp; footnote differences</strong> (' + sBooks.length + ' books)</summary>'
-          + '<p class="text-muted">Section headings and footnotes that differ between our copy and the BSB site.</p>'
+        html += '<details style="margin-top:14px"><summary><strong>Heading, footnote &amp; cross-reference differences</strong> (' + sBooks.length + ' books)</summary>'
+          + '<p class="text-muted">Section headings, footnotes, and parallel-passage cross-references (\\r) that differ between our copy and the BSB site.</p>'
           + sBooks.map(function (b) {
             var bn = b.bookName || b.book;
+            var cr = b.crossRefs || { onlyInOurs: [], onlyInOfficial: [] };
             return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
               + structRows(bn, b.code, r.translationId, 'Heading', b.headings.onlyInOurs, b.headings.onlyInOfficial)
               + structRows(bn, b.code, r.translationId, 'Footnote', b.footnotes.onlyInOurs, b.footnotes.onlyInOfficial)
+              + structRows(bn, b.code, r.translationId, 'Cross-reference', cr.onlyInOurs, cr.onlyInOfficial)
               + '</div>';
           }).join('') + '</details>';
       }
@@ -1638,7 +1643,7 @@
         if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
         if (e.target.id === 'bv-refresh-all') {
           var applicable = Object.keys(changesById).map(function (k) { return changesById[k]; })
-            .filter(function (c) { return c.type === 'verse-store' || c.type === 'usfm-heading' || c.type === 'usfm-footnote'; });
+            .filter(function (c) { return c.type === 'verse-store' || c.type === 'usfm-heading' || c.type === 'usfm-footnote' || c.type === 'usfm-crossref'; });
           if (!applicable.length) return;
           if (!window.confirm('Apply ' + applicable.length + ' update(s) to our Bible copy (verses, headings, footnotes) to match the BSB site? This commits to the content repository.')) return;
           var btn = e.target, status = btn.parentElement.querySelector('.bv-refresh-status');
