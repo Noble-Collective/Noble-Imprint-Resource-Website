@@ -264,16 +264,24 @@ function extractHeadings(usfm) {
     const cm = line.match(/^\s*\\c\s+(\d+)/);
     if (cm) { ch = parseInt(cm[1], 10); continue; }
     const hm = line.match(/^\s*\\s[1-4]?\s+(.+)$/);
-    if (hm) { pending.push(normalizeVerse(stripInlineMarkers(hm[1]))); continue; }
+    // `raw` keeps the publisher's real typography (dashes/quotes) for writing back;
+    // `text` is normalized only for order-insensitive matching.
+    if (hm) { const raw = headingRaw(hm[1]); pending.push({ text: normalizeVerse(raw), raw }); continue; }
     const vm = line.match(/^\s*\\v\s+(\d+)/);
     if (vm && pending.length) {
       const ref = ch + ':' + vm[1];
-      for (const t of pending) out.push({ text: t, ref });
+      for (const t of pending) out.push({ text: t.text, raw: t.raw, ref });
       pending = [];
     }
   }
-  for (const t of pending) out.push({ text: t, ref: ch ? ch + ':?' : '?' });
+  for (const t of pending) out.push({ text: t.text, raw: t.raw, ref: ch ? ch + ':?' : '?' });
   return out;
+}
+
+// Heading display form: inline markers stripped, whitespace collapsed, but
+// Unicode punctuation (dashes, curly quotes) preserved — the value written on Accept.
+function headingRaw(s) {
+  return stripInlineMarkers(s).replace(/\s+/g, ' ').trim();
 }
 
 // Footnotes as { text, ref } where ref is the "chapter:verse" the footnote sits
@@ -292,22 +300,30 @@ function extractFootnotes(usfm) {
     if (m[1] !== undefined) { ch = parseInt(m[1], 10); continue; }
     if (m[2] !== undefined) { vs = parseInt(m[2], 10); continue; }
     const n = footnoteText(m[0]);
-    if (n) out.push({ text: n, ref: ch + ':' + vs });
+    if (n) out.push({ text: n, raw: footnoteRaw(m[0]), ref: ch + ':' + vs });
   }
   return out;
 }
 
-// Normalized prose of a single "\f … \f*" footnote span — the caller, \fr origin
-// reference, and all sub-markers stripped, \ref reduced to display text. Shared
-// by the compare (extractFootnotes) and the sync apply so they agree exactly.
-function footnoteText(span) {
+// Display prose of a single "\f … \f*" footnote span — markers stripped and \ref
+// reduced to display text, but Unicode punctuation (en/em-dashes, curly quotes)
+// PRESERVED. This is the value written back on Accept, so the publisher's real
+// typography survives; earlier we wrote the normalized form and flattened "–" → "-".
+function footnoteRaw(span) {
   const text = String(span)
     .replace(/\\f\s*[+\-?]?\s*/, ' ')                    // opening marker + caller symbol
     .replace(/\\fr\s+\S+/g, ' ')                         // origin reference, e.g. "1:3"
     .replace(/\\ref\s+([^|\\]*)\|[^\\]*\\ref\*/g, '$1')  // \ref Genesis 5:32|GEN 5:32\ref* → "Genesis 5:32"
     .replace(/\\f\*/g, ' ')                              // closing marker
     .replace(/\\f[a-z]+\*?/g, ' ');                      // \ft \fq \fqa \fk … and their closers
-  return normalizeVerse(text).replace(/\s+([.,;:!?])/g, '$1');
+  return text.replace(/\s+/g, ' ').trim().replace(/\s+([.,;:!?])/g, '$1');
+}
+
+// Normalized prose of a single "\f … \f*" footnote span — footnoteRaw folded through
+// normalizeVerse (dashes/quotes/whitespace canonicalized) so encoding differences
+// don't defeat matching. Shared by the compare (extractFootnotes) and the sync apply.
+function footnoteText(span) {
+  return normalizeVerse(footnoteRaw(span)).replace(/\s+([.,;:!?])/g, '$1');
 }
 
 // Strip inline character markers (\add \wj \nd \it …, opening and closing) from
@@ -457,6 +473,8 @@ module.exports = {
   extractHeadings,
   extractFootnotes,
   footnoteText,
+  footnoteRaw,
+  headingRaw,
   stripInlineMarkers,
   multisetDiff,
   multisetDiffBy,

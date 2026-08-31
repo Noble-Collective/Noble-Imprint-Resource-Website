@@ -1473,7 +1473,9 @@
           if (canAccept) {
             var type = isHeading ? 'usfm-heading' : 'usfm-footnote';
             var id = type + ':' + bookCode + ':' + o.ref + ':' + (structSeq++);
-            changesById[id] = { id: id, type: type, translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: official[best].text };
+            // newText = the official RAW form (real dashes/quotes preserved); oldText
+            // stays normalized so the apply's ref+normalized match still finds our span.
+            changesById[id] = { id: id, type: type, translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: (official[best].raw || official[best].text) };
             idAttr = ' data-change-id="' + esc(id) + '"';
             actions = '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
               + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div>';

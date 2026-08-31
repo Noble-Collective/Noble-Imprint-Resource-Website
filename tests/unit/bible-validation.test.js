@@ -171,14 +171,14 @@ test('extractHeadings pulls \\s1/\\s2 heading text and strips inline markers', (
   ].join('\n');
   const h = v.extractHeadings(usfm);
   assert.deepStrictEqual(h, [
-    { text: 'The Creation', ref: '1:1' },
-    { text: 'The First Day', ref: '1:3' },
+    { text: 'The Creation', raw: 'The Creation', ref: '1:1' },
+    { text: 'The First Day', raw: 'The First Day', ref: '1:3' },
   ]);
 });
 
 test('extractFootnotes pulls note prose with its verse ref, dropping caller/\\fr/submarkers', () => {
   const usfm = '\\c 1\n\\v 3 And God said, "Let there be light," \\f + \\fr 1:3 \\ft Cited in 2 Corinthians 4:6\\f* and there was light.';
-  assert.deepStrictEqual(v.extractFootnotes(usfm), [{ text: 'Cited in 2 Corinthians 4:6', ref: '1:3' }]);
+  assert.deepStrictEqual(v.extractFootnotes(usfm), [{ text: 'Cited in 2 Corinthians 4:6', raw: 'Cited in 2 Corinthians 4:6', ref: '1:3' }]);
 });
 
 test('extractFootnotes handles multiple footnotes across a book with refs', () => {
@@ -188,9 +188,27 @@ test('extractFootnotes handles multiple footnotes across a book with refs', () =
     '\\v 6 ...\\f + \\fr 1:6 \\ft Or a canopy\\f*',
   ].join('\n');
   assert.deepStrictEqual(v.extractFootnotes(usfm), [
-    { text: 'Literally day one', ref: '1:5' },
-    { text: 'Or a canopy', ref: '1:6' },
+    { text: 'Literally day one', raw: 'Literally day one', ref: '1:5' },
+    { text: 'Or a canopy', raw: 'Or a canopy', ref: '1:6' },
   ]);
+});
+
+// The .raw form is what gets WRITTEN back on Accept; it must preserve the
+// publisher's real typography (en/em-dashes, curly quotes) while .text stays
+// normalized purely for matching. Writing .text was flattening "91:11–12" → "91:11-12".
+test('extractFootnotes exposes a raw display form that preserves dashes/quotes', () => {
+  const usfm = '\\c 1\n\\v 1 x\\f + \\fr 1:1 \\ft Psalms 91:11–12; “see also”\\f*';
+  const fn = v.extractFootnotes(usfm);
+  assert.strictEqual(fn[0].text, 'Psalms 91:11-12; "see also"'); // normalized for matching
+  assert.strictEqual(fn[0].raw, 'Psalms 91:11–12; “see also”'); // en-dash + curly quotes preserved
+  assert.strictEqual(fn[0].ref, '1:1');
+});
+
+test('extractHeadings exposes a raw display form that preserves punctuation', () => {
+  const usfm = '\\c 2\n\\s1 A “Quoted” Heading—Yes\n\\v 1 x';
+  const h = v.extractHeadings(usfm);
+  assert.strictEqual(h[0].text, 'A "Quoted" Heading-Yes');
+  assert.strictEqual(h[0].raw, 'A “Quoted” Heading—Yes');
 });
 
 // ── diffStructure ─────────────────────────────────────────────────────────────
