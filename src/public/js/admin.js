@@ -1309,12 +1309,13 @@
     var checklistEl = document.getElementById('bv-checklist');
     var compareOut = document.getElementById('bv-compare-output');
     var changesById = {};
-    var STEP_ORDER = ['download-verses', 'download-usfm', 'load-ours', 'compare', 'structure', 'library', 'reader'];
+    var STEP_ORDER = ['download-verses', 'download-usfm', 'load-ours', 'compare', 'reader', 'structure', 'library'];
     var STEP_LABELS = {
       'download-verses': 'Download official verse text from bereanbible.com',
       'download-usfm': 'Download official structure (headings + footnotes)',
       'load-ours': 'Load our stored copy',
-      'compare': 'Compare every book, verse by verse',
+      'compare': 'Compare every book, verse by verse (BSB site → repo)',
+      'reader': 'Compare every book, verse by verse (repo → web reader)',
       'structure': 'Check section headings & footnotes',
       'library': 'Scan the library for affected quotations'
     };
@@ -1547,27 +1548,48 @@
         return '<div class="bv-struct-book"><div class="bv-struct-title">' + esc(bn) + '</div>'
           + structRows(bn, b.code, r.translationId, label, f.onlyInOurs, f.onlyInOfficial) + '</div>';
       }).join('') || '<p class="text-muted">No differences.</p>';
-      return bvSection(label + ' differences', bookCount + ' book' + (bookCount === 1 ? '' : 's'), bookCount > 0, refreshType, refreshLabel, body);
+      var diffCount = (body.match(/bv-struct-card/g) || []).length; // one card per difference
+      var countLabel = bookCount + ' book' + (bookCount === 1 ? '' : 's') + ', ' + diffCount + ' difference' + (diffCount === 1 ? '' : 's');
+      return bvSection(label + ' differences', countLabel, bookCount > 0, refreshType, refreshLabel, body);
     }
 
-    // Summary tiles for the third verification leg: repo → what the reader renders.
+    // Summary tiles for verse-text leg 2: repo → what the web reader renders.
     function readerGroup(rd) {
       rd = rd || { error: 'not run' };
       if (rd.error) {
-        return '<div class="bv-group-label">Reader &mdash; what the browser renders</div>'
+        return '<div class="bv-group-label">Verse text: repo &rarr; web reader</div>'
           + '<p class="text-muted bv-math">Reader fidelity check unavailable: ' + esc(rd.error) + '</p>';
       }
       var bad = (rd.mismatched || 0) + (rd.missing || 0);
-      return '<div class="bv-group-label">Reader &mdash; what the browser renders (parsed copy)</div>'
+      return '<div class="bv-group-label">Verse text: repo &rarr; web reader &mdash; what the browser actually renders</div>'
         + '<div class="bv-tiles">'
-        + tile('Matches repo', Number(rd.matched || 0).toLocaleString(), bad ? 'warn' : 'ok')
+        + tile('Identical', Number(rd.matched || 0).toLocaleString(), bad ? 'warn' : 'ok')
         + tile('Differs', rd.mismatched || 0, rd.mismatched ? 'err' : 'ok')
         + tile('Missing', rd.missing || 0, rd.missing ? 'err' : 'ok')
         + '</div>'
         + '<p class="text-muted bv-math">' + (bad
-            ? 'The reader serves a committed parsed snapshot (<code>.bible-cache</code>). <strong>' + bad + '</strong> verse(s) differ from the repo — the snapshot is stale; regenerate <code>.bible-cache</code> or bump <code>CACHE_VERSION</code> so readers see the current text.'
-            : 'The reader serves exactly what is in the repo — the parsed snapshot is current.')
+            ? 'The web reader serves a committed parsed snapshot (<code>.bible-cache</code>). <strong>' + bad + '</strong> verse(s) differ from the repo — it auto-rebuilds after an Accept and nightly; see the section below.'
+            : 'The web reader serves exactly what is in the repo — the parsed snapshot is current.')
         + '</p>';
+    }
+
+    // Results section for verse-text leg 2 (repo → web reader). No refresh button — this
+    // is a cache rebuild (automatic), not a BSB sync.
+    function readerSection(rd) {
+      rd = rd || {};
+      var bad = (rd.mismatched || 0) + (rd.missing || 0);
+      var body;
+      if (rd.error) body = '<p class="text-muted">Reader check unavailable: ' + esc(rd.error) + '</p>';
+      else if (!bad) body = '<p class="text-muted">The web reader serves exactly what is in the repo — nothing to sync.</p>';
+      else {
+        var samples = (rd.samples || []).map(function (s) {
+          return '<div class="admin-card bv-change bv-struct-card"><div class="bv-change-loc"><span class="bv-loc">' + esc(s.ref) + '</span> <span class="text-muted">(' + esc(s.kind) + ')</span></div>'
+            + '<div class="bv-diff-line"><span class="bv-side">Repo</span> ' + esc(s.repo || '') + '</div>'
+            + '<div class="bv-diff-line"><span class="bv-side bv-side--new">Web&nbsp;reader</span> ' + esc(s.reader == null ? '(missing)' : s.reader) + '</div></div>';
+        }).join('');
+        body = '<p class="text-muted">The web reader serves a committed parsed snapshot (<code>.bible-cache</code>) that is behind the repo. It rebuilds automatically after an Accept and nightly, so this clears on its own. Showing up to ' + (rd.samples || []).length + ' example(s):</p>' + samples;
+      }
+      return '<details class="bv-section"' + (bad ? ' open' : '') + '><summary><strong>Verse text (repo &rarr; web reader)</strong> <span class="bv-count">' + bad + ' difference' + (bad === 1 ? '' : 's') + '</span></summary>' + body + '</details>';
     }
 
     function renderCompareResult(r) {
@@ -1585,14 +1607,16 @@
         + '<div class="bv-result-head">'
         + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
         + ' <span class="text-muted">source updated ' + esc((r.upstream && r.upstream.lastModified) || 'unknown') + ' · checked in ' + esc(r.durationMs) + ' ms</span></div>'
-        // Verse text — one axis
-        + '<div class="bv-group-label">Verse text &mdash; ' + Number(v.total).toLocaleString() + ' verses</div>'
+        // Verse text, leg 1: BSB site → repo
+        + '<div class="bv-group-label">Verse text: BSB site &rarr; repo &mdash; ' + Number(v.total).toLocaleString() + ' verses</div>'
         + '<div class="bv-tiles">'
         + tile('Identical', Number(v.matched).toLocaleString(), 'ok')
         + tile('Changed', v.changed, v.changed ? 'warn' : 'ok')
         + tile('Missing', v.missing, v.missing ? 'err' : 'ok')
         + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
         + '</div>'
+        // Verse text, leg 2: repo → web reader (shown right next to leg 1)
+        + readerGroup(r.reader)
         // Structure (headings + footnotes) — a separate axis, measured per book
         + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings, footnotes &amp; cross-references)</div>'
         + '<div class="bv-tiles">'
@@ -1601,7 +1625,6 @@
         + tile('Books w/ footnote diffs', ftBooks, ftBooks ? 'warn' : 'ok')
         + tile('Books w/ cross-ref diffs', crBooks, crBooks ? 'warn' : 'ok')
         + '</div>'
-        + readerGroup(r.reader)
         + '<p class="text-muted bv-math">' + (clean
           ? 'Our copy matches the current published BSB exactly.'
           : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
@@ -1614,7 +1637,9 @@
         var vBody = vChanges.length
           ? '<p class="text-muted">Accept to update our copy to the current BSB (one commit each). Reject to keep ours.</p>' + vChanges.map(changeCard).join('')
           : '<p class="text-muted">No verse-text differences.</p>';
-        html += bvSection('Verse text differences', String(v.changed || 0), v.changed > 0, 'verse-store', 'Refresh all verses', vBody);
+        // The two verse-text legs sit next to each other: BSB site → repo, then repo → reader.
+        html += bvSection('Verse text (BSB site → repo)', (v.changed || 0) + ' difference' + (v.changed === 1 ? '' : 's'), v.changed > 0, 'verse-store', 'Refresh all verses', vBody);
+        html += readerSection(r.reader);
 
         html += structSection(r, 'Heading', 'headings', 'usfm-heading', 'Refresh all headings', hdgBooks);
         html += structSection(r, 'Footnote', 'footnotes', 'usfm-footnote', 'Refresh all footnotes', ftBooks);
@@ -1627,20 +1652,6 @@
             + '<p class="text-muted">Places in our books that quote the old wording — reviewed individually.</p>'
             + libChanges.map(changeCard).join('') + '</details>';
         }
-      }
-
-      // Reader out of sync — shown whenever the served snapshot differs from the repo,
-      // even if the repo itself matches the BSB (this is a cache-regeneration task, not
-      // a BSB sync, so it has no refresh button).
-      if (r.reader && !r.reader.error && readerBad) {
-        var rsamples = (r.reader.samples || []).map(function (s) {
-          return '<div class="bv-struct-item"><div class="bv-change-loc">' + esc(s.ref) + ' <span class="text-muted">(' + esc(s.kind) + ')</span></div>'
-            + '<div class="bv-diff-line"><span class="bv-side">Repo</span> ' + esc(s.repo || '') + '</div>'
-            + '<div class="bv-diff-line"><span class="bv-side bv-side--new">Reader</span> ' + esc(s.reader == null ? '(missing)' : s.reader) + '</div></div>';
-        }).join('');
-        html += '<details class="bv-section" open><summary><strong>Reader out of sync</strong> <span class="bv-count">' + readerBad + ' verse(s)</span></summary>'
-          + '<p class="text-muted">The reader serves a stale parsed snapshot (<code>.bible-cache</code>). Regenerate it (or bump <code>CACHE_VERSION</code>) so readers see the current repo text. Showing up to ' + (r.reader.samples || []).length + ' example(s):</p>'
-          + (rsamples || '') + '</details>';
       }
 
       compareOut.innerHTML = html;

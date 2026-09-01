@@ -108,23 +108,10 @@ async function runStreamingCompare(opts = {}) {
   for (const ref of oursVerses.keys()) if (!officialVerses.has(ref)) extra++;
   emit({ type: 'step', key: 'compare', status: 'done', detail: `${matched.toLocaleString()} verses identical · ${drifted.length} changed · ${missing} missing · ${extra} extra` });
 
-  // 5. Structure (headings + footnotes)
-  emit({ type: 'step', key: 'structure', label: 'Checking section headings, footnotes, and cross-references', status: 'running' });
-  const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true, crossRefs: true });
-  emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote, ${structure.totals.booksWithCrossRefDiffs} cross-reference differences` });
-
-  // 6. Library scan for quotations of changed verses (parallel + live progress)
-  emit({ type: 'step', key: 'library', label: 'Scanning the library for quotations of changed verses', status: 'running' });
-  let libPct = -1;
-  const changes = await sync.buildChangesFromDrift(drifted, translationId, {
-    onProgress: (d, t) => { const pct = Math.floor(d / t * 100); if (pct - libPct >= 20 || d === t) { libPct = pct; emit({ type: 'step', key: 'library', status: 'running', detail: `scanned ${d}/${t} files` }); } },
-  });
-  emit({ type: 'step', key: 'library', status: 'done', detail: `${changes.scannedFiles} files scanned · ${changes.libraryChanges.length} quotation(s) affected` });
-
-  // 7. Reader fidelity — does the parsed/served copy the browser renders match our repo?
-  //    (Catches a stale committed .bible-cache snapshot or any parser transform of the
-  //    verse text — the leg from repo → what the reader actually displays.)
-  emit({ type: 'step', key: 'reader', label: 'Verifying the rendered reader matches our repo copy', status: 'running' });
+  // 5. Reader fidelity — repo → what the browser actually renders. Runs right after the
+  //    BSB-site→repo verse compare so the two verse checks sit side by side. (Catches a
+  //    stale committed .bible-cache snapshot or any parser transform of the verse text.)
+  emit({ type: 'step', key: 'reader', label: 'Comparing every book, verse by verse (repo → web reader)', status: 'running' });
   let reader = null;
   try {
     const served = await bible.getServedVerses(translationId);
@@ -136,6 +123,19 @@ async function runStreamingCompare(opts = {}) {
     reader = { total: oursVerses.size, matched: 0, mismatched: 0, missing: 0, samples: [], error: e.message };
     emit({ type: 'step', key: 'reader', status: 'done', detail: 'reader check unavailable: ' + e.message });
   }
+
+  // 6. Structure (headings + footnotes + cross-references)
+  emit({ type: 'step', key: 'structure', label: 'Checking section headings, footnotes, and cross-references', status: 'running' });
+  const structure = v.diffStructure(oursUsfm, officialUsfm, { footnotes: true, crossRefs: true });
+  emit({ type: 'step', key: 'structure', status: 'done', detail: `${structure.totals.booksMatched}/${structure.totals.booksChecked} books identical · ${structure.totals.booksWithHeadingDiffs} heading, ${structure.totals.booksWithFootnoteDiffs} footnote, ${structure.totals.booksWithCrossRefDiffs} cross-reference differences` });
+
+  // 7. Library scan for quotations of changed verses (parallel + live progress)
+  emit({ type: 'step', key: 'library', label: 'Scanning the library for quotations of changed verses', status: 'running' });
+  let libPct = -1;
+  const changes = await sync.buildChangesFromDrift(drifted, translationId, {
+    onProgress: (d, t) => { const pct = Math.floor(d / t * 100); if (pct - libPct >= 20 || d === t) { libPct = pct; emit({ type: 'step', key: 'library', status: 'running', detail: `scanned ${d}/${t} files` }); } },
+  });
+  emit({ type: 'step', key: 'library', status: 'done', detail: `${changes.scannedFiles} files scanned · ${changes.libraryChanges.length} quotation(s) affected` });
 
   const result = {
     translationId,
