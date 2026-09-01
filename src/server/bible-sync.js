@@ -478,6 +478,7 @@ async function getSyncLog({ limit = 50 } = {}) {
       date: c.commit.author && c.commit.author.date,
       by: (c.commit.author && (c.commit.author.name || c.commit.author.email)) || '',
       message: c.commit.message.split('\n')[0],
+      url: c.html_url || `https://github.com/${github.OWNER}/${github.REPO}/commit/${c.sha}`,
       ...classifySyncCommit(c.commit.message),
     }));
 }

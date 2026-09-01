@@ -1829,12 +1829,15 @@
           : '<span class="admin-badge admin-badge--warn">Differences</span>';
     }
 
+    var historyRuns = [], historyShown = 25;
     function renderHistory(runs) {
+      if (runs) { historyRuns = runs; historyShown = 25; }
+      runs = historyRuns;
       var clearBtn = '<div class="bv-history-actions"><button class="admin-btn admin-btn--sm" id="bv-clear-history">Clear history</button> <span class="bv-clear-status text-muted"></span></div>';
       if (!runs.length) { historyEl.innerHTML = '<p class="text-muted">No comparisons run yet.</p>' + clearBtn; wireClearHistory(); return; }
       // "—" for older runs saved before the per-type columns existed.
       var cell = function (val) { return '<td>' + (val == null ? '<span class="text-muted">—</span>' : esc(val)) + '</td>'; };
-      var rows = runs.map(function (r) {
+      var rows = runs.slice(0, historyShown).map(function (r) {
         var verses = r.verseChanged != null ? r.verseChanged : (r.verse ? r.verse.changed : null);
         return '<tr><td>' + esc(r.createdAt ? new Date(r.createdAt).toLocaleString() : '') + '</td>'
           + '<td>' + statusBadge(r.status) + '</td>'
@@ -1845,11 +1848,16 @@
           + cell(r.crossRefDiffBooks)
           + '<td>' + esc(r.runBy || '') + '</td></tr>';
       }).join('');
+      var more = runs.length > historyShown
+        ? '<div class="bv-more"><button class="admin-btn admin-btn--sm bv-history-more">View more (' + (runs.length - historyShown) + ' older)</button></div>'
+        : '';
       historyEl.innerHTML = '<table class="admin-table"><thead><tr>'
         + '<th>When</th><th>Result</th><th>Bible</th><th>Verse diffs</th><th>Heading diffs</th><th>Footnote diffs</th><th>Cross-ref diffs</th><th>By</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>' + more
         + '<p class="text-muted" style="font-size:12px">Heading / footnote / cross-ref counts are the number of books differing; “—” marks older runs recorded before these columns existed.</p>'
         + clearBtn;
+      var moreBtn = historyEl.querySelector('.bv-history-more');
+      if (moreBtn) moreBtn.addEventListener('click', function () { historyShown += 25; renderHistory(); });
       wireClearHistory();
     }
 
@@ -1867,7 +1875,7 @@
     }
 
     function loadHistory() {
-      apiCall('GET', '/api/admin/bible-validation/runs')
+      apiCall('GET', '/api/admin/bible-validation/runs?limit=100')
         .then(function (d) { renderHistory(d.runs || []); })
         .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
     }
@@ -1880,43 +1888,53 @@
       return '<span class="bv-log-kind bv-log-kind--' + esc(k || 'other') + '">' + esc(labels[k] || 'Change') + '</span>';
     }
 
-    function renderSyncLog(entries) {
+    var syncLogEntries = [], syncLogShown = 25;
+    function renderSyncLog() {
       if (!syncLogEl) return;
+      var entries = syncLogEntries;
       if (!entries.length) { syncLogEl.innerHTML = '<p class="text-muted">No applied changes yet.</p>'; return; }
-      syncLogEl.innerHTML = entries.map(function (e) {
-        return '<div class="bv-log-row" data-sha="' + esc(e.sha) + '">'
+      var rows = entries.slice(0, syncLogShown).map(function (e) {
+        return '<div class="bv-log-row" data-sha="' + esc(e.sha) + '" data-url="' + esc(e.url || '') + '">'
           + '<div class="bv-log-head">' + kindBadge(e.kind)
           + '<span class="bv-log-msg">' + esc(e.message) + '</span>'
           + '<span class="bv-log-meta text-muted">' + esc(e.date ? new Date(e.date).toLocaleString() : '') + ' · ' + esc(e.by) + ' · ' + esc(e.shortSha) + '</span>'
           + '<span class="bv-log-actions"><button class="admin-btn admin-btn--sm bv-log-view">View diff</button> <button class="admin-btn admin-btn--sm bv-log-restore">Restore</button> <span class="bv-log-status text-muted"></span></span>'
           + '</div><div class="bv-log-diff" style="display:none"></div></div>';
       }).join('');
+      var more = entries.length > syncLogShown
+        ? '<div class="bv-more"><button class="admin-btn admin-btn--sm bv-synclog-more">View more (' + (entries.length - syncLogShown) + ' older)</button></div>'
+        : '';
+      syncLogEl.innerHTML = rows + more;
     }
 
     function loadSyncLog() {
       if (!syncLogEl) return;
+      syncLogShown = 25;
       syncLogEl.innerHTML = '<p class="text-muted">Loading applied changes…</p>';
-      apiCall('GET', '/api/admin/bible-sync-log?limit=60')
-        .then(function (d) { renderSyncLog(d.entries || []); })
+      apiCall('GET', '/api/admin/bible-sync-log?limit=100')
+        .then(function (d) { syncLogEntries = d.entries || []; renderSyncLog(); })
         .catch(function (e) { syncLogEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
     }
 
     if (syncLogEl) syncLogEl.addEventListener('click', function (e) {
+      if (e.target.classList.contains('bv-synclog-more')) { syncLogShown += 25; renderSyncLog(); return; }
       var row = e.target.closest('.bv-log-row'); if (!row) return;
-      var sha = row.getAttribute('data-sha');
+      var sha = row.getAttribute('data-sha'), url = row.getAttribute('data-url');
       if (e.target.classList.contains('bv-log-view')) {
         var diffEl = row.querySelector('.bv-log-diff');
         if (diffEl.style.display === 'block') { diffEl.style.display = 'none'; e.target.textContent = 'View diff'; return; }
         e.target.textContent = 'Hide diff'; diffEl.style.display = 'block'; diffEl.innerHTML = '<p class="text-muted">Loading…</p>';
         apiCall('GET', '/api/admin/bible-sync-log/' + encodeURIComponent(sha))
           .then(function (d) {
-            diffEl.innerHTML = (d.files || []).map(function (f) {
+            var body = (d.files || []).map(function (f) {
               return '<div class="bv-log-file"><div class="text-muted" style="font-size:12px">' + esc(f.name) + '</div>'
                 + (f.changes || []).map(function (c) {
                   return '<div class="bv-diff-line"><span class="bv-side">Before</span> ' + esc(c.old || '(none)') + '</div>'
                     + '<div class="bv-diff-line"><span class="bv-side bv-side--new">After</span> ' + esc(c.new || '(none)') + '</div>';
                 }).join('') + '</div>';
             }).join('') || '<p class="text-muted">No line changes.</p>';
+            var gh = url ? '<div class="bv-log-ghlink"><a href="' + esc(url) + '" target="_blank" rel="noopener">View this diff on GitHub &rarr;</a></div>' : '';
+            diffEl.innerHTML = body + gh;
           })
           .catch(function (err) { diffEl.innerHTML = '<p class="admin-error">' + esc(err.message) + '</p>'; });
       }

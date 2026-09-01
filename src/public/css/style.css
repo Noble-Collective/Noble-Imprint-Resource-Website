@@ -5831,3 +5831,7 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .bv-log-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .bv-log-diff { padding: 6px 12px 12px; border-top: 1px solid #efe9d8; }
 .bv-log-file { margin-top: 6px; }
+
+/* Sync-log / history: view-more + GitHub link */
+.bv-more { margin: 10px 0; text-align: center; }
+.bv-log-ghlink { margin-top: 8px; font-size: 13px; }
