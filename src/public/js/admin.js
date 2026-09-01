@@ -1383,7 +1383,7 @@
     // Popup showing the whole chapter a diff comes from, with the verse
     // highlighted — reuses the public /api/verses endpoint (same data the
     // on-site verse-citation popup uses).
-    function openChapterPopup(ref) {
+    function openChapterPopup(ref, note) {
       var m = String(ref).match(/^(.+?)\s+(\d+)(?::(\d+))?/);
       if (!m) return;
       var book = m[1], chapter = m[2], target = m[3] ? parseInt(m[3], 10) : -1;
@@ -1407,9 +1407,15 @@
             if (vv.gap) return '';
             var head = vv.sectionHeading ? '<div class="bv-ctx-heading">' + esc(vv.sectionHeading) + '</div>' : '';
             var cls = vv.verse === target ? 'bv-ctx-verse bv-ctx-verse--hl' : 'bv-ctx-verse';
-            return head + '<p class="' + cls + '"><sup>' + esc(vv.verse) + '</sup> ' + esc(vv.text) + '</p>';
+            // Show the diff's heading/footnote/cross-ref inline at the verse it applies to.
+            var noteHtml = (note && note.text && vv.verse === target)
+              ? '<div class="bv-ctx-note"><span class="bv-ctx-note-kind">' + esc(note.kind || 'Note') + '</span> ' + esc(note.text) + '</div>' : '';
+            return head + '<p class="' + cls + '"><sup>' + esc(vv.verse) + '</sup> ' + esc(vv.text) + '</p>' + noteHtml;
           }).join('');
           body.innerHTML = html || '<p class="text-muted">No text found.</p>';
+          if (note && note.text && target < 0) {
+            body.innerHTML += '<div class="bv-ctx-note"><span class="bv-ctx-note-kind">' + esc(note.kind || 'Note') + '</span> ' + esc(note.text) + '</div>';
+          }
           var hl = body.querySelector('.bv-ctx-verse--hl'); if (hl) hl.scrollIntoView({ block: 'center' });
         })
         .catch(function (e) { body.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
@@ -1436,8 +1442,12 @@
       var shared = 0; aw.forEach(function (w) { if (cnt[w] > 0) { shared++; cnt[w]--; } });
       return shared / Math.max(aw.length, bw.length);
     }
-    function ctxLink(bookName, ref) {
-      return '<a href="#" class="bv-context" data-ctx-ref="' + esc(bookName + ' ' + ref) + '">View context</a>';
+    function ctxLink(bookName, ref, noteKind, noteText) {
+      var attrs = ' data-ctx-ref="' + esc(bookName + ' ' + ref) + '"';
+      // Carry the diff's heading/footnote/cross-ref text so the scripture popup can show
+      // it in place at the verse it applies to (we have no footnote viewer otherwise).
+      if (noteText) attrs += ' data-ctx-note-kind="' + esc(noteKind || 'Note') + '" data-ctx-note="' + esc(noteText) + '"';
+      return '<a href="#" class="bv-context"' + attrs + '>View context</a>';
     }
     var structSeq = 0;
 
@@ -1451,7 +1461,7 @@
       var isHeading = label === 'Heading';
       var isCrossRef = label === 'Cross-reference';
       var changeType = isHeading ? 'usfm-heading' : isCrossRef ? 'usfm-crossref' : 'usfm-footnote';
-      var loc = function (ref) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref); };
+      var loc = function (ref, noteKind, noteText) { return '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref, noteKind, noteText); };
       var rows = [], usedOff = {};
 
       ours.forEach(function (o) {
@@ -1482,18 +1492,18 @@
             actions = '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
               + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div>';
           }
-          rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + '><div class="bv-change-loc">' + loc(o.ref) + '</div>'
+          rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + '><div class="bv-change-loc">' + loc(o.ref, label, official[best].raw || official[best].text) + '</div>'
             + diffPair(o.text, official[best].text) + actions + '</div>');
         } else {
           // Present only in our copy → Accept DELETES it so we match the BSB (which has none here).
-          rows.push(unpairedCard(bookName, bookCode, translationId, changeType, o.ref, o.raw || o.text, '', o.text, ''));
+          rows.push(unpairedCard(bookName, bookCode, translationId, changeType, label, o.ref, o.raw || o.text, '', o.text, ''));
         }
       });
       official.forEach(function (f, i) {
         if (usedOff[i]) return;
         // Present only on the BSB site → Accept ADDS it to our copy. For footnotes we also
         // pass the anchor (the BSB's words before the caller) so it lands at the exact spot.
-        rows.push(unpairedCard(bookName, bookCode, translationId, changeType, f.ref, '', f.raw || f.text, '', f.raw || f.text, f.anchor));
+        rows.push(unpairedCard(bookName, bookCode, translationId, changeType, label, f.ref, '', f.raw || f.text, '', f.raw || f.text, f.anchor));
       });
       return rows.join('');
     }
@@ -1501,8 +1511,8 @@
     // A one-sided (add/delete) structure difference rendered like the paired cards —
     // Current + BSB Site columns with "[none]" for the empty side — plus Accept/Reject.
     // Accept applies { oldText, newText } where one side is '' (empty = add or delete).
-    function unpairedCard(bookName, bookCode, translationId, changeType, ref, curText, bsbText, oldText, newText, anchor) {
-      var loc = '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref);
+    function unpairedCard(bookName, bookCode, translationId, changeType, label, ref, curText, bsbText, oldText, newText, anchor) {
+      var loc = '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref, label, bsbText || curText);
       var id = changeType + ':' + bookCode + ':' + ref + ':' + (structSeq++);
       var change = { id: id, type: changeType, translationId: translationId, bookCode: bookCode, ref: ref, oldText: oldText, newText: newText };
       if (anchor) change.anchor = anchor;
@@ -1710,7 +1720,7 @@
 
       // "See context" popup + per-type "Refresh all …" buttons.
       compareOut.addEventListener('click', function (e) {
-        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref'), { kind: e.target.getAttribute('data-ctx-note-kind'), text: e.target.getAttribute('data-ctx-note') }); return; }
         if (e.target.classList.contains('bv-refresh-type')) {
           var btn = e.target, rtype = btn.getAttribute('data-refresh-type');
           var nouns = { 'verse-store': 'verse', 'usfm-heading': 'heading', 'usfm-footnote': 'footnote', 'usfm-crossref': 'cross-reference' };
@@ -1968,7 +1978,7 @@
 
       // "Show scripture" popup + "Fix quote" apply inside audit results.
       qaOutput.addEventListener('click', function (e) {
-        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref')); return; }
+        if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref'), { kind: e.target.getAttribute('data-ctx-note-kind'), text: e.target.getAttribute('data-ctx-note') }); return; }
         if (e.target.classList.contains('bv-fix')) {
           var btn = e.target, meta = qaFixes[btn.getAttribute('data-fix-id')];
           if (!meta) return;

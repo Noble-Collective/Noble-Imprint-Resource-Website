@@ -3812,6 +3812,8 @@ body.drawer-open {
 .bv-ctx-verse { margin: 4px 0; line-height: 1.6; }
 .bv-ctx-verse sup { color: #b0a583; font-size: 11px; margin-right: 2px; }
 .bv-ctx-verse--hl { background: #fff2a8; border-radius: 4px; padding: 4px 6px; }
+.bv-ctx-note { margin: 4px 0 10px 18px; padding: 6px 10px; border-left: 3px solid #d7b44a; background: #fbf6e6; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.5; color: #5a4e32; }
+.bv-ctx-note-kind { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; font-weight: 700; color: #9a7d1a; margin-right: 6px; }
 .admin-diff-loading {
   text-align: center;
   padding: 40px;
