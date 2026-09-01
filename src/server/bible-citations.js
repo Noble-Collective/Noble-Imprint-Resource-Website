@@ -97,7 +97,9 @@ function quoteForCitation(text, index) {
       const bStart = bStart0 === -1 ? 0 : bStart0 + 2;
       let bEnd = text.indexOf('\n\n', index);
       if (bEnd === -1) bEnd = text.length;
-      return { kind: 'inline', quote, raw: quote, context: text.slice(bStart, bEnd).trim() };
+      // raw includes BOTH quotation marks (the exact source unit a Fix replaces), so
+      // the fix keeps the quote characters; `quote` stays the inner text for matching.
+      return { kind: 'inline', quote, raw: text.slice(openPos, i + 1), context: text.slice(bStart, bEnd).trim() };
     }
   }
   // attribution: citation sits on a line beginning with "<<", quote is the

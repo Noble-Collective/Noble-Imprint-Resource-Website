@@ -34,15 +34,27 @@ function alignWords(a, b) {
 
 // The BSB wording for the span a quote actually covers — so a "Fix" replaces the
 // quote with just that scripture fragment, not the whole verse. We align the quote
-// to the verse by word-LCS (tolerating boundary word differences), then take the
-// verse text from the first to the last aligned word, extended to cover the words
-// the quote substituted at each edge:
+// to the verse by word-LCS (tolerating boundary word differences), narrowed to the
+// most COMPACT window of the verse that still explains the whole quote (so a word the
+// quote repeats — "a pit" vs the verse's two "pit"s — doesn't spread the span), then
+// take the verse text from the first to the last aligned word, extended to cover the
+// words the quote substituted at each edge:
 //   • if the aligned span reaches near a verse end, run to that end (quotes stop at
 //     natural breaks) — this captures "abundantly" → "in all its fullness";
 //   • otherwise extend by the count of substituted boundary quote words, stopping
 //     at the first clause punctuation — this trims a trailing clause the quote
 //     never covered (e.g. John 1:9 "…everyone" not "…into the world").
+// Finally the span's trailing punctuation is matched to the quote's, so a quote that
+// stopped mid-sentence ("…forgot him") doesn't gain a period it never had.
 // Returns null when the quote can't be aligned confidently (a real paraphrase).
+function lcsLen(a, b) {
+  const m = b.length, dp = new Array(m + 1).fill(0);
+  for (let i = 0; i < a.length; i++) {
+    let prev = 0;
+    for (let j = 1; j <= m; j++) { const t = dp[j]; dp[j] = a[i] === b[j - 1] ? prev + 1 : Math.max(dp[j], dp[j - 1]); prev = t; }
+  }
+  return dp[m];
+}
 function correctQuote(quote, verseText) {
   const tokens = String(verseText).split(/(\s+)/); // words + whitespace, preserved
   const vw = []; // { l: normalized-lowercase, tok: token index, raw: original token }
@@ -50,10 +62,23 @@ function correctQuote(quote, verseText) {
   if (vw.length < 3) return null;
   // De-bracket the quote (editorial [..] marks aren't the Bible's wording) and drop
   // inline markdown emphasis markers so "_word_"/"**word**" align to the plain verse.
-  const qw = v.normalizeVerse(String(quote).replace(/\[[^\]]*\]/g, ' ').replace(/[_*`]+/g, '')).toLowerCase().split(' ').filter(Boolean);
+  // Compare on BARE words (punctuation stripped) so "pit" matches "pit." — otherwise a
+  // repeated word could anchor to the wrong (differently-punctuated) occurrence.
+  const bare = w => w.replace(/[^a-z0-9]/g, '');
+  const qw = v.normalizeVerse(String(quote).replace(/\[[^\]]*\]/g, ' ').replace(/[_*`]+/g, '')).toLowerCase().split(/\s+/).map(bare).filter(Boolean);
   if (qw.length < 3) return null;
 
-  const matches = alignWords(qw, vw.map(w => w.l));
+  // Narrow to the most compact verse window that still yields the full LCS: the earliest
+  // end and the latest start that each preserve it. This anchors a repeated quote word to
+  // the occurrence nearest the rest of the match, not a far one.
+  const vl = vw.map(w => bare(w.l));
+  const full = lcsLen(qw, vl);
+  if (full < 2) return null;
+  let winEnd = vl.length;
+  for (let k = 1; k <= vl.length; k++) { if (lcsLen(qw, vl.slice(0, k)) === full) { winEnd = k; break; } }
+  let winStart = 0;
+  for (let k = 0; k < vl.length; k++) { if (lcsLen(qw, vl.slice(k)) === full) winStart = k; else break; }
+  const matches = alignWords(qw, vl.slice(winStart, winEnd)).map(p => ({ qi: p.qi, vi: p.vi + winStart }));
   if (matches.length < 2) return null;
   const qi0 = matches[0].qi, qi1 = matches[matches.length - 1].qi;
   const vi0 = matches[0].vi, vi1 = matches[matches.length - 1].vi;
@@ -76,9 +101,15 @@ function correctQuote(quote, verseText) {
     }
   }
 
-  const span = tokens.slice(vw[startVi].tok, vw[endVi].tok + 1).join('').trim();
+  let span = tokens.slice(vw[startVi].tok, vw[endVi].tok + 1).join('').trim();
   const spanWords = span.split(/\s+/).filter(Boolean).length;
   if (spanWords > qw.length * 2.5 + 4) return null; // alignment ballooned — bail
+  // Match the span's trailing punctuation to the quote's — the quote's own boundary
+  // (usually none, since it's embedded mid-sentence) governs, so we don't append a
+  // sentence-ending period the author didn't quote.
+  const qCore = String(quote).replace(/[_*`"'“”‘’]+/g, '').trim();
+  const qTrail = (qCore.match(/[.,;:!?]+$/) || [''])[0];
+  span = span.replace(/[.,;:!?]+$/, '') + qTrail;
   return span || null;
 }
 

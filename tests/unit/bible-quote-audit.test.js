@@ -8,16 +8,31 @@ const a = require('../../src/server/bible-quote-audit');
 test('correctQuote: John 10:10 — aligns past a tense difference at the boundary', () => {
   const quote = 'came that [you] may have life and have it abundantly';
   const verse = 'The thief comes only to steal and kill and destroy. I have come that they may have life, and have it in all its fullness.';
-  // The quote covers "come … fullness"; not the whole verse (no thief/steal/kill).
+  // The quote covers "come … fullness"; not the whole verse (no thief/steal/kill). The
+  // quote had no trailing period, so the span keeps none either.
   assert.strictEqual(a.correctQuote(quote, verse),
-    'come that they may have life, and have it in all its fullness.');
+    'come that they may have life, and have it in all its fullness');
 });
 
 test('correctQuote: 1 Peter 2:9 — returns only the quoted clause, not the whole verse', () => {
   const quote = 'proclaim the excellencies of him who called you out of darkness into his marvelous light';
   const verse = "But you are a chosen people, a royal priesthood, a holy nation, a people for God's own possession, to proclaim the virtues of Him who called you out of darkness into His marvelous light.";
   assert.strictEqual(a.correctQuote(quote, verse),
-    'proclaim the virtues of Him who called you out of darkness into His marvelous light.');
+    'proclaim the virtues of Him who called you out of darkness into His marvelous light');
+});
+
+test('correctQuote: Genesis 37:24 — anchors a repeated word compactly, no trailing period', () => {
+  const quote = 'threw him into a pit';
+  const verse = 'and they took him and threw him into the pit. Now the pit was empty, with no water in it.';
+  // Must NOT spread to the second "pit" ("…the pit. Now the pit").
+  assert.strictEqual(a.correctQuote(quote, verse), 'threw him into the pit');
+});
+
+test('correctQuote: Genesis 40:23 — whole-verse coverage keeps the quote-embedded (no) period', () => {
+  const quote = 'the chief cupbearer did not remember Joseph, but forgot him';
+  const verse = 'The chief cupbearer, however, did not remember Joseph; he forgot all about him.';
+  assert.strictEqual(a.correctQuote(quote, verse),
+    'The chief cupbearer, however, did not remember Joseph; he forgot all about him');
 });
 
 test('correctQuote: John 1:9 — trims the trailing clause the quote does not cover', () => {
@@ -83,4 +98,17 @@ test('computeFix leaves a bare inline quote unwrapped', () => {
   assert.strictEqual(fix.ok, true);
   assert.ok(!/[>_*`]/.test(fix.replacement), 'inline replacement stays plain: ' + JSON.stringify(fix.replacement));
   assert.strictEqual(fix.replacement, fix.span);
+});
+
+test('computeFix keeps the surrounding quote marks when raw includes them', () => {
+  const q = {
+    kind: 'inline',
+    quote: 'came that [you] may have life and have it abundantly',
+    raw: '"came that [you] may have life and have it abundantly"',
+  };
+  const verse = 'The thief comes only to steal and kill and destroy. I have come that they may have life, and have it in all its fullness.';
+  const fix = a.computeFix(q, { status: 'deviation' }, verse);
+  assert.strictEqual(fix.ok, true);
+  assert.ok(fix.replacement.startsWith('"') && fix.replacement.endsWith('"'), 'keeps quote marks: ' + JSON.stringify(fix.replacement));
+  assert.ok(!fix.span.startsWith('"'), 'span stays unquoted for verse highlighting');
 });

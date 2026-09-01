@@ -2158,9 +2158,12 @@
         // markdown, including any blockquote/italic wrappers) comes from the editable
         // textarea at click time and is written verbatim.
         qaFixes[fid] = { file: f.file, ref: f.ref, oldText: f.fix.oldRaw };
+        var replText = f.fix.replacement || f.fix.preview || '';
+        // Size the box to the content (multi-line quotes need room); auto-grows on edit.
+        var estRows = Math.min(16, Math.max(2, (replText.match(/\n/g) || []).length + 1 + Math.floor(replText.length / 70)));
         fixBlock = '<div class="qa-fix">'
           + '<div class="qa-fix-label text-muted">Fix will replace the quote with this exact source text (edit before applying if needed):</div>'
-          + '<textarea class="qa-fix-text" rows="2" spellcheck="false">' + esc(f.fix.replacement || f.fix.preview) + '</textarea>'
+          + '<textarea class="qa-fix-text" rows="' + estRows + '" spellcheck="false">' + esc(replText) + '</textarea>'
           + '<div class="qa-fix-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button> <span class="bv-fix-status text-muted"></span></div></div>';
       }
       return '<div class="admin-card qa-finding">'
@@ -2246,6 +2249,13 @@
       });
 
       // "Show scripture" popup + "Fix quote" apply inside audit results.
+      // Auto-grow the Fix textareas as they're edited (multi-line quotes).
+      qaOutput.addEventListener('input', function (e) {
+        if (e.target.classList.contains('qa-fix-text')) {
+          e.target.style.height = 'auto';
+          e.target.style.height = Math.min(420, e.target.scrollHeight + 2) + 'px';
+        }
+      });
       qaOutput.addEventListener('click', function (e) {
         if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref'), { kind: e.target.getAttribute('data-ctx-note-kind'), text: e.target.getAttribute('data-ctx-note') }); return; }
         if (e.target.classList.contains('bv-fix')) {
