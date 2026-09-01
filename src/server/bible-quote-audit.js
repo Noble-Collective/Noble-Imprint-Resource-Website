@@ -104,12 +104,12 @@ function correctQuote(quote, verseText) {
   let span = tokens.slice(vw[startVi].tok, vw[endVi].tok + 1).join('').trim();
   const spanWords = span.split(/\s+/).filter(Boolean).length;
   if (spanWords > qw.length * 2.5 + 4) return null; // alignment ballooned — bail
-  // Match the span's trailing punctuation to the quote's — the quote's own boundary
-  // (usually none, since it's embedded mid-sentence) governs, so we don't append a
-  // sentence-ending period the author didn't quote.
-  const qCore = String(quote).replace(/[_*`"'“”‘’]+/g, '').trim();
-  const qTrail = (qCore.match(/[.,;:!?]+$/) || [''])[0];
-  span = span.replace(/[.,;:!?]+$/, '') + qTrail;
+  // If the quote stopped mid-sentence (no terminal . ! ? before any closing quote), drop
+  // the terminal/clause punctuation the span picked up from the verse — so an embedded
+  // quote doesn't gain a period it never had (Genesis 40:23 "…forgot him"). Closing quote
+  // marks are kept. When the quote DOES end a sentence, the span is left exactly as-is.
+  const qEndsSentence = /[.!?][”"'’)\]]*\s*$/.test(String(quote));
+  if (!qEndsSentence) span = span.replace(/[.,;:!?]+([”"'’)\]]*)\s*$/, '$1');
   return span || null;
 }
 
@@ -117,12 +117,17 @@ function correctQuote(quote, verseText) {
 // it: leading blockquote markers / opening quotes / emphasis, and the matching
 // trailing markers — leaving the scripture "core" (sentence punctuation stays in the
 // core). E.g. "> _Christ … him._ " → open "> _", core "Christ … him.", close "_ ".
-const EDGE_MARKUP = /[>\s_*`"'“”‘’]/;
-function peelRaw(raw) {
+// `peelQuotes` controls whether quotation marks count as wrapper: true for INLINE quotes
+// (the "…" delimits the quote) but false for blockquote/attribution, where a trailing
+// quote mark is part of the scripture (Jesus's speech) and must NOT be peeled/duplicated.
+const EDGE_WITH_QUOTES = /[>\s_*`"'“”‘’]/;
+const EDGE_NO_QUOTES = /[>\s_*`]/;
+function peelRaw(raw, peelQuotes) {
+  const re = peelQuotes ? EDGE_WITH_QUOTES : EDGE_NO_QUOTES;
   const s = String(raw);
   let i = 0, j = s.length;
-  while (i < j && EDGE_MARKUP.test(s[i])) i++;
-  while (j > i && EDGE_MARKUP.test(s[j - 1])) j--;
+  while (i < j && re.test(s[i])) i++;
+  while (j > i && re.test(s[j - 1])) j--;
   return { open: s.slice(0, i), core: s.slice(i, j), close: s.slice(j) };
 }
 
@@ -136,7 +141,9 @@ function computeFix(q, res, verseText) {
   if (res.status !== 'deviation') return { ok: false };
   const corrected = correctQuote(q.quote, verseText) || String(verseText).trim();
   if (!corrected || v.normalizeVerse(corrected) === v.normalizeVerse(q.quote)) return { ok: false };
-  const { open, close } = peelRaw(q.raw);
+  // Inline quotes wrap the scripture in "…"; blockquotes don't (a trailing quote there is
+  // scripture), so only peel quote marks for inline.
+  const { open, close } = peelRaw(q.raw, q.kind !== 'attribution');
   const replacement = (open + corrected + close).replace(/\s+$/, '');
   return { ok: true, oldRaw: q.raw, span: corrected, replacement, preview: replacement };
 }

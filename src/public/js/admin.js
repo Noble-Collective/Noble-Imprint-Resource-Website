@@ -2120,28 +2120,47 @@
         + bookBadge(b.diffs) + '</div>';
     }
     function normWord(t) { return String(t).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-    function setOf(words) { var s = {}; (words || []).forEach(function (w) { var n = normWord(w); if (n) s[n] = true; }); return s; }
-    // Bold the tokens whose normalized word is in `set`; escape everything.
-    function boldBySet(text, set) {
-      return String(text).split(/(\s+)/).map(function (tok) {
-        if (!tok.trim()) return esc(tok);
-        return set[normWord(tok)] ? '<strong>' + esc(tok) + '</strong>' : esc(tok);
+    // Word-LCS alignment: boolean[] over aWords — true where a word matches (is common with)
+    // bWords, false where it is inserted/changed. Positional, so a word the two share
+    // elsewhere isn't falsely flagged (only the ONE extra "the" in Matt 19:13, not all).
+    function wordMatchFlags(aWords, bWords) {
+      var na = aWords.map(normWord), nb = bWords.map(normWord);
+      var n = na.length, m = nb.length, i, j;
+      var dp = []; for (i = 0; i <= n; i++) { dp.push([]); for (j = 0; j <= m; j++) dp[i][j] = 0; }
+      for (i = 1; i <= n; i++) for (j = 1; j <= m; j++)
+        dp[i][j] = na[i - 1] === nb[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      var matched = []; for (i = 0; i < n; i++) matched.push(false);
+      i = n; j = m;
+      while (i > 0 && j > 0) {
+        if (na[i - 1] === nb[j - 1]) { matched[i - 1] = true; i--; j--; }
+        else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--;
+      }
+      return matched;
+    }
+    // Render `text`, wrapping ONLY the words that don't match `otherWords` in diffCls.
+    function markDiffWords(text, otherWords, diffCls) {
+      var toks = String(text).split(/(\s+)/), words = [], idxByTok = [];
+      toks.forEach(function (t, i) { if (t.trim()) { idxByTok[i] = words.length; words.push(t); } });
+      var flags = wordMatchFlags(words, otherWords || []);
+      return toks.map(function (t, i) {
+        if (!t.trim()) return esc(t);
+        return flags[idxByTok[i]] ? esc(t) : '<span class="' + diffCls + '">' + esc(t) + '</span>';
       }).join('');
     }
-    // Show the surrounding paragraph with the quote <mark>ed and differing words bold.
-    function markQuoteInParagraph(paragraph, quote, diffSet) {
+    function words0(s) { return String(s || '').split(/\s+/).filter(Boolean); }
+    // Session paragraph: whole quote in light-yellow, only its differing words darker.
+    function markQuoteInParagraph(paragraph, quote, bsbSpan) {
       var idx = paragraph.indexOf(quote);
-      if (idx < 0) return boldBySet(paragraph, diffSet);
-      return esc(paragraph.slice(0, idx)) + '<mark class="qa-q">' + boldBySet(quote, diffSet) + '</mark>' + esc(paragraph.slice(idx + quote.length));
+      var inner = markDiffWords(quote, words0(bsbSpan), 'qa-diff');
+      if (idx < 0) return markDiffWords(paragraph, words0(bsbSpan), 'qa-diff');
+      return esc(paragraph.slice(0, idx)) + '<span class="qa-q">' + inner + '</span>' + esc(paragraph.slice(idx + quote.length));
     }
-    // Show the full BSB verse with the quoted span <mark>ed and its differing (vs the quote) words bold.
+    // BSB verse: whole aligned span in light-green, only its differing words darker.
     function markSpanInVerse(verse, span, quoteText) {
-      var qset = setOf(String(quoteText).split(/\s+/));
-      var bibleSet = {};
-      String(span || '').split(/\s+/).forEach(function (w) { var n = normWord(w); if (n && !qset[n]) bibleSet[n] = true; });
       var idx = span ? verse.indexOf(span) : -1;
-      if (idx < 0) return boldBySet(verse, bibleSet);
-      return esc(verse.slice(0, idx)) + '<mark class="qa-q">' + boldBySet(span, bibleSet) + '</mark>' + esc(verse.slice(idx + span.length));
+      var inner = markDiffWords(span || '', words0(quoteText), 'qa-diff-bsb');
+      if (idx < 0) return esc(verse);
+      return esc(verse.slice(0, idx)) + '<span class="qa-bsb">' + inner + '</span>' + esc(verse.slice(idx + span.length));
     }
 
     // A link that opens the rendered session page scrolled to & highlighting the quote,
@@ -2159,15 +2178,14 @@
         ? encodeURIComponent(trim(words.slice(0, 4).join(' '))) + ',' + encodeURIComponent(trim(words.slice(-4).join(' ')))
         : encodeURIComponent(trim(clean));
       var url = f.sessionUrl + '#:~:text=' + frag;
-      return ' <a href="' + esc(url) + '" target="_blank" rel="noopener">Show in book &#8599;</a>';
+      return '<a class="bv-qalink" href="' + esc(url) + '" target="_blank" rel="noopener">Show in book &#8599;</a>';
     }
     function findingRow(f) {
       var tierLbl = f.tier === 'review' ? 'Review' : f.tier === 'different-translation' ? 'Different translation' : 'Minor';
       var sessionHead = f.sessionTitle
         ? (f.sessionUrl ? '<a href="' + esc(f.sessionUrl) + '" target="_blank" rel="noopener">' + esc(f.sessionTitle) + '</a>' : esc(f.sessionTitle))
         : '<code>' + esc((f.file || '').split('/').pop()) + '</code>';
-      var diffSet = setOf(f.onlyInQuote);
-      var span = (f.fix && f.fix.ok) ? (f.fix.span || f.fix.preview) : null;
+      var span = (f.fix && f.fix.ok) ? (f.fix.span || f.fix.preview) : f.verse;
       var fixBlock = '';
       if (f.fix && f.fix.ok) {
         var fid = 'fix:' + (qaFixSeq++);
@@ -2178,17 +2196,27 @@
         var replText = f.fix.replacement || f.fix.preview || '';
         // Size the box to the content (multi-line quotes need room); auto-grows on edit.
         var estRows = Math.min(16, Math.max(2, (replText.match(/\n/g) || []).length + 1 + Math.floor(replText.length / 70)));
+        // Show the surrounding session text before/after the box, so it's clear how the
+        // page will read once applied. Split the paragraph at the exact source unit.
+        var ctx = String(f.context || ''), oldRaw = f.fix.oldRaw || '', ci = oldRaw ? ctx.indexOf(oldRaw) : -1;
+        var before = ci >= 0 ? ctx.slice(0, ci) : '';
+        var after = ci >= 0 ? ctx.slice(ci + oldRaw.length) : '';
+        var ctxWrap = (before || after)
+          ? '<div class="qa-fix-inline">' + (before ? '<span class="qa-ctx-text">' + esc(before) + '</span>' : '')
+              + '<textarea class="qa-fix-text" rows="' + estRows + '" spellcheck="false">' + esc(replText) + '</textarea>'
+              + (after ? '<span class="qa-ctx-text">' + esc(after) + '</span>' : '') + '</div>'
+          : '<textarea class="qa-fix-text" rows="' + estRows + '" spellcheck="false">' + esc(replText) + '</textarea>';
         fixBlock = '<div class="qa-fix">'
-          + '<div class="qa-fix-label text-muted">Fix will replace the quote with this exact source text (edit before applying if needed):</div>'
-          + '<textarea class="qa-fix-text" rows="' + estRows + '" spellcheck="false">' + esc(replText) + '</textarea>'
+          + '<div class="qa-fix-label text-muted">Fix will replace the yellow highlighted quote above with this exact text (edit before applying if needed):</div>'
+          + ctxWrap
           + '<div class="qa-fix-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-fix" data-fix-id="' + esc(fid) + '">Fix quote</button> <span class="bv-fix-status text-muted"></span></div></div>';
       }
       return '<div class="admin-card qa-finding">'
         + '<div class="qa-finding-session">' + sessionHead + '</div>'
         + '<div class="qa-finding-head"><span class="bv-loc">' + esc(f.ref) + '</span> <span class="admin-badge admin-badge--warn">' + esc(tierLbl) + '</span> <span class="text-muted">' + esc(f.coverage) + '% overlap</span> '
-        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a>' + bookFragmentLink(f) + '</div>'
-        + '<div class="qa-block"><div class="qa-block-label">In the session</div><div class="qa-para">' + markQuoteInParagraph(f.context || f.quote, f.quote, diffSet) + '</div></div>'
-        + '<div class="qa-block"><div class="qa-block-label">BSB &mdash; ' + esc(f.ref) + '</div><div class="qa-para">' + markSpanInVerse(f.verse, span, f.quote) + '</div></div>'
+        + '<a href="#" class="bv-context bv-qalink" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a>' + bookFragmentLink(f) + '</div>'
+        + '<div class="qa-block"><div class="qa-block-label">In the session</div><div class="qa-para">' + markQuoteInParagraph(f.context || f.quote, f.quote, span) + '</div></div>'
+        + '<div class="qa-block"><div class="qa-block-label">BSB &mdash; ' + esc(f.ref) + '</div><div class="qa-para">' + markSpanInVerse(f.verse, (f.fix && f.fix.ok) ? f.fix.span : null, f.quote) + '</div></div>'
         + fixBlock + '</div>';
     }
     // A collapsible result card per book, with cover + counts + findings.

@@ -3801,7 +3801,8 @@ body.drawer-open {
 .admin-btn:disabled { opacity: .55; cursor: default; }
 
 /* "See context" link + chapter popup */
-.bv-context { font-size: 12px; margin-left: 8px; color: #2980b9; cursor: pointer; }
+.bv-context, .bv-qalink { font-size: 12px; color: #2980b9; cursor: pointer; text-decoration: none; }
+.bv-context:hover, .bv-qalink:hover { text-decoration: underline; }
 .bv-ctx-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1000; align-items: center; justify-content: center; }
 .bv-ctx-modal { background: #fff; border-radius: 10px; width: min(680px, 92vw); max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
 .bv-ctx-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #eee6d3; }
@@ -5784,8 +5785,12 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .qa-block { margin: 6px 0; }
 .qa-block-label { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: #8a7f66; margin-bottom: 2px; }
 .qa-para { line-height: 1.6; padding: 6px 8px; background: #faf7ef; border-radius: 6px; }
-.qa-q { background: #fff2a8; border-radius: 3px; padding: 0 1px; }
-.qa-q strong, .qa-para strong { background: #ffd54a; font-weight: 700; }
+/* In-session quote: whole span light yellow, only the differing words darker yellow. */
+.qa-q { background: #fdf3c4; border-radius: 3px; padding: 0 1px; }
+.qa-diff { background: #ffd23f; border-radius: 2px; padding: 0 1px; font-weight: 600; }
+/* BSB span: whole span light green, only the differing (correct) words darker green. */
+.qa-bsb { background: #dff2d8; border-radius: 3px; padding: 0 1px; }
+.qa-diff-bsb { background: #a6e0a0; border-radius: 2px; padding: 0 1px; font-weight: 600; }
 .qa-fix { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #eae4d6; }
 .qa-fix-preview { margin-bottom: 6px; }
 
@@ -5806,10 +5811,14 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .bv-count { color: #8a7d5a; font-weight: 400; font-size: 13px; margin-left: 4px; }
 .bv-history-actions { margin-top: 12px; }
 
-/* Quotation Audit — editable fix box */
+/* Quotation Audit — editable fix box, shown in the session's surrounding text */
 .qa-fix-label { font-size: 12px; margin-bottom: 4px; }
-.qa-fix-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.5;
-  padding: 6px 8px; border: 1px solid #d7cdb5; border-radius: 6px; resize: vertical; background: #fff; }
+.qa-fix-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.6;
+  padding: 6px 8px; border: 1px solid #cdb86a; border-radius: 6px; resize: vertical;
+  background: #fffdf3; box-shadow: 0 0 0 2px #fdf3c4; }
+.qa-fix-inline { line-height: 1.6; padding: 6px 8px; background: #faf7ef; border-radius: 6px; }
+.qa-fix-inline .qa-fix-text { margin: 6px 0; }
+.qa-ctx-text { color: #9a8f77; }
 .qa-fix-actions { margin-top: 8px; }
 
 /* Publisher freshness banner (Bible Validation) */

@@ -100,6 +100,33 @@ test('computeFix leaves a bare inline quote unwrapped', () => {
   assert.strictEqual(fix.replacement, fix.span);
 });
 
+test('computeFix does not double the closing quote or append a period (Matt 28:20 style)', () => {
+  // Blockquote ending in the scripture's own closing quote; quote has an extra word so a
+  // fix is produced. Must end "...age.”" — not "...age.”.”" / "...age.”.".
+  const q = {
+    kind: 'attribution',
+    quote: 'Then the eleven disciples went to Galilee. And Jesus said, "All authority has been given to Me. Go therefore, even to the end of the age."',
+    raw: '> Then the eleven disciples went to Galilee. And Jesus said, "All authority has been given to Me. Go therefore, even to the end of the age."',
+  };
+  const verse = 'Then eleven disciples went to Galilee. And Jesus said, “All authority has been given to Me. Go therefore, even to the end of the age.”';
+  const fix = a.computeFix(q, { status: 'deviation' }, verse);
+  assert.strictEqual(fix.ok, true);
+  assert.ok(!/[.”"']\s*[”"']\s*$/.test(fix.replacement) || /age\.”$/.test(fix.replacement),
+    'no doubled quote/period tail: ' + JSON.stringify(fix.replacement));
+  assert.ok(/age\.”$/.test(fix.replacement), 'ends with a single closing quote: ' + JSON.stringify(fix.replacement));
+  assert.ok(fix.replacement.startsWith('> '), 'keeps the blockquote');
+});
+
+test('peelRaw peels quote marks only when asked (inline yes, blockquote no)', () => {
+  assert.strictEqual(a.peelRaw('“come to Me.”', true).open, '“');
+  assert.strictEqual(a.peelRaw('“come to Me.”', true).close, '”');
+  // Blockquote: a trailing quote is scripture, not a wrapper — leave it in the core.
+  const r = a.peelRaw('> Jesus said, “come to Me.”', false);
+  assert.strictEqual(r.open, '> ');
+  assert.strictEqual(r.close, '');
+  assert.ok(r.core.endsWith('”'));
+});
+
 test('computeFix keeps the surrounding quote marks when raw includes them', () => {
   const q = {
     kind: 'inline',
