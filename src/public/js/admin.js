@@ -1670,9 +1670,17 @@
           ? (counts.anyHidden ? 'Our copy matches the current published BSB, aside from diff(s) you have hidden (see “Hidden / dismissed” at the bottom).' : 'Our copy matches the current published BSB exactly.')
           : 'The <strong>' + counts.verseChanged + '</strong> verse change(s) and the <strong>' + counts.structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
         + '</p>'
-        + (r.storeCheck ? '<p class="text-muted bv-math" style="border-top:1px solid #efe9d8;padding-top:8px">' + (r.storeCheck.diverged === 0
-            ? '<strong>references.json ↔ USFM: in sync ✓</strong> — ' + Number(r.storeCheck.checked || 0).toLocaleString() + ' verses cross-checked; the reader (references.json) and the audiobook (USFM) use the same text.'
-            : '<span class="admin-error"><strong>references.json ↔ USFM: ' + r.storeCheck.diverged + ' verse(s) diverged</strong></span> — a verse was edited in one store but not the other, so the reader and the audiobook would disagree. See “Store divergence” below.') + '</p>' : '')
+        + (r.storeCheck
+          ? '<div class="bv-group-label">Store consistency &mdash; references.json &harr; USFM (reader &harr; audiobook)</div>'
+            + '<div class="bv-tiles">'
+            + tile('Cross-checked', Number(r.storeCheck.checked || 0).toLocaleString(), 'ok')
+            + tile('In sync', Number(Math.max(0, (r.storeCheck.checked || 0) - (r.storeCheck.diverged || 0))).toLocaleString(), r.storeCheck.diverged ? 'warn' : 'ok')
+            + tile('Diverged', r.storeCheck.diverged, r.storeCheck.diverged ? 'err' : 'ok')
+            + '</div>'
+            + '<p class="text-muted bv-math">' + (r.storeCheck.diverged === 0
+                ? 'The reader (references.json) and the audiobook (USFM) use the same verse text.'
+                : '<span class="admin-error">A verse was edited in one store but not the other</span>, so the reader and the audiobook would disagree &mdash; see the &ldquo;Store divergence&rdquo; section below.') + '</p>'
+          : '')
         + '</div>';
     }
 
