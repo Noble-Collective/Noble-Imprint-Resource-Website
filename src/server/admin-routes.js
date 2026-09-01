@@ -801,6 +801,28 @@ api.post('/bible-sync-log/:sha/restore', async (req, res) => {
   }
 });
 
+// Dismissed (hidden) compare diffs — admins can hide an oddball diff (e.g. a one-off
+// publisher footnote) so it stops counting toward "up to date". Persisted across runs.
+api.get('/bible-dismissed', async (req, res) => {
+  try { res.json({ dismissed: await firestore.getDismissedDiffs() }); }
+  catch (err) { console.error('Bible dismissed list error:', err.message); res.status(500).json({ error: err.message }); }
+});
+api.post('/bible-dismissed', async (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'key required' });
+    const { key: _k, ...meta } = req.body;
+    res.json(await firestore.addDismissedDiff({ key, ...meta, by: (req.user && req.user.email) || '' }));
+  } catch (err) { console.error('Bible dismiss error:', err.message); res.status(500).json({ error: err.message }); }
+});
+api.delete('/bible-dismissed', async (req, res) => {
+  try {
+    const key = req.query.key;
+    if (!key) return res.status(400).json({ error: 'key required' });
+    res.json({ removed: await firestore.removeDismissedDiff(key) });
+  } catch (err) { console.error('Bible undismiss error:', err.message); res.status(500).json({ error: err.message }); }
+});
+
 // Clear the comparison run history (e.g. after adding new per-type columns that old
 // runs can't backfill).
 api.delete('/bible-validation/runs', async (req, res) => {

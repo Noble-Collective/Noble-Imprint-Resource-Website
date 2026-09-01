@@ -211,6 +211,32 @@ async function deleteAllValidationRuns() {
   return deleted;
 }
 
+// --- Dismissed (hidden) compare diffs ---
+// Each doc = one diff the admin chose to hide (by a stable key), so it stays hidden across
+// compare runs and is excluded from the "up to date" verdict.
+function dismissedDiffsCollection() { return getDb().collection('bibleDismissedDiffs'); }
+
+async function getDismissedDiffs() {
+  const snap = await dismissedDiffsCollection().get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function addDismissedDiff(entry) {
+  const existing = await dismissedDiffsCollection().where('key', '==', entry.key).limit(1).get();
+  if (!existing.empty) return { id: existing.docs[0].id, deduped: true };
+  const ref = await dismissedDiffsCollection().add({ ...entry, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  return { id: ref.id };
+}
+
+async function removeDismissedDiff(key) {
+  const snap = await dismissedDiffsCollection().where('key', '==', key).get();
+  if (snap.empty) return 0;
+  const batch = getDb().batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  return snap.size;
+}
+
 // --- Quotation-audit run history ---
 
 async function saveQuoteAuditRun(run) {
@@ -234,6 +260,9 @@ module.exports = {
   saveValidationRun,
   getValidationRuns,
   deleteAllValidationRuns,
+  getDismissedDiffs,
+  addDismissedDiff,
+  removeDismissedDiff,
   saveQuoteAuditRun,
   getQuoteAuditRuns,
   createOrUpdateUser,

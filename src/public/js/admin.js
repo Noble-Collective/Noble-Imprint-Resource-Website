@@ -1430,14 +1430,16 @@
     }
 
     function changeCard(c) {
-      var loc = c.type === 'verse-store'
+      var isVerse = c.type === 'verse-store';
+      var loc = isVerse
         ? 'Verse text &mdash; <strong>' + esc(c.ref) + '</strong>'
         : 'Quotation of <strong>' + esc(c.ref) + '</strong> in <code>' + esc(c.file) + '</code>';
-      return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '">'
+      var kind = isVerse ? 'verse' : 'library';
+      var key = diffKeyOf(c.type, c.bookCode || c.file || '', c.ref, c.oldText, c.newText);
+      return '<div class="admin-card bv-change" data-change-id="' + esc(c.id) + '"' + cardData(kind, c.bookCode || c.file || '', key) + '>'
         + '<div class="bv-change-loc">' + loc + ' <a href="#" class="bv-context" data-ctx-ref="' + esc(c.ref) + '">See context</a></div>'
         + diffPair(c.oldText, c.newText)
-        + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
-        + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
+        + cardActions(true) + '</div>';
     }
 
     // Word-overlap similarity (0..1) — used to pair a reworded heading/footnote
@@ -1458,6 +1460,30 @@
       return '<a href="#" class="bv-context"' + attrs + '>View context</a>';
     }
     var structSeq = 0;
+
+    // ── Hide/dismiss support ──────────────────────────────────────────────────
+    var dismissedKeys = {};          // key → true (persisted; hidden diffs)
+    var lastCompareResult = null;    // for re-render after hide/unhide
+    // A stable key for a diff so a hide persists across compare runs.
+    function diffKeyOf(type, book, ref, oldText, newText) {
+      return [type, book || '', ref || '', String(oldText || ''), String(newText || '')].join('␟');
+    }
+    // Accept?/Reject + always a Hide button; the card carries its diff key + kind + book.
+    function cardActions(canAccept) {
+      return '<div class="bv-change-actions">'
+        + (canAccept ? '<button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> <button class="admin-btn admin-btn--sm bv-reject">Reject</button> ' : '')
+        + '<button class="admin-btn admin-btn--sm bv-hide">Hide</button>'
+        + '<span class="bv-change-status text-muted"></span></div>';
+    }
+    function cardData(kind, book, key) {
+      return ' data-diff-kind="' + esc(kind) + '" data-diff-book="' + esc(book || '') + '" data-diff-key="' + esc(key) + '"';
+    }
+    function loadDismissed() {
+      return apiCall('GET', '/api/admin/bible-dismissed').then(function (d) {
+        dismissedKeys = {};
+        (d.dismissed || []).forEach(function (e) { if (e.key) dismissedKeys[e.key] = true; });
+      }).catch(function () { dismissedKeys = {}; });
+    }
 
     // Render heading/footnote differences for one book. Items are { text, ref }.
     // A reworded item (best word-similarity match on the other side) is shown as
@@ -1489,19 +1515,20 @@
           // pairs, or high word-similarity pairs (e.g. superscription footnotes our
           // copy and the official put at slightly different verse numbers).
           var canAccept = isHeading || isCrossRef || sameRef || wordSim(o.text, official[best].text) >= 0.6;
-          var actions = '', idAttr = '';
+          var kind = isHeading ? 'heading' : isCrossRef ? 'crossref' : 'footnote';
+          var newTextP = official[best].raw || official[best].text;
+          var key = diffKeyOf(changeType, bookCode, o.ref, o.text, newTextP);
+          var idAttr = '';
           if (canAccept) {
             var type = changeType;
             var id = type + ':' + bookCode + ':' + o.ref + ':' + (structSeq++);
             // newText = the official RAW form (real dashes/quotes preserved); oldText
             // stays normalized so the apply's ref+normalized match still finds our span.
-            changesById[id] = { id: id, type: type, translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: (official[best].raw || official[best].text) };
+            changesById[id] = { id: id, type: type, translationId: translationId, bookCode: bookCode, ref: o.ref, oldText: o.text, newText: newTextP };
             idAttr = ' data-change-id="' + esc(id) + '"';
-            actions = '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
-              + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div>';
           }
-          rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + '><div class="bv-change-loc">' + loc(o.ref, label, official[best].raw || official[best].text) + '</div>'
-            + diffPair(o.text, official[best].text) + actions + '</div>');
+          rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + cardData(kind, bookCode, key) + '><div class="bv-change-loc">' + loc(o.ref, label, newTextP) + '</div>'
+            + diffPair(o.text, official[best].text) + cardActions(canAccept) + '</div>');
         } else {
           // Present only in our copy → Accept DELETES it so we match the BSB (which has none here).
           rows.push(unpairedCard(bookName, bookCode, translationId, changeType, label, o.ref, o.raw || o.text, '', o.text, ''));
@@ -1525,12 +1552,13 @@
       var change = { id: id, type: changeType, translationId: translationId, bookCode: bookCode, ref: ref, oldText: oldText, newText: newText };
       if (anchor) change.anchor = anchor;
       changesById[id] = change;
+      var kind = changeType === 'usfm-heading' ? 'heading' : changeType === 'usfm-crossref' ? 'crossref' : 'footnote';
+      var key = diffKeyOf(changeType, bookCode, ref, oldText, newText);
       var none = '<span class="text-muted">[none]</span>';
-      return '<div class="admin-card bv-change bv-struct-card" data-change-id="' + esc(id) + '"><div class="bv-change-loc">' + loc + '</div>'
+      return '<div class="admin-card bv-change bv-struct-card" data-change-id="' + esc(id) + '"' + cardData(kind, bookCode, key) + '><div class="bv-change-loc">' + loc + '</div>'
         + '<div class="bv-diff-line"><span class="bv-side">Current</span> ' + (curText ? esc(curText) : none) + '</div>'
         + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site</span> ' + (bsbText ? esc(bsbText) : none) + '</div>'
-        + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
-        + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
+        + cardActions(true) + '</div>';
     }
 
     // Count accepted (applyable) changes of a given type currently in the registry.
@@ -1544,7 +1572,8 @@
     }
     // A collapsible results section: title + count + its own refresh button + body.
     function bvSection(title, countLabel, open, refreshType, refreshLabel, bodyHtml) {
-      return '<details class="bv-section"' + (open ? ' open' : '') + '><summary><strong>' + esc(title) + '</strong> <span class="bv-count">' + esc(countLabel) + '</span></summary>'
+      var kind = { 'verse-store': 'verse', 'usfm-heading': 'heading', 'usfm-footnote': 'footnote', 'usfm-crossref': 'crossref' }[refreshType] || '';
+      return '<details class="bv-section" data-sec-kind="' + esc(kind) + '"' + (open ? ' open' : '') + '><summary><strong>' + esc(title) + '</strong> <span class="bv-count">' + esc(countLabel) + '</span></summary>'
         + refreshBtn(refreshType, refreshLabel) + bodyHtml + '</details>';
     }
     // One structure section (heading | footnote | cross-reference), grouped by book.
@@ -1599,7 +1628,39 @@
       return '<details class="bv-section"' + (bad ? ' open' : '') + '><summary><strong>Verse text (repo &rarr; web reader)</strong> <span class="bv-count">' + bad + ' difference' + (bad === 1 ? '' : 's') + '</span></summary>' + body + '</details>';
     }
 
+    // The summary card (badge + verse/reader/structure tiles + note). `counts` carries the
+    // VISIBLE totals (recomputed after hides), so the verdict reflects what isn't hidden.
+    function buildSummaryCard(r, counts) {
+      var v = r.verse, st = r.structure.totals;
+      var clean = counts.clean;
+      var booksMatched = st.booksChecked - counts.structBooksDiff - (st.missingBooks || 0);
+      return '<div class="admin-card">'
+        + '<div class="bv-result-head">'
+        + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
+        + ' <span class="text-muted">source updated ' + esc((r.upstream && r.upstream.lastModified) || 'unknown') + ' · checked in ' + esc(r.durationMs) + ' ms</span></div>'
+        + '<div class="bv-group-label">Verse text: BSB site &rarr; repo &mdash; ' + Number(v.total).toLocaleString() + ' verses</div>'
+        + '<div class="bv-tiles">'
+        + tile('Identical', Number(v.matched).toLocaleString(), 'ok')
+        + tile('Changed', counts.verseChanged, counts.verseChanged ? 'warn' : 'ok')
+        + tile('Missing', v.missing, v.missing ? 'err' : 'ok')
+        + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
+        + '</div>'
+        + readerGroup(r.reader)
+        + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings, footnotes &amp; cross-references)</div>'
+        + '<div class="bv-tiles">'
+        + tile('Books identical', booksMatched + '/' + st.booksChecked, counts.structBooksDiff ? 'warn' : 'ok')
+        + tile('Books w/ heading diffs', counts.hdgBooks, counts.hdgBooks ? 'warn' : 'ok')
+        + tile('Books w/ footnote diffs', counts.ftBooks, counts.ftBooks ? 'warn' : 'ok')
+        + tile('Books w/ cross-ref diffs', counts.crBooks, counts.crBooks ? 'warn' : 'ok')
+        + '</div>'
+        + '<p class="text-muted bv-math">' + (clean
+          ? (counts.anyHidden ? 'Our copy matches the current published BSB, aside from diff(s) you have hidden (see “Hidden / dismissed” at the bottom).' : 'Our copy matches the current published BSB exactly.')
+          : 'The <strong>' + counts.verseChanged + '</strong> verse change(s) and the <strong>' + counts.structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
+        + '</p></div>';
+    }
+
     function renderCompareResult(r) {
+      lastCompareResult = r;
       changesById = {};
       var ch = r.changes || { verseChanges: [], libraryChanges: [], citationReview: [] };
       (ch.verseChanges || []).concat(ch.libraryChanges || []).forEach(function (c) { changesById[c.id] = c; });
@@ -1607,61 +1668,104 @@
       var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + (st.booksWithCrossRefDiffs || 0) + st.missingBooks + st.extraBooks;
       var readerBad = (r.reader && !r.reader.error) ? ((r.reader.mismatched || 0) + (r.reader.missing || 0)) : 0;
       var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0 && readerBad === 0;
-
       var hdgBooks = st.booksWithHeadingDiffs || 0, ftBooks = st.booksWithFootnoteDiffs || 0, crBooks = st.booksWithCrossRefDiffs || 0;
-      var structBooksDiff = st.booksChecked - st.booksMatched; // books differing in headings, footnotes and/or cross-references
-      var html = '<div class="admin-card">'
-        + '<div class="bv-result-head">'
-        + (clean ? '<span class="admin-badge admin-badge--ok">Up to date</span>' : '<span class="admin-badge admin-badge--warn">Differences found</span>')
-        + ' <span class="text-muted">source updated ' + esc((r.upstream && r.upstream.lastModified) || 'unknown') + ' · checked in ' + esc(r.durationMs) + ' ms</span></div>'
-        // Verse text, leg 1: BSB site → repo
-        + '<div class="bv-group-label">Verse text: BSB site &rarr; repo &mdash; ' + Number(v.total).toLocaleString() + ' verses</div>'
-        + '<div class="bv-tiles">'
-        + tile('Identical', Number(v.matched).toLocaleString(), 'ok')
-        + tile('Changed', v.changed, v.changed ? 'warn' : 'ok')
-        + tile('Missing', v.missing, v.missing ? 'err' : 'ok')
-        + tile('Extra', v.extra, v.extra ? 'err' : 'ok')
-        + '</div>'
-        // Verse text, leg 2: repo → web reader (shown right next to leg 1)
-        + readerGroup(r.reader)
-        // Structure (headings + footnotes) — a separate axis, measured per book
-        + '<div class="bv-group-label">Structure &mdash; ' + st.booksChecked + ' books (headings, footnotes &amp; cross-references)</div>'
-        + '<div class="bv-tiles">'
-        + tile('Books identical', st.booksMatched + '/' + st.booksChecked, structBooksDiff ? 'warn' : 'ok')
-        + tile('Books w/ heading diffs', hdgBooks, hdgBooks ? 'warn' : 'ok')
-        + tile('Books w/ footnote diffs', ftBooks, ftBooks ? 'warn' : 'ok')
-        + tile('Books w/ cross-ref diffs', crBooks, crBooks ? 'warn' : 'ok')
-        + '</div>'
-        + '<p class="text-muted bv-math">' + (clean
-          ? 'Our copy matches the current published BSB exactly.'
-          : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
-        + '</p>';
-      html += '</div>';
+
+      // Server-side counts for the first paint; reconcileHidden() recomputes from visible cards.
+      var initialCounts = { verseChanged: v.changed, hdgBooks: hdgBooks, ftBooks: ftBooks, crBooks: crBooks,
+        structBooksDiff: st.booksChecked - st.booksMatched, readerBad: readerBad, clean: clean, anyHidden: false };
+      var html = '<div id="bv-summary">' + buildSummaryCard(r, initialCounts) + '</div>';
 
       if (!clean) {
-        // Each difference type is its own collapsible section with its own refresh button.
         var vChanges = ch.verseChanges || [];
         var vBody = vChanges.length
           ? '<p class="text-muted">Accept to update our copy to the current BSB (one commit each). Reject to keep ours.</p>' + vChanges.map(changeCard).join('')
           : '<p class="text-muted">No verse-text differences.</p>';
-        // The two verse-text legs sit next to each other: BSB site → repo, then repo → reader.
         html += bvSection('Verse text (BSB site → repo)', (v.changed || 0) + ' difference' + (v.changed === 1 ? '' : 's'), v.changed > 0, 'verse-store', 'Refresh all verses', vBody);
         html += readerSection(r.reader);
-
         html += structSection(r, 'Heading', 'headings', 'usfm-heading', 'Refresh all headings', hdgBooks);
         html += structSection(r, 'Footnote', 'footnotes', 'usfm-footnote', 'Refresh all footnotes', ftBooks);
         html += structSection(r, 'Cross-reference', 'crossRefs', 'usfm-crossref', 'Refresh all cross-references', crBooks);
 
-        // Library quotations are reviewed individually (no batch refresh).
         var libChanges = ch.libraryChanges || [];
         if (libChanges.length) {
-          html += '<details class="bv-section"><summary><strong>Affected library quotations</strong> <span class="bv-count">' + libChanges.length + '</span></summary>'
+          html += '<details class="bv-section" data-sec-kind="library"><summary><strong>Affected library quotations</strong> <span class="bv-count">' + libChanges.length + '</span></summary>'
             + '<p class="text-muted">Places in our books that quote the old wording — reviewed individually.</p>'
             + libChanges.map(changeCard).join('') + '</details>';
         }
       }
 
+      html += '<div id="bv-hidden"></div>';
       compareOut.innerHTML = html;
+      reconcileHidden(r);
+    }
+
+    // Move hidden (dismissed) cards into the bottom section, then recompute the summary + the
+    // section labels from what's still visible — so a diff you've hidden no longer counts and
+    // the status can go green.
+    function reconcileHidden(r) {
+      var hiddenEl = document.getElementById('bv-hidden');
+      var summaryEl = document.getElementById('bv-summary');
+      if (!hiddenEl || !summaryEl) return;
+      var inHidden = function (n) { return hiddenEl.contains(n); };
+
+      // 1. Move dismissed cards into the hidden bucket (their actions become just "Unhide").
+      //    Do the move NOW (before recomputing) so they no longer count as visible.
+      var hiddenCards = [];
+      Array.prototype.forEach.call(compareOut.querySelectorAll('.bv-change[data-diff-key]'), function (card) {
+        if (inHidden(card) || !dismissedKeys[card.getAttribute('data-diff-key')]) return;
+        var act = card.querySelector('.bv-change-actions');
+        if (act) act.innerHTML = '<button class="admin-btn admin-btn--sm bv-unhide">Unhide</button> <span class="bv-change-status text-muted"></span>';
+        hiddenCards.push(card);
+      });
+      if (hiddenCards.length) {
+        var det = document.createElement('details'); det.className = 'bv-section';
+        det.innerHTML = '<summary><strong>Hidden / dismissed</strong> <span class="bv-count">' + hiddenCards.length + '</span></summary>'
+          + '<p class="text-muted" style="margin:6px 12px">Diffs you have hidden. They do not count toward the status above. Click Unhide to bring one back.</p>';
+        hiddenCards.forEach(function (c) { det.appendChild(c); });
+        hiddenEl.innerHTML = ''; hiddenEl.appendChild(det);
+      } else { hiddenEl.innerHTML = ''; }
+
+      // 2. Recompute counts from the still-visible cards.
+      var vis = Array.prototype.filter.call(compareOut.querySelectorAll('.bv-change[data-diff-key]'), function (c) { return !inHidden(c); });
+      var books = { heading: {}, footnote: {}, crossref: {} }, verseChanged = 0;
+      vis.forEach(function (c) {
+        var kind = c.getAttribute('data-diff-kind'), book = c.getAttribute('data-diff-book');
+        if (kind === 'verse') verseChanged++;
+        else if (books[kind]) books[kind][book] = true;
+      });
+      var structBooks = {};
+      ['heading', 'footnote', 'crossref'].forEach(function (k) { Object.keys(books[k]).forEach(function (b) { structBooks[b] = true; }); });
+      var v = r.verse, st = r.structure.totals;
+      var readerBad = (r.reader && !r.reader.error) ? ((r.reader.mismatched || 0) + (r.reader.missing || 0)) : 0;
+      var counts = {
+        verseChanged: verseChanged,
+        hdgBooks: Object.keys(books.heading).length, ftBooks: Object.keys(books.footnote).length, crBooks: Object.keys(books.crossref).length,
+        structBooksDiff: Object.keys(structBooks).length, readerBad: readerBad,
+        anyHidden: hiddenCards.length > 0,
+      };
+      counts.clean = verseChanged === 0 && counts.hdgBooks === 0 && counts.ftBooks === 0 && counts.crBooks === 0
+        && readerBad === 0 && (v.missing || 0) === 0 && (v.extra || 0) === 0 && (st.missingBooks || 0) === 0 && (st.extraBooks || 0) === 0;
+
+      // 3. Rebuild the summary.
+      summaryEl.innerHTML = buildSummaryCard(r, counts);
+
+      // 4. Relabel each verse/struct section from its visible cards, hide emptied book groups.
+      Array.prototype.forEach.call(compareOut.querySelectorAll('.bv-section[data-sec-kind]'), function (sec) {
+        if (inHidden(sec)) return;
+        var kind = sec.getAttribute('data-sec-kind');
+        var cards = Array.prototype.filter.call(sec.querySelectorAll('.bv-change[data-diff-key]'), function (c) { return !inHidden(c); });
+        var countEl = sec.querySelector('summary .bv-count');
+        if (countEl) {
+          if (kind === 'verse' || kind === 'library') countEl.textContent = cards.length + (kind === 'library' ? '' : (' difference' + (cards.length === 1 ? '' : 's')));
+          else { var bset = {}; cards.forEach(function (c) { if (c.getAttribute('data-diff-book')) bset[c.getAttribute('data-diff-book')] = true; }); var nb = Object.keys(bset).length; countEl.textContent = nb + ' book' + (nb === 1 ? '' : 's') + ', ' + cards.length + ' difference' + (cards.length === 1 ? '' : 's'); }
+        }
+        Array.prototype.forEach.call(sec.querySelectorAll('.bv-struct-book'), function (bw) {
+          var vc = Array.prototype.filter.call(bw.querySelectorAll('.bv-change[data-diff-key]'), function (c) { return !inHidden(c); });
+          bw.style.display = vc.length ? '' : 'none';
+        });
+        var rt = sec.querySelector('.bv-refresh-type');
+        if (rt) rt.disabled = cards.filter(function (c) { return c.querySelector('.bv-accept'); }).length === 0;
+      });
     }
 
     if (compareBtn) {
@@ -1679,6 +1783,7 @@
         compareBtn.disabled = true;
         compareBtn.textContent = 'Comparing…';
         compareOut.innerHTML = '';
+        loadDismissed(); // ready well before the stream result arrives (~8s)
 
         // Server state (arrives whenever it arrives) is decoupled from the UI,
         // which is driven sequentially below.
@@ -1739,6 +1844,24 @@
       // "See context" popup + per-type "Refresh all …" buttons.
       compareOut.addEventListener('click', function (e) {
         if (e.target.classList.contains('bv-context')) { e.preventDefault(); openChapterPopup(e.target.getAttribute('data-ctx-ref'), { kind: e.target.getAttribute('data-ctx-note-kind'), text: e.target.getAttribute('data-ctx-note') }); return; }
+        if (e.target.classList.contains('bv-hide')) {
+          var hc = e.target.closest('.bv-change'); if (!hc) return;
+          var hk = hc.getAttribute('data-diff-key'); if (!hk) return;
+          e.target.disabled = true;
+          apiCall('POST', '/api/admin/bible-dismissed', { key: hk, kind: hc.getAttribute('data-diff-kind'), book: hc.getAttribute('data-diff-book') })
+            .then(function () { dismissedKeys[hk] = true; if (lastCompareResult) renderCompareResult(lastCompareResult); })
+            .catch(function (err) { e.target.disabled = false; alert(err.message); });
+          return;
+        }
+        if (e.target.classList.contains('bv-unhide')) {
+          var uc = e.target.closest('.bv-change'); if (!uc) return;
+          var uk = uc.getAttribute('data-diff-key'); if (!uk) return;
+          e.target.disabled = true;
+          apiCall('DELETE', '/api/admin/bible-dismissed?key=' + encodeURIComponent(uk))
+            .then(function () { delete dismissedKeys[uk]; if (lastCompareResult) renderCompareResult(lastCompareResult); })
+            .catch(function (err) { e.target.disabled = false; alert(err.message); });
+          return;
+        }
         if (e.target.classList.contains('bv-refresh-type')) {
           var btn = e.target, rtype = btn.getAttribute('data-refresh-type');
           var nouns = { 'verse-store': 'verse', 'usfm-heading': 'heading', 'usfm-footnote': 'footnote', 'usfm-crossref': 'cross-reference' };
