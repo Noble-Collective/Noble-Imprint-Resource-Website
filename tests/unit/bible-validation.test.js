@@ -292,6 +292,29 @@ test('diffServed reports a clean pass when the reader matches the repo exactly',
   assert.strictEqual(r.missing, 0);
 });
 
+// ── extractUsfmVerses / crossCheckStores (references.json ↔ USFM) ─────────────
+test('extractUsfmVerses folds \\d superscription into v1 and spans a mid-verse heading', () => {
+  const usfm = '\\c 1\n\\d A Psalm of David.\n\\q1\n\\v 1 The LORD is my shepherd;\n\\s1 Some Heading\n\\q1 I shall not want.';
+  const vs = v.extractUsfmVerses(usfm);
+  assert.strictEqual(vs['1:1'], 'A Psalm of David. The LORD is my shepherd; I shall not want.');
+});
+
+test('crossCheckStores flags a verse that differs between references.json and the USFM', () => {
+  const refs = new Map([['Jude 1:11', 'they rushed for profit into error']]);
+  const usfm = new Map([['66JUDBSB.SFM', '\\c 1\n\\v 11 they rushed headlong into error']]);
+  const r = v.crossCheckStores(refs, usfm);
+  assert.strictEqual(r.checked, 1);
+  assert.strictEqual(r.diverged, 1);
+  assert.strictEqual(r.samples[0].ref, 'Jude 1:11');
+});
+
+test('crossCheckStores treats dash/quote spacing as in-sync (no false divergence)', () => {
+  const refs = new Map([['Genesis 1:1', 'In the beginning—God created it.”']]);
+  const usfm = new Map([['01GENBSB.SFM', '\\c 1\n\\v 1 In the beginning— God created it. ”']]);
+  const r = v.crossCheckStores(refs, usfm);
+  assert.strictEqual(r.diverged, 0);
+});
+
 // ── diffStructure ─────────────────────────────────────────────────────────────
 test('diffStructure compares headings + footnotes across naming styles', () => {
   const ours = new Map([

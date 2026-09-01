@@ -307,6 +307,50 @@ function replaceCrossRefInUsfm(content, ref, oldText, newText) {
   return { content, changed: false };
 }
 
+// Update a verse's text inside the raw USFM (the audiobook pipeline renders from these
+// \v lines, so a verse-store edit to references.json must be mirrored here or the two
+// diverge). We change only the differing span (via the change anchor) within that verse's
+// region, leaving the verse's footnote markers / poetry line breaks intact.
+function replaceVerseInUsfm(content, ref, oldText, newText) {
+  const anchor = computeChangeAnchor(oldText, newText);
+  if (!anchor.changed) return { content, changed: false };
+  const m = String(ref).match(/(\d+):(\d+)\s*$/);
+  if (!m) return { content, changed: false };
+  const ch = m[1], vs = m[2];
+  const s = String(content);
+  const re = /\\c\s+(\d+)|\\v\s+(\d+)/g;
+  let mm, curCh = 0, vStart = -1, vEnd = s.length;
+  while ((mm = re.exec(s)) !== null) {
+    if (mm[1] !== undefined) { if (vStart >= 0) { vEnd = mm.index; break; } curCh = mm[1]; continue; }
+    if (vStart >= 0) { vEnd = mm.index; break; }          // next \v ends the verse region
+    if (String(curCh) === ch && mm[2] === vs) vStart = mm.index;
+  }
+  if (vStart < 0) return { content, changed: false };
+  const region = s.slice(vStart, vEnd);
+  // Match the anchor with flexible whitespace so a line break inside the verse (poetry) or
+  // a footnote adjacent to the span doesn't defeat it.
+  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  const hit = region.match(new RegExp(esc(anchor.oldAnchor)));
+  if (hit) {
+    const abs = vStart + hit.index;
+    return { content: s.slice(0, abs) + anchor.newAnchor + s.slice(abs + hit[0].length), changed: true };
+  }
+  // Fallback: replace just the changed middle span if it occurs exactly once in the verse.
+  if (anchor.oldMiddle) {
+    const midRe = new RegExp(esc(anchor.oldMiddle));
+    const first = region.search(midRe);
+    if (first >= 0) {
+      const rest = region.slice(first + anchor.oldMiddle.length);
+      if (rest.search(midRe) === -1) {
+        const mh = region.match(midRe);
+        const abs = vStart + first;
+        return { content: s.slice(0, abs) + anchor.newMiddle + s.slice(abs + mh[0].length), changed: true };
+      }
+    }
+  }
+  return { content, changed: false };
+}
+
 // Read a file too large for the contents API's 1MB inline limit (references.json
 // is ~4.6MB): content via getFileRaw (raw media type), sha via the git tree.
 async function readBigFile(file) {
@@ -363,8 +407,21 @@ async function applyChange(change) {
     if (!changed) throw new Error(`Verse ${change.ref} not found with the expected old text (already updated?)`);
     const res = await github.updateFileContent(change.file, json, sha,
       `Sync ${change.ref} to latest BSB\n\nUpdate verse text to match bereanbible.com master.`);
+    // Mirror the change into the USFM \v line — the audiobook pipeline renders from the USFM,
+    // so a references.json-only edit would leave the two stores (and the audiobook) diverged.
+    let usfmSha;
+    try {
+      const code = v.refToBookCode(change.ref);
+      const usfmPath = code ? await resolveOurUsfmPath(change.translationId || 'bsb', code) : null;
+      if (usfmPath) {
+        const uf = await github.getFileContent(usfmPath);
+        const r = replaceVerseInUsfm(uf.content, change.ref, change.oldText, change.newText);
+        if (r.changed) { const ur = await github.updateFileContent(usfmPath, r.content, uf.sha, `Sync ${change.ref} verse text in USFM to match references.json`); usfmSha = ur.sha; }
+        else console.warn('USFM verse span not found for ' + change.ref + ' (references.json updated, USFM unchanged)');
+      }
+    } catch (e) { console.warn('USFM verse sync failed for ' + change.ref + ':', e.message); }
     refreshReader(); // verse text changed → keep the rendered reader in sync
-    return { file: change.file, ref: change.ref, sha: res.sha };
+    return { file: change.file, ref: change.ref, sha: res.sha, usfmSha };
   }
 
   if (change.type === 'library-quote') {
@@ -405,6 +462,19 @@ async function applyBatch(changes) {
       for (const c of verse) { const r = updateReferenceValue(json, c.ref, c.oldText, c.newText); if (r.changed) { json = r.json; n++; } else failed++; }
       if (n) { await github.updateFileContent(file, json, sha, `Refresh ${n} verse(s) from BSB`); applied += n; commits++; }
     } catch (e) { failed += verse.length; }
+    // Mirror the verse edits into each book's USFM \v (audiobook source), one commit per book.
+    const byBookV = {};
+    for (const c of verse) { const code = v.refToBookCode(c.ref); if (code) (byBookV[code] = byBookV[code] || []).push(c); }
+    for (const code of Object.keys(byBookV)) {
+      try {
+        const usfmPath = await resolveOurUsfmPath(verse[0].translationId || 'bsb', code);
+        if (!usfmPath) continue;
+        const uf = await github.getFileContent(usfmPath);
+        let text = uf.content, un = 0;
+        for (const c of byBookV[code]) { const r = replaceVerseInUsfm(text, c.ref, c.oldText, c.newText); if (r.changed) { text = r.content; un++; } }
+        if (un) { await github.updateFileContent(usfmPath, text, uf.sha, `Sync ${un} verse(s) in ${code} USFM to match references.json`); commits++; }
+      } catch (e) { /* best-effort; references.json already committed */ }
+    }
   }
 
   // 2. Headings + footnotes + cross-references → one commit per USFM book.
@@ -531,6 +601,7 @@ module.exports = {
   replaceHeadingInUsfm,
   replaceFootnoteInUsfm,
   replaceCrossRefInUsfm,
+  replaceVerseInUsfm,
   listLibraryMarkdown,
   detectSyncChanges,
   buildChangesFromDrift,

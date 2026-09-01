@@ -1320,7 +1320,7 @@
     var STEP_LABELS = {
       'download-verses': 'Download official verse text from bereanbible.com',
       'download-usfm': 'Download official structure (headings + footnotes)',
-      'load-ours': 'Load our stored copy',
+      'load-ours': 'Load & cross-check our stored copies (references.json ↔ USFM)',
       'compare': 'Compare every book, verse by verse (BSB site → repo)',
       'reader': 'Compare every book, verse by verse (repo → web reader)',
       'structure': 'Check section headings & footnotes',
@@ -1628,6 +1628,19 @@
       return '<details class="bv-section"' + (bad ? ' open' : '') + '><summary><strong>Verse text (repo &rarr; web reader)</strong> <span class="bv-count">' + bad + ' difference' + (bad === 1 ? '' : 's') + '</span></summary>' + body + '</details>';
     }
 
+    // Shown only when references.json and the USFM verse text disagree — a verse edited in
+    // one store but not the other (the reader vs the audiobook). Read-only (informational).
+    function storeSection(sc) {
+      if (!sc || !sc.diverged) return '';
+      var body = (sc.samples || []).map(function (s) {
+        return '<div class="admin-card bv-change bv-struct-card"><div class="bv-change-loc"><span class="bv-loc">' + esc(s.ref) + '</span></div>'
+          + '<div class="bv-diff-line"><span class="bv-side">references.json</span> ' + esc(s.references || '') + '</div>'
+          + '<div class="bv-diff-line"><span class="bv-side bv-side--new">USFM (audiobook)</span> ' + esc(s.usfm || '') + '</div></div>';
+      }).join('');
+      return '<details class="bv-section" open><summary><strong>Store divergence (references.json ↔ USFM)</strong> <span class="bv-count">' + sc.diverged + ' verse' + (sc.diverged === 1 ? '' : 's') + '</span></summary>'
+        + '<p class="text-muted">These verses differ between the reader’s store (references.json) and the audiobook’s store (USFM). Accepting a verse now updates both, so this should stay at zero.</p>' + body + '</details>';
+    }
+
     // The summary card (badge + verse/reader/structure tiles + note). `counts` carries the
     // VISIBLE totals (recomputed after hides), so the verdict reflects what isn't hidden.
     function buildSummaryCard(r, counts) {
@@ -1656,7 +1669,11 @@
         + '<p class="text-muted bv-math">' + (clean
           ? (counts.anyHidden ? 'Our copy matches the current published BSB, aside from diff(s) you have hidden (see “Hidden / dismissed” at the bottom).' : 'Our copy matches the current published BSB exactly.')
           : 'The <strong>' + counts.verseChanged + '</strong> verse change(s) and the <strong>' + counts.structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
-        + '</p></div>';
+        + '</p>'
+        + (r.storeCheck ? '<p class="text-muted bv-math" style="border-top:1px solid #efe9d8;padding-top:8px">' + (r.storeCheck.diverged === 0
+            ? '<strong>references.json ↔ USFM: in sync ✓</strong> — ' + Number(r.storeCheck.checked || 0).toLocaleString() + ' verses cross-checked; the reader (references.json) and the audiobook (USFM) use the same text.'
+            : '<span class="admin-error"><strong>references.json ↔ USFM: ' + r.storeCheck.diverged + ' verse(s) diverged</strong></span> — a verse was edited in one store but not the other, so the reader and the audiobook would disagree. See “Store divergence” below.') + '</p>' : '')
+        + '</div>';
     }
 
     function renderCompareResult(r) {
@@ -1694,6 +1711,7 @@
         }
       }
 
+      html += storeSection(r.storeCheck);
       html += '<div id="bv-hidden"></div>';
       compareOut.innerHTML = html;
       reconcileHidden(r);

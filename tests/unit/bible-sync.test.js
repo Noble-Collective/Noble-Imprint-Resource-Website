@@ -152,6 +152,26 @@ test('replaceCrossRefInUsfm returns changed=false when no \\r line matches', () 
   assert.strictEqual(r.changed, false);
 });
 
+// ── replaceVerseInUsfm (mirror a verse-store edit into the USFM \v) ────────────
+test('replaceVerseInUsfm swaps the changed span in the \\v line, keeping footnotes intact', () => {
+  const usfm = '\\c 1\n\\v 11 they have rushed headlong into the error of Balaam;\\f + \\fr 1:11 \\ft note\\f* they perished.';
+  const r = s.replaceVerseInUsfm(usfm, 'Jude 1:11',
+    'they have rushed headlong into the error of Balaam; they perished.',
+    'they have rushed for profit into the error of Balaam; they perished.');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('rushed for profit into'));
+  assert.ok(r.content.includes('\\f + \\fr 1:11')); // footnote preserved
+});
+
+test('replaceVerseInUsfm falls back to the changed word when it is unique in the verse', () => {
+  const usfm = '\\c 22\n\\v 2 they became even more silent. Then Paul declared,';
+  const r = s.replaceVerseInUsfm(usfm, 'Acts 22:2',
+    'they became even more silent. Then Paul declared,',
+    'they became even more quiet. Then Paul declared,');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('even more quiet.'));
+});
+
 // ── Add / delete (one-sided) structure changes ────────────────────────────────
 test('replaceHeadingInUsfm deletes our heading when newText is empty (BSB has none)', () => {
   const usfm = '\\c 11\n\\s1 (Joshua-Malachi)\n\\v 30 By faith...';

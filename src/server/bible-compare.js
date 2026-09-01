@@ -71,7 +71,7 @@ async function runStreamingCompare(opts = {}) {
 
   // 3. Our stored copy — read the 66 USFM files in parallel with live progress
   //    (sequential reads were the ~17s cold-start stall before books appeared).
-  emit({ type: 'step', key: 'load-ours', label: 'Loading our stored copy from the content repository', status: 'running' });
+  emit({ type: 'step', key: 'load-ours', label: 'Load & cross-check our stored copies (references.json ↔ USFM)', status: 'running' });
   // references.json is ~4.6MB — larger than the GitHub contents API's 1MB inline
   // limit — so it must be read via getFileRaw (raw media type), not getFileContent.
   const raw = await github.getFileRaw(`bibles/${translationId}/references.json`);
@@ -85,7 +85,10 @@ async function runStreamingCompare(opts = {}) {
     (d, t) => { const pct = Math.floor(d / t * 100); if (pct - lastPct >= 20 || d === t) { lastPct = pct; emit({ type: 'step', key: 'load-ours', status: 'running', detail: `loaded ${d}/${t} books` }); } });
   const oursUsfm = new Map();
   usfmNames.forEach((n, i) => { if (contents[i] != null) oursUsfm.set(n, contents[i]); });
-  emit({ type: 'step', key: 'load-ours', status: 'done', detail: `${oursVerses.size.toLocaleString()} verses · ${oursUsfm.size} books` });
+  // Cross-check our two verse stores: references.json (reader) vs the USFM \v text (audiobook).
+  // They should agree word-for-word; a divergence means one was edited without the other.
+  const storeCheck = v.crossCheckStores(oursVerses, oursUsfm);
+  emit({ type: 'step', key: 'load-ours', status: 'done', detail: `${oursVerses.size.toLocaleString()} verses · ${oursUsfm.size} books · references.json ↔ USFM ${storeCheck.diverged === 0 ? 'in sync ✓' : storeCheck.diverged + ' diverged ⚠'}` });
 
   // 4. Book-by-book verse comparison (streamed)
   emit({ type: 'step', key: 'compare', label: 'Comparing every book, verse by verse, against the source', status: 'running' });
@@ -150,6 +153,7 @@ async function runStreamingCompare(opts = {}) {
       }),
     },
     reader,
+    storeCheck,
     changes,
   };
   emit({ type: 'result', result });
