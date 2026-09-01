@@ -40,3 +40,47 @@ test('correctQuote: returns null when there is no real alignment (paraphrase)', 
   const verse = 'In the beginning God created the heavens and the earth.';
   assert.strictEqual(a.correctQuote(quote, verse), null);
 });
+
+// ── peelRaw: separate wrapper markup from the scripture core ────────────────────
+test('peelRaw peels blockquote + italics, leaving sentence punctuation in the core', () => {
+  const r = a.peelRaw('> _Christ, having been offered once, will appear._ ');
+  assert.strictEqual(r.open, '> _');
+  assert.strictEqual(r.close, '_ ');
+  assert.strictEqual(r.core, 'Christ, having been offered once, will appear.');
+});
+
+test('peelRaw returns empty wrappers for a bare inline quote', () => {
+  const r = a.peelRaw('came that may have life and have it abundantly');
+  assert.strictEqual(r.open, '');
+  assert.strictEqual(r.close, '');
+});
+
+// ── computeFix: the replacement preserves the quote's markdown wrappers ──────────
+test('computeFix keeps the blockquote + italics around an attribution replacement', () => {
+  const q = {
+    kind: 'attribution',
+    quote: '_Christ, having been offered once to bear the sins of many, will appear a second time, not to deal with sin but to save those who are eagerly waiting for him._',
+    raw: '> _Christ, having been offered once to bear the sins of many, will appear a second time, not to deal with sin but to save those who are eagerly waiting for him._ ',
+  };
+  const verse = 'so also Christ was offered once to bear the sins of many; and He will appear a second time, not to bear sin, but to bring salvation to those who eagerly await Him.';
+  const fix = a.computeFix(q, { status: 'deviation' }, verse);
+  assert.strictEqual(fix.ok, true);
+  assert.ok(fix.replacement.startsWith('> _'), 'replacement keeps "> _": ' + JSON.stringify(fix.replacement));
+  assert.ok(/_$/.test(fix.replacement), 'replacement keeps trailing "_": ' + JSON.stringify(fix.replacement));
+  assert.ok(!/^> [A-Za-z]/.test(fix.replacement), 'must NOT flatten to a plain blockquote');
+  assert.ok(!fix.span.includes('_') && !fix.span.includes('>'), 'span stays plain for verse highlighting');
+  assert.strictEqual(fix.oldRaw, q.raw);
+});
+
+test('computeFix leaves a bare inline quote unwrapped', () => {
+  const q = {
+    kind: 'inline',
+    quote: 'came that [you] may have life and have it abundantly',
+    raw: 'came that [you] may have life and have it abundantly',
+  };
+  const verse = 'The thief comes only to steal and kill and destroy. I have come that they may have life, and have it in all its fullness.';
+  const fix = a.computeFix(q, { status: 'deviation' }, verse);
+  assert.strictEqual(fix.ok, true);
+  assert.ok(!/[>_*`]/.test(fix.replacement), 'inline replacement stays plain: ' + JSON.stringify(fix.replacement));
+  assert.strictEqual(fix.replacement, fix.span);
+});

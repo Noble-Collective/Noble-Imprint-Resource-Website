@@ -48,8 +48,9 @@ function correctQuote(quote, verseText) {
   const vw = []; // { l: normalized-lowercase, tok: token index, raw: original token }
   tokens.forEach((tok, i) => { if (tok.trim()) vw.push({ l: v.normalizeVerse(tok).toLowerCase(), tok: i, raw: tok }); });
   if (vw.length < 3) return null;
-  // De-bracket the quote — editorial [..] marks aren't the Bible's wording.
-  const qw = v.normalizeVerse(String(quote).replace(/\[[^\]]*\]/g, ' ')).toLowerCase().split(' ').filter(Boolean);
+  // De-bracket the quote (editorial [..] marks aren't the Bible's wording) and drop
+  // inline markdown emphasis markers so "_word_"/"**word**" align to the plain verse.
+  const qw = v.normalizeVerse(String(quote).replace(/\[[^\]]*\]/g, ' ').replace(/[_*`]+/g, '')).toLowerCase().split(' ').filter(Boolean);
   if (qw.length < 3) return null;
 
   const matches = alignWords(qw, vw.map(w => w.l));
@@ -81,16 +82,32 @@ function correctQuote(quote, verseText) {
   return span || null;
 }
 
-// Build a "Fix" for a deviation: the scripture wording to replace the quote with.
-// Prefer the aligned span (changes only what differs); fall back to the full
-// cited verse text when the quote can't be aligned (e.g. a different-translation
-// passage). oldRaw/newRaw are the exact source text to swap; preview is shown.
+// Peel the wrapper markup off the edges of a raw quote block so a Fix can preserve
+// it: leading blockquote markers / opening quotes / emphasis, and the matching
+// trailing markers — leaving the scripture "core" (sentence punctuation stays in the
+// core). E.g. "> _Christ … him._ " → open "> _", core "Christ … him.", close "_ ".
+const EDGE_MARKUP = /[>\s_*`"'“”‘’]/;
+function peelRaw(raw) {
+  const s = String(raw);
+  let i = 0, j = s.length;
+  while (i < j && EDGE_MARKUP.test(s[i])) i++;
+  while (j > i && EDGE_MARKUP.test(s[j - 1])) j--;
+  return { open: s.slice(0, i), core: s.slice(i, j), close: s.slice(j) };
+}
+
+// Build a "Fix" for a deviation. `span` is the aligned scripture (used to highlight
+// the covered words in the verse). `replacement` is the EXPLICIT source text the
+// reviewer edits and that will be written verbatim — the scripture re-wrapped in the
+// quote's original markdown (blockquote/italics/bold), so applying a Fix preserves
+// that formatting instead of flattening it. Falls back to the full cited verse when
+// the quote can't be aligned (e.g. a different-translation passage).
 function computeFix(q, res, verseText) {
   if (res.status !== 'deviation') return { ok: false };
   const corrected = correctQuote(q.quote, verseText) || String(verseText).trim();
   if (!corrected || v.normalizeVerse(corrected) === v.normalizeVerse(q.quote)) return { ok: false };
-  const newRaw = q.kind === 'attribution' ? '> ' + corrected : corrected;
-  return { ok: true, oldRaw: q.raw, newRaw: newRaw, preview: corrected };
+  const { open, close } = peelRaw(q.raw);
+  const replacement = (open + corrected + close).replace(/\s+$/, '');
+  return { ok: true, oldRaw: q.raw, span: corrected, replacement, preview: replacement };
 }
 
 // Audit every citation+quote in one file's text against the Bible.
@@ -215,7 +232,7 @@ async function runStreamingQuoteAudit(opts = {}) {
   return result;
 }
 
-module.exports = { runStreamingQuoteAudit, scanText, auditLibraryQuotations, correctQuote, computeFix };
+module.exports = { runStreamingQuoteAudit, scanText, auditLibraryQuotations, correctQuote, computeFix, peelRaw };
 
 // ── Legacy non-streaming audit (kept for compatibility) ────────────────────────
 async function auditLibraryQuotations(opts = {}) {
