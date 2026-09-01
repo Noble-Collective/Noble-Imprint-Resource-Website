@@ -1485,16 +1485,31 @@
           rows.push('<div class="admin-card bv-change bv-struct-card"' + idAttr + '><div class="bv-change-loc">' + loc(o.ref) + '</div>'
             + diffPair(o.text, official[best].text) + actions + '</div>');
         } else {
-          rows.push('<div class="bv-struct-item"><div class="bv-change-loc">' + loc(o.ref) + '</div>'
-            + '<div class="bv-diff-line"><span class="bv-side">Current only</span> ' + esc(o.text) + '</div></div>');
+          // Present only in our copy → Accept DELETES it so we match the BSB (which has none here).
+          rows.push(unpairedCard(bookName, bookCode, translationId, changeType, o.ref, o.raw || o.text, '', o.text, ''));
         }
       });
       official.forEach(function (f, i) {
         if (usedOff[i]) return;
-        rows.push('<div class="bv-struct-item"><div class="bv-change-loc">' + loc(f.ref) + '</div>'
-          + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site only</span> ' + esc(f.text) + '</div></div>');
+        // Present only on the BSB site → Accept ADDS it to our copy.
+        rows.push(unpairedCard(bookName, bookCode, translationId, changeType, f.ref, '', f.raw || f.text, '', f.raw || f.text));
       });
       return rows.join('');
+    }
+
+    // A one-sided (add/delete) structure difference rendered like the paired cards —
+    // Current + BSB Site columns with "[none]" for the empty side — plus Accept/Reject.
+    // Accept applies { oldText, newText } where one side is '' (empty = add or delete).
+    function unpairedCard(bookName, bookCode, translationId, changeType, ref, curText, bsbText, oldText, newText) {
+      var loc = '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref);
+      var id = changeType + ':' + bookCode + ':' + ref + ':' + (structSeq++);
+      changesById[id] = { id: id, type: changeType, translationId: translationId, bookCode: bookCode, ref: ref, oldText: oldText, newText: newText };
+      var none = '<span class="text-muted">[none]</span>';
+      return '<div class="admin-card bv-change bv-struct-card" data-change-id="' + esc(id) + '"><div class="bv-change-loc">' + loc + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-side">Current</span> ' + (curText ? esc(curText) : none) + '</div>'
+        + '<div class="bv-diff-line"><span class="bv-side bv-side--new">BSB&nbsp;Site</span> ' + (bsbText ? esc(bsbText) : none) + '</div>'
+        + '<div class="bv-change-actions"><button class="admin-btn admin-btn--primary admin-btn--sm bv-accept">Accept</button> '
+        + '<button class="admin-btn admin-btn--sm bv-reject">Reject</button><span class="bv-change-status text-muted"></span></div></div>';
     }
 
     // Count accepted (applyable) changes of a given type currently in the registry.
@@ -1761,20 +1776,40 @@
     }
 
     function renderHistory(runs) {
-      if (!runs.length) { historyEl.innerHTML = '<p class="text-muted">No comparisons run yet.</p>'; return; }
+      var clearBtn = '<div class="bv-history-actions"><button class="admin-btn admin-btn--sm" id="bv-clear-history">Clear history</button> <span class="bv-clear-status text-muted"></span></div>';
+      if (!runs.length) { historyEl.innerHTML = '<p class="text-muted">No comparisons run yet.</p>' + clearBtn; wireClearHistory(); return; }
+      // "—" for older runs saved before the per-type columns existed.
+      var cell = function (val) { return '<td>' + (val == null ? '<span class="text-muted">—</span>' : esc(val)) + '</td>'; };
       var rows = runs.map(function (r) {
-        var changed = r.verse ? r.verse.changed : (r.verseCheck && r.verseCheck.totals ? r.verseCheck.totals.textMismatch : '?');
-        var structg = r.structureDiffBooks != null ? r.structureDiffBooks
-          : (r.structureCheck && r.structureCheck.totals ? (r.structureCheck.totals.booksWithHeadingDiffs || 0) + (r.structureCheck.totals.booksWithFootnoteDiffs || 0) : 0);
+        var verses = r.verseChanged != null ? r.verseChanged : (r.verse ? r.verse.changed : null);
         return '<tr><td>' + esc(r.createdAt ? new Date(r.createdAt).toLocaleString() : '') + '</td>'
           + '<td>' + statusBadge(r.status) + '</td>'
           + '<td>' + esc((r.translationId || '').toUpperCase()) + '</td>'
-          + '<td>' + esc(changed) + '</td><td>' + esc(structg) + '</td>'
+          + cell(verses)
+          + cell(r.headingDiffBooks)
+          + cell(r.footnoteDiffBooks)
+          + cell(r.crossRefDiffBooks)
           + '<td>' + esc(r.runBy || '') + '</td></tr>';
       }).join('');
       historyEl.innerHTML = '<table class="admin-table"><thead><tr>'
-        + '<th>When</th><th>Result</th><th>Bible</th><th>Verses changed</th><th>Books w/ struct diffs</th><th>By</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table>';
+        + '<th>When</th><th>Result</th><th>Bible</th><th>Verse diffs</th><th>Heading diffs</th><th>Footnote diffs</th><th>Cross-ref diffs</th><th>By</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>'
+        + '<p class="text-muted" style="font-size:12px">Heading / footnote / cross-ref counts are the number of books differing; “—” marks older runs recorded before these columns existed.</p>'
+        + clearBtn;
+      wireClearHistory();
+    }
+
+    function wireClearHistory() {
+      var btn = document.getElementById('bv-clear-history');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (!window.confirm('Clear the entire comparison run history? This cannot be undone.')) return;
+        var status = btn.parentElement.querySelector('.bv-clear-status');
+        btn.disabled = true; status.textContent = ' clearing…';
+        apiCall('DELETE', '/api/admin/bible-validation/runs')
+          .then(function (d) { status.textContent = ' cleared ' + (d.deleted || 0); loadHistory(); })
+          .catch(function (e) { btn.disabled = false; status.innerHTML = ' <span class="admin-error">' + esc(e.message) + '</span>'; });
+      });
     }
 
     function loadHistory() {

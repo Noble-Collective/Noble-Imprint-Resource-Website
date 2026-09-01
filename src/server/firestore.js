@@ -197,6 +197,20 @@ async function getValidationRuns(limit = 25) {
   });
 }
 
+// Delete every validation run (history reset). Returns the count removed.
+async function deleteAllValidationRuns() {
+  const snap = await validationRunsCollection().get();
+  let deleted = 0;
+  // Firestore batches cap at 500 ops.
+  for (let i = 0; i < snap.docs.length; i += 450) {
+    const batch = getDb().batch();
+    for (const doc of snap.docs.slice(i, i + 450)) batch.delete(doc.ref);
+    await batch.commit();
+    deleted += Math.min(450, snap.docs.length - i);
+  }
+  return deleted;
+}
+
 // --- Quotation-audit run history ---
 
 async function saveQuoteAuditRun(run) {
@@ -219,6 +233,7 @@ module.exports = {
   getUser,
   saveValidationRun,
   getValidationRuns,
+  deleteAllValidationRuns,
   saveQuoteAuditRun,
   getQuoteAuditRuns,
   createOrUpdateUser,

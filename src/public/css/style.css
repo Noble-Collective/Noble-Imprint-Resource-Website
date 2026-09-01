@@ -5802,6 +5802,7 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .bv-section > *:not(summary) { margin-left: 12px; margin-right: 12px; }
 .bv-section > .bv-refresh:first-of-type { margin-top: 12px; }
 .bv-count { color: #8a7d5a; font-weight: 400; font-size: 13px; margin-left: 4px; }
+.bv-history-actions { margin-top: 12px; }
 
 /* Quotation Audit — editable fix box */
 .qa-fix-label { font-size: 12px; margin-bottom: 4px; }

@@ -19,6 +19,7 @@ const v = require('./bible-validation');
 const { computeChangeAnchor } = require('./bible-validation');
 const citations = require('./bible-citations');
 const { runValidation } = require('./bible-validation-runner');
+const bible = require('./bible');
 
 const CONTEXT = 45; // chars of surrounding context to show for a library match
 
@@ -173,13 +174,33 @@ async function buildChangesFromDrift(drifted, translationId = 'bsb', opts = {}) 
 // Replace a section-heading's text in raw USFM, matching on NORMALIZED prose
 // (so curly/straight-quote and marker-encoding differences don't defeat it).
 // Preserves the leading marker + indentation and any trailing CR. Pure/testable.
-function replaceHeadingInUsfm(content, oldText, newText) {
+function replaceHeadingInUsfm(content, oldText, newText, ref) {
+  // ADD (BSB has a heading ours lacks) → insert "\s1 <text>" before the ref verse.
+  if (!oldText) return insertLineBeforeVerse(content, ref, '\\s1 ' + newText);
   const want = v.normalizeVerse(v.stripInlineMarkers(oldText));
   const lines = String(content).split('\n');
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(\s*\\s[1-4]?\s+)(.+?)(\r?)$/);
     if (m && v.normalizeVerse(v.stripInlineMarkers(m[2])) === want) {
-      lines[i] = m[1] + newText + m[3];
+      if (!newText) lines.splice(i, 1);            // DELETE (ours has a heading BSB lacks)
+      else lines[i] = m[1] + newText + m[3];       // REPLACE
+      return { content: lines.join('\n'), changed: true };
+    }
+  }
+  return { content, changed: false };
+}
+
+// Insert a whole line (e.g. "\s1 …" or "\r …") immediately before the \v of `ref`.
+function insertLineBeforeVerse(content, ref, newLine) {
+  if (!ref) return { content, changed: false };
+  const [ch, vs] = String(ref).split(':');
+  const lines = String(content).split('\n');
+  let curCh = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const cm = lines[i].match(/^\s*\\c\s+(\d+)/); if (cm) { curCh = cm[1]; continue; }
+    const vm = lines[i].match(/^\s*\\v\s+(\d+)/);
+    if (vm && String(curCh) === String(ch) && vm[1] === String(vs)) {
+      lines.splice(i, 0, newLine);
       return { content: lines.join('\n'), changed: true };
     }
   }
@@ -193,6 +214,10 @@ function replaceHeadingInUsfm(content, oldText, newText) {
 // as the compare (v.footnoteText) so encoding differences don't defeat it.
 function replaceFootnoteInUsfm(content, ref, oldText, newText) {
   const s = String(content);
+  // ADD (BSB has a footnote ours lacks) → append it to the ref verse's text. The exact
+  // in-verse caller position isn't recoverable from the compare, so it lands at the end
+  // of the verse; footnotes aren't rendered on the site, so this only affects storage.
+  if (!oldText) return appendFootnoteToVerse(s, ref, newText);
   const re = /\\c\s+(\d+)|\\v\s+(\d+)|\\f\s[\s\S]*?\\f\*/g;
   let ch = 0, vs = 0, m;
   while ((m = re.exec(s)) !== null) {
@@ -201,10 +226,30 @@ function replaceFootnoteInUsfm(content, ref, oldText, newText) {
     if (ref && ch + ':' + vs !== ref) continue;
     const span = m[0];
     if (v.footnoteText(span) !== oldText) continue;
+    if (!newText) {  // DELETE (ours has a footnote BSB lacks) → drop the whole span
+      return { content: s.slice(0, m.index) + s.slice(m.index + span.length), changed: true };
+    }
     const caller = (span.match(/\\f\s*([+\-?])/) || [null, '+'])[1];
     const fr = (span.match(/\\fr\s+(\S+)/) || [null, ''])[1];
     const rebuilt = '\\f ' + caller + (fr ? ' \\fr ' + fr : '') + ' \\ft ' + newText + '\\f*';
     return { content: s.slice(0, m.index) + rebuilt + s.slice(m.index + span.length), changed: true };
+  }
+  return { content, changed: false };
+}
+
+// Append a canonical footnote span at the end of the \v line for `ref`.
+function appendFootnoteToVerse(content, ref, newText) {
+  const [ch, vs] = String(ref).split(':');
+  const lines = String(content).split('\n');
+  let curCh = 0;
+  const span = '\\f + \\fr ' + ref + ' \\ft ' + newText + '\\f*';
+  for (let i = 0; i < lines.length; i++) {
+    const cm = lines[i].match(/^\s*\\c\s+(\d+)/); if (cm) { curCh = cm[1]; continue; }
+    const vm = lines[i].match(/^(\s*\\v\s+(\d+)\s.*?)(\r?)$/);
+    if (vm && String(curCh) === String(ch) && vm[2] === String(vs)) {
+      lines[i] = vm[1] + span + vm[3];
+      return { content: lines.join('\n'), changed: true };
+    }
   }
   return { content, changed: false };
 }
@@ -214,11 +259,14 @@ function replaceFootnoteInUsfm(content, ref, oldText, newText) {
 // official RAW display form (real dashes/parens preserved), keeping our plain-text
 // style. Matches the first \r line whose reduced+normalized text equals oldText.
 function replaceCrossRefInUsfm(content, ref, oldText, newText) {
+  // ADD (BSB has a \r ours lacks) → insert "\r <text>" before the ref verse.
+  if (!oldText) return insertLineBeforeVerse(content, ref, '\\r ' + newText);
   const lines = String(content).split('\n');
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(\s*\\r\s+)(.+?)(\r?)$/);
     if (m && v.normalizeVerse(v.crossRefRaw(m[2])) === oldText) {
-      lines[i] = m[1] + newText + m[3];
+      if (!newText) lines.splice(i, 1);           // DELETE (ours has a \r BSB lacks)
+      else lines[i] = m[1] + newText + m[3];      // REPLACE
       return { content: lines.join('\n'), changed: true };
     }
   }
@@ -246,6 +294,14 @@ async function resolveOurUsfmPath(translationId, code) {
 
 // ── Apply a single accepted change (GitHub write) ──────────────────────────────
 
+// Keep the rendered Bible reader in sync after a Bible-copy commit: rebuild the
+// in-memory + on-disk .bible-cache from the just-committed repo content. Fire-and-forget
+// so it never blocks the accept response; the warm instance serves fresh on its next
+// request. (Cold containers get a fresh committed cache via the refresh-cache workflow.)
+function refreshReader() {
+  Promise.resolve().then(() => bible.reload()).catch(err => console.warn('bible reader refresh failed:', err.message));
+}
+
 async function applyChange(change) {
   if (change.type === 'usfm-heading' || change.type === 'usfm-footnote' || change.type === 'usfm-crossref') {
     const kind = change.type === 'usfm-heading' ? 'heading' : change.type === 'usfm-footnote' ? 'footnote' : 'cross-reference';
@@ -254,13 +310,15 @@ async function applyChange(change) {
     if (!file) throw new Error(`No USFM file found for ${change.bookCode}`);
     const { content, sha } = await github.getFileContent(file);
     const { content: updated, changed } = change.type === 'usfm-heading'
-      ? replaceHeadingInUsfm(content, change.oldText, change.newText)
+      ? replaceHeadingInUsfm(content, change.oldText, change.newText, change.ref)
       : change.type === 'usfm-footnote'
         ? replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText)
         : replaceCrossRefInUsfm(content, change.ref, change.oldText, change.newText);
-    if (!changed) throw new Error(`${kind} "${change.oldText}" not found in ${file} (already updated?)`);
+    if (!changed) throw new Error(`${kind} "${change.oldText || change.newText}" not found in ${file} (already updated?)`);
+    const verb = !change.oldText ? 'Add' : !change.newText ? 'Remove' : 'Update';
     const res = await github.updateFileContent(file, updated, sha,
-      `Update ${change.bookCode} ${kind} at ${change.ref} to match latest BSB`);
+      `${verb} ${change.bookCode} ${kind} at ${change.ref} to match latest BSB`);
+    refreshReader(); // keep the rendered reader in sync with the repo
     return { file, ref: change.ref, sha: res.sha };
   }
 
@@ -271,6 +329,7 @@ async function applyChange(change) {
     if (!changed) throw new Error(`Verse ${change.ref} not found with the expected old text (already updated?)`);
     const res = await github.updateFileContent(change.file, json, sha,
       `Sync ${change.ref} to latest BSB\n\nUpdate verse text to match bereanbible.com master.`);
+    refreshReader(); // verse text changed → keep the rendered reader in sync
     return { file: change.file, ref: change.ref, sha: res.sha };
   }
 
@@ -326,7 +385,7 @@ async function applyBatch(changes) {
       let text = content, n = 0;
       for (const c of list) {
         const r = c.type === 'usfm-heading'
-          ? replaceHeadingInUsfm(text, c.oldText, c.newText)
+          ? replaceHeadingInUsfm(text, c.oldText, c.newText, c.ref)
           : c.type === 'usfm-footnote'
             ? replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText)
             : replaceCrossRefInUsfm(text, c.ref, c.oldText, c.newText);
@@ -336,6 +395,7 @@ async function applyBatch(changes) {
     } catch (e) { failed += list.length; }
   }
 
+  if (applied) refreshReader(); // the Bible copy changed → rebuild the rendered reader
   return { applied, commits, failed };
 }
 

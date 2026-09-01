@@ -769,6 +769,18 @@ api.get('/bible-validation/runs', async (req, res) => {
   }
 });
 
+// Clear the comparison run history (e.g. after adding new per-type columns that old
+// runs can't backfill).
+api.delete('/bible-validation/runs', async (req, res) => {
+  try {
+    const deleted = await firestore.deleteAllValidationRuns();
+    res.json({ deleted });
+  } catch (err) {
+    console.error('Bible validation history clear error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Scan for changes needed to bring our copy (and library quotations) up to the
 // latest official BSB. Read-only — proposes changes, applies nothing.
 api.get('/bible-validation/sync-scan', async (req, res) => {
@@ -845,14 +857,21 @@ api.get('/bible-compare/stream', async (req, res) => {
     const result = await bibleCompare.runStreamingCompare({ translationId, emit });
     // Persist a compact summary to run history (fire-and-forget).
     const st = result.structure.totals;
-    const structureDiffBooks = (st.booksWithHeadingDiffs || 0) + (st.booksWithFootnoteDiffs || 0) + (st.missingBooks || 0) + (st.extraBooks || 0);
-    const clean = result.verse.changed === 0 && result.verse.missing === 0 && result.verse.extra === 0 && structureDiffBooks === 0;
+    const structureDiffBooks = (st.booksWithHeadingDiffs || 0) + (st.booksWithFootnoteDiffs || 0) + (st.booksWithCrossRefDiffs || 0) + (st.missingBooks || 0) + (st.extraBooks || 0);
+    const readerDiffs = result.reader && !result.reader.error ? ((result.reader.mismatched || 0) + (result.reader.missing || 0)) : 0;
+    const clean = result.verse.changed === 0 && result.verse.missing === 0 && result.verse.extra === 0 && structureDiffBooks === 0 && readerDiffs === 0;
     firestore.saveValidationRun({
       translationId,
       runBy: (req.user && req.user.email) || 'unknown',
       status: clean ? 'pass' : 'fail',
       verse: result.verse,
       structureDiffBooks,
+      // per-type diff counts (books, except verses which is verse count) for the history table
+      verseChanged: result.verse.changed,
+      headingDiffBooks: st.booksWithHeadingDiffs || 0,
+      footnoteDiffBooks: st.booksWithFootnoteDiffs || 0,
+      crossRefDiffBooks: st.booksWithCrossRefDiffs || 0,
+      readerDiffs,
       upstreamLastModified: result.upstream.lastModified,
       durationMs: result.durationMs,
     }).catch(err => console.warn('compare history save failed:', err.message));

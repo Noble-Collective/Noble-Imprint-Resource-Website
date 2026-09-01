@@ -151,3 +151,44 @@ test('replaceCrossRefInUsfm returns changed=false when no \\r line matches', () 
   const r = s.replaceCrossRefInUsfm('\\c 1\n\\r (Acts 2:1-4)\n\\v 1 x', '1:1', '(Nope 1:1)', 'x');
   assert.strictEqual(r.changed, false);
 });
+
+// ── Add / delete (one-sided) structure changes ────────────────────────────────
+test('replaceHeadingInUsfm deletes our heading when newText is empty (BSB has none)', () => {
+  const usfm = '\\c 11\n\\s1 (Joshua-Malachi)\n\\v 30 By faith...';
+  const r = s.replaceHeadingInUsfm(usfm, '(Joshua-Malachi)', '', '11:30');
+  assert.strictEqual(r.changed, true);
+  assert.ok(!r.content.includes('\\s1 (Joshua-Malachi)'));
+  assert.ok(r.content.includes('\\v 30 By faith...'));
+});
+
+test('replaceHeadingInUsfm adds a heading before the verse when oldText is empty (BSB-only)', () => {
+  const usfm = '\\c 3\n\\v 1 In those days...';
+  const r = s.replaceHeadingInUsfm(usfm, '', 'The Ministry of John', '3:1');
+  assert.strictEqual(r.changed, true);
+  assert.ok(/\\s1 The Ministry of John\n\\v 1 In those days/.test(r.content));
+});
+
+test('replaceFootnoteInUsfm deletes our footnote when newText is empty', () => {
+  const usfm = '\\c 1\n\\v 1 x\\f + \\fr 1:1 \\ft A note\\f* y';
+  const r = s.replaceFootnoteInUsfm(usfm, '1:1', 'A note', '');
+  assert.strictEqual(r.changed, true);
+  assert.ok(!r.content.includes('\\f'));
+  assert.ok(r.content.includes('\\v 1 x y'));
+});
+
+test('replaceFootnoteInUsfm adds a footnote to the verse when oldText is empty (BSB-only)', () => {
+  const usfm = '\\c 18\n\\v 2 Now Judas His betrayer also knew the place.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('\\f + \\fr 18:2 \\ft HF and PT Jesus also\\f*'));
+  assert.ok(r.content.includes('knew the place.')); // verse text preserved
+});
+
+test('replaceCrossRefInUsfm deletes / adds a \\r line for one-sided diffs', () => {
+  const del = s.replaceCrossRefInUsfm('\\c 3\n\\r (Psalms 1:1-6)\n\\v 1 x', '3:1', '(Psalms 1:1-6)', '');
+  assert.strictEqual(del.changed, true);
+  assert.ok(!del.content.includes('\\r '));
+  const add = s.replaceCrossRefInUsfm('\\c 3\n\\v 1 x', '3:1', '', '(Psalm 1:1–6)');
+  assert.strictEqual(add.changed, true);
+  assert.ok(/\\r \(Psalm 1:1–6\)\n\\v 1 x/.test(add.content));
+});

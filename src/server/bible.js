@@ -1,10 +1,12 @@
 const github = require('./github');
 const usfmAudio = require('./usfm-audio');
+const cache = require('./cache');
 const fs = require('fs');
 const path = require('path');
 
 const translations = {};
 let loaded = false;
+let reloading = null;
 
 // Lazy caches for audio-chapter rendering (independent of the bible disk cache):
 //  - contentListingCache: translationId → github dir listing of bibles/{tx}/content
@@ -223,6 +225,25 @@ async function loadBibles() {
     }
   }
   loaded = true;
+}
+
+// Rebuild the in-memory + on-disk bible cache from the current repo content. Called
+// after a Bible-copy commit so the rendered reader reflects the latest text instead of a
+// stale snapshot. Clears the GitHub file cache first (so references.json/USFM are refetched
+// fresh, not the pre-commit cached copy) and deletes the disk snapshot so loadBibles
+// rebuilds from GitHub. Coalesces concurrent calls.
+async function reload() {
+  if (reloading) return reloading;
+  reloading = (async () => {
+    try {
+      cache.invalidateFiles();
+      loaded = false;
+      for (const id of Object.keys(translations)) delete translations[id];
+      for (const id of ['bsb', 'kjv']) { try { fs.unlinkSync(getCachePath(id)); } catch { /* absent is fine */ } }
+      await loadBibles();
+    } finally { reloading = null; }
+  })();
+  return reloading;
 }
 
 // The verse text the reader actually SERVES (in-memory ref→text map, loaded from the
@@ -451,6 +472,7 @@ async function refreshCoverPaths() {
 
 module.exports = {
   loadBibles,
+  reload,
   refreshCoverPaths,
   getServedVerses,
   getVerse,
