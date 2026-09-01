@@ -1491,8 +1491,9 @@
       });
       official.forEach(function (f, i) {
         if (usedOff[i]) return;
-        // Present only on the BSB site → Accept ADDS it to our copy.
-        rows.push(unpairedCard(bookName, bookCode, translationId, changeType, f.ref, '', f.raw || f.text, '', f.raw || f.text));
+        // Present only on the BSB site → Accept ADDS it to our copy. For footnotes we also
+        // pass the anchor (the BSB's words before the caller) so it lands at the exact spot.
+        rows.push(unpairedCard(bookName, bookCode, translationId, changeType, f.ref, '', f.raw || f.text, '', f.raw || f.text, f.anchor));
       });
       return rows.join('');
     }
@@ -1500,10 +1501,12 @@
     // A one-sided (add/delete) structure difference rendered like the paired cards —
     // Current + BSB Site columns with "[none]" for the empty side — plus Accept/Reject.
     // Accept applies { oldText, newText } where one side is '' (empty = add or delete).
-    function unpairedCard(bookName, bookCode, translationId, changeType, ref, curText, bsbText, oldText, newText) {
+    function unpairedCard(bookName, bookCode, translationId, changeType, ref, curText, bsbText, oldText, newText, anchor) {
       var loc = '<span class="bv-loc">' + esc(bookName + ' ' + ref) + '</span> ' + ctxLink(bookName, ref);
       var id = changeType + ':' + bookCode + ':' + ref + ':' + (structSeq++);
-      changesById[id] = { id: id, type: changeType, translationId: translationId, bookCode: bookCode, ref: ref, oldText: oldText, newText: newText };
+      var change = { id: id, type: changeType, translationId: translationId, bookCode: bookCode, ref: ref, oldText: oldText, newText: newText };
+      if (anchor) change.anchor = anchor;
+      changesById[id] = change;
       var none = '<span class="text-muted">[none]</span>';
       return '<div class="admin-card bv-change bv-struct-card" data-change-id="' + esc(id) + '"><div class="bv-change-loc">' + loc + '</div>'
         + '<div class="bv-diff-line"><span class="bv-side">Current</span> ' + (curText ? esc(curText) : none) + '</div>'

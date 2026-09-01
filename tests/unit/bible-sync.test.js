@@ -176,12 +176,19 @@ test('replaceFootnoteInUsfm deletes our footnote when newText is empty', () => {
   assert.ok(r.content.includes('\\v 1 x y'));
 });
 
-test('replaceFootnoteInUsfm adds a footnote to the verse when oldText is empty (BSB-only)', () => {
-  const usfm = '\\c 18\n\\v 2 Now Judas His betrayer also knew the place.';
-  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also');
+test('replaceFootnoteInUsfm adds a BSB-only footnote at the anchor position', () => {
+  const usfm = '\\c 18\n\\v 2 Now Judas knew the place, because Jesus had often met there.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also', 'because Jesus');
   assert.strictEqual(r.changed, true);
-  assert.ok(r.content.includes('\\f + \\fr 18:2 \\ft HF and PT Jesus also\\f*'));
-  assert.ok(r.content.includes('knew the place.')); // verse text preserved
+  // lands right after "because Jesus", exactly where the BSB puts it
+  assert.ok(r.content.includes('because Jesus\\f + \\fr 18:2 \\ft HF and PT Jesus also\\f* had often met'));
+});
+
+test('replaceFootnoteInUsfm falls back to end-of-verse when the anchor is not found', () => {
+  const usfm = '\\c 18\n\\v 2 Some verse text here.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'A note', 'no such anchor words');
+  assert.strictEqual(r.changed, true);
+  assert.ok(r.content.includes('here.\\f + \\fr 18:2 \\ft A note\\f*'));
 });
 
 test('replaceCrossRefInUsfm deletes / adds a \\r line for one-sided diffs', () => {

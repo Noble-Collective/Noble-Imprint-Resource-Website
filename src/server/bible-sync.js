@@ -212,12 +212,12 @@ function insertLineBeforeVerse(content, ref, newLine) {
 // (verified: no \fq/\fk/multi-part), so we rebuild that canonical form with the
 // new prose, preserving the caller and \fr. Matching uses the SAME normalization
 // as the compare (v.footnoteText) so encoding differences don't defeat it.
-function replaceFootnoteInUsfm(content, ref, oldText, newText) {
+function replaceFootnoteInUsfm(content, ref, oldText, newText, anchor) {
   const s = String(content);
-  // ADD (BSB has a footnote ours lacks) → append it to the ref verse's text. The exact
-  // in-verse caller position isn't recoverable from the compare, so it lands at the end
-  // of the verse; footnotes aren't rendered on the site, so this only affects storage.
-  if (!oldText) return appendFootnoteToVerse(s, ref, newText);
+  // ADD (BSB has a footnote ours lacks) → insert it at the same in-verse position the
+  // BSB puts it (right after the `anchor` words that precede the caller in the source),
+  // falling back to end-of-verse only if the anchor text can't be located.
+  if (!oldText) return appendFootnoteToVerse(s, ref, newText, anchor);
   const re = /\\c\s+(\d+)|\\v\s+(\d+)|\\f\s[\s\S]*?\\f\*/g;
   let ch = 0, vs = 0, m;
   while ((m = re.exec(s)) !== null) {
@@ -237,21 +237,55 @@ function replaceFootnoteInUsfm(content, ref, oldText, newText) {
   return { content, changed: false };
 }
 
-// Append a canonical footnote span at the end of the \v line for `ref`.
-function appendFootnoteToVerse(content, ref, newText) {
+// Insert a canonical footnote span into the verse `ref`. If `anchor` (the words the BSB
+// places just before the caller) is given and found in the verse, the span is inserted
+// right after it — matching the publisher's exact position. Otherwise it lands at the end
+// of the verse's first line. Collects all lines of the verse so mid-verse (poetry) anchors
+// work too.
+function appendFootnoteToVerse(content, ref, newText, anchor) {
   const [ch, vs] = String(ref).split(':');
   const lines = String(content).split('\n');
-  let curCh = 0;
   const span = '\\f + \\fr ' + ref + ' \\ft ' + newText + '\\f*';
+  let curCh = 0, inVerse = false;
+  const verseIdxs = [];
   for (let i = 0; i < lines.length; i++) {
-    const cm = lines[i].match(/^\s*\\c\s+(\d+)/); if (cm) { curCh = cm[1]; continue; }
-    const vm = lines[i].match(/^(\s*\\v\s+(\d+)\s.*?)(\r?)$/);
-    if (vm && String(curCh) === String(ch) && vm[2] === String(vs)) {
-      lines[i] = vm[1] + span + vm[3];
-      return { content: lines.join('\n'), changed: true };
+    const cm = lines[i].match(/^\s*\\c\s+(\d+)/); if (cm) { if (inVerse) break; curCh = cm[1]; continue; }
+    const vm = lines[i].match(/^\s*\\v\s+(\d+)/);
+    if (vm) {
+      if (inVerse) break;
+      if (String(curCh) === String(ch) && vm[1] === String(vs)) { inVerse = true; verseIdxs.push(i); }
+      continue;
+    }
+    if (inVerse) verseIdxs.push(i);
+  }
+  if (!verseIdxs.length) return { content, changed: false };
+
+  if (anchor) {
+    for (const idx of verseIdxs) {
+      const pos = findAnchorEnd(lines[idx], anchor);
+      if (pos >= 0) { lines[idx] = lines[idx].slice(0, pos) + span + lines[idx].slice(pos); return { content: lines.join('\n'), changed: true }; }
     }
   }
-  return { content, changed: false };
+  // Fallback: end of the verse's first line, preserving any trailing CR.
+  const fm = lines[verseIdxs[0]].match(/^(.*?)(\r?)$/);
+  lines[verseIdxs[0]] = fm[1] + span + fm[2];
+  return { content: lines.join('\n'), changed: true };
+}
+
+// Char index just after `anchor` in `line`. Tries the full anchor, then shorter word
+// tails, so minor punctuation/edition differences in the leading words don't defeat it.
+function findAnchorEnd(line, anchor) {
+  let i = line.indexOf(anchor);
+  if (i >= 0) return i + anchor.length;
+  const words = anchor.split(' ');
+  for (const n of [4, 3, 2]) {
+    if (words.length >= n) {
+      const tail = words.slice(-n).join(' ');
+      i = line.indexOf(tail);
+      if (i >= 0) return i + tail.length;
+    }
+  }
+  return -1;
 }
 
 // Replace a \r parallel-passage cross-reference line, matching by normalized
@@ -312,7 +346,7 @@ async function applyChange(change) {
     const { content: updated, changed } = change.type === 'usfm-heading'
       ? replaceHeadingInUsfm(content, change.oldText, change.newText, change.ref)
       : change.type === 'usfm-footnote'
-        ? replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText)
+        ? replaceFootnoteInUsfm(content, change.ref, change.oldText, change.newText, change.anchor)
         : replaceCrossRefInUsfm(content, change.ref, change.oldText, change.newText);
     if (!changed) throw new Error(`${kind} "${change.oldText || change.newText}" not found in ${file} (already updated?)`);
     const verb = !change.oldText ? 'Add' : !change.newText ? 'Remove' : 'Update';
@@ -387,7 +421,7 @@ async function applyBatch(changes) {
         const r = c.type === 'usfm-heading'
           ? replaceHeadingInUsfm(text, c.oldText, c.newText, c.ref)
           : c.type === 'usfm-footnote'
-            ? replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText)
+            ? replaceFootnoteInUsfm(text, c.ref, c.oldText, c.newText, c.anchor)
             : replaceCrossRefInUsfm(text, c.ref, c.oldText, c.newText);
         if (r.changed) { text = r.content; n++; } else failed++;
       }

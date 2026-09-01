@@ -296,13 +296,24 @@ function extractFootnotes(usfm) {
   const re = /\\c\s+(\d+)|\\v\s+(\d+)|\\f\s[\s\S]*?\\f\*/g;
   const s = String(usfm);
   let ch = 0, vs = 0, m;
+  let lastEnd = 0;
   while ((m = re.exec(s)) !== null) {
-    if (m[1] !== undefined) { ch = parseInt(m[1], 10); continue; }
-    if (m[2] !== undefined) { vs = parseInt(m[2], 10); continue; }
+    if (m[1] !== undefined) { ch = parseInt(m[1], 10); lastEnd = re.lastIndex; continue; }
+    if (m[2] !== undefined) { vs = parseInt(m[2], 10); lastEnd = re.lastIndex; continue; }
     const n = footnoteText(m[0]);
-    if (n) out.push({ text: n, raw: footnoteRaw(m[0]), ref: ch + ':' + vs });
+    // `anchor` = the verse words immediately before this footnote's caller, so a
+    // BSB-only footnote can be re-placed at its exact position when added to our copy.
+    if (n) out.push({ text: n, raw: footnoteRaw(m[0]), ref: ch + ':' + vs, anchor: footnoteAnchor(s.slice(lastEnd, m.index)) });
+    lastEnd = re.lastIndex;
   }
   return out;
+}
+
+// The last few words of verse text right before a footnote caller (markers stripped,
+// whitespace collapsed). Used to insert a BSB-only footnote at the same spot in our copy.
+function footnoteAnchor(before) {
+  const txt = String(before).replace(/\\\+?[a-z]+\d*\*?/g, ' ').replace(/\s+/g, ' ').trim();
+  return txt ? txt.split(' ').slice(-6).join(' ') : '';
 }
 
 // Display prose of a single "\f … \f*" footnote span — markers stripped and \ref
@@ -539,6 +550,7 @@ module.exports = {
   extractHeadings,
   extractFootnotes,
   extractCrossRefs,
+  footnoteAnchor,
   footnoteText,
   footnoteRaw,
   headingRaw,

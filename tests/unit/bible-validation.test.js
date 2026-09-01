@@ -178,7 +178,7 @@ test('extractHeadings pulls \\s1/\\s2 heading text and strips inline markers', (
 
 test('extractFootnotes pulls note prose with its verse ref, dropping caller/\\fr/submarkers', () => {
   const usfm = '\\c 1\n\\v 3 And God said, "Let there be light," \\f + \\fr 1:3 \\ft Cited in 2 Corinthians 4:6\\f* and there was light.';
-  assert.deepStrictEqual(v.extractFootnotes(usfm), [{ text: 'Cited in 2 Corinthians 4:6', raw: 'Cited in 2 Corinthians 4:6', ref: '1:3' }]);
+  assert.deepStrictEqual(v.extractFootnotes(usfm).map(f => ({ text: f.text, raw: f.raw, ref: f.ref })), [{ text: 'Cited in 2 Corinthians 4:6', raw: 'Cited in 2 Corinthians 4:6', ref: '1:3' }]);
 });
 
 test('extractFootnotes handles multiple footnotes across a book with refs', () => {
@@ -187,10 +187,17 @@ test('extractFootnotes handles multiple footnotes across a book with refs', () =
     '\\v 5 ...the first day.\\f + \\fr 1:5 \\ft Literally day one\\f*',
     '\\v 6 ...\\f + \\fr 1:6 \\ft Or a canopy\\f*',
   ].join('\n');
-  assert.deepStrictEqual(v.extractFootnotes(usfm), [
+  assert.deepStrictEqual(v.extractFootnotes(usfm).map(f => ({ text: f.text, raw: f.raw, ref: f.ref })), [
     { text: 'Literally day one', raw: 'Literally day one', ref: '1:5' },
     { text: 'Or a canopy', raw: 'Or a canopy', ref: '1:6' },
   ]);
+});
+
+test('extractFootnotes captures the anchor words right before the footnote caller', () => {
+  const usfm = '\\c 18\n\\v 2 Now Judas His betrayer also knew the place, because Jesus\\f + \\fr 18:2 \\ft HF and PT Jesus also\\f* had often met there.';
+  const fn = v.extractFootnotes(usfm);
+  assert.strictEqual(fn[0].ref, '18:2');
+  assert.strictEqual(fn[0].anchor, 'also knew the place, because Jesus'); // 6 words before the caller
 });
 
 // The .raw form is what gets WRITTEN back on Accept; it must preserve the
