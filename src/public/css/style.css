@@ -5811,3 +5811,11 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .qa-fix-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.5;
   padding: 6px 8px; border: 1px solid #d7cdb5; border-radius: 6px; resize: vertical; background: #fff; }
 .qa-fix-actions { margin-top: 8px; }
+
+/* Publisher freshness banner (Bible Validation) */
+.bv-fresh { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 14px; padding: 12px 14px; border: 1px solid #e5ddc9; border-radius: 8px; background: #fff; }
+.bv-fresh--ok { border-color: #bfe3c0; background: #f2faf2; }
+.bv-fresh--warn { border-color: #f0d98a; background: #fdf8e6; }
+.bv-fresh--err { border-color: #eecaca; background: #fbf1f1; }
+.bv-fresh-icon { font-size: 18px; line-height: 1.4; }
+.bv-fresh-sub { font-size: 13px; color: #6b6350; margin-top: 2px; }

@@ -873,6 +873,7 @@ api.get('/bible-compare/stream', async (req, res) => {
       crossRefDiffBooks: st.booksWithCrossRefDiffs || 0,
       readerDiffs,
       upstreamLastModified: result.upstream.lastModified,
+      upstreamContentLength: result.upstream.contentLength,
       durationMs: result.durationMs,
     }).catch(err => console.warn('compare history save failed:', err.message));
   } catch (err) {
@@ -915,6 +916,33 @@ api.get('/bible-version', async (req, res) => {
     res.json({ version: JSON.parse(content) });
   } catch {
     res.json({ version: null });
+  }
+});
+
+// Is the publisher's BSB newer than what we last compared against? Cheap HEAD to
+// bereanbible.com for the current Last-Modified, compared to the most recent run's
+// stored fingerprint. We can't track a discrete "version" (edits are applied one
+// accept at a time), so this "changed since your last compare?" signal is the honest one.
+api.get('/bible-freshness', async (req, res) => {
+  try {
+    let live = null;
+    try {
+      const head = await fetch('https://bereanbible.com/bsb.txt', { method: 'HEAD' });
+      live = { lastModified: head.headers.get('last-modified'), contentLength: head.headers.get('content-length') };
+    } catch (e) { /* publisher unreachable → report unknown below */ }
+    const runs = await firestore.getValidationRuns(1);
+    const last = runs[0] || null;
+    let status = 'no-runs';
+    if (!live || !live.lastModified) status = 'unknown';
+    else if (last && last.upstreamLastModified) status = last.upstreamLastModified === live.lastModified ? 'current' : 'newer';
+    res.json({
+      status,
+      live,
+      lastRun: last ? { at: last.createdAt, lastModified: last.upstreamLastModified || null, contentLength: last.upstreamContentLength || null } : null,
+    });
+  } catch (err) {
+    console.error('Bible freshness check error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

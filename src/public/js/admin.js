@@ -1300,9 +1300,16 @@
         var sub = btn.getAttribute('data-bv-sub');
         var el = document.getElementById('bv-sub-' + sub);
         if (el) el.classList.remove('bv-sub--hidden');
-        if (sub === 'version' && !versionHistoryLoaded) { versionHistoryLoaded = true; loadVersion(); loadHistory(); }
+        if (sub === 'version' && !versionHistoryLoaded) { versionHistoryLoaded = true; loadHistory(); }
+        if (sub === 'version') loadFreshness();
       });
     });
+
+    // Re-check publisher freshness whenever the Bible Validation tab is opened (and on load
+    // if it's already the active panel).
+    var bvMainTab = document.querySelector('[data-admin-tab="bible-validation"]');
+    if (bvMainTab) bvMainTab.addEventListener('click', loadFreshness);
+    if (!panel.classList.contains('admin-panel--hidden')) loadFreshness();
 
     // ── Compare to BSB (streaming, live checklist) ──
     var compareBtn = document.getElementById('bv-compare-btn');
@@ -1778,19 +1785,42 @@
     }
 
     // ── Version & History ──
-    var versionEl = document.getElementById('bv-version');
     var historyEl = document.getElementById('bv-history');
 
-    function loadVersion() {
-      apiCall('GET', '/api/admin/bible-version?translationId=bsb').then(function (d) {
-        var v = d.version;
-        if (!v) { versionEl.innerHTML = '<div class="admin-card"><p class="text-muted">No version pinned yet.</p></div>'; return; }
-        versionEl.innerHTML = '<div class="admin-card"><h3>Our pinned copy</h3>'
-          + '<p><strong>' + esc(v.printing || '—') + '</strong> · pinned ' + esc(v.pinnedAt || '—') + '</p>'
-          + (v.note ? '<p class="text-muted">' + esc(v.note) + '</p>' : '')
-          + (v.upstreamLastSeen && v.upstreamLastSeen.lastModified ? '<p class="text-muted">Publisher last seen: ' + esc(v.upstreamLastSeen.lastModified) + '</p>' : '')
-          + '</div>';
-      }).catch(function (e) { versionEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
+    // Is the publisher's BSB newer than what we last compared against? We don't track a
+    // discrete "version" (edits land one accept at a time), so this is the honest signal:
+    // a green check if bereanbible.com hasn't changed since your last compare, a yellow
+    // warning if it has. Rendered into both the Compare banner and the Version tab.
+    function freshnessHtml(d) {
+      var live = d.live || {}, last = d.lastRun || null;
+      var when = last && last.at ? new Date(last.at).toLocaleString() : null;
+      if (d.status === 'current') {
+        return '<div class="bv-fresh bv-fresh--ok"><span class="bv-fresh-icon">✅</span><div>'
+          + '<strong>Up to date with the publisher.</strong>'
+          + '<div class="bv-fresh-sub">bereanbible.com hasn’t changed since your last compare' + (when ? ' (' + esc(when) + ')' : '') + '. Publisher text dated ' + esc(live.lastModified || '—') + '.</div></div></div>';
+      }
+      if (d.status === 'newer') {
+        return '<div class="bv-fresh bv-fresh--warn"><span class="bv-fresh-icon">⚠️</span><div>'
+          + '<strong>A newer BSB is available.</strong>'
+          + '<div class="bv-fresh-sub">The publisher updated their text to <strong>' + esc(live.lastModified || '—') + '</strong>; your last compare was against ' + esc((last && last.lastModified) || '—') + (when ? ' on ' + esc(when) : '') + '. Run a compare to review what changed.</div></div></div>';
+      }
+      if (d.status === 'no-runs') {
+        return '<div class="bv-fresh"><span class="bv-fresh-icon">•</span><div>'
+          + '<strong>No compare run yet.</strong>'
+          + '<div class="bv-fresh-sub">Run a compare to set a baseline; after that this shows a ✅ until the publisher releases a newer text. Publisher text currently dated ' + esc(live.lastModified || '—') + '.</div></div></div>';
+      }
+      return '<div class="bv-fresh"><span class="bv-fresh-icon">•</span><div>'
+        + '<strong>Couldn’t reach the publisher.</strong>'
+        + '<div class="bv-fresh-sub">Unable to check bereanbible.com right now.</div></div></div>';
+    }
+
+    function loadFreshness() {
+      var containers = [document.getElementById('bv-freshness'), document.getElementById('bv-version')].filter(Boolean);
+      if (!containers.length) return;
+      containers.forEach(function (c) { c.innerHTML = '<div class="bv-fresh"><span class="bv-fresh-icon">…</span><div><strong>Checking for a newer BSB…</strong></div></div>'; });
+      apiCall('GET', '/api/admin/bible-freshness?translationId=bsb')
+        .then(function (d) { var html = freshnessHtml(d); containers.forEach(function (c) { c.innerHTML = html; }); })
+        .catch(function (e) { containers.forEach(function (c) { c.innerHTML = '<div class="bv-fresh bv-fresh--err"><span class="bv-fresh-icon">⚠️</span><div><strong>Freshness check failed.</strong><div class="bv-fresh-sub">' + esc(e.message) + '</div></div></div>'; }); });
     }
 
     function statusBadge(s) {
