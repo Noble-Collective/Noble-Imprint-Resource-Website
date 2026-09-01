@@ -1817,7 +1817,7 @@
     function loadFreshness() {
       var containers = [document.getElementById('bv-freshness'), document.getElementById('bv-version')].filter(Boolean);
       if (!containers.length) return;
-      containers.forEach(function (c) { c.innerHTML = '<div class="bv-fresh"><span class="bv-fresh-icon">…</span><div><strong>Checking for a newer BSB…</strong></div></div>'; });
+      containers.forEach(function (c) { c.innerHTML = '<div class="bv-fresh"><span class="bv-fresh-icon"><span class="bv-spin"></span></span><div><strong>Checking for a newer BSB…</strong></div></div>'; });
       apiCall('GET', '/api/admin/bible-freshness?translationId=bsb')
         .then(function (d) { var html = freshnessHtml(d); containers.forEach(function (c) { c.innerHTML = html; }); })
         .catch(function (e) { containers.forEach(function (c) { c.innerHTML = '<div class="bv-fresh bv-fresh--err"><span class="bv-fresh-icon">⚠️</span><div><strong>Freshness check failed.</strong><div class="bv-fresh-sub">' + esc(e.message) + '</div></div></div>'; }); });
@@ -1875,6 +1875,7 @@
     }
 
     function loadHistory() {
+      if (historyEl) historyEl.innerHTML = '<p class="text-muted"><span class="bv-spin"></span> Loading history…</p>';
       apiCall('GET', '/api/admin/bible-validation/runs?limit=100')
         .then(function (d) { renderHistory(d.runs || []); })
         .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
@@ -1910,7 +1911,7 @@
     function loadSyncLog() {
       if (!syncLogEl) return;
       syncLogShown = 25;
-      syncLogEl.innerHTML = '<p class="text-muted">Loading applied changes…</p>';
+      syncLogEl.innerHTML = '<p class="text-muted"><span class="bv-spin"></span> Loading applied changes…</p>';
       apiCall('GET', '/api/admin/bible-sync-log?limit=100')
         .then(function (d) { syncLogEntries = d.entries || []; renderSyncLog(); })
         .catch(function (e) { syncLogEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });

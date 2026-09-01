@@ -955,13 +955,17 @@ api.get('/bible-version', async (req, res) => {
 // bereanbible.com for the current Last-Modified, compared to the most recent run's
 // stored fingerprint. We can't track a discrete "version" (edits are applied one
 // accept at a time), so this "changed since your last compare?" signal is the honest one.
+let _freshLiveCache = null; // { at, live } — avoids a slow external HEAD on every tab open
 api.get('/bible-freshness', async (req, res) => {
   try {
-    let live = null;
-    try {
-      const head = await fetch('https://bereanbible.com/bsb.txt', { method: 'HEAD' });
-      live = { lastModified: head.headers.get('last-modified'), contentLength: head.headers.get('content-length') };
-    } catch (e) { /* publisher unreachable → report unknown below */ }
+    let live = _freshLiveCache && (Date.now() - _freshLiveCache.at < 60000) ? _freshLiveCache.live : null;
+    if (!live) {
+      try {
+        const head = await fetch('https://bereanbible.com/bsb.txt', { method: 'HEAD', signal: AbortSignal.timeout(6000) });
+        live = { lastModified: head.headers.get('last-modified'), contentLength: head.headers.get('content-length') };
+        _freshLiveCache = { at: Date.now(), live };
+      } catch (e) { /* publisher unreachable/slow → report unknown below */ }
+    }
     const runs = await firestore.getValidationRuns(1);
     const last = runs[0] || null;
     let status = 'no-runs';

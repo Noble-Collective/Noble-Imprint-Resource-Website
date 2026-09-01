@@ -5835,3 +5835,7 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 /* Sync-log / history: view-more + GitHub link */
 .bv-more { margin: 10px 0; text-align: center; }
 .bv-log-ghlink { margin-top: 8px; font-size: 13px; }
+
+/* Small inline spinner for async loads */
+.bv-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid #e6ddc7; border-top-color: #b8923a; border-radius: 50%; animation: bv-spin 0.7s linear infinite; vertical-align: -3px; }
+@keyframes bv-spin { to { transform: rotate(360deg); } }
