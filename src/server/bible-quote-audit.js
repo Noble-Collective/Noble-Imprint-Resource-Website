@@ -147,12 +147,13 @@ async function runStreamingQuoteAudit(opts = {}) {
       }
     });
     const review = bcount['word-difference'] || 0;
-    const minor = (bcount['footnote-artifact'] || 0) + (bcount['ellipsis-omission'] || 0) + (bcount['editorial-bracket'] || 0);
+    const minor = (bcount['footnote-artifact'] || 0) + (bcount['ellipsis-omission'] || 0);
     const diffTransl = bcount['heavy-difference'] || 0;
     const rec = {
       title: g.meta.title, series: g.meta.series, coverPath: g.meta.coverPath,
       files: g.files.length, quotes: bChecked,
       exact: bcount['exact'] || 0, caseOnly: bcount['case-only'] || 0, formatOnly: bcount['format-only'] || 0,
+      bracketed: bcount['bracketed-match'] || 0,
       review, minor, diffTransl, paraphrase: bcount['paraphrase'] || 0,
       findings: findings.slice(0, 60).sort((a, b) => (a.coverage || 0) - (b.coverage || 0)),
     };

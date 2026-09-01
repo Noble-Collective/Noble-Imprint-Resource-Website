@@ -240,15 +240,43 @@ function auditQuoteAgainstText(quote, verseText, opts = {}) {
   if (bareWords(nv).includes(bareWords(nq))) {
     return { status: 'format-only', tier: 'cosmetic', quote: nqO, verse: nvO };
   }
-  const qw = nq.split(' ');
-  const { onlyA, onlyB } = diffWords(qw, nv.split(' '));
+
+  // Editorial brackets ([...] insertions/substitutions) are the author's marks, not the
+  // Bible's — the quote is still faithful if it matches once they're set aside. Try the
+  // de-bracketed quote before calling it a deviation, and use it for the word-diff so the
+  // bracketed words don't corrupt the alignment of the real ones.
+  const hasBrackets = /[[\]]/.test(nqO);
+  let compareText = nq;
+  if (hasBrackets) {
+    const deBr = normalizeVerse(quote.replace(/\[[^\]]*\]/g, ' '));
+    const deBrL = deBr.toLowerCase();
+    if (deBr.length >= 8 && (nvO.toLowerCase().includes(deBrL) || bareWords(nv).includes(bareWords(deBr)))) {
+      return { status: 'bracketed-match', tier: 'faithful', reason: 'editorial-bracket', quote: nqO, verse: nvO };
+    }
+    compareText = deBrL;
+  }
+
+  const vw = nv.split(' ');
+  const qw = compareText.split(' ').filter(Boolean);
+  const { onlyA } = diffWords(qw, vw);
+  if (hasBrackets) {
+    // A bracketed substitution ([our] for "your", [Jesus] for "He") shifts the word
+    // alignment, so the LCS can flag a couple of real words as "different". If every
+    // offending word actually appears somewhere in the verse (compared bare, ignoring the
+    // attached punctuation), the quote introduced no foreign wording — faithful, just
+    // bracketed. A genuinely different word (e.g. "abundantly" for "fullness") is not in
+    // the verse and keeps it a deviation.
+    const vbare = new Set(bareWords(nv).split(' '));
+    if (onlyA.every(w => vbare.has(w.replace(/[^a-z0-9]/g, '')))) {
+      return { status: 'bracketed-match', tier: 'faithful', reason: 'editorial-bracket', quote: nqO, verse: nvO };
+    }
+  }
   const coverage = (qw.length - onlyA.length) / qw.length;
   if (coverage < minCoverage) return { status: 'paraphrase', tier: 'ignore', coverage };
 
-  // Word-level deviation — sub-classify by what the offending words look like.
+  // Word-level deviation — sub-classify by what the offending (non-bracket) words look like.
   let reason, tier;
   if (onlyA.length && onlyA.every(w => /^[a-z0-9]$/.test(w))) { reason = 'footnote-artifact'; tier = 'minor'; }
-  else if (/[[\]]/.test(nqO)) { reason = 'editorial-bracket'; tier = 'minor'; }
   else if (/\.\.\.|…/.test(nqO)) { reason = 'ellipsis-omission'; tier = 'minor'; }
   else if (onlyA.length <= 4) { reason = 'word-difference'; tier = 'review'; }   // a few words off → likely misquote/older wording
   else { reason = 'heavy-difference'; tier = 'different-translation'; }           // many words off → probably a different translation

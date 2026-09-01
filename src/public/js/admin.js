@@ -2026,7 +2026,7 @@
       var diffs = (b.review || 0) + (b.minor || 0) + (b.diffTransl || 0);
       var summary = '<summary class="qa-book-summary">' + coverImg(b.coverPath)
         + '<div class="qa-book-meta"><div class="qa-book-title">' + esc(b.title) + '</div>'
-        + '<div class="text-muted">' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact · ' + esc(b.caseOnly + b.formatOnly) + ' cosmetic · <strong>' + esc(b.review) + '</strong> to review</div></div>'
+        + '<div class="text-muted">' + esc(b.quotes) + ' quotes · ' + esc(b.exact) + ' exact · ' + (b.bracketed ? esc(b.bracketed) + ' bracketed · ' : '') + esc(b.caseOnly + b.formatOnly) + ' cosmetic · <strong>' + esc(b.review) + '</strong> to review</div></div>'
         + bookBadge(diffs) + '</summary>';
       var body = (b.findings && b.findings.length)
         ? b.findings.map(findingRow).join('')
@@ -2041,9 +2041,10 @@
       var overview = '<div class="admin-card" style="margin:12px 0">'
         + '<p><strong>' + esc(result.checked) + '</strong> quotations checked across <strong>' + esc(result.books.length) + '</strong> books against the ' + esc(result.comparedAgainst || 'current Bible') + '.</p>'
         + '<table class="admin-table"><tbody>'
-        + row('exact', '✅ Exact match') + row('case-only', 'Cosmetic — “Lord” vs “LORD”') + row('format-only', 'Cosmetic — punctuation/spacing')
+        + row('exact', '✅ Perfect match') + row('bracketed-match', '✅ Matching (with editorial [brackets])')
+        + row('case-only', 'Cosmetic — “Lord” vs “LORD”') + row('format-only', 'Cosmetic — punctuation/spacing')
         + row('word-difference', 'TIER 1 — review (small wording differences)')
-        + row('footnote-artifact', 'TIER 2 — footnote-marker leak') + row('ellipsis-omission', 'TIER 2 — ellipsis omission') + row('editorial-bracket', 'TIER 2 — editorial [brackets]')
+        + row('footnote-artifact', 'TIER 2 — footnote-marker leak') + row('ellipsis-omission', 'TIER 2 — ellipsis omission')
         + row('heavy-difference', 'TIER 3 — likely a different translation') + row('paraphrase', 'Paraphrase (ignored)')
         + '</tbody></table></div>';
       // Books with the most to review first, then the rest.

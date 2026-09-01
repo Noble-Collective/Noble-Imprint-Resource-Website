@@ -113,6 +113,29 @@ test('auditQuoteAgainstText: a real added word is a deviation', () => {
   assert.ok(r.coverage >= 0.6);
 });
 
+test('auditQuoteAgainstText: an editorial [Name] insertion + verbatim rest is a bracketed-match', () => {
+  // "[Jesus] You are the Christ…" — remove the bracket and it's verbatim BSB.
+  const r = c.auditQuoteAgainstText('[Jesus] you are the Christ, the Son of the living God',
+    'Simon Peter answered, You are the Christ, the Son of the living God');
+  assert.strictEqual(r.status, 'bracketed-match');
+  assert.strictEqual(r.tier, 'faithful');
+});
+
+test('auditQuoteAgainstText: a [pronoun] substitution is a bracketed-match', () => {
+  // BSB "He"; author quotes "[Jesus]" — the only difference is the bracketed pronoun.
+  const r = c.auditQuoteAgainstText('Therefore [Jesus] is able to save completely those who draw near to God',
+    'Therefore He is able to save completely those who draw near to God through Him');
+  assert.strictEqual(r.status, 'bracketed-match');
+});
+
+test('auditQuoteAgainstText: a real non-bracket word difference is still a deviation despite a bracket', () => {
+  // "[you] may have life and have it abundantly" — de-bracketed still differs on "abundantly".
+  const r = c.auditQuoteAgainstText('that [you] may have life and have it abundantly',
+    'I have come that they may have life and have it to the full');
+  assert.strictEqual(r.status, 'deviation');
+  assert.ok((r.onlyInQuote || []).includes('abundantly'));
+});
+
 test('auditQuoteAgainstText: unrelated text is paraphrase', () => {
   const r = c.auditQuoteAgainstText('a completely different sentence with no overlap at all',
     'For God so loved the world that He gave His one and only Son');
