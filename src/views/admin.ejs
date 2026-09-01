@@ -225,8 +225,11 @@
 
       <!-- Sub-tab: Version & History -->
       <section class="bv-sub bv-sub--hidden" id="bv-sub-version">
-        <div id="bv-version"><p class="text-muted">Loading version&hellip;</p></div>
-        <h3 style="margin-top:24px">Run History</h3>
+        <div id="bv-version"><p class="text-muted">Loading&hellip;</p></div>
+        <h3 style="margin-top:24px">Applied changes</h3>
+        <p class="text-muted" style="font-size:13px;margin-top:-6px">Every individual accept/sync, read straight from the content-repo commit history. Expand to see the exact change; restore to put the original back.</p>
+        <div id="bv-synclog"><p class="text-muted">Loading applied changes&hellip;</p></div>
+        <h3 style="margin-top:24px">Compare run history</h3>
         <div id="bv-history"><p class="text-muted">Loading history&hellip;</p></div>
       </section>
     </div>
@@ -448,7 +451,7 @@
     }),
   }).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');
 </script>
-<script src="/static/js/admin.js?v=25"></script>
+<script src="/static/js/admin.js?v=26"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
 <script src="/static/js/admin-analytics.js?v=4"></script>
 

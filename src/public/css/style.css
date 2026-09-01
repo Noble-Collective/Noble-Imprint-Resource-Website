@@ -5819,3 +5819,15 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .bv-fresh--err { border-color: #eecaca; background: #fbf1f1; }
 .bv-fresh-icon { font-size: 18px; line-height: 1.4; }
 .bv-fresh-sub { font-size: 13px; color: #6b6350; margin-top: 2px; }
+
+/* BSB applied-changes sync log */
+.bv-log-row { border: 1px solid #e5ddc9; border-radius: 8px; margin-bottom: 8px; background: #fff; }
+.bv-log-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; flex-wrap: wrap; }
+.bv-log-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #efe9d8; color: #7a6f52; white-space: nowrap; }
+.bv-log-kind--verse { background: #e6f0fb; color: #3a6ea5; }
+.bv-log-kind--restore { background: #f2e6e6; color: #a05a5a; }
+.bv-log-msg { flex: 1; min-width: 180px; font-size: 14px; }
+.bv-log-meta { font-size: 12px; }
+.bv-log-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.bv-log-diff { padding: 6px 12px 12px; border-top: 1px solid #efe9d8; }
+.bv-log-file { margin-top: 6px; }

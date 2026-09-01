@@ -202,6 +202,22 @@ async function listTags() {
   return tags;
 }
 
+// Commits touching a path, newest first. Returns the raw GitHub commit objects.
+async function listCommits(path, { perPage = 50, page = 1 } = {}) {
+  const { data } = await loggedApiCall(`GET commits ${path}`, () =>
+    getOctokit().rest.repos.listCommits({ owner: OWNER, repo: REPO, path, per_page: perPage, page })
+  );
+  return data;
+}
+
+// A single commit with its files + patches.
+async function getCommit(sha) {
+  const { data } = await loggedApiCall(`GET commit ${sha.slice(0, 7)}`, () =>
+    getOctokit().rest.repos.getCommit({ owner: OWNER, repo: REPO, ref: sha })
+  );
+  return data;
+}
+
 // List every path in the repo in a single API call (recursive git tree).
 // Returns [{ path, type: 'blob'|'tree', sha }]. Cached 5 min.
 async function getTreeRecursive(ref = 'main') {
@@ -247,4 +263,4 @@ function clearDiskCache() {
   } catch (err) { console.error('[GITHUB] Error clearing disk cache:', err.message); }
 }
 
-module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, getTreeRecursive, getRateLimitReset, clearDiskCache, OWNER, REPO };
+module.exports = { getDirectoryContents, getFileContent, getFileBinary, getFileRaw, updateFileContent, getFileContentAtRef, getDirectoryContentsAtRef, listTags, listCommits, getCommit, getTreeRecursive, getRateLimitReset, clearDiskCache, OWNER, REPO };

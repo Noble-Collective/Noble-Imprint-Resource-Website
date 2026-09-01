@@ -433,7 +433,94 @@ async function applyBatch(changes) {
   return { applied, commits, failed };
 }
 
+// ── Sync log (derived from the content-repo commit history) ─────────────────────
+// Every accept/refresh is a real commit under bibles/<id>/, so reading that history gives
+// a complete per-change log (all past accepts included, no separate bookkeeping) where each
+// entry links to its actual commit. Restore re-applies the reverse of a commit's changes.
+
+const SYNC_PATH_RE = /^bibles\/[a-z0-9]+\/(content\/|references\.json)/i;
+
+// A short type/location badge parsed from the commit message (display only, best-effort).
+function classifySyncCommit(message) {
+  const first = String(message || '').split('\n')[0];
+  let m;
+  if ((m = first.match(/^(Update|Add|Remove) (\S+) (heading|footnote|cross-reference) at (\S+)/)))
+    return { kind: m[3], action: m[1], where: m[2] + ' ' + m[4] };
+  if ((m = first.match(/^Sync (.+?) to latest BSB/))) return { kind: 'verse', action: 'Update', where: m[1] };
+  if ((m = first.match(/^Refresh (\d+) verse/))) return { kind: 'verse', action: 'Refresh', where: m[1] + ' verses' };
+  if ((m = first.match(/^Refresh (\d+) .*?in (\S+)/))) return { kind: 'structure', action: 'Refresh', where: m[1] + ' in ' + m[2] };
+  if ((m = first.match(/quotation to .*? in (.+)/))) return { kind: 'quote', action: 'Fix', where: (m[1] || '').split('/').pop() };
+  if (/^Restore /.test(first)) return { kind: 'restore', action: 'Restore', where: '' };
+  return { kind: 'other', action: '', where: '' };
+}
+
+// Parse a unified-diff patch into changed { old, new } line pairs (context/headers dropped).
+function parsePatchChanges(patch) {
+  if (!patch) return [];
+  const removed = [], added = [];
+  for (const l of String(patch).split('\n')) {
+    if (l.startsWith('---') || l.startsWith('+++') || l.startsWith('@@')) continue;
+    if (l[0] === '-') removed.push(l.slice(1));
+    else if (l[0] === '+') added.push(l.slice(1));
+  }
+  const pairs = [];
+  for (let i = 0; i < Math.max(removed.length, added.length); i++) pairs.push({ old: removed[i] || '', new: added[i] || '' });
+  return pairs.filter(p => p.old !== p.new);
+}
+
+// List sync commits (newest first) with a parsed badge — no patches (one cheap API call).
+async function getSyncLog({ limit = 50 } = {}) {
+  const commits = await github.listCommits('bibles', { perPage: Math.min(limit, 100) });
+  return commits
+    .filter(c => !/^Resources added/.test(c.commit.message)) // skip the one-time bulk import
+    .map(c => ({
+      sha: c.sha, shortSha: c.sha.slice(0, 7),
+      date: c.commit.author && c.commit.author.date,
+      by: (c.commit.author && (c.commit.author.name || c.commit.author.email)) || '',
+      message: c.commit.message.split('\n')[0],
+      ...classifySyncCommit(c.commit.message),
+    }));
+}
+
+// The individual line changes of one sync commit (for the on-demand diff view + restore).
+async function getSyncCommitChanges(sha) {
+  const detail = await github.getCommit(sha);
+  return (detail.files || [])
+    .filter(f => SYNC_PATH_RE.test(f.filename))
+    .map(f => ({ file: f.filename, name: f.filename.split('/').pop(), changes: parsePatchChanges(f.patch) }));
+}
+
+// Restore (revert) one sync commit: put the OLD text of each changed line back into the
+// CURRENT file (line-level, so it works even if other lines changed since). Best-effort for
+// whole-line adds/deletes. Commits the reverted content + refreshes the reader.
+async function restoreCommit(sha) {
+  const detail = await github.getCommit(sha);
+  let reverted = 0; const files = [];
+  for (const f of (detail.files || [])) {
+    if (!SYNC_PATH_RE.test(f.filename)) continue;
+    const pairs = parsePatchChanges(f.patch);
+    if (!pairs.length) continue;
+    const big = /references\.json$/.test(f.filename);
+    const { content, sha: fileSha } = big ? await readBigFile(f.filename) : await github.getFileContent(f.filename);
+    let text = content, n = 0;
+    for (const p of pairs) {
+      if (p.old !== '' && p.new !== '') { if (text.includes(p.new)) { text = text.replace(p.new, p.old); n++; } }
+      else if (p.old === '' && p.new !== '') { const before = text; text = text.split('\n').filter(l => l !== p.new).join('\n'); if (text !== before) n++; }
+      // pure delete (new === '') — re-adding at the exact position isn't supported here.
+    }
+    if (n) {
+      await github.updateFileContent(f.filename, text, fileSha, `Restore ${f.filename.split('/').pop()} (revert ${sha.slice(0, 7)})`);
+      reverted += n; files.push(f.filename.split('/').pop());
+    }
+  }
+  if (reverted) refreshReader();
+  return { reverted, files };
+}
+
 module.exports = {
+  getSyncLog,
+  getSyncCommitChanges,
+  restoreCommit,
   findOccurrences,
   replaceNthOccurrence,
   computeChangeAnchor,

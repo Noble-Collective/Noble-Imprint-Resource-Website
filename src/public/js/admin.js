@@ -1301,7 +1301,7 @@
         var el = document.getElementById('bv-sub-' + sub);
         if (el) el.classList.remove('bv-sub--hidden');
         if (sub === 'version' && !versionHistoryLoaded) { versionHistoryLoaded = true; loadHistory(); }
-        if (sub === 'version') loadFreshness();
+        if (sub === 'version') { loadFreshness(); loadSyncLog(); }
       });
     });
 
@@ -1871,6 +1871,64 @@
         .then(function (d) { renderHistory(d.runs || []); })
         .catch(function (e) { historyEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
     }
+
+    // ── Applied-changes sync log (per-commit, from the content repo history) ──
+    var syncLogEl = document.getElementById('bv-synclog');
+
+    function kindBadge(k) {
+      var labels = { heading: 'Heading', footnote: 'Footnote', 'cross-reference': 'Cross-ref', verse: 'Verse', structure: 'Structure', quote: 'Quotation', restore: 'Restore', other: 'Change' };
+      return '<span class="bv-log-kind bv-log-kind--' + esc(k || 'other') + '">' + esc(labels[k] || 'Change') + '</span>';
+    }
+
+    function renderSyncLog(entries) {
+      if (!syncLogEl) return;
+      if (!entries.length) { syncLogEl.innerHTML = '<p class="text-muted">No applied changes yet.</p>'; return; }
+      syncLogEl.innerHTML = entries.map(function (e) {
+        return '<div class="bv-log-row" data-sha="' + esc(e.sha) + '">'
+          + '<div class="bv-log-head">' + kindBadge(e.kind)
+          + '<span class="bv-log-msg">' + esc(e.message) + '</span>'
+          + '<span class="bv-log-meta text-muted">' + esc(e.date ? new Date(e.date).toLocaleString() : '') + ' · ' + esc(e.by) + ' · ' + esc(e.shortSha) + '</span>'
+          + '<span class="bv-log-actions"><button class="admin-btn admin-btn--sm bv-log-view">View diff</button> <button class="admin-btn admin-btn--sm bv-log-restore">Restore</button> <span class="bv-log-status text-muted"></span></span>'
+          + '</div><div class="bv-log-diff" style="display:none"></div></div>';
+      }).join('');
+    }
+
+    function loadSyncLog() {
+      if (!syncLogEl) return;
+      syncLogEl.innerHTML = '<p class="text-muted">Loading applied changes…</p>';
+      apiCall('GET', '/api/admin/bible-sync-log?limit=60')
+        .then(function (d) { renderSyncLog(d.entries || []); })
+        .catch(function (e) { syncLogEl.innerHTML = '<p class="admin-error">' + esc(e.message) + '</p>'; });
+    }
+
+    if (syncLogEl) syncLogEl.addEventListener('click', function (e) {
+      var row = e.target.closest('.bv-log-row'); if (!row) return;
+      var sha = row.getAttribute('data-sha');
+      if (e.target.classList.contains('bv-log-view')) {
+        var diffEl = row.querySelector('.bv-log-diff');
+        if (diffEl.style.display === 'block') { diffEl.style.display = 'none'; e.target.textContent = 'View diff'; return; }
+        e.target.textContent = 'Hide diff'; diffEl.style.display = 'block'; diffEl.innerHTML = '<p class="text-muted">Loading…</p>';
+        apiCall('GET', '/api/admin/bible-sync-log/' + encodeURIComponent(sha))
+          .then(function (d) {
+            diffEl.innerHTML = (d.files || []).map(function (f) {
+              return '<div class="bv-log-file"><div class="text-muted" style="font-size:12px">' + esc(f.name) + '</div>'
+                + (f.changes || []).map(function (c) {
+                  return '<div class="bv-diff-line"><span class="bv-side">Before</span> ' + esc(c.old || '(none)') + '</div>'
+                    + '<div class="bv-diff-line"><span class="bv-side bv-side--new">After</span> ' + esc(c.new || '(none)') + '</div>';
+                }).join('') + '</div>';
+            }).join('') || '<p class="text-muted">No line changes.</p>';
+          })
+          .catch(function (err) { diffEl.innerHTML = '<p class="admin-error">' + esc(err.message) + '</p>'; });
+      }
+      if (e.target.classList.contains('bv-log-restore')) {
+        if (!window.confirm('Restore the original text for this change? This commits a revert to the content repository.')) return;
+        var st = row.querySelector('.bv-log-status'), btn = e.target;
+        btn.disabled = true; st.textContent = ' restoring…';
+        apiCall('POST', '/api/admin/bible-sync-log/' + encodeURIComponent(sha) + '/restore', {})
+          .then(function (r) { st.innerHTML = r.reverted ? ' <span class="admin-badge admin-badge--ok">Restored</span>' : ' <span class="text-muted">nothing to restore (changed since?)</span>'; setTimeout(loadSyncLog, 1500); })
+          .catch(function (err) { btn.disabled = false; st.innerHTML = ' <span class="admin-error">' + esc(err.message) + '</span>'; });
+      }
+    });
 
     // --- Quotation Audit (streaming, grouped by book) ---
     var qaBtn = document.getElementById('qa-run-btn');

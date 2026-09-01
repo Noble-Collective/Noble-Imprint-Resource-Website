@@ -769,6 +769,38 @@ api.get('/bible-validation/runs', async (req, res) => {
   }
 });
 
+// Sync log — every applied change, read from the content-repo commit history so it's
+// complete (all past accepts) and each entry links to its real commit.
+api.get('/bible-sync-log', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    res.json({ entries: await bibleSync.getSyncLog({ limit }) });
+  } catch (err) {
+    console.error('Bible sync log error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// The individual line changes of one sync commit (for the diff view).
+api.get('/bible-sync-log/:sha', async (req, res) => {
+  try {
+    res.json({ files: await bibleSync.getSyncCommitChanges(req.params.sha) });
+  } catch (err) {
+    console.error('Bible sync commit changes error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Restore (revert) one applied change.
+api.post('/bible-sync-log/:sha/restore', async (req, res) => {
+  try {
+    res.json(await bibleSync.restoreCommit(req.params.sha));
+  } catch (err) {
+    console.error('Bible sync restore error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Clear the comparison run history (e.g. after adding new per-type columns that old
 // runs can't backfill).
 api.delete('/bible-validation/runs', async (req, res) => {
