@@ -157,6 +157,7 @@ function scanText(text, path, hasRef, getText, sessionTitle, sessionUrl) {
       status: res.status, reason: res.reason, tier: res.tier,
       coverage: res.coverage != null ? Math.round(res.coverage * 100) : undefined,
       onlyInQuote: res.onlyInQuote || [], ref: cite.refString, file: path,
+      pos: cite.index, // char offset in the file — for ordering findings by book position
       kind: q.kind, quote: q.quote, verse: verseText, context: q.context || q.quote,
       sessionTitle: sessionTitle, sessionUrl: sessionUrl,
       fix: computeFix(q, res, verseText),
@@ -188,12 +189,15 @@ async function runStreamingQuoteAudit(opts = {}) {
     .map(b => ({ repoPath: b.repoPath, title: b.title, coverPath: b.coverPath || null, series: b.seriesTitle || '', sub: b.subseriesTitle || '' }))
     .sort((a, b) => b.repoPath.length - a.repoPath.length); // longest-prefix match first
 
-  // Map each session file → its live site URL (for the "Show session" link).
+  // Map each session file → its live site URL (for the "Show session" link) and its
+  // reading order (tree order → so findings sort by where they appear in the book).
   const urlByPath = new Map();
+  const orderByPath = new Map();
+  let seq = 0;
   for (const series of tree.series) {
     for (const child of series.children) {
-      if (child.type === 'book') for (const se of child.sessions) urlByPath.set(se.path, content.sessionUrl(series, null, child, se));
-      else if (child.type === 'subseries') for (const bk of child.books) for (const se of bk.sessions) urlByPath.set(se.path, content.sessionUrl(series, child, bk, se));
+      if (child.type === 'book') for (const se of child.sessions) { urlByPath.set(se.path, content.sessionUrl(series, null, child, se)); orderByPath.set(se.path, seq++); }
+      else if (child.type === 'subseries') for (const bk of child.books) for (const se of bk.sessions) { urlByPath.set(se.path, content.sessionUrl(series, child, bk, se)); orderByPath.set(se.path, seq++); }
     }
   }
 
@@ -247,7 +251,11 @@ async function runStreamingQuoteAudit(opts = {}) {
       exact: bcount['exact'] || 0, caseOnly: bcount['case-only'] || 0, formatOnly: bcount['format-only'] || 0,
       bracketed: bcount['bracketed-match'] || 0,
       review, minor, diffTransl, paraphrase: bcount['paraphrase'] || 0,
-      findings: findings.slice(0, 60).sort((a, b) => (a.coverage || 0) - (b.coverage || 0)),
+      // Order findings by where they appear in the book: session reading order, then
+      // character offset within the session.
+      findings: findings.sort((a, b) =>
+        ((orderByPath.get(a.file) ?? 1e9) - (orderByPath.get(b.file) ?? 1e9)) || ((a.pos || 0) - (b.pos || 0))
+      ).slice(0, 60),
     };
     perBook.push(rec);
     emit({ type: 'book', title: rec.title, series: rec.series, coverPath: rec.coverPath, quotes: rec.quotes, exact: rec.exact, review: rec.review, diffs: review + minor + diffTransl });

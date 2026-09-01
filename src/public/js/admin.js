@@ -2144,6 +2144,23 @@
       return esc(verse.slice(0, idx)) + '<mark class="qa-q">' + boldBySet(span, bibleSet) + '</mark>' + esc(verse.slice(idx + span.length));
     }
 
+    // A link that opens the rendered session page scrolled to & highlighting the quote,
+    // using the browser's native text-fragment feature (no server rendering to duplicate).
+    // Long quotes use the "start,end" range form, which is more robust to inner wording.
+    function bookFragmentLink(f) {
+      if (!f.sessionUrl) return '';
+      // Strip markdown emphasis (consumed when rendered) but KEEP editorial [..] brackets —
+      // our parser renders them literally, so the on-page text still contains them.
+      var clean = String(f.quote || '').replace(/[_*`]+/g, '').replace(/\s+/g, ' ').trim();
+      if (!clean) return '';
+      var trim = function (s) { return s.replace(/^[^0-9A-Za-z]+|[^0-9A-Za-z]+$/g, ''); };
+      var words = clean.split(' ');
+      var frag = words.length > 8
+        ? encodeURIComponent(trim(words.slice(0, 4).join(' '))) + ',' + encodeURIComponent(trim(words.slice(-4).join(' ')))
+        : encodeURIComponent(trim(clean));
+      var url = f.sessionUrl + '#:~:text=' + frag;
+      return ' <a href="' + esc(url) + '" target="_blank" rel="noopener">Show in book &#8599;</a>';
+    }
     function findingRow(f) {
       var tierLbl = f.tier === 'review' ? 'Review' : f.tier === 'different-translation' ? 'Different translation' : 'Minor';
       var sessionHead = f.sessionTitle
@@ -2169,7 +2186,7 @@
       return '<div class="admin-card qa-finding">'
         + '<div class="qa-finding-session">' + sessionHead + '</div>'
         + '<div class="qa-finding-head"><span class="bv-loc">' + esc(f.ref) + '</span> <span class="admin-badge admin-badge--warn">' + esc(tierLbl) + '</span> <span class="text-muted">' + esc(f.coverage) + '% overlap</span> '
-        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a></div>'
+        + '<a href="#" class="bv-context" data-ctx-ref="' + esc(f.ref) + '">Show scripture</a>' + bookFragmentLink(f) + '</div>'
         + '<div class="qa-block"><div class="qa-block-label">In the session</div><div class="qa-para">' + markQuoteInParagraph(f.context || f.quote, f.quote, diffSet) + '</div></div>'
         + '<div class="qa-block"><div class="qa-block-label">BSB &mdash; ' + esc(f.ref) + '</div><div class="qa-para">' + markSpanInVerse(f.verse, span, f.quote) + '</div></div>'
         + fixBlock + '</div>';
