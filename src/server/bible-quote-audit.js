@@ -14,27 +14,71 @@ const citations = require('./bible-citations');
 const v = require('./bible-validation');
 const { listLibraryMarkdown } = require('./bible-sync');
 
-// The BSB wording for the span a quote covers: the raw verse text from the first
-// to the last quoted word (so a "Fix" replaces the quote with scripture, changing
-// only what differs). Returns null when it can't be aligned confidently.
+// Word-level LCS alignment: the matched (quote-word, verse-word) index pairs, in
+// increasing order. Lets us locate where a quote maps into a verse even when the
+// boundary words are substitutions (e.g. "came"/"come", "abundantly"/"fullness").
+function alignWords(a, b) {
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++)
+    for (let j = 1; j <= m; j++)
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+  const pairs = [];
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) { pairs.unshift({ qi: i - 1, vi: j - 1 }); i--; j--; }
+    else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--;
+  }
+  return pairs;
+}
+
+// The BSB wording for the span a quote actually covers — so a "Fix" replaces the
+// quote with just that scripture fragment, not the whole verse. We align the quote
+// to the verse by word-LCS (tolerating boundary word differences), then take the
+// verse text from the first to the last aligned word, extended to cover the words
+// the quote substituted at each edge:
+//   • if the aligned span reaches near a verse end, run to that end (quotes stop at
+//     natural breaks) — this captures "abundantly" → "in all its fullness";
+//   • otherwise extend by the count of substituted boundary quote words, stopping
+//     at the first clause punctuation — this trims a trailing clause the quote
+//     never covered (e.g. John 1:9 "…everyone" not "…into the world").
+// Returns null when the quote can't be aligned confidently (a real paraphrase).
 function correctQuote(quote, verseText) {
-  const qWords = v.normalizeVerse(quote).split(' ').filter(Boolean);
-  if (qWords.length < 3) return null;
   const tokens = String(verseText).split(/(\s+)/); // words + whitespace, preserved
-  const words = [];
-  tokens.forEach((tok, i) => { if (tok.trim()) words.push({ norm: v.normalizeVerse(tok).toLowerCase(), idx: i }); });
-  const firstN = v.normalizeVerse(qWords[0]).toLowerCase();
-  const lastN = v.normalizeVerse(qWords[qWords.length - 1]).toLowerCase();
-  let start = -1;
-  for (const w of words) { if (w.norm === firstN) { start = w.idx; break; } }
-  if (start < 0) return null;
-  let end = -1;
-  for (const w of words) { if (w.idx >= start && w.norm === lastN) end = w.idx; }
-  if (end < start) return null;
-  const span = tokens.slice(start, end + 1).join('');
+  const vw = []; // { l: normalized-lowercase, tok: token index, raw: original token }
+  tokens.forEach((tok, i) => { if (tok.trim()) vw.push({ l: v.normalizeVerse(tok).toLowerCase(), tok: i, raw: tok }); });
+  if (vw.length < 3) return null;
+  // De-bracket the quote — editorial [..] marks aren't the Bible's wording.
+  const qw = v.normalizeVerse(String(quote).replace(/\[[^\]]*\]/g, ' ')).toLowerCase().split(' ').filter(Boolean);
+  if (qw.length < 3) return null;
+
+  const matches = alignWords(qw, vw.map(w => w.l));
+  if (matches.length < 2) return null;
+  const qi0 = matches[0].qi, qi1 = matches[matches.length - 1].qi;
+  const vi0 = matches[0].vi, vi1 = matches[matches.length - 1].vi;
+  const NEAR = 4; // words-from-a-verse-edge that we treat as "reaches the edge"
+
+  // Leading boundary.
+  let startVi;
+  if (vi0 <= NEAR) startVi = 0;
+  else startVi = Math.max(0, vi0 - qi0);
+
+  // Trailing boundary.
+  let endVi;
+  if ((vw.length - 1) - vi1 <= NEAR) endVi = vw.length - 1;
+  else {
+    endVi = vi1;
+    let steps = (qw.length - 1) - qi1; // substituted quote words after the last match
+    while (steps > 0 && endVi < vw.length - 1) {
+      endVi++; steps--;
+      if (/[.,;:!?”"']$/.test(vw[endVi].raw)) break; // stop at a clause boundary
+    }
+  }
+
+  const span = tokens.slice(vw[startVi].tok, vw[endVi].tok + 1).join('').trim();
   const spanWords = span.split(/\s+/).filter(Boolean).length;
-  if (spanWords < qWords.length * 0.6 || spanWords > qWords.length * 1.6) return null; // sanity
-  return span;
+  if (spanWords > qw.length * 2.5 + 4) return null; // alignment ballooned — bail
+  return span || null;
 }
 
 // Build a "Fix" for a deviation: the scripture wording to replace the quote with.
@@ -171,7 +215,7 @@ async function runStreamingQuoteAudit(opts = {}) {
   return result;
 }
 
-module.exports = { runStreamingQuoteAudit, scanText, auditLibraryQuotations };
+module.exports = { runStreamingQuoteAudit, scanText, auditLibraryQuotations, correctQuote, computeFix };
 
 // ── Legacy non-streaming audit (kept for compatibility) ────────────────────────
 async function auditLibraryQuotations(opts = {}) {
