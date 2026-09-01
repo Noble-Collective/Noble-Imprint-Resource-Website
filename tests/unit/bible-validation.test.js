@@ -229,6 +229,14 @@ test('extractCrossRefs reads our plain-text \\r line with its section-start ref'
   assert.deepStrictEqual(v.extractCrossRefs(ours), [{ text: '(Psalms 38:1-22)', raw: '(Psalms 38:1–22)', ref: '3:1' }]);
 });
 
+test('extractCrossRefs treats the BSB stray space before a join semicolon as identical (no false diff)', () => {
+  // The official joins multiple \ref entries as "…\ref* ; \ref…" → a stray space before ";".
+  const off = '\\c 11\n\\s1 H\n\\r (\\ref Genesis 15–22|GEN 15-22\\ref* ; \\ref Romans 4:1–12|ROM 4:1-12\\ref*)\n\\v 8 x';
+  const ours = '\\c 11\n\\s1 H\n\\r (Genesis 15–22; Romans 4:1–12)\n\\v 8 x';
+  assert.strictEqual(v.extractCrossRefs(off)[0].raw, '(Genesis 15–22; Romans 4:1–12)'); // no space before ;
+  assert.strictEqual(v.extractCrossRefs(off)[0].text, v.extractCrossRefs(ours)[0].text);
+});
+
 test('extractCrossRefs treats cosmetic space just inside parens as identical (no false diff)', () => {
   // The official BSB is inconsistent: one \r line reads "( \ref ..." with a stray space.
   const spaced = '\\c 4\n\\s1 H\n\\r ( \\ref Matthew 11:7–19|MAT 11:7-19\\ref*)\n\\v 1 x';

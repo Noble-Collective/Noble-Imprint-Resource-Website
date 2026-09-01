@@ -369,6 +369,7 @@ function crossRefRaw(s) {
     .replace(/\\\+?[a-z]+\d*\*?/g, ' ')                  // any other stray USFM markers
     .replace(/\s+/g, ' ')
     .replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')       // drop cosmetic space just inside parens ("( Matthew" → "(Matthew")
+    .replace(/\s+([;,])/g, '$1')                         // drop the space the BSB leaves before a join semicolon/comma ("15–22 ;" → "15–22;")
     .trim();
 }
 
