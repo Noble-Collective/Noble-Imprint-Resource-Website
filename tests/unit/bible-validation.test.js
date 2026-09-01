@@ -248,6 +248,35 @@ test('diffStructure with crossRefs disabled ignores \\r differences', () => {
   assert.strictEqual(r.totals.booksMatched, 1);
 });
 
+// ── diffServed (repo verse store vs what the reader serves) ───────────────────
+test('diffServed flags reader copies that are stale or missing vs the repo', () => {
+  const repo = new Map([
+    ['John 3:16', 'For God so loved the world'],
+    ['John 3:17', 'For God did not send His Son'],
+    ['Acts 2:1', 'When the day of Pentecost came'],
+  ]);
+  const served = {
+    'John 3:16': 'For God so loved the world',   // match
+    'John 3:17': 'For God did NOT send His Son',  // stale/mismatch
+    // Acts 2:1 absent → missing from reader
+  };
+  const r = v.diffServed(repo, served);
+  assert.strictEqual(r.total, 3);
+  assert.strictEqual(r.matched, 1);
+  assert.strictEqual(r.mismatched, 1);
+  assert.strictEqual(r.missing, 1);
+  assert.strictEqual(r.samples.find(s => s.ref === 'John 3:17').kind, 'mismatch');
+  assert.strictEqual(r.samples.find(s => s.ref === 'Acts 2:1').kind, 'missing');
+});
+
+test('diffServed reports a clean pass when the reader matches the repo exactly', () => {
+  const repo = new Map([['John 1:1', 'In the beginning was the Word']]);
+  const r = v.diffServed(repo, { 'John 1:1': 'In the beginning was the Word' });
+  assert.strictEqual(r.matched, 1);
+  assert.strictEqual(r.mismatched, 0);
+  assert.strictEqual(r.missing, 0);
+});
+
 // ── diffStructure ─────────────────────────────────────────────────────────────
 test('diffStructure compares headings + footnotes across naming styles', () => {
   const ours = new Map([

@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const github = require('./github');
 const v = require('./bible-validation');
 const sync = require('./bible-sync');
+const bible = require('./bible');
 
 const BSB_TXT_URL = 'https://bereanbible.com/bsb.txt';
 const BSB_USFM_ZIP_URL = 'https://bereanbible.com/bsb_usfm.zip';
@@ -120,6 +121,22 @@ async function runStreamingCompare(opts = {}) {
   });
   emit({ type: 'step', key: 'library', status: 'done', detail: `${changes.scannedFiles} files scanned · ${changes.libraryChanges.length} quotation(s) affected` });
 
+  // 7. Reader fidelity — does the parsed/served copy the browser renders match our repo?
+  //    (Catches a stale committed .bible-cache snapshot or any parser transform of the
+  //    verse text — the leg from repo → what the reader actually displays.)
+  emit({ type: 'step', key: 'reader', label: 'Verifying the rendered reader matches our repo copy', status: 'running' });
+  let reader = null;
+  try {
+    const served = await bible.getServedVerses(translationId);
+    if (!served || !served.verses) throw new Error('reader copy not loaded');
+    reader = v.diffServed(oursVerses, served.verses);
+    reader.cacheVersion = served.cacheVersion;
+    emit({ type: 'step', key: 'reader', status: 'done', detail: `${reader.matched.toLocaleString()} verses match the reader · ${reader.mismatched} differ · ${reader.missing} missing` });
+  } catch (e) {
+    reader = { total: oursVerses.size, matched: 0, mismatched: 0, missing: 0, samples: [], error: e.message };
+    emit({ type: 'step', key: 'reader', status: 'done', detail: 'reader check unavailable: ' + e.message });
+  }
+
   const result = {
     translationId,
     durationMs: Date.now() - t0,
@@ -132,6 +149,7 @@ async function runStreamingCompare(opts = {}) {
         return { ...b, code, bookName: USFM_BOOK_NAMES[code] || code };
       }),
     },
+    reader,
     changes,
   };
   emit({ type: 'result', result });

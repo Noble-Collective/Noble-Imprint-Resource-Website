@@ -1309,7 +1309,7 @@
     var checklistEl = document.getElementById('bv-checklist');
     var compareOut = document.getElementById('bv-compare-output');
     var changesById = {};
-    var STEP_ORDER = ['download-verses', 'download-usfm', 'load-ours', 'compare', 'structure', 'library'];
+    var STEP_ORDER = ['download-verses', 'download-usfm', 'load-ours', 'compare', 'structure', 'library', 'reader'];
     var STEP_LABELS = {
       'download-verses': 'Download official verse text from bereanbible.com',
       'download-usfm': 'Download official structure (headings + footnotes)',
@@ -1522,13 +1522,34 @@
       return bvSection(label + ' differences', bookCount + ' book' + (bookCount === 1 ? '' : 's'), bookCount > 0, refreshType, refreshLabel, body);
     }
 
+    // Summary tiles for the third verification leg: repo → what the reader renders.
+    function readerGroup(rd) {
+      rd = rd || { error: 'not run' };
+      if (rd.error) {
+        return '<div class="bv-group-label">Reader &mdash; what the browser renders</div>'
+          + '<p class="text-muted bv-math">Reader fidelity check unavailable: ' + esc(rd.error) + '</p>';
+      }
+      var bad = (rd.mismatched || 0) + (rd.missing || 0);
+      return '<div class="bv-group-label">Reader &mdash; what the browser renders (parsed copy)</div>'
+        + '<div class="bv-tiles">'
+        + tile('Matches repo', Number(rd.matched || 0).toLocaleString(), bad ? 'warn' : 'ok')
+        + tile('Differs', rd.mismatched || 0, rd.mismatched ? 'err' : 'ok')
+        + tile('Missing', rd.missing || 0, rd.missing ? 'err' : 'ok')
+        + '</div>'
+        + '<p class="text-muted bv-math">' + (bad
+            ? 'The reader serves a committed parsed snapshot (<code>.bible-cache</code>). <strong>' + bad + '</strong> verse(s) differ from the repo — the snapshot is stale; regenerate <code>.bible-cache</code> or bump <code>CACHE_VERSION</code> so readers see the current text.'
+            : 'The reader serves exactly what is in the repo — the parsed snapshot is current.')
+        + '</p>';
+    }
+
     function renderCompareResult(r) {
       changesById = {};
       var ch = r.changes || { verseChanges: [], libraryChanges: [], citationReview: [] };
       (ch.verseChanges || []).concat(ch.libraryChanges || []).forEach(function (c) { changesById[c.id] = c; });
       var v = r.verse, st = r.structure.totals;
       var structDiffs = st.booksWithHeadingDiffs + st.booksWithFootnoteDiffs + (st.booksWithCrossRefDiffs || 0) + st.missingBooks + st.extraBooks;
-      var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0;
+      var readerBad = (r.reader && !r.reader.error) ? ((r.reader.mismatched || 0) + (r.reader.missing || 0)) : 0;
+      var clean = v.changed === 0 && v.missing === 0 && v.extra === 0 && structDiffs === 0 && readerBad === 0;
 
       var hdgBooks = st.booksWithHeadingDiffs || 0, ftBooks = st.booksWithFootnoteDiffs || 0, crBooks = st.booksWithCrossRefDiffs || 0;
       var structBooksDiff = st.booksChecked - st.booksMatched; // books differing in headings, footnotes and/or cross-references
@@ -1552,6 +1573,7 @@
         + tile('Books w/ footnote diffs', ftBooks, ftBooks ? 'warn' : 'ok')
         + tile('Books w/ cross-ref diffs', crBooks, crBooks ? 'warn' : 'ok')
         + '</div>'
+        + readerGroup(r.reader)
         + '<p class="text-muted bv-math">' + (clean
           ? 'Our copy matches the current published BSB exactly.'
           : 'The <strong>' + v.changed + '</strong> verse change(s) and the <strong>' + structBooksDiff + '</strong> book(s) with heading/footnote/cross-reference differences are independent — a book counts as “identical” only when its headings, footnotes and cross-references all match, regardless of verse changes. Each type has its own section and refresh button below.')
@@ -1578,6 +1600,21 @@
             + libChanges.map(changeCard).join('') + '</details>';
         }
       }
+
+      // Reader out of sync — shown whenever the served snapshot differs from the repo,
+      // even if the repo itself matches the BSB (this is a cache-regeneration task, not
+      // a BSB sync, so it has no refresh button).
+      if (r.reader && !r.reader.error && readerBad) {
+        var rsamples = (r.reader.samples || []).map(function (s) {
+          return '<div class="bv-struct-item"><div class="bv-change-loc">' + esc(s.ref) + ' <span class="text-muted">(' + esc(s.kind) + ')</span></div>'
+            + '<div class="bv-diff-line"><span class="bv-side">Repo</span> ' + esc(s.repo || '') + '</div>'
+            + '<div class="bv-diff-line"><span class="bv-side bv-side--new">Reader</span> ' + esc(s.reader == null ? '(missing)' : s.reader) + '</div></div>';
+        }).join('');
+        html += '<details class="bv-section" open><summary><strong>Reader out of sync</strong> <span class="bv-count">' + readerBad + ' verse(s)</span></summary>'
+          + '<p class="text-muted">The reader serves a stale parsed snapshot (<code>.bible-cache</code>). Regenerate it (or bump <code>CACHE_VERSION</code>) so readers see the current repo text. Showing up to ' + (r.reader.samples || []).length + ' example(s):</p>'
+          + (rsamples || '') + '</details>';
+      }
+
       compareOut.innerHTML = html;
     }
 
@@ -1587,7 +1624,7 @@
       // the server does them fast (and concurrently).
       var STEP_MIN_MS = {
         'download-verses': 3000, 'download-usfm': 3000, 'load-ours': 3000,
-        'compare': 1000, 'structure': 1200, 'library': 1000,
+        'compare': 1000, 'structure': 1200, 'library': 1000, 'reader': 1000,
       };
 
       compareBtn.addEventListener('click', function () {

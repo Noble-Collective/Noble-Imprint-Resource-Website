@@ -367,6 +367,23 @@ function stripInlineMarkers(s) {
   return s.replace(/\\\+?[a-z]+\d*\*?/g, ' ');
 }
 
+// Compare the repo verse store (Map ref→text) against what the reader actually
+// SERVES (object ref→text — the in-memory copy the browser renders from, loaded from
+// the committed .bible-cache snapshot). ANY textual difference is a mismatch: the
+// reader should be byte-faithful to the repo, so a diff means the parsed snapshot is
+// stale or the parser transformed the text. Returns totals + up to sampleLimit examples.
+function diffServed(repoVerses, served, sampleLimit = 25) {
+  let matched = 0, mismatched = 0, missing = 0;
+  const samples = [];
+  for (const [ref, text] of repoVerses) {
+    const shown = served ? served[ref] : undefined;
+    if (shown == null) { missing++; if (samples.length < sampleLimit) samples.push({ ref, kind: 'missing', repo: text, reader: null }); }
+    else if (shown === text) { matched++; }
+    else { mismatched++; if (samples.length < sampleLimit) samples.push({ ref, kind: 'mismatch', repo: text, reader: shown }); }
+  }
+  return { total: repoVerses.size, matched, mismatched, missing, samples };
+}
+
 // Order-insensitive multiset difference of two string arrays.
 function multisetDiff(a, b) {
   const counts = new Map();
@@ -529,6 +546,7 @@ module.exports = {
   stripInlineMarkers,
   multisetDiff,
   multisetDiffBy,
+  diffServed,
   diffStructure,
   overallStatus,
 };

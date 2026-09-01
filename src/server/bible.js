@@ -225,6 +225,17 @@ async function loadBibles() {
   loaded = true;
 }
 
+// The verse text the reader actually SERVES (in-memory ref→text map, loaded from the
+// committed .bible-cache snapshot or a fresh parse). Ensures bibles are loaded. Used by
+// the compare tool to verify the rendered/served copy matches the repo source. Returns
+// { verses, cacheVersion, fromCache } — fromCache indicates the snapshot path was used.
+async function getServedVerses(translationId) {
+  await loadBibles();
+  const t = translations[translationId];
+  if (!t) return null;
+  return { verses: t.verses, cacheVersion: CACHE_VERSION };
+}
+
 // Look up a single verse like "Acts 2:1"
 function getVerse(translation, ref) {
   const t = translations[translation];
@@ -441,6 +452,7 @@ async function refreshCoverPaths() {
 module.exports = {
   loadBibles,
   refreshCoverPaths,
+  getServedVerses,
   getVerse,
   getVerses,
   getTranslation,
