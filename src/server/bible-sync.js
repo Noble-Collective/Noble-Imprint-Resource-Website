@@ -191,20 +191,38 @@ function replaceHeadingInUsfm(content, oldText, newText, ref) {
 }
 
 // Insert a whole line (e.g. "\s1 …" or "\r …") immediately before the \v of `ref`.
+// Idempotent: if an equivalent heading/cross-ref line already sits in the run of marker
+// lines directly before that verse, it's a no-op (guards duplicate Accepts, same class of
+// bug as the footnote ADD — see appendFootnoteToVerse).
 function insertLineBeforeVerse(content, ref, newLine) {
   if (!ref) return { content, changed: false };
   const [ch, vs] = String(ref).split(':');
   const lines = String(content).split('\n');
+  const sig = markerSig(newLine);
   let curCh = 0;
   for (let i = 0; i < lines.length; i++) {
     const cm = lines[i].match(/^\s*\\c\s+(\d+)/); if (cm) { curCh = cm[1]; continue; }
     const vm = lines[i].match(/^\s*\\v\s+(\d+)/);
     if (vm && String(curCh) === String(ch) && vm[1] === String(vs)) {
+      // Scan back over the contiguous heading/cross-ref lines introducing this verse.
+      for (let j = i - 1; j >= 0 && !/^\s*\\(v|c)\s/.test(lines[j]); j--) {
+        if (sig && markerSig(lines[j]) === sig) return { content, changed: false };
+      }
       lines.splice(i, 0, newLine);
       return { content: lines.join('\n'), changed: true };
     }
   }
   return { content, changed: false };
+}
+
+// Family+text signature of a heading (\s1-4) or cross-ref (\r) line, normalized the
+// same way the compare matches them, so encoding/marker-digit differences don't matter.
+function markerSig(line) {
+  const s = line.match(/^\s*\\s[1-4]?\s+(.+?)\r?$/);
+  if (s) return 's|' + v.normalizeVerse(v.stripInlineMarkers(s[1]));
+  const r = line.match(/^\s*\\r\s+(.+?)\r?$/);
+  if (r) return 'r|' + v.normalizeVerse(v.crossRefRaw(r[1]));
+  return '';
 }
 
 // Replace a footnote's text in raw USFM, matching by verse ref + normalized
@@ -259,6 +277,16 @@ function appendFootnoteToVerse(content, ref, newText, anchor) {
     if (inVerse) verseIdxs.push(i);
   }
   if (!verseIdxs.length) return { content, changed: false };
+
+  // Idempotency guard: if an equivalent footnote already exists anywhere in this verse,
+  // do nothing. Without this, a duplicate Accept (double-click, or a re-accept after a
+  // lagging read) appends a SECOND identical footnote — the John 18:2 "keeps showing up"
+  // bug, where our copy ended up with two "HF and PT Jesus also" spans vs the BSB's one.
+  const wantText = v.footnoteText(span);
+  for (const idx of verseIdxs) {
+    const existing = lines[idx].match(/\\f\s[\s\S]*?\\f\*/g) || [];
+    if (existing.some(fn => v.footnoteText(fn) === wantText)) return { content, changed: false };
+  }
 
   if (anchor) {
     for (const idx of verseIdxs) {

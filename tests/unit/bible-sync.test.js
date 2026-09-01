@@ -219,3 +219,40 @@ test('replaceCrossRefInUsfm deletes / adds a \\r line for one-sided diffs', () =
   assert.strictEqual(add.changed, true);
   assert.ok(/\\r \(Psalm 1:1–6\)\n\\v 1 x/.test(add.content));
 });
+
+// ── idempotent footnote ADD (guards against duplicate-accept, e.g. John 18:2) ────
+test('replaceFootnoteInUsfm ADD is a no-op when the footnote already exists at the verse', () => {
+  const usfm = '\\c 18\n\\v 2 Now Judas His betrayer also knew the place, because Jesus\\f + \\fr 18:2 \\ft HF and PT Jesus also\\f* had often met there.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also', 'because Jesus');
+  assert.strictEqual(r.changed, false);
+  // exactly one footnote span survives — no duplicate is appended
+  assert.strictEqual((r.content.match(/HF and PT Jesus also/g) || []).length, 1);
+});
+
+test('replaceFootnoteInUsfm ADD ignores marker/spacing differences when detecting an existing footnote', () => {
+  // existing uses \fqa; the add text is the reduced plain form — still recognized as present
+  const usfm = '\\c 18\n\\v 2 because Jesus\\f + \\fr 18:2 \\ft HF and PT \\fqa Jesus also\\f* had often met there.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also', 'because Jesus');
+  assert.strictEqual(r.changed, false);
+});
+
+test('replaceFootnoteInUsfm ADD still inserts when the verse has no such footnote', () => {
+  const usfm = '\\c 18\n\\v 2 because Jesus had often met there.';
+  const r = s.replaceFootnoteInUsfm(usfm, '18:2', '', 'HF and PT Jesus also', 'because Jesus');
+  assert.strictEqual(r.changed, true);
+  assert.strictEqual((r.content.match(/HF and PT Jesus also/g) || []).length, 1);
+});
+
+test('replaceHeadingInUsfm ADD is a no-op when the heading already introduces the verse', () => {
+  const usfm = '\\c 3\n\\s1 The Betrayal\n\\v 1 x';
+  const r = s.replaceHeadingInUsfm(usfm, '', 'The Betrayal', '3:1');
+  assert.strictEqual(r.changed, false);
+  assert.strictEqual((r.content.match(/The Betrayal/g) || []).length, 1);
+});
+
+test('replaceCrossRefInUsfm ADD is a no-op when the cross-reference already introduces the verse', () => {
+  const usfm = '\\c 3\n\\r (Psalm 1:1–6)\n\\v 1 x';
+  const r = s.replaceCrossRefInUsfm(usfm, '3:1', '', '(Psalm 1:1–6)');
+  assert.strictEqual(r.changed, false);
+  assert.strictEqual((r.content.match(/Psalm 1:1/g) || []).length, 1);
+});
