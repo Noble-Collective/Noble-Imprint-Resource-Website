@@ -1314,6 +1314,7 @@ body.text-mode .home-text {
   padding-left: 2em;
   text-indent: -2em;
   text-align: left;
+  margin-bottom: 0.9rem;
   hyphens: manual;
   -webkit-hyphens: manual;
 }
