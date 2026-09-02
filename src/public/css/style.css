@@ -1295,6 +1295,29 @@ body.text-mode .home-text {
   -webkit-hyphens: auto;
 }
 
+/* Bibliography — Chicago-style hanging indent, no bullets. Scoped to the
+   <Bibliography> wrapper (parser.js). Applies to both list entries and plain
+   paragraph entries so mixed source formats render uniformly. */
+.session-content .bibliography ul,
+.reading-content .bibliography ul,
+.session-content .bibliography ol,
+.reading-content .bibliography ol {
+  padding-left: 0;
+  margin-left: 0;
+  list-style: none;
+}
+
+.session-content .bibliography li,
+.reading-content .bibliography li,
+.session-content .bibliography p,
+.reading-content .bibliography p {
+  padding-left: 2em;
+  text-indent: -2em;
+  text-align: left;
+  hyphens: manual;
+  -webkit-hyphens: manual;
+}
+
 /* Blockquote */
 .session-content blockquote,
 .reading-content blockquote {

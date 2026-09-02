@@ -424,6 +424,14 @@ function preprocess(raw, options = {}) {
     });
   }
 
+  // ── Bibliography wrapper (hanging indent, no bullets — Chicago style) ──
+  // Wraps entries in a scoped div so CSS can render a hanging indent instead of
+  // disc bullets. Blank lines around the content let markdown-it render the inner
+  // list/paragraphs and italics normally (same pattern as the structural tags above).
+  text = text.replace(/<Bibliography>([\s\S]*?)<\/Bibliography>/g, (_, content) => {
+    return `\n<div class="bibliography">\n\n${content.trim()}\n\n</div>\n`;
+  });
+
   // ── <image name> tags ──
   const imagesPath = options.imagesPath || '';
   function imageUrl(name) {
