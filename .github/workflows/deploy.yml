@@ -3,14 +3,41 @@ name: Build and Deploy to Cloud Run
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-production
+  # Per-ref group so a PR's check run never cancels an in-flight production deploy.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Quality gate — runs on every push AND every PR. `deploy` depends on it, so a red
+  # gate blocks production. PRs run the gate but never reach the deploy job below.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Verify committed editor bundle is up to date
+        run: |
+          npm run build:editor
+          if ! git diff --exit-code --ignore-cr-at-eol src/public/js/codemirror-bundle.js; then
+            echo "::error::codemirror-bundle.js is stale — run 'npm run build:editor' and commit the result."
+            exit 1
+          fi
+
   deploy:
+    needs: check
+    # Never deploy from a pull_request event — only pushes to main / manual dispatch.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,11 +61,14 @@ jobs:
         run: |
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           IMAGE=gcr.io/noble-imprint-website/resource-website
+          SHA_TAG="$IMAGE:${GITHUB_SHA}"   # immutable, per-commit — the rollback target
+          LATEST="$IMAGE:latest"
           # Retry build+push so a transient registry/network blip (e.g. a Docker Hub
           # i/o timeout on the base-image pull) doesn't fail the whole deploy.
           for attempt in 1 2 3; do
             echo "::group::Build & push — attempt $attempt"
-            if docker build --build-arg BUILD_TIME="$BUILD_TIME" -t "$IMAGE" . && docker push "$IMAGE"; then
+            if docker build --build-arg BUILD_TIME="$BUILD_TIME" -t "$SHA_TAG" -t "$LATEST" . \
+               && docker push "$SHA_TAG" && docker push "$LATEST"; then
               echo "::endgroup::"; echo "Succeeded on attempt $attempt"; exit 0
             fi
             echo "::endgroup::"
@@ -48,14 +78,22 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # Deploy the immutable per-commit image, and PIN the known-good runtime config
+          # so a redeploy can never silently reset it (values captured 2026-09-03).
           gcloud run deploy resource-website \
-            --image gcr.io/noble-imprint-website/resource-website \
+            --image gcr.io/noble-imprint-website/resource-website:${GITHUB_SHA} \
             --platform managed \
             --region us-central1 \
             --min-instances=0 \
+            --max-instances=20 \
+            --memory=512Mi \
+            --cpu=1 \
+            --concurrency=80 \
+            --timeout=300 \
+            --cpu-boost \
             --project=noble-imprint-website
 
       # Content cache refresh not needed on deploy — new containers start with
       # empty in-memory cache. The runtime warm-up populates the disk cache.
-      # Manual refresh still available: POST /api/refresh
-      # Test data cleanup still available: POST /api/cleanup-test-data
+      # Manual refresh still available: POST /api/refresh (requires REFRESH_SECRET)
+      # Test data cleanup is dev-only (404 in production).

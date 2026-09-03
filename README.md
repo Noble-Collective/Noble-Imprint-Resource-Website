@@ -267,20 +267,20 @@ src/
 
 ### Environment Variables
 
-Locally, every variable is read from `.env` via dotenv. In production they are set on the
-Cloud Run service — **Secret Manager** for the two below marked _(Secret Manager)_, plain
-Cloud Run env vars for the rest (moving the remaining API keys into Secret Manager is tracked
-in `plans/2026-09-03-architecture-hardening-plan.md`).
+Locally, every variable is read from `.env` via dotenv. In production, all sensitive values
+are stored in **GCP Secret Manager** and wired to Cloud Run via `--set-secrets`; only
+non-sensitive values (a public client key, an email, a domain) remain as plain env vars.
 
 | Variable | Source (prod) | Purpose |
 |----------|--------------|---------|
-| `GITHUB_TOKEN` | Cloud Run **(Secret Manager** `github-token`**)** | GitHub API access (read content, commit changes) |
-| `REFRESH_SECRET` | Cloud Run **(Secret Manager** `refresh-secret`**)** | Shared secret gating `POST /api/refresh` + `/api/refresh-audio` (also `Authorization: Bearer` / `x-refresh-key`). Admin sessions bypass it. Also a GitHub secret in the audiobooks repo. |
-| `SCHEDULER_SECRET` | Cloud Run env _(currently unset)_ | Gates `POST /api/notifications/send-daily-summary`. Set it (and a Cloud Scheduler job) to enable daily-summary emails; while unset the endpoint fails closed (admin-only). |
-| `CLAUDE_API_KEY` | Cloud Run env | API key for Claude AI bot access (`x-api-key`) |
+| `GITHUB_TOKEN` | Secret Manager `github-token` | GitHub API access (read content, commit changes) |
+| `REFRESH_SECRET` | Secret Manager `refresh-secret` | Shared secret gating `POST /api/refresh` + `/api/refresh-audio` (also `Authorization: Bearer` / `x-refresh-key`). Admin sessions bypass it. Also a GitHub secret in the audiobooks repo. |
+| `CLAUDE_API_KEY` | Secret Manager `claude-api-key` | API key for Claude AI bot access (`x-api-key`) |
+| `MAILGUN_API_KEY` | Secret Manager `mailgun-api-key` | Notification / role email delivery via Mailgun |
+| `ANALYTICS_IP_SALT` | Secret Manager `analytics-ip-salt` | Salt for hashing visitor IPs (raw IP never stored). If unset/default in prod, analytics ingestion disables itself. |
+| `SCHEDULER_SECRET` | _(currently unset)_ | Gates `POST /api/notifications/send-daily-summary`. Set it (and a Cloud Scheduler job) to enable daily-summary emails; while unset the endpoint fails closed (admin-only). |
+| `MAILGUN_DOMAIN` | Cloud Run env | Mailgun sending domain (not secret) |
 | `CLAUDE_BOT_EMAIL` | Cloud Run env | Email identity for bot user |
-| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Cloud Run env | Notification / role email delivery via Mailgun |
-| `ANALYTICS_IP_SALT` | Cloud Run env | Salt for hashing visitor IPs (raw IP never stored). If unset/default in prod, analytics ingestion disables itself. |
 | `FIREBASE_API_KEY` | Cloud Run env | Firebase Auth **client-side** key (public by design) |
 | `GOOGLE_CLOUD_PROJECT` | Cloud Run env | Firestore / BigQuery project ID |
 | `GOOGLE_APPLICATION_CREDENTIALS` | `.env` **local only** | Path to the service account key for Firestore access. In prod, Cloud Run uses ADC — no key file (and `service-account-key.json` is `.dockerignore`d so it never enters the image). |
@@ -397,11 +397,28 @@ The site serves audiobook versions of books that have been processed through the
 
 ### Automatic (standard workflow)
 
-Push to `main` branch. GitHub Actions builds a Docker image and deploys to Cloud Run. Takes ~2-3 minutes.
+Push to `main` branch. GitHub Actions first runs the **`check` gate** (`npm ci`, `npm run test:unit`, and an editor-bundle staleness check); the `deploy` job `needs: check`, so a red gate blocks production. On a passing push it builds a Docker image tagged both `:latest` and `:<commit-sha>`, deploys the **immutable `:<sha>`** image, and pins the Cloud Run runtime config (`--min-instances=0 --max-instances=20 --memory=512Mi --cpu=1 --concurrency=80 --timeout=300 --cpu-boost`) so a redeploy can't silently reset it. PRs run the gate but never deploy. Takes ~2-3 minutes.
 
 ```bash
 git push origin main
 # That's it. CI/CD handles the rest.
+```
+
+### Rollback
+
+Every deploy pushes an immutable `:<commit-sha>` image and Cloud Run keeps prior revisions.
+
+```bash
+# Fast (no rebuild): shift 100% traffic back to the previous good revision
+gcloud run revisions list --service resource-website --region us-central1 --project noble-imprint-website
+gcloud run services update-traffic resource-website --region us-central1 --project noble-imprint-website \
+  --to-revisions <PREV_REVISION>=100
+
+# Or redeploy a known-good commit image (keep the pinned config flags):
+gcloud run deploy resource-website \
+  --image gcr.io/noble-imprint-website/resource-website:<good-sha> \
+  --platform managed --region us-central1 --project noble-imprint-website \
+  --min-instances=0 --max-instances=20 --memory=512Mi --cpu=1 --concurrency=80 --timeout=300 --cpu-boost
 ```
 
 ### Content updates
@@ -438,7 +455,7 @@ gcloud run deploy resource-website \
 | **Firebase Hosting** | `noble-imprint-website.web.app` + `resources.noblecollective.org` |
 | **Firestore** | Collections: `users`, `suggestions`, `comments`, `replies` |
 | **Firestore Indexes** | `suggestions` (filePath+status+originalFrom), `suggestions` (status+createdAt), `comments` (filePath+status+from), `replies` (filePath+createdAt) |
-| **GCP Secret Manager** | `github-token`, `refresh-secret` (wired to Cloud Run via `--set-secrets`); `claude-api-key` exists but is currently served as a plain Cloud Run env var |
+| **GCP Secret Manager** | `github-token`, `refresh-secret`, `claude-api-key`, `mailgun-api-key`, `analytics-ip-salt` — all wired to Cloud Run via `--set-secrets` |
 | **Cloudflare DNS** | `resources` CNAME > `noble-imprint-website.web.app` (proxy OFF) |
 
 ### Creating Firestore Indexes
