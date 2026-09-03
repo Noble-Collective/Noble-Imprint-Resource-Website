@@ -247,6 +247,15 @@ function isTreeSane(newTree, prevTree) {
   return { ok: true };
 }
 
+// Cheap health check: is a non-empty content tree available to serve right now WITHOUT
+// triggering a rebuild? True if the in-memory cache or the committed snapshot has books.
+function hasServableTree() {
+  const cached = cache.get(TREE_CACHE_KEY);
+  if (cached && countBooks(cached) > 0) return true;
+  const snap = readTreeSnapshot();
+  return !!(snap && countBooks(snap) > 0);
+}
+
 let treeRebuildInFlight = null;
 
 // The real build: hits the GitHub API (~90 directory calls + per-book meta),
@@ -737,5 +746,6 @@ module.exports = {
   warmDiskCache,
   isTreeSane,
   countBooks,
+  hasServableTree,
   slugify,
 };

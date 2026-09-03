@@ -93,6 +93,17 @@ jobs:
             --cpu-boost \
             --project=noble-imprint-website
 
+      - name: Smoke check (/healthz)
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://resources.noblecollective.org/healthz || echo 000)
+            echo "attempt $i: /healthz -> $code"
+            [ "$code" = "200" ] && { echo "Deploy is serving."; exit 0; }
+            sleep 10
+          done
+          echo "::error::/healthz did not return 200 after deploy — the new revision may be broken."
+          exit 1
+
       # Content cache refresh not needed on deploy — new containers start with
       # empty in-memory cache. The runtime warm-up populates the disk cache.
       # Manual refresh still available: POST /api/refresh (requires REFRESH_SECRET)

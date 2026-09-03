@@ -91,3 +91,16 @@ jobs:
             git commit -m "Refresh content + bible cache [automated]"
             git push
           fi
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.RESOURCE_REPO_TOKEN }}
+        run: |
+          # A failed nightly refresh means the committed caches are going stale. The
+          # validate-before-commit guard prevents a BAD commit, so the live site keeps
+          # serving the last good caches — but this needs eyes. Surface it as an issue.
+          gh issue create --repo Noble-Collective/Noble-Imprint-Resource-Website \
+            --title "Nightly cache refresh failed ($(date -u +%F))" \
+            --body "The scheduled content/bible cache refresh failed. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. The site still serves the last committed caches (the pre-commit validation guard blocks bad commits), but they are now going stale — please investigate." \
+            || echo "Failed to open alert issue"

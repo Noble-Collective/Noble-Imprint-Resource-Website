@@ -146,6 +146,16 @@ app.get('/image/*', async (req, res) => {
   }
 });
 
+// Health check for Cloud Run probes + uptime monitors. 200 only when a content tree is
+// servable (in-memory cache or committed snapshot). Bible-load status is reported in the
+// body for observability but does NOT fail the check — the ~2min first-boot bible warm-up
+// must not make a healthy container look dead to a liveness probe.
+app.get('/healthz', (req, res) => {
+  const treeOk = content.hasServableTree();
+  const biblesOk = bible.isReady();
+  res.status(treeOk ? 200 : 503).json({ status: treeOk ? 'ok' : 'unhealthy', tree: treeOk, bibles: biblesOk });
+});
+
 // Content tree endpoint — list all books and sessions (for API/bot access)
 app.get('/api/content-tree', async (req, res) => {
   try {
@@ -885,6 +895,20 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).render('error', { title: 'Error', message: 'Something went wrong. Please try again.' });
+});
+
+// Process-level safety net. Without these, a single stray rejected promise terminates the
+// process (Node 15+ default) and drops every in-flight request on this instance with no
+// signal beyond a default stack trace. Log with a stable "FATAL" marker so a Cloud Logging
+// alert can page on it.
+process.on('unhandledRejection', (reason) => {
+  console.error('FATAL unhandledRejection:', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('FATAL uncaughtException:', err && err.stack ? err.stack : err);
+  // Process state is undefined after an uncaught exception — exit so Cloud Run replaces the
+  // instance cleanly rather than serving from a corrupted state.
+  process.exit(1);
 });
 
 // Start server immediately so Cloud Run health check passes, then load bibles

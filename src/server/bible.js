@@ -490,8 +490,14 @@ async function refreshCoverPaths() {
   }
 }
 
+// True once at least the primary translation is loaded and serving verses (for /healthz).
+function isReady() {
+  return loaded && !!translations['bsb'];
+}
+
 module.exports = {
   loadBibles,
+  isReady,
   reload,
   refreshCoverPaths,
   getServedVerses,
