@@ -259,10 +259,26 @@ function record(req, ev) {
   else scheduleFlush();
 }
 
+// Lightweight per-IP fixed-window rate limit — an abuse/cost guard on the unauthenticated
+// collector (each accepted request can stream up to 50 rows into BigQuery). The default of
+// 120 req/min/IP is far above any legitimate beacon cadence.
+const RL_WINDOW_MS = 60 * 1000;
+const RL_MAX = Number(process.env.ANALYTICS_RL_MAX) || 120;
+const rlHits = new Map(); // ip -> { count, resetAt }
+function rateLimited(ip) {
+  const now = Date.now();
+  let e = rlHits.get(ip || 'unknown');
+  if (!e || now >= e.resetAt) { e = { count: 0, resetAt: now + RL_WINDOW_MS }; rlHits.set(ip || 'unknown', e); }
+  e.count++;
+  if (rlHits.size > 5000) { for (const [k, v] of rlHits) if (now >= v.resetAt) rlHits.delete(k); }
+  return e.count > RL_MAX;
+}
+
 // Express handler for POST /api/analytics/collect. Accepts a single event object
 // or { events: [...] }. Always 204 (beacons ignore the response body).
 function collect(req, res) {
   try {
+    if (rateLimited(req.ip)) { res.status(429).end(); return; }
     const body = req.body || {};
     const events = Array.isArray(body.events) ? body.events : [body];
     for (const ev of events.slice(0, MAX_EVENTS_PER_REQUEST)) record(req, ev);

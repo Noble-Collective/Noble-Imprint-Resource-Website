@@ -496,7 +496,17 @@ async function getSessionPageData(req, resolvedRoute) {
   // (book → subseries → series). Done on the raw markdown so injected content
   // (questions, callouts, blockquotes, attributions) flows through the normal pipeline.
   const includeBlocks = content.gatherCommonBlocks(series, subseries || null, book);
-  const resolvedContent = resolveIncludes(sessionData.content, includeBlocks);
+  // A malformed @include (unknown key, missing id=, non-matching bold=/active=) throws.
+  // Degrade to the raw session rather than 500-ing a published page — the unresolved
+  // directive is an HTML comment so it renders invisibly, and the console.error trips the
+  // Cloud Logging error alert so the bad include still gets surfaced and fixed.
+  let resolvedContent;
+  try {
+    resolvedContent = resolveIncludes(sessionData.content, includeBlocks);
+  } catch (e) {
+    console.error('[INCLUDE] resolve failed for', session.path, '-', (e && e.message) || e);
+    resolvedContent = sessionData.content;
+  }
   // Build images path from session path: series/.../sessions/file.md → series/.../sessions/images
   const sessionsDir = session.path ? session.path.replace(/\/[^/]+$/, '') : '';
   const imagesPath = sessionsDir ? sessionsDir + '/images' : '';

@@ -76,11 +76,15 @@ async function processImmediateNotifications({ bookPath, filePath, actorEmail, a
   if (mentionedUsers && mentionedUsers.length > 0) {
     for (const mentionedEmail of mentionedUsers) {
       if (mentionedEmail === actorEmail) continue;
+      // Only ever email a KNOWN user — never an arbitrary address from the client's
+      // mentionedUsers payload (otherwise our Mailgun domain could be used to spam, since
+      // shouldNotify defaults to opt-in for unknown addresses).
+      const recipient = await firestore.getUser(mentionedEmail);
+      if (!recipient) continue;
       const shouldSend = await firestore.shouldNotify(mentionedEmail, bookPath);
       if (!shouldSend) continue;
 
-      const recipient = await firestore.getUser(mentionedEmail);
-      const recipientName = recipient ? (recipient.displayName || mentionedEmail) : mentionedEmail;
+      const recipientName = recipient.displayName || mentionedEmail;
 
       await queueNotification({
         recipientEmail: mentionedEmail,
