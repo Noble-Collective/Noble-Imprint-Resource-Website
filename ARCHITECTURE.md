@@ -255,12 +255,16 @@ For rare exceptions — like hiding a book on the website that doesn't have a "H
 
 ### Hosting and deployment
 
-The website runs as a containerized Node.js application on Google Cloud Run, deployed at `resources.noblecollective.org`. Cloud Run is serverless — it scales to zero when no one is using the site and scales up automatically under load.
+The website runs as a containerized Node.js application (non-root `node` user) on Google Cloud Run, deployed at `resources.noblecollective.org`. Cloud Run is serverless — it scales to zero when no one is using the site and scales up automatically under load. Runtime config is **pinned in the deploy step** (min 0 / max 20 instances, 512Mi, 1 CPU, concurrency 80, 300s timeout, startup CPU boost) so a redeploy can't silently reset it.
 
 Two GitHub Actions workflows trigger deployment:
 
-1. **Any push to the website repo's main branch** (code changes, CSS updates, config changes).
+1. **Any push to the website repo's main branch** (code changes, CSS updates, config changes). This first runs a **CI `check` gate** (install → unit tests → editor-bundle staleness); the deploy only runs if the gate passes. PRs run the gate but never deploy. The image is tagged with the commit SHA (immutable, for clean rollback) as well as `:latest`, and a **post-deploy smoke check** hits `/api/health` and fails the deploy if the new revision isn't serving.
 2. **A cross-repo dispatch from the resources repo** (content changes). The resources repo has a small workflow that notifies the website repo whenever content is pushed.
+
+**Secrets** (GitHub token, refresh secret, Claude/Mailgun keys, analytics salt) live in Google Secret Manager and are mounted into Cloud Run; the container uses Application Default Credentials (no key file in the image).
+
+**Reliability & observability.** Firestore (roles, comments, suggestions, analytics IDs) has automated daily backups + point-in-time recovery. Content and Bible caches have floor guards that refuse to persist/commit a degraded (empty/partial) snapshot, so a GitHub API hiccup can't blank the live site. Runtime errors are caught by process-level handlers and raise a Cloud Logging alert (email); the nightly cache-refresh job validates its output before committing and opens a GitHub issue if it fails.
 
 ### Content fetching
 

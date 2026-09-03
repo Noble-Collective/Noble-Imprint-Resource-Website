@@ -144,6 +144,24 @@ An admin-only suite (`/admin` → **Bible Validation** tab) that independently v
 
 Book repo paths use `|` instead of `/` as separators in Firestore field names (Firestore disallows `/`). Helpers: `encodeBookPath()` / `decodeBookPath()` in `firestore.js`. Analytics uses a `contentRegistry` collection (stable `content_id` per book/session).
 
+## Operations (CI/CD, security, data-safety, observability)
+
+Established by the 2026-09-03 architecture hardening (`plans/2026-09-03-architecture-hardening-plan.md`).
+
+**CI/CD (`deploy.yml`):** push/PR to `main` runs a **`check` gate** (`npm ci` → `npm run test:unit` → editor-bundle staleness check). `deploy` `needs: check`, so a red gate blocks prod; PRs run the gate but never deploy. On a passing push: build image tagged `:latest` **and** `:<commit-sha>`, deploy the immutable `:<sha>`, **pin Cloud Run config** (`--min-instances=0 --max-instances=20 --memory=512Mi --cpu=1 --concurrency=80 --timeout=300 --cpu-boost`), then a **post-deploy smoke check** hits `/api/health` and fails the deploy if it's not 200. Rollback runbook is in `README.md` (shift traffic to a prior revision, or redeploy a `:<sha>`).
+
+**Secrets:** all sensitive values live in **Secret Manager** and are wired to Cloud Run via `--set-secrets`: `github-token`, `refresh-secret`, `claude-api-key`, `mailgun-api-key`, `analytics-ip-salt`. Only non-sensitive values stay as plain env (`FIREBASE_API_KEY` is a public client key, `CLAUDE_BOT_EMAIL`, `MAILGUN_DOMAIN`). `service-account-key.json` is `.dockerignore`d (prod uses ADC).
+
+**Data-safety floor guards (never ship a blank site):** `content.isTreeSane()` — `rebuildContentTree` refuses to persist a degraded tree (empty / zero books / <90% of the prior book count / a book that lost all its sessions) and keeps serving the prior committed snapshot. `bible.loadBibles({force})` is **rebuild-then-swap** — it never deletes the disk snapshot before a verified re-fetch, and falls back to the intact snapshot on failure (`reload()` uses `force`). The nightly `refresh-cache.yml` no longer `rm`s the bible cache and **validates content book-count + bible verse-count floors before committing** (fails the job otherwise, and opens a GitHub issue). `content-registry.syncTree` skips orphan recompute when the path set collapses sharply (protects analytics IDs from a degraded tree).
+
+**Access control (suggestion surface, `src/server/access-control.js`):** a suggestion's `filePath` must belong to its `bookPath` (`filePathBelongsToBook` — sessions/commonBook inside the book, or an ancestor commonSubseries/commonSeries the book includes), enforced on hunk create AND re-validated on accept. The read endpoints (`/file-version`, `/suggestion-count`, `/presence`, `/file`, `/history`) require a per-book role (`canViewFile` → role at-or-under the file's owning dir). Suggestion `newText` is run through `neutralizeDangerousHtml` on create (XSS floor — markdown-it renders with `html:true`).
+
+**Observability:** `GET /api/health` returns 200 when a content tree is servable (reports bible-load status in the body; **do not use `/healthz` — Google Front End intercepts it before the container**). `process.on('unhandledRejection'|'uncaughtException')` handlers in `index.js` (log with a `FATAL` marker; uncaught → exit for a clean restart). A **Cloud Logging alert policy** ("Resource Website — runtime errors") emails steve@ on `severity>=ERROR`/`FATAL`/`Server error:` from the service. Baseline security headers (nosniff, X-Frame-Options, Referrer-Policy, HSTS in prod) are set in `index.js`; a tuned CSP is deferred (needs a CDN allowlist audit). The Docker image runs as non-root `node`.
+
+**Abuse/cost:** `/api/analytics/collect` is per-IP rate-limited (120 req/min, `ANALYTICS_RL_MAX`). Mention emails only send to known users. `/api/refresh-audio` clears only audio cache keys (was `invalidateAll`).
+
+**⚠ Known gotcha:** the `editor-*.js` modules are imported by `editor.js` via **unversioned** `/static/js/...` paths (no `?v=N`), so a change to them won't reach returning users for up to a year. Fix the module versioning before relying on edits to those files landing.
+
 ## Key Patterns
 
 - **Custom markdown tags** (`<Question>`, `<Callout>`, `<ChapterNum>`, `<<`) must be preserved exactly in content — the mobile app depends on this syntax

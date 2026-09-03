@@ -457,6 +457,14 @@ gcloud run deploy resource-website \
 | **Firestore Indexes** | `suggestions` (filePath+status+originalFrom), `suggestions` (status+createdAt), `comments` (filePath+status+from), `replies` (filePath+createdAt) |
 | **GCP Secret Manager** | `github-token`, `refresh-secret`, `claude-api-key`, `mailgun-api-key`, `analytics-ip-salt` — all wired to Cloud Run via `--set-secrets` |
 | **Cloudflare DNS** | `resources` CNAME > `noble-imprint-website.web.app` (proxy OFF) |
+| **Firestore backups** | Daily scheduled backup (30-day retention) + PITR (7-day) + delete protection on the default DB |
+| **Monitoring** | Cloud Logging alert policy "Resource Website — runtime errors" → email `steve@noblecollective.org` on `severity>=ERROR`/`FATAL` from the service |
+
+### Health & monitoring
+
+- **`GET /api/health`** returns `{status, tree, bibles}` — 200 when a content tree is servable. Used by the post-deploy smoke check and available for uptime monitors. (Note: a bare `/healthz` does **not** work — Google Front End intercepts it before the container.)
+- Runtime errors trigger an **email alert** (see the Monitoring row above). Unhandled crashes are caught by process-level handlers; the container then restarts cleanly.
+- The nightly cache-refresh job **opens a GitHub issue** if it fails.
 
 ### Creating Firestore Indexes
 
