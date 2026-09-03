@@ -4,6 +4,7 @@ const firestore = require('./firestore');
 const github = require('./github');
 const cache = require('./cache');
 const notifications = require('./notifications');
+const ac = require('./access-control');
 
 const router = express.Router();
 
@@ -53,6 +54,7 @@ router.get('/file-version', async (req, res) => {
   try {
     const { filePath } = req.query;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    if (!(await assertFileAccess(req, res, filePath))) return;
 
     const { sha } = await github.getFileContent(filePath);
     const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
@@ -73,6 +75,7 @@ router.get('/suggestion-count', async (req, res) => {
   try {
     const { filePath } = req.query;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    if (!(await assertFileAccess(req, res, filePath))) return;
     const pendingSuggestions = await suggestions.getSuggestionsForFile(filePath);
     const replies = await suggestions.getRepliesForFile(filePath);
     const comments = await suggestions.getCommentsForFile(filePath);
@@ -91,6 +94,7 @@ router.post('/presence', async (req, res) => {
   try {
     const { filePath, mode } = req.body;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    if (!(await assertFileAccess(req, res, filePath))) return;
     await suggestions.enterEditingSession({
       filePath, email: req.user.email, displayName: req.user.displayName || req.user.email,
       photoURL: req.user.photoURL || null,
@@ -132,6 +136,7 @@ router.get('/presence', async (req, res) => {
   try {
     const { filePath } = req.query;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    if (!(await assertFileAccess(req, res, filePath))) return;
     const editors = await suggestions.getActiveEditors(filePath);
     res.json({ editors });
   } catch (err) {
@@ -195,6 +200,25 @@ async function canEdit(email, bookPath) {
   return role === 'admin' || role === 'manuscript-owner' || role === 'comment-suggest';
 }
 
+// May this user READ suggestion/comment/presence data for `filePath`? (S5) Admins always;
+// otherwise the user must hold a role on the file's owning book — or, for a shared common
+// file, on any book in the series/subseries that includes it.
+async function canViewFile(user, filePath) {
+  if (!user) return false;
+  if (user.isAdmin || user.isSuperAdmin) return true;
+  const u = await firestore.getUser(user.email);
+  if (!u) return false;
+  if (u.globalRole === 'admin') return true;
+  return ac.hasRoleAtOrUnder(u.bookRoles, ac.owningDirForFile(filePath));
+}
+
+// Guard helper: 403s and returns false when the user may not read this file.
+async function assertFileAccess(req, res, filePath) {
+  if (await canViewFile(req.user, filePath)) return true;
+  res.status(403).json({ error: 'No access to this file' });
+  return false;
+}
+
 async function canReview(email, bookPath) {
   const role = await firestore.getUserBookRole(email, bookPath);
   return role === 'admin' || role === 'manuscript-owner';
@@ -212,6 +236,13 @@ router.post('/hunk', async (req, res) => {
     if (!(await canEdit(req.user.email, bookPath))) {
       return res.status(403).json({ error: 'No edit permission on this book' });
     }
+    // S3: the write target (filePath) must belong to the authorized book (bookPath) — a
+    // shared common file the book includes is allowed, another book's file is not.
+    if (!ac.filePathBelongsToBook(filePath, bookPath)) {
+      return res.status(400).json({ error: 'filePath does not belong to bookPath' });
+    }
+    // XSS floor: neutralize dangerous HTML before this text can ever be committed to content.
+    const cleanNewText = ac.neutralizeDangerousHtml(newText);
 
     // Fetch file content for line-number position resolution and anchor data
     let fileContent = null;
@@ -219,7 +250,7 @@ router.post('/hunk', async (req, res) => {
 
     const result = await suggestions.createHunk({
       filePath, bookPath, baseCommitSha,
-      type, originalFrom, originalTo, originalText, newText,
+      type, originalFrom, originalTo, originalText, newText: cleanNewText,
       contextBefore, contextAfter, lineNumber,
       authorEmail: req.user.email,
       authorName: req.user.displayName,
@@ -265,7 +296,7 @@ router.post('/hunk', async (req, res) => {
         actorEmail: req.user.email,
         actorName: req.user.displayName || req.user.email,
         action: 'suggestion',
-        text: newText || originalText || '',
+        text: cleanNewText || originalText || '',
         selectedText: originalText || null,
         mentionedUsers: [],
       }).catch(err => console.error('[NOTIFY] hunk notification error:', err.message));
@@ -315,6 +346,7 @@ router.get('/file', async (req, res) => {
   try {
     const { filePath } = req.query;
     if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    if (!(await assertFileAccess(req, res, filePath))) return;
 
     const sug = await suggestions.getSuggestionsForFile(filePath);
     const comments = await suggestions.getCommentsForFile(filePath);
@@ -348,6 +380,11 @@ router.put('/hunk/:id/accept', async (req, res) => {
     if (!hunk) return res.status(404).json({ error: 'Not found' });
     if (!(await canReview(req.user.email, hunk.bookPath))) {
       return res.status(403).json({ error: 'No review permission' });
+    }
+    // S3: re-validate the stored target on accept — never write to a file outside the book
+    // the reviewer is authorized for (defends against a hunk crafted with a mismatched path).
+    if (!ac.filePathBelongsToBook(hunk.filePath, hunk.bookPath)) {
+      return res.status(400).json({ error: 'Suggestion target file is outside its book' });
     }
 
     // Block accepts while someone is in direct edit mode on this file
@@ -400,6 +437,9 @@ router.post('/comments', async (req, res) => {
     }
     if (!(await canEdit(req.user.email, bookPath))) {
       return res.status(403).json({ error: 'No edit permission' });
+    }
+    if (bookPath && !ac.filePathBelongsToBook(filePath, bookPath)) {
+      return res.status(400).json({ error: 'filePath does not belong to bookPath' });
     }
 
     // Get file content for building rich anchor data
@@ -479,6 +519,9 @@ router.post('/replies', async (req, res) => {
     if (!(await canEdit(req.user.email, bookPath))) {
       return res.status(403).json({ error: 'No edit permission' });
     }
+    if (bookPath && !ac.filePathBelongsToBook(filePath, bookPath)) {
+      return res.status(400).json({ error: 'filePath does not belong to bookPath' });
+    }
 
     const id = await suggestions.createReply({
       parentId, parentType, filePath, text,
@@ -543,6 +586,13 @@ router.delete('/replies/by-parent/:parentId', async (req, res) => {
 router.get('/history', async (req, res) => {
   try {
     const { filePath, bookPath, limit } = req.query;
+    // Per-file / per-book read authorization (S5).
+    if (filePath) {
+      if (!(await assertFileAccess(req, res, filePath))) return;
+    } else if (bookPath) {
+      const role = await firestore.getUserBookRole(req.user.email, bookPath);
+      if (!role && !req.user.isAdmin) return res.status(403).json({ error: 'No access to this book' });
+    }
     const lim = parseInt(limit, 10) || 50;
 
     const [resolvedSuggestions, resolvedComments] = await Promise.all([
