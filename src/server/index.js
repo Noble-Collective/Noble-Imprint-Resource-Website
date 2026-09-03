@@ -150,8 +150,11 @@ app.get('/image/*', async (req, res) => {
 app.get('/api/content-tree', async (req, res) => {
   try {
     const tree = await content.buildContentTree();
+    // Filter to what this requester may see (hidden/unpublished books stay invisible
+    // to non-privileged callers) — mirrors the homepage, which never exposes the raw tree.
+    const filtered = await content.filterContentTree(tree, req.user);
     const result = [];
-    for (const s of tree.series) {
+    for (const s of filtered.series) {
       for (const child of s.children) {
         if (child.type === 'book') {
           result.push({
@@ -186,8 +189,9 @@ app.get('/api/content-tree', async (req, res) => {
   }
 });
 
-// Cache refresh endpoint — called after deploy or content update to clear stale content
-app.post('/api/refresh', async (req, res) => {
+// Cache refresh endpoint — called after deploy or content update to clear stale content.
+// Gated: admin session, or REFRESH_SECRET (Bearer/x-refresh-key). Open in local dev only.
+app.post('/api/refresh', auth.requireRefreshSecret, async (req, res) => {
   const cache = require('./cache');
   // Scoped refresh (used by the test suite): drop only cached file contents and
   // keep the content tree, skipping the full rebuild. A full rebuild is ~70+
@@ -234,14 +238,21 @@ app.get('/api/audio/url/*', async (req, res) => {
   }
 });
 
-// Audio cache refresh — called by audiobook generation workflow
-app.post('/api/refresh-audio', (req, res) => {
+// Audio cache refresh — called by the audiobook generation workflow (Noble-Imprint-Audiobooks).
+// Gated: admin session, or REFRESH_SECRET (Bearer/x-refresh-key). The audiobook workflow must
+// send the secret. Open in local dev only.
+app.post('/api/refresh-audio', auth.requireRefreshSecret, (req, res) => {
   audio.clearCache();
   res.json({ ok: true, message: 'Audio cache cleared' });
 });
 
-// Clean up test book suggestions/comments/replies after deploy
+// Clean up test book suggestions/comments/replies — a TEST-ONLY utility (the Playwright
+// fixture calls it before each test). Never exposed in production: it batch-deletes Firestore
+// documents and has no place on the live site.
 app.post('/api/cleanup-test-data', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   try {
     const admin = require('firebase-admin');
     const db = admin.firestore();

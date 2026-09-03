@@ -23,8 +23,17 @@ const geoip = require('geoip-country');
 
 const DATASET = process.env.BQ_ANALYTICS_DATASET || 'analytics';
 const TABLE = process.env.BQ_ANALYTICS_TABLE || 'events';
-const IP_SALT = process.env.ANALYTICS_IP_SALT || 'dev-unsalted-change-me';
-const ENABLED = process.env.ANALYTICS_ENABLED !== 'false'; // on unless explicitly disabled
+const DEFAULT_IP_SALT = 'dev-unsalted-change-me';
+const IP_SALT = process.env.ANALYTICS_IP_SALT || DEFAULT_IP_SALT;
+let ENABLED = process.env.ANALYTICS_ENABLED !== 'false'; // on unless explicitly disabled
+
+// Privacy fail-safe: never write reversible IP hashes in production. If the salt is the
+// public default (unset or the literal placeholder), `ip_hash` would be trivially reversible
+// over the small IPv4 space — so disable ingestion entirely rather than emit weak pseudonyms.
+if (ENABLED && process.env.NODE_ENV === 'production' && IP_SALT === DEFAULT_IP_SALT) {
+  console.error('[ANALYTICS] ANALYTICS_IP_SALT is unset/default in production — DISABLING analytics ingestion to avoid writing reversible IP hashes. Set ANALYTICS_IP_SALT to re-enable.');
+  ENABLED = false;
+}
 
 const FLUSH_MS = 5000;   // flush the buffer at least this often
 const FLUSH_MAX = 50;    // ...or as soon as it reaches this many rows

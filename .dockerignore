@@ -3,3 +3,12 @@ node_modules/
 mockups/
 *.md
 .env
+# Never bake credentials into the image (runtime uses ADC on Cloud Run, not this file).
+service-account-key.json
+# Dev-only artifacts — not needed at runtime, keep them out of the image.
+tests/
+test-results/
+test-screenshots/
+.claude/
+.github/
+plans/

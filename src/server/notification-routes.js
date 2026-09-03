@@ -81,12 +81,22 @@ api.put('/preferences', async (req, res) => {
 
 // --- Internal endpoint for Cloud Scheduler ---
 api.post('/send-daily-summary', async (req, res) => {
-  // Authenticate via shared secret (from Cloud Scheduler)
-  const schedulerKey = process.env.SCHEDULER_SECRET;
-  const providedKey = req.headers['x-cloudscheduler-key'];
-  // Allow if: valid scheduler key, or admin user, or no scheduler secret configured (dev)
-  if (schedulerKey && providedKey !== schedulerKey && !(req.user && req.user.isAdmin)) {
-    return res.status(403).json({ error: 'Unauthorized' });
+  // Authenticate via shared secret (from Cloud Scheduler), constant-time compared.
+  // FAIL CLOSED: an admin session always passes; otherwise a matching SCHEDULER_SECRET is
+  // required. If SCHEDULER_SECRET is unset we reject in production (never fall open — an
+  // unset secret must not make this batch-email trigger public); local dev is allowed through.
+  const auth = require('./auth');
+  const isAdmin = req.user && req.user.isAdmin;
+  if (!isAdmin) {
+    const schedulerKey = process.env.SCHEDULER_SECRET;
+    const providedKey = req.headers['x-cloudscheduler-key'];
+    if (schedulerKey) {
+      if (!auth.timingSafeEqualStr(providedKey, schedulerKey)) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      return res.status(500).json({ error: 'Server misconfigured: SCHEDULER_SECRET is not set' });
+    }
   }
 
   try {

@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 const cache = require('./cache');
 
 const SUPER_ADMIN_EMAIL = 'steve@noblecollective.org';
@@ -120,6 +121,35 @@ function attachUser(req, res, next) {
   });
 }
 
+// Constant-time string comparison (avoids leaking secret length/prefix via timing).
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length === 0 || b.length === 0) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+// Middleware: gate automation/destructive endpoints (refresh, refresh-audio) behind a
+// shared secret. Accepts `Authorization: Bearer <REFRESH_SECRET>` or `x-refresh-key`.
+// Admins pass too (so Steve can trigger from a signed-in session). In non-production
+// it falls through so the local dev server + test suite keep working without a secret.
+// Fails CLOSED in production: if REFRESH_SECRET is unset it rejects (500) rather than
+// silently allowing anonymous access.
+function requireRefreshSecret(req, res, next) {
+  if (req.user && req.user.isAdmin) return next();
+  const secret = process.env.REFRESH_SECRET;
+  if (secret) {
+    const authHeader = req.headers['authorization'] || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const provided = req.headers['x-refresh-key'] || bearer;
+    if (timingSafeEqualStr(provided, secret)) return next();
+  }
+  if (process.env.NODE_ENV !== 'production') return next(); // local dev / tests
+  if (!secret) return res.status(500).json({ error: 'Server misconfigured: REFRESH_SECRET is not set' });
+  return res.status(403).json({ error: 'Unauthorized' });
+}
+
 // Middleware: require admin or super admin
 function requireAdmin(req, res, next) {
   if (!req.user) {
@@ -142,6 +172,8 @@ module.exports = {
   verifySessionCookie,
   attachUser,
   requireAdmin,
+  requireRefreshSecret,
+  timingSafeEqualStr,
   isSuperAdmin,
   SESSION_EXPIRES_IN,
   SUPER_ADMIN_EMAIL,
