@@ -27,6 +27,19 @@ app.set('views', path.join(__dirname, '../views'));
 // wire and shrinks every HTML/JS/JSON payload too. No build step, no source
 // changes — the compression happens at request time.
 app.use(compression());
+// Baseline security headers (dependency-free — avoids a new runtime dep and the CSP
+// mis-config risk of full helmet defaults, which would block the site's font/icon CDNs).
+// A tuned Content-Security-Policy is deferred pending a CDN allowlist audit.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  }
+  next();
+});
 app.use(cookieParser());
 app.use(express.json({ limit: '2mb' }));
 
@@ -418,7 +431,7 @@ app.post('/api/auth/session', async (req, res) => {
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('Session creation error:', err.code, err.message);
-    res.status(401).json({ error: 'Invalid token', detail: err.message });
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 

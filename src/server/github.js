@@ -80,6 +80,11 @@ async function getDirectoryContents(path) {
     getOctokit().rest.repos.getContent({ owner: OWNER, repo: REPO, path })
   );
   if (!Array.isArray(data)) throw new Error(`Expected directory at ${path}`);
+  // GitHub's Contents API silently truncates a directory listing near ~1000 entries with
+  // no error — so content past the cap just vanishes. Warn loudly (trips the error alert).
+  if (data.length >= 1000) {
+    console.error(`[GITHUB] WARNING: directory listing for "${path}" returned ${data.length} entries — the Contents API truncates near 1000, so some files are likely MISSING. Split this folder into subfolders.`);
+  }
   return data;
 }
 
@@ -227,6 +232,9 @@ async function getTreeRecursive(ref = 'main') {
   const { data } = await loggedApiCall(`GET tree ${ref}`, () =>
     getOctokit().rest.git.getTree({ owner: OWNER, repo: REPO, tree_sha: ref, recursive: 'true' })
   );
+  if (data.truncated) {
+    console.error(`[GITHUB] WARNING: git tree for "${ref}" is TRUNCATED — the listing is incomplete; results built from it (e.g. quote audits) must not be treated as authoritative.`);
+  }
   const tree = (data.tree || []).map(t => ({ path: t.path, type: t.type, sha: t.sha }));
   cache.set(cacheKey, tree, 5 * 60 * 1000);
   return tree;

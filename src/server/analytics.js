@@ -288,6 +288,10 @@ function collect(req, res) {
   res.status(204).end();
 }
 
+// Cloud Run sends SIGTERM before stopping an instance (scale-down / redeploy). Flush any
+// buffered events so they aren't silently lost — the flush timer is unref'd and wouldn't fire.
+process.on('SIGTERM', () => { flush().catch(() => {}); });
+
 module.exports = {
   collect, record, flush, parsePath, isBot,
   parseUserAgent, lookupCountry, resolveContent,

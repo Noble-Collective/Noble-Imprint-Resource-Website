@@ -7,6 +7,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
+# Run as the unprivileged built-in `node` user (was root). chown so the app can still
+# write its runtime disk caches (.file-cache/.bible-cache/.content-tree-cache.json).
+RUN chown -R node:node /app
+USER node
 EXPOSE 8080
 ENV NODE_ENV=production
 ARG BUILD_TIME

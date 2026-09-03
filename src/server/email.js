@@ -5,6 +5,12 @@ let client = null;
 const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN || 'noblecollective.org';
 const FROM_ADDRESS = 'Noble Collective <notifications@' + MAILGUN_DOMAIN + '>';
 
+// Startup visibility: a misconfigured prod deploy would otherwise drop ALL notification/
+// role emails with only per-send log lines. Warn loudly once at boot (trips the error alert).
+if (process.env.NODE_ENV === 'production' && !process.env.MAILGUN_API_KEY) {
+  console.error('[EMAIL] WARNING: MAILGUN_API_KEY is not set in production — all notification/role emails will be silently skipped.');
+}
+
 function getClient() {
   if (client) return client;
   const apiKey = process.env.MAILGUN_API_KEY;

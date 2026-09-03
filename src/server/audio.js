@@ -154,10 +154,11 @@ async function getVoiceCompareData(slug) {
  * Clear all audio manifest caches.
  */
 function clearCache() {
-  // Clear all entries starting with 'audio-manifest:'
-  // cache.js doesn't have prefix invalidation yet, so we use invalidateAll
-  // which is acceptable since audio cache is a small portion of total cache
-  cache.invalidateAll();
+  // Clear only the audio caches — NOT the content tree / file caches. Nuking everything
+  // (the old behavior) forced the next visitor to pay a full content-tree rebuild.
+  cache.invalidatePrefix('audio-manifest:');
+  cache.invalidatePrefix('bible-audio-manifest:');
+  cache.invalidatePrefix('voice-compare:');
 }
 
 function formatDuration(seconds) {

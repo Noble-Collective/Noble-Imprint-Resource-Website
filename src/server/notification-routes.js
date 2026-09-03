@@ -17,9 +17,13 @@ page.get('/', async (req, res, next) => {
     // Get books the user has comment-suggest access or higher
     const tree = await content.buildContentTree();
     const allBooks = content.getAllBooks(tree);
+    // Resolve every book's role in parallel (was ~22 sequential Firestore round-trips).
+    const roleResults = await Promise.all(allBooks.map(async (book) => ({
+      book,
+      role: await firestore.getUserBookRole(req.user.email, book.repoPath),
+    })));
     const userBooks = [];
-    for (const book of allBooks) {
-      const role = await firestore.getUserBookRole(req.user.email, book.repoPath);
+    for (const { book, role } of roleResults) {
       if (role === 'admin' || role === 'manuscript-owner' || role === 'comment-suggest') {
         const encodedPath = book.repoPath.replace(/\//g, '|');
         const isTestBook = book.repoPath.includes('Foundations/Test Book');

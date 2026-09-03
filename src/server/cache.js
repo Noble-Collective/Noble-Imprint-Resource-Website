@@ -34,4 +34,12 @@ function invalidateFiles() {
   }
 }
 
-module.exports = { get, set, del, invalidateAll, invalidateFiles };
+// Invalidate only keys starting with `prefix` — lets a subsystem clear its own cache
+// entries without nuking everyone else's (e.g. audio refresh shouldn't drop the content tree).
+function invalidatePrefix(prefix) {
+  for (const key of Array.from(store.keys())) {
+    if (key.startsWith(prefix)) store.delete(key);
+  }
+}
+
+module.exports = { get, set, del, invalidateAll, invalidateFiles, invalidatePrefix };
