@@ -150,7 +150,9 @@ app.get('/image/*', async (req, res) => {
 // servable (in-memory cache or committed snapshot). Bible-load status is reported in the
 // body for observability but does NOT fail the check — the ~2min first-boot bible warm-up
 // must not make a healthy container look dead to a liveness probe.
-app.get('/healthz', (req, res) => {
+// NOTE: served under /api/ deliberately — Google Front End intercepts a bare /healthz
+// before it reaches the container, so that path never works on Cloud Run.
+app.get('/api/health', (req, res) => {
   const treeOk = content.hasServableTree();
   const biblesOk = bible.isReady();
   res.status(treeOk ? 200 : 503).json({ status: treeOk ? 'ok' : 'unhealthy', tree: treeOk, bibles: biblesOk });
