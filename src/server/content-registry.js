@@ -60,11 +60,14 @@ async function init() {
   }
 }
 
+// A tree whose path count collapses to below this fraction of the last good view is
+// treated as degraded — we skip the orphan recompute rather than orphan live content.
+const ORPHAN_SYNC_MIN_FRACTION = Number(process.env.REGISTRY_ORPHAN_SYNC_MIN_FRACTION) || 0.5;
+
 // Recompute the current-path set + orphan list from the (cached) content tree.
 // Memoized on the tree object reference, so it only runs when the tree rebuilds.
 function syncTree(tree) {
   if (!tree || tree === lastTree) return;
-  lastTree = tree;
   const paths = new Set();
   for (const s of (tree.series || [])) {
     for (const child of (s.children || [])) {
@@ -79,6 +82,15 @@ function syncTree(tree) {
       }
     }
   }
+  // Data-safety guard (coupled to content.isTreeSane): if the path set collapses sharply
+  // vs. the last good sync, this is almost certainly a degraded/partial tree. Recomputing
+  // orphans off it would mark live content as "disappeared" → a new path could inherit()
+  // its id and DELETE the real registry doc. Skip until a healthy tree returns.
+  if (currentPaths.size > 0 && paths.size < currentPaths.size * ORPHAN_SYNC_MIN_FRACTION) {
+    console.error(`[REGISTRY] skipping orphan sync — path count ${currentPaths.size} → ${paths.size} looks degraded; keeping previous view`);
+    return; // leave lastTree/currentPaths/orphans untouched
+  }
+  lastTree = tree;
   currentPaths = paths;
   orphans.clear();
   for (const [key, entry] of index) {
@@ -143,7 +155,11 @@ async function inherit(orphan, type, repoPath, meta) {
   };
   const col = firestore.contentRegistryCollection();
   await col.doc(newKey).set(entry);
-  if (oldKey !== newKey) await col.doc(oldKey).delete().catch(() => {});
+  // Soft-delete the old doc (tombstone) instead of hard-deleting, so a mistaken rename
+  // re-link stays recoverable (the id already lives on the new doc).
+  if (oldKey !== newKey) {
+    await col.doc(oldKey).set({ status: 'renamed', renamedTo: repoPath }, { merge: true }).catch(() => {});
+  }
   index.delete(oldKey);
   orphans.delete(oldKey);
   index.set(newKey, entry);

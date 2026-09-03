@@ -197,6 +197,56 @@ function readTreeSnapshot() {
   }
 }
 
+// Flatten a content tree to its list of book nodes (direct children + subseries books).
+function eachBook(tree) {
+  const out = [];
+  for (const s of (tree && tree.series) || []) {
+    for (const c of s.children || []) {
+      if (c.type === 'book') out.push(c);
+      else if (c.type === 'subseries') for (const b of c.books || []) out.push(b);
+    }
+  }
+  return out;
+}
+
+function countBooks(tree) {
+  return eachBook(tree).length;
+}
+
+// Data-safety floor guard. A rebuild can produce a valid-SHAPED but content-poor tree
+// when the GitHub API degrades mid-build (the loaders swallow errors → empty sessions /
+// missing books). Persisting that would overwrite the good committed snapshot — the outage
+// fallback — and the nightly job would then commit it, shipping a blank/missing-content site.
+// This decides whether a freshly-built tree is safe to persist, comparing it to the previous
+// snapshot. Returns { ok, reason }.
+const TREE_MIN_RETAIN_FRACTION = Number(process.env.CONTENT_TREE_MIN_RETAIN_FRACTION) || 0.9;
+function isTreeSane(newTree, prevTree) {
+  if (!newTree || !Array.isArray(newTree.series) || newTree.series.length === 0) {
+    return { ok: false, reason: 'empty or malformed tree (no series)' };
+  }
+  const newBooks = countBooks(newTree);
+  if (newBooks === 0) return { ok: false, reason: 'tree contains zero books' };
+
+  if (prevTree) {
+    const prevBooks = countBooks(prevTree);
+    if (prevBooks > 0 && newBooks < prevBooks * TREE_MIN_RETAIN_FRACTION) {
+      return { ok: false, reason: `book count dropped ${prevBooks} → ${newBooks} (< ${Math.round(TREE_MIN_RETAIN_FRACTION * 100)}% retained)` };
+    }
+    // A book that previously had sessions must not silently drop to zero (swallowed
+    // loadSessions error). New books, or books that were always empty, are fine.
+    const prevSessions = new Map();
+    for (const b of eachBook(prevTree)) prevSessions.set(b.repoPath, (b.sessions || []).length);
+    for (const b of eachBook(newTree)) {
+      const had = prevSessions.get(b.repoPath) || 0;
+      const now = (b.sessions || []).length;
+      if (had > 0 && now === 0) {
+        return { ok: false, reason: `book "${b.repoPath}" lost all ${had} sessions` };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 let treeRebuildInFlight = null;
 
 // The real build: hits the GitHub API (~90 directory calls + per-book meta),
@@ -245,6 +295,24 @@ async function rebuildContentTree() {
   // page load would still fan out one GitHub call per session to fill them in,
   // which is most of the cold-start cost this whole mechanism exists to avoid.
   try { await loadAllSessionTitles(tree); } catch (e) { console.error('Title enrichment failed:', e.message); }
+
+  // Floor guard: never let a degraded build overwrite the good snapshot (the outage
+  // fallback) or get committed by the nightly job. If the new tree looks content-poor
+  // vs. the existing snapshot, keep the old one and serve it instead.
+  const prevSnapshot = readTreeSnapshot();
+  const sanity = isTreeSane(tree, prevSnapshot);
+  if (!sanity.ok) {
+    console.error(`[content] REFUSING to persist degraded content tree: ${sanity.reason}. Keeping existing snapshot.`);
+    if (prevSnapshot) {
+      cache.set(TREE_CACHE_KEY, prevSnapshot, 60 * 1000);
+      return prevSnapshot;
+    }
+    // No prior snapshot to fall back on (first-ever build came up degraded): serve what
+    // we have with a short TTL so it self-heals on retry, but do NOT write a bad snapshot
+    // to disk (that would bake the degraded state into the image and the nightly commit).
+    cache.set(TREE_CACHE_KEY, tree, 60 * 1000);
+    return tree;
+  }
 
   cache.set(TREE_CACHE_KEY, tree, TREE_TTL);
   // Persist to disk so the tree survives rate limits/restarts AND so a freshly
@@ -635,8 +703,14 @@ async function warmDiskCache() {
       }
     }
     console.log(`Disk cache warm-up complete: ${sessions} sessions, ${covers} covers across ${books.length} books`);
+    // rebuildContentTree returns the PREVIOUS snapshot when the fresh build is degraded
+    // (floor guard). Report whether we ended up with a servable tree so the nightly job
+    // can refuse to commit / alert instead of committing silence.
+    const treeSane = isTreeSane(tree, null).ok;
+    return { ok: treeSane, treeSane, books: books.length, sessions, covers };
   } catch (err) {
     console.error('Disk cache warm-up failed:', err.message);
+    return { ok: false, treeSane: false, error: err.message };
   }
 }
 
@@ -661,5 +735,7 @@ module.exports = {
   canAccessBook,
   getAllBooks,
   warmDiskCache,
+  isTreeSane,
+  countBooks,
   slugify,
 };

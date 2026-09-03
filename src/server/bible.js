@@ -43,6 +43,27 @@ function saveToCache(id, data) {
   }
 }
 
+// Populate translations[id] from a parsed disk-cache object (rebuilds the chapter Maps).
+function hydrateFromCache(id, cached) {
+  const books = new Map();
+  for (const [bookName, bookData] of Object.entries(cached.books)) {
+    const chapters = new Map();
+    for (const [ch, verses] of Object.entries(bookData.chapters)) {
+      chapters.set(parseInt(ch), verses);
+    }
+    books.set(bookName, { chapters });
+  }
+  translations[id] = {
+    id: cached.id,
+    title: cached.title,
+    description: cached.description,
+    version: cached.version,
+    coverPath: cached.coverPath,
+    verses: cached.verses,
+    books,
+  };
+}
+
 // The USFM \h book name occasionally differs from the references.json verse-key name
 // (e.g. \h "Psalms" vs key "Psalm"; \h "Song" vs "Song of Solomon"). Resolve \h to the
 // references.json name so paragraph/heading flags key-match the verse objects — otherwise
@@ -54,33 +75,17 @@ function resolveRefBookName(hName, books) {
   return hName;
 }
 
-async function loadBibles() {
-  if (loaded) return;
+async function loadBibles({ force = false } = {}) {
+  if (loaded && !force) return { ok: true, failed: [] };
 
   const ids = ['bsb', 'kjv'];
+  const failed = [];
   for (const id of ids) {
-    // Try loading from cache first
-    const cached = loadFromCache(id);
-    if (cached) {
-      // Rebuild Maps from cached data
-      const books = new Map();
-      for (const [bookName, bookData] of Object.entries(cached.books)) {
-        const chapters = new Map();
-        for (const [ch, verses] of Object.entries(bookData.chapters)) {
-          chapters.set(parseInt(ch), verses);
-        }
-        books.set(bookName, { chapters });
-      }
-      translations[id] = {
-        id: cached.id,
-        title: cached.title,
-        description: cached.description,
-        version: cached.version,
-        coverPath: cached.coverPath,
-        verses: cached.verses,
-        books,
-      };
-      continue;
+    // Try loading from cache first — unless forcing a fresh fetch (e.g. after a Bible-copy
+    // edit), in which case we go straight to GitHub and overwrite the snapshot on success.
+    if (!force) {
+      const cached = loadFromCache(id);
+      if (cached) { hydrateFromCache(id, cached); continue; }
     }
     try {
       const raw = await github.getFileRaw(`bibles/${id}/references.json`);
@@ -222,16 +227,32 @@ async function loadBibles() {
       saveToCache(id, cacheData);
     } catch (err) {
       console.error(`Failed to load Bible ${id}:`, err.message);
+      // Fallback: keep serving the previous on-disk snapshot rather than leaving this
+      // translation blank — critical when force-reloading during a GitHub rate limit,
+      // since we no longer delete the snapshot before re-fetching (rebuild-then-swap).
+      const cached = loadFromCache(id);
+      if (cached) {
+        hydrateFromCache(id, cached);
+        console.warn(`[BIBLE] ${id.toUpperCase()}: fetch failed, served previous disk snapshot`);
+      } else {
+        failed.push(id);
+      }
     }
   }
-  loaded = true;
+  // Only mark fully-loaded when every translation is present. On partial failure we leave
+  // `loaded` false so a later call retries the missing one (survivors load from disk cache).
+  loaded = failed.length === 0;
+  if (failed.length) console.error(`[BIBLE] load incomplete — no text for: ${failed.join(', ')}`);
+  return { ok: failed.length === 0, failed };
 }
 
 // Rebuild the in-memory + on-disk bible cache from the current repo content. Called
 // after a Bible-copy commit so the rendered reader reflects the latest text instead of a
 // stale snapshot. Clears the GitHub file cache first (so references.json/USFM are refetched
-// fresh, not the pre-commit cached copy) and deletes the disk snapshot so loadBibles
-// rebuilds from GitHub. Coalesces concurrent calls.
+// fresh, not the pre-commit cached copy), then force-reloads. Rebuild-then-swap: it does
+// NOT delete the disk snapshot up front — loadBibles({force}) overwrites it only on a
+// successful fetch, and on failure falls back to the intact snapshot so the reader never
+// goes blank during a rate limit. Coalesces concurrent calls.
 async function reload() {
   if (reloading) return reloading;
   reloading = (async () => {
@@ -239,8 +260,7 @@ async function reload() {
       cache.invalidateFiles();
       loaded = false;
       for (const id of Object.keys(translations)) delete translations[id];
-      for (const id of ['bsb', 'kjv']) { try { fs.unlinkSync(getCachePath(id)); } catch { /* absent is fine */ } }
-      await loadBibles();
+      return await loadBibles({ force: true });
     } finally { reloading = null; }
   })();
   return reloading;

@@ -25,10 +25,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RESOURCE_REPO_TOKEN }}
         run: |
           node -e "
-            process.env.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
             const content = require('./src/server/content');
-            content.warmDiskCache().then(() => {
-              console.log('Cache refresh complete');
+            content.warmDiskCache().then(res => {
+              if (!res || !res.ok) { console.error('Content warm-up degraded/failed:', JSON.stringify(res)); process.exit(1); }
+              console.log('Content cache refresh complete:', JSON.stringify(res));
             }).catch(err => {
               console.error('Cache refresh failed:', err.message);
               process.exit(1);
@@ -41,15 +41,43 @@ jobs:
         run: |
           # Rebuild the parsed .bible-cache snapshot the reader serves from, so it never
           # drifts behind references.json/USFM edits made via the admin compare tool.
-          rm -f .bible-cache/*.json
+          # NOTE: do NOT 'rm' the snapshot first — loadBibles({force}) refetches fresh and
+          # overwrites on success, but falls back to the existing snapshot if GitHub is
+          # rate-limited, so a bad run can never commit the DELETION of the bible cache.
           node -e "
             const bible = require('./src/server/bible');
-            bible.loadBibles().then(() => {
-              console.log('Bible cache rebuilt');
+            bible.loadBibles({ force: true }).then(res => {
+              if (!res || !res.ok) { console.error('Bible reload incomplete (missing text):', JSON.stringify(res)); process.exit(1); }
+              console.log('Bible cache rebuilt:', JSON.stringify(res));
             }).catch(err => {
               console.error('Bible cache rebuild failed:', err.message);
               process.exit(1);
             });
+          "
+
+      - name: Validate regenerated caches before commit
+        run: |
+          # Floor guard on what we're about to commit — refuse to ship a blank/degraded
+          # content tree or a bible cache that lost its verses.
+          node -e "
+            const fs = require('fs');
+            const content = require('./src/server/content');
+            const tree = JSON.parse(fs.readFileSync('src/.content-tree-cache.json', 'utf8'));
+            const books = content.countBooks(tree);
+            const MIN_BOOKS = Number(process.env.MIN_BOOKS || 10);
+            if (!Array.isArray(tree.series) || tree.series.length === 0 || books < MIN_BOOKS) {
+              console.error('Content tree failed validation: series=' + (tree.series || []).length + ' books=' + books + ' (min ' + MIN_BOOKS + ')');
+              process.exit(1);
+            }
+            const MIN_VERSES = Number(process.env.MIN_VERSES || 30000);
+            for (const id of ['bsb', 'kjv']) {
+              const p = '.bible-cache/' + id + '-v1.json';
+              if (!fs.existsSync(p)) { console.error('Missing bible cache file: ' + p); process.exit(1); }
+              const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+              const n = data && data.verses ? Object.keys(data.verses).length : 0;
+              if (n < MIN_VERSES) { console.error(id + ' verse count too low: ' + n + ' (min ' + MIN_VERSES + ')'); process.exit(1); }
+            }
+            console.log('Cache validation passed: books=' + books);
           "
 
       - name: Commit updated cache
