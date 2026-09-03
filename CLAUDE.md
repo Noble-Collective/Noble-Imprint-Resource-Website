@@ -101,6 +101,8 @@ Three auth paths in `auth.attachUser`:
 
 Super admin is hardcoded: `steve@noblecollective.org` in `auth.js`.
 
+**Automation/destructive endpoints** are gated by `auth.requireRefreshSecret` (`auth.js`): `POST /api/refresh` and `POST /api/refresh-audio` require an admin session **or** the `REFRESH_SECRET` (sent as `Authorization: Bearer <secret>` or `x-refresh-key`), constant-time compared. It **fails closed in production** (unset secret → 500) but falls through in local dev so the test suite works without a secret. `REFRESH_SECRET` lives in Secret Manager (`refresh-secret`) and as a GitHub secret in the audiobooks repo (its `generate.yml`/`voice-compare.yml` send it when calling `/api/refresh-audio`). `POST /api/cleanup-test-data` is **test-only** (404 in production). `POST /api/notifications/send-daily-summary` requires an admin session or `SCHEDULER_SECRET` (also fail-closed).
+
 ### Audiobook System
 
 Audio is generated in a separate repo (`Noble-Imprint-Audiobooks`) via ElevenLabs TTS. This website serves audio via GCS signed URLs. The `audio-player.js` provides a floating icon → sticky bottom bar player with sentence-level text sync from timestamp data.

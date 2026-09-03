@@ -267,18 +267,26 @@ src/
 
 ### Environment Variables
 
-| Variable | Source | Purpose |
-|----------|--------|---------|
-| `GITHUB_TOKEN` | `.env` (from GCP Secret Manager) | GitHub API access (read content, commit changes) |
-| `FIREBASE_API_KEY` | `.env` | Firebase Auth client-side key |
-| `GOOGLE_CLOUD_PROJECT` | `.env` | Firestore project ID |
-| `CLAUDE_API_KEY` | `.env` (from GCP Secret Manager) | API key for Claude AI bot access |
-| `CLAUDE_BOT_EMAIL` | `.env` | Email identity for bot user |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `.env` | Path to service account key for Firestore access |
+Locally, every variable is read from `.env` via dotenv. In production they are set on the
+Cloud Run service — **Secret Manager** for the two below marked _(Secret Manager)_, plain
+Cloud Run env vars for the rest (moving the remaining API keys into Secret Manager is tracked
+in `plans/2026-09-03-architecture-hardening-plan.md`).
+
+| Variable | Source (prod) | Purpose |
+|----------|--------------|---------|
+| `GITHUB_TOKEN` | Cloud Run **(Secret Manager** `github-token`**)** | GitHub API access (read content, commit changes) |
+| `REFRESH_SECRET` | Cloud Run **(Secret Manager** `refresh-secret`**)** | Shared secret gating `POST /api/refresh` + `/api/refresh-audio` (also `Authorization: Bearer` / `x-refresh-key`). Admin sessions bypass it. Also a GitHub secret in the audiobooks repo. |
+| `SCHEDULER_SECRET` | Cloud Run env _(currently unset)_ | Gates `POST /api/notifications/send-daily-summary`. Set it (and a Cloud Scheduler job) to enable daily-summary emails; while unset the endpoint fails closed (admin-only). |
+| `CLAUDE_API_KEY` | Cloud Run env | API key for Claude AI bot access (`x-api-key`) |
+| `CLAUDE_BOT_EMAIL` | Cloud Run env | Email identity for bot user |
+| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Cloud Run env | Notification / role email delivery via Mailgun |
+| `ANALYTICS_IP_SALT` | Cloud Run env | Salt for hashing visitor IPs (raw IP never stored). If unset/default in prod, analytics ingestion disables itself. |
+| `FIREBASE_API_KEY` | Cloud Run env | Firebase Auth **client-side** key (public by design) |
+| `GOOGLE_CLOUD_PROJECT` | Cloud Run env | Firestore / BigQuery project ID |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `.env` **local only** | Path to the service account key for Firestore access. In prod, Cloud Run uses ADC — no key file (and `service-account-key.json` is `.dockerignore`d so it never enters the image). |
 | `PORT` | Cloud Run sets automatically | Server port (defaults to 8080) |
 | `BUILD_TIME` | Docker build arg | Displayed in footer as "last updated" |
-| `NODE_ENV` | Dockerfile sets to `production` | Disables test-login endpoint in prod |
-| `ANALYTICS_IP_SALT` | Cloud Run env (secret) | Salt for hashing visitor IPs (raw IP never stored) |
+| `NODE_ENV` | Dockerfile sets to `production` | Disables test-login + cleanup-test-data endpoints in prod |
 | `BQ_ANALYTICS_TABLE` | `.env` **local only** | **Set to `events_dev` locally** so dev testing doesn't write to the prod `analytics.events` table. Prod omits it (defaults to `events`). |
 
 ### Rebuilding the CodeMirror Bundle
@@ -430,7 +438,7 @@ gcloud run deploy resource-website \
 | **Firebase Hosting** | `noble-imprint-website.web.app` + `resources.noblecollective.org` |
 | **Firestore** | Collections: `users`, `suggestions`, `comments`, `replies` |
 | **Firestore Indexes** | `suggestions` (filePath+status+originalFrom), `suggestions` (status+createdAt), `comments` (filePath+status+from), `replies` (filePath+createdAt) |
-| **GCP Secret Manager** | `github-token`, `claude-api-key` |
+| **GCP Secret Manager** | `github-token`, `refresh-secret` (wired to Cloud Run via `--set-secrets`); `claude-api-key` exists but is currently served as a plain Cloud Run env var |
 | **Cloudflare DNS** | `resources` CNAME > `noble-imprint-website.web.app` (proxy OFF) |
 
 ### Creating Firestore Indexes
