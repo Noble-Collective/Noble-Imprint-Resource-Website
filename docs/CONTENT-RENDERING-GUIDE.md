@@ -30,7 +30,7 @@ Renders to `<div class="question-block" data-question-id="…"><p>…</p></div>`
 ```
 <Callout>A short, quotable line from the surrounding text.</Callout>
 ```
-The callout text stays **inline** in its paragraph. Post-processing **also** emits a duplicate `<aside class="pullquote">` copy for visual display. → The same sentence appears twice in the DOM. This matters for audio text-sync (skip the `aside.pullquote` copy); see the audio guide.
+The callout text stays **inline** in its paragraph. Post-processing **also** emits a duplicate `<aside class="pullquote">` copy for visual display (with its first letter capitalized for display if it started lowercase). → The same sentence appears twice in the DOM. This matters for audio text-sync (skip the `aside.pullquote` copy); see the audio guide.
 
 ### ChapterNum
 ```
