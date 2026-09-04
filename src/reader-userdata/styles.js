@@ -62,6 +62,15 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-iconbtn:hover{background:var(--nc-hover);color:var(--nc-text)}
 .nc-iconbtn[aria-pressed="true"]{color:var(--nc-accent)}
 
+/* ---- header control cluster (in the site's sticky top nav) ---- */
+.nc-header{display:inline-flex;align-items:center;gap:.1rem;margin-right:.5rem}
+.nc-hbtn{cursor:pointer;border:none;background:none;color:#f0efec;padding:.4rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
+.nc-hbtn:hover{background:rgba(255,255,255,.16)}
+.nc-hbtn--in{color:#fbbf24}
+.nc-acct{width:214px}
+.nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-acct__email{font-size:.75rem;color:var(--nc-muted);margin-bottom:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ---- answers ---- */
 .nc-answer{margin:.6rem 0 .1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .nc-answer__ta{width:100%;box-sizing:border-box;min-height:3.2rem;padding:.55rem .65rem;border:1px solid var(--nc-border);

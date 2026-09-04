@@ -59,15 +59,24 @@ jobs:
 
       - name: Build and push image
         run: |
+          export DOCKER_BUILDKIT=1
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           IMAGE=gcr.io/noble-imprint-website/resource-website
           SHA_TAG="$IMAGE:${GITHUB_SHA}"   # immutable, per-commit — the rollback target
           LATEST="$IMAGE:latest"
-          # Retry build+push so a transient registry/network blip (e.g. a Docker Hub
-          # i/o timeout on the base-image pull) doesn't fail the whole deploy.
+          # Pull the previous image as a BuildKit layer-cache source. Combined with
+          # BUILDKIT_INLINE_CACHE=1 (which embeds cache metadata in the pushed image), the heavy
+          # `npm ci` layer is REUSED whenever package*.json + vendor are unchanged — so a normal
+          # code-only deploy skips the ~5-minute dependency install. Best-effort (|| true).
+          docker pull "$LATEST" || true
+          # Retry build+push so a transient registry/network blip doesn't fail the whole deploy.
           for attempt in 1 2 3; do
             echo "::group::Build & push — attempt $attempt"
-            if docker build --build-arg BUILD_TIME="$BUILD_TIME" -t "$SHA_TAG" -t "$LATEST" . \
+            if docker build \
+                 --cache-from "$LATEST" \
+                 --build-arg BUILDKIT_INLINE_CACHE=1 \
+                 --build-arg BUILD_TIME="$BUILD_TIME" \
+                 -t "$SHA_TAG" -t "$LATEST" . \
                && docker push "$SHA_TAG" && docker push "$LATEST"; then
               echo "::endgroup::"; echo "Succeeded on attempt $attempt"; exit 0
             fi

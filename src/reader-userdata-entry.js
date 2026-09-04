@@ -1,53 +1,62 @@
 // Reader per-user data layer (convergence) — entry point. Bundled by esbuild into
 // src/public/js/reader-userdata-bundle.js and loaded on session pages only when FEATURE_USER_DATA
-// is on. Wires the top bar + settings + answers + highlights/notes/bookmarks + library. Entirely
-// additive and self-contained; any failure is swallowed so reading is never affected.
+// is on. Injects a control cluster (Notebook · Settings · Account) into the site's sticky top nav
+// (Coram-Deo-style), then wires settings + answers + highlights/notes/bookmarks + notebook.
+// Entirely additive and self-contained; any failure is swallowed so reading is never affected.
 import { injectStyles } from './reader-userdata/styles.js'
 import { applyCachedSettings, initSettings, toggleSettingsMenu } from './reader-userdata/settings.js'
-import { initFirebase, onUser, signIn, doSignOut } from './reader-userdata/firebase.js'
+import { initFirebase, onUser, getUser, signIn, doSignOut } from './reader-userdata/firebase.js'
 import { initAnswers } from './reader-userdata/answers.js'
 import { initAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
-function buildBar(root) {
-  const bar = el('div', 'nc-bar')
-  bar.setAttribute('data-nc-skip', '')
-  const msg = el('span', 'nc-bar__msg', 'Sign in to save your highlights, notes & answers.')
-  const spacer = el('span', 'nc-bar__spacer')
-  const libBtn = el('button', 'nc-btn')
-  libBtn.innerHTML = `${ICONS.notebook}<span>Notebook</span>`
-  libBtn.style.display = 'none'
-  libBtn.onclick = () => openLibrary()
-  const gear = el('button', 'nc-iconbtn')
-  gear.setAttribute('data-nc-settings-btn', '')
-  gear.title = 'Reading settings'
-  gear.innerHTML = ICONS.gear
-  gear.onclick = () => toggleSettingsMenu(gear)
-  const signInBtn = el('button', 'nc-btn nc-btn--primary', 'Sign in with Google')
-  signInBtn.onclick = () => signIn()
-  const signOutBtn = el('button', 'nc-btn', 'Sign out')
-  signOutBtn.style.display = 'none'
-  signOutBtn.onclick = () => doSignOut()
-  bar.append(msg, spacer, libBtn, gear, signInBtn, signOutBtn)
-  root.parentNode.insertBefore(bar, root)
+function hbtn(icon, title, onClick) {
+  const b = el('button', 'nc-hbtn')
+  b.type = 'button'
+  b.title = title
+  b.innerHTML = icon
+  b.onclick = (e) => onClick(e, b)
+  return b
+}
 
-  // Always-reachable floating notebook button (so you don't have to scroll up).
-  const fab = el('button', 'nc-fab')
-  fab.setAttribute('data-nc-skip', '')
-  fab.title = 'My Notebook'
-  fab.innerHTML = ICONS.notebook
-  fab.onclick = () => openLibrary()
-  document.body.appendChild(fab)
+let acctMenu = null
+const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn')) closeAcct() }
+function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('mousedown', acctOutside) }
+function toggleAccountMenu(anchor) {
+  if (acctMenu) { closeAcct(); return }
+  const u = getUser()
+  acctMenu = el('div', 'nc-menu nc-acct')
+  acctMenu.setAttribute('data-nc-skip', '')
+  acctMenu.appendChild(el('div', 'nc-acct__name', u?.displayName || 'Signed in'))
+  if (u?.email) acctMenu.appendChild(el('div', 'nc-acct__email', u.email))
+  const out = el('button', 'nc-btn', 'Sign out')
+  out.onclick = () => { doSignOut(); closeAcct() }
+  acctMenu.appendChild(out)
+  document.body.appendChild(acctMenu)
+  const r = anchor.getBoundingClientRect()
+  const w = 214
+  acctMenu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'
+  acctMenu.style.top = (r.bottom + 8) + 'px'
+  setTimeout(() => document.addEventListener('mousedown', acctOutside), 0)
+}
 
+function buildHeaderControls() {
+  const host = document.querySelector('.header-icons') || document.querySelector('.header-inner')
+  if (!host) return
+  const wrap = el('div', 'nc-header')
+  wrap.setAttribute('data-nc-skip', '')
+  const nbBtn = hbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
+  nbBtn.style.display = 'none'
+  const setBtn = hbtn(ICONS.gear, 'Reading settings', () => toggleSettingsMenu(setBtn))
+  setBtn.setAttribute('data-nc-settings-btn', '')
+  const userBtn = hbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser()) toggleAccountMenu(b); else signIn() })
+  wrap.append(nbBtn, setBtn, userBtn)
+  host.insertBefore(wrap, host.firstChild)
   onUser((u) => {
-    if (u) {
-      msg.textContent = `Signed in as ${u.displayName || u.email}`
-      signInBtn.style.display = 'none'; signOutBtn.style.display = ''; libBtn.style.display = ''; fab.style.display = 'flex'
-    } else {
-      msg.textContent = 'Sign in to save your highlights, notes & answers.'
-      signInBtn.style.display = ''; signOutBtn.style.display = 'none'; libBtn.style.display = 'none'; fab.style.display = 'none'
-    }
+    nbBtn.style.display = u ? '' : 'none'
+    userBtn.classList.toggle('nc-hbtn--in', !!u)
+    userBtn.title = u ? 'Account' : 'Sign in to save your highlights, notes & answers'
   })
 }
 
@@ -59,7 +68,7 @@ function boot() {
   injectStyles()
   initFirebase()
   initSettings()
-  buildBar(root)
+  buildHeaderControls()
   initAnswers(ctx)
   initAnnotations(ctx)
 }
