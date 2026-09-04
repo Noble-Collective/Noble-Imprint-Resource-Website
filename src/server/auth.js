@@ -6,9 +6,34 @@ const SUPER_ADMIN_EMAIL = 'steve@noblecollective.org';
 const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
 const ADMIN_CACHE_TTL = 60 * 1000; // 60 seconds
 
-// Initialize Firebase Admin SDK — uses ADC on Cloud Run, local credentials in dev
+// Initialize Firebase Admin SDK — uses ADC on Cloud Run, local credentials in dev.
+// The DEFAULT app stays on the website's project (noble-imprint-website) and owns all
+// Firestore/data access (users, roles, suggestions, notifications).
 if (!admin.apps.length) {
   admin.initializeApp();
+}
+
+// Convergence Phase 1b: when AUTH_UNIFIED=1, end-user identity comes from the shared project
+// noble-imprint-463519 instead of noble-imprint-website. Token verification + session-cookie
+// mint/verify then run against a SECOND named admin app pinned to 463519. Data access is
+// unchanged — it stays on the default app. Keyless signing: the named app is initialized with a
+// serviceAccountId so createSessionCookie signs via the IAM Credentials signBlob API (no stored
+// key), which requires the runtime SA to hold roles/iam.serviceAccountTokenCreator on that SA.
+const AUTH_UNIFIED = process.env.AUTH_UNIFIED === '1';
+const READER_PROJECT_ID = process.env.AUTH_UNIFIED_PROJECT_ID || 'noble-imprint-463519';
+const READER_SIGNER_SA = process.env.AUTH_UNIFIED_SIGNER_SA
+  || `firebase-adminsdk@${READER_PROJECT_ID}.iam.gserviceaccount.com`;
+
+let _authApp = null;
+function authAuth() {
+  if (!AUTH_UNIFIED) return admin.auth(); // default app = noble-imprint-website (today's behavior)
+  if (!_authApp) {
+    _authApp = admin.initializeApp(
+      { projectId: READER_PROJECT_ID, serviceAccountId: READER_SIGNER_SA },
+      'auth463519',
+    );
+  }
+  return _authApp.auth();
 }
 
 function isSuperAdmin(email) {
@@ -16,12 +41,17 @@ function isSuperAdmin(email) {
 }
 
 async function createSessionCookie(idToken) {
-  return admin.auth().createSessionCookie(idToken, { expiresIn: SESSION_EXPIRES_IN });
+  return authAuth().createSessionCookie(idToken, { expiresIn: SESSION_EXPIRES_IN });
+}
+
+// Verify a Google ID token from whichever project owns identity under the current flag.
+async function verifyIdToken(idToken) {
+  return authAuth().verifyIdToken(idToken);
 }
 
 async function verifySessionCookie(cookie) {
   try {
-    return await admin.auth().verifySessionCookie(cookie, true);
+    return await authAuth().verifySessionCookie(cookie, true);
   } catch {
     return null;
   }
@@ -41,8 +71,9 @@ function attachUser(req, res, next) {
       isAdmin: false,
     };
     const firestoreMod = require('./firestore');
-    return firestoreMod.isAdmin(email).then(isAdm => {
-      user.isAdmin = isAdm || user.isSuperAdmin;
+    return firestoreMod.getRoleFlags(email).then(flags => {
+      user.isAdmin = flags.isAdmin || user.isSuperAdmin;
+      user.isEditor = flags.isEditor || user.isSuperAdmin;
       req.user = user;
       res.locals.user = user;
       next();
@@ -66,6 +97,7 @@ function attachUser(req, res, next) {
       };
       const isAdm = await firestoreMod.isAdmin(botEmail);
       user.isAdmin = isAdm;
+      user.isEditor = isAdm;
       req.user = user;
       res.locals.user = user;
       next();
@@ -101,15 +133,16 @@ function attachUser(req, res, next) {
       isAdmin: false,
     };
 
-    // Check admin status with caching
-    const cacheKey = `admin-check:${email.toLowerCase()}`;
-    let isAdmin = cache.get(cacheKey);
-    if (isAdmin === undefined || isAdmin === null) {
+    // Resolve admin + editor flags with caching (one Firestore read, cached 60s)
+    const cacheKey = `roleflags:${email.toLowerCase()}`;
+    let flags = cache.get(cacheKey);
+    if (!flags) {
       const firestore = require('./firestore');
-      isAdmin = await firestore.isAdmin(email);
-      cache.set(cacheKey, isAdmin, ADMIN_CACHE_TTL);
+      flags = await firestore.getRoleFlags(email);
+      cache.set(cacheKey, flags, ADMIN_CACHE_TTL);
     }
-    user.isAdmin = isAdmin || user.isSuperAdmin;
+    user.isAdmin = flags.isAdmin || user.isSuperAdmin;
+    user.isEditor = flags.isEditor || user.isSuperAdmin;
 
     req.user = user;
     res.locals.user = user;
@@ -169,8 +202,10 @@ function requireAdmin(req, res, next) {
 
 module.exports = {
   createSessionCookie,
+  verifyIdToken,
   verifySessionCookie,
   attachUser,
+  AUTH_UNIFIED,
   requireAdmin,
   requireRefreshSecret,
   timingSafeEqualStr,

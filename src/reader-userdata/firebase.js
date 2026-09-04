@@ -52,5 +52,26 @@ export function onUser(cb) {
 }
 export const getClient = () => _client
 export const getUser = () => _user
-export const signIn = () => signInWithPopup(_auth, new GoogleAuthProvider()).catch((e) => warn('sign-in', e))
-export const doSignOut = () => signOut(_auth).catch(() => {})
+
+// Convergence Phase 1b: when identity is unified (window.__NC_UNIFIED), the reader sign-in is ALSO
+// the site's sign-in — after the popup we exchange the 463519 ID token for the server __session
+// cookie (so editor/admin access + role-aware UI light up), then reload to reflect server state.
+async function bridgeSession(cred) {
+  if (!window.__NC_UNIFIED || !cred || !cred.user) return
+  const idToken = await cred.user.getIdToken()
+  await fetch('/api/auth/session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }),
+  })
+  location.reload()
+}
+
+export const signIn = () =>
+  signInWithPopup(_auth, new GoogleAuthProvider()).then(bridgeSession).catch((e) => warn('sign-in', e))
+
+export const doSignOut = async () => {
+  try {
+    if (window.__NC_UNIFIED) await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    await signOut(_auth)
+    if (window.__NC_UNIFIED) location.reload()
+  } catch { /* ignore */ }
+}

@@ -70,6 +70,13 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-acct{width:214px}
 .nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-acct__email{font-size:.75rem;color:var(--nc-muted);margin-bottom:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-acct__link{width:100%;box-sizing:border-box;cursor:pointer;border:none;background:none;font:inherit;font-size:.82rem;color:var(--nc-text);
+  display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;border-radius:8px;text-align:left;margin-bottom:.35rem}
+.nc-acct__link:hover{background:var(--nc-hover)}
+.nc-acct__ico{display:inline-flex;align-items:center;color:var(--nc-muted)}
+.nc-signin{width:260px}
+.nc-signin__body{font-size:.82rem;color:var(--nc-muted);line-height:1.4;margin:.15rem 0 .7rem}
+.nc-signin .nc-btn--primary{width:100%;justify-content:center;padding:.5rem}
 
 /* ---- answers ---- */
 .nc-answer{margin:.6rem 0 .1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}

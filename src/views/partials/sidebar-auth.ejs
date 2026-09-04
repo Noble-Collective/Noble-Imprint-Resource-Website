@@ -1,3 +1,6 @@
+    <% if (typeof featureAuthUnified === 'undefined' || !featureAuthUnified) { %>
+    <!-- Legacy in-sidebar auth. Under AUTH_UNIFIED the reader account menu (top-left control
+         cluster) owns identity + Notifications + Admin, so this second sign-in is suppressed. -->
     <div class="sidebar-auth">
       <% if (user) { %>
         <div class="sidebar-auth-user">
@@ -20,3 +23,4 @@
         <button onclick="loginWithGoogle()" class="sidebar-auth-link sidebar-auth-link--signin">Sign In</button>
       <% } %>
     </div>
+    <% } %>

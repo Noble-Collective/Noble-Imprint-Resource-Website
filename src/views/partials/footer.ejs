@@ -58,6 +58,9 @@
   </div>
 </div>
 
+<% if (typeof featureAuthUnified === 'undefined' || !featureAuthUnified) { %>
+<!-- Legacy login: end-user identity on noble-imprint-website (compat SDK). Replaced under
+     AUTH_UNIFIED by the reader bundle's 463519 sign-in (see below). -->
 <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-auth-compat.js"></script>
 <script>
@@ -70,6 +73,15 @@
   });
 </script>
 <script src="/static/js/auth.js?v=1"></script>
+<% } else { %>
+<!-- Unified identity (Phase 1b): the reader bundle (below) owns sign-in on noble-imprint-463519 and
+     mints the __session cookie. Expose the flag + the server-resolved user so the account menu can
+     render role-aware links (admin console, notifications) and the mobile drawer's Sign In/Out. -->
+<script>
+  window.__NC_UNIFIED = true;
+  window.__NC_USER = <%- user ? JSON.stringify({ email: user.email, displayName: user.displayName, photoURL: user.photoURL, isAdmin: !!user.isAdmin, isEditor: !!user.isEditor }).replace(/</g, '\\u003c') : 'null' %>;
+</script>
+<% } %>
 <script src="/static/js/main.js?v=17"></script>
 <script>window.__analyticsContext = <%- analyticsContext ? JSON.stringify(analyticsContext).replace(/</g, '\\u003c') : 'null' %>;</script>
 <script src="/static/js/analytics.js?v=2"></script>
@@ -77,7 +89,7 @@
 <!-- Convergence per-user data layer — loaded site-wide so the account/settings controls appear on
      every page. Reading features (highlights/notes/bookmarks/answers/notebook) self-gate on the
      session context (window.__READER_CTX) that session pages set just above this include. -->
-<script type="module" src="/static/js/reader-userdata-bundle.js?v=8"></script>
+<script type="module" src="/static/js/reader-userdata-bundle.js?v=9"></script>
 <% } %>
 </body>
 </html>

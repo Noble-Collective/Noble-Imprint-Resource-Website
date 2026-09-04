@@ -84,6 +84,10 @@ app.use((req, res, next) => {
   // session pages only). Flag-gated so it ships dark until enabled. The footer loads the bundle
   // on every page when this is on; the reading features additionally require window.__READER_CTX.
   res.locals.featureUserData = process.env.FEATURE_USER_DATA === '1';
+  // Convergence Phase 1b — when on, end-user identity is unified on noble-imprint-463519: the reader
+  // bundle owns sign-in (mints the __session cookie via the 463519 admin app), the legacy compat
+  // login is dropped, and the account menu carries role-aware links (admin/notifications).
+  res.locals.featureAuthUnified = process.env.AUTH_UNIFIED === '1';
   // Canonical analytics content identity — set per content route below, echoed
   // into the page as window.__analyticsContext (see footer.ejs). null by default
   // (non-content pages fall back to the server's coarse path parse).
@@ -427,9 +431,9 @@ app.post('/api/auth/session', async (req, res) => {
       maxAge: auth.SESSION_EXPIRES_IN,
     });
 
-    // Create or update user in Firestore
-    const admin = require('firebase-admin');
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    // Create or update user in Firestore. Verify the ID token against whichever project owns
+    // identity under the current flag (463519 when AUTH_UNIFIED, else noble-imprint-website).
+    const decoded = await auth.verifyIdToken(idToken);
     await firestore.createOrUpdateUser(decoded.email, decoded.name, decoded.picture);
 
     res.json({ status: 'ok' });
