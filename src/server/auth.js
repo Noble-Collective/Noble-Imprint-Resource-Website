@@ -22,7 +22,7 @@ if (!admin.apps.length) {
 const AUTH_UNIFIED = process.env.AUTH_UNIFIED === '1';
 const READER_PROJECT_ID = process.env.AUTH_UNIFIED_PROJECT_ID || 'noble-imprint-463519';
 const READER_SIGNER_SA = process.env.AUTH_UNIFIED_SIGNER_SA
-  || `firebase-adminsdk@${READER_PROJECT_ID}.iam.gserviceaccount.com`;
+  || `firebase-adminsdk-fbsvc@${READER_PROJECT_ID}.iam.gserviceaccount.com`;
 
 let _authApp = null;
 function authAuth() {
