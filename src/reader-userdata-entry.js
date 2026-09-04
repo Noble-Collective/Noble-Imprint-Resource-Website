@@ -14,7 +14,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut,
   onAuthStateChanged, setPersistence, browserLocalPersistence, connectAuthEmulator,
 } from 'firebase/auth'
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { createUserDataClient } from '@noble-collective/userdata/client'
 import { seriesLocator } from '@noble-collective/userdata/core'
 
@@ -104,7 +104,10 @@ function main(ctx) {
 
   const app = initializeApp(READER_CONFIG, 'readerApp')
   const auth = getAuth(app)
-  const db = getFirestore(app)
+  // Target the dedicated converged database (NOT the app's legacy (default) DB), in the same
+  // project so the uid is shared. Auto-detect long-polling avoids multi-second first-write stalls
+  // on networks where Firestore's default streaming (WebChannel) transport is slow to establish.
+  const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, 'collective-user-data')
   if (/[?&]ncEmu=1/.test(location.search)) {
     try { connectFirestoreEmulator(db, '127.0.0.1', 8080); connectAuthEmulator(auth, 'http://127.0.0.1:9099') } catch (e) { warn(e) }
   }
