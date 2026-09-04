@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'   # reuse ~/.npm across runs so `npm ci` doesn't re-download the (now large,
+                         # firebase-included) dev tree every deploy — the check job's main cost.
       - name: Install dependencies
         run: npm ci
       - name: Unit tests
