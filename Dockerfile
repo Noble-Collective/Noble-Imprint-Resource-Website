@@ -5,6 +5,10 @@
 FROM mirror.gcr.io/library/node:22-slim
 WORKDIR /app
 COPY package*.json ./
+# vendor/ holds the committed @noble-collective/userdata tarball referenced as a file: devDependency.
+# Copy it before `npm ci` so lockfile resolution never hits a missing path (it's dev-only, so
+# --omit=dev skips installing it, but the file must exist for ci to validate the tree).
+COPY vendor ./vendor
 RUN npm ci --omit=dev
 COPY . .
 # Run as the unprivileged built-in `node` user (was root). chown so the app can still

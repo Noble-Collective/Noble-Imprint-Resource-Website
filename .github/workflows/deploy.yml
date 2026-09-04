@@ -91,6 +91,7 @@ jobs:
             --concurrency=80 \
             --timeout=300 \
             --cpu-boost \
+            --update-env-vars=FEATURE_USER_DATA=1 \
             --project=noble-imprint-website
 
       - name: Smoke check (/api/health)
