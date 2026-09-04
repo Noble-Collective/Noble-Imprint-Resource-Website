@@ -62,11 +62,11 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-iconbtn:hover{background:var(--nc-hover);color:var(--nc-text)}
 .nc-iconbtn[aria-pressed="true"]{color:var(--nc-accent)}
 
-/* ---- header control cluster (in the site's sticky top nav) ---- */
-.nc-header{display:inline-flex;align-items:center;gap:.1rem;margin-right:.5rem}
-.nc-hbtn{cursor:pointer;border:none;background:none;color:#f0efec;padding:.4rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
-.nc-hbtn:hover{background:rgba(255,255,255,.16)}
-.nc-hbtn--in{color:#fbbf24}
+/* ---- control cluster at the TOP of the left sidebar (Coram-Deo-style) ---- */
+.nc-side{display:flex;align-items:center;gap:.15rem;padding:.6rem .85rem;border-bottom:1px solid var(--color-border,#e2e6df)}
+.nc-sbtn{cursor:pointer;border:none;background:none;color:var(--color-text-light,#6b6b6b);padding:.42rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
+.nc-sbtn:hover{background:rgba(120,120,120,.16);color:var(--color-text,#3a3a3a)}
+.nc-sbtn--in{color:var(--color-gold,#dfb53b)}
 .nc-acct{width:214px}
 .nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-acct__email{font-size:.75rem;color:var(--nc-muted);margin-bottom:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -131,6 +131,19 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 /* ---- library slide-out panel ---- */
 .nc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9600;opacity:0;transition:opacity .18s}
 .nc-backdrop.open{opacity:1}
+/* ---- notebook bottom sheet (with Highlights/Notes/Bookmarks tabs) ---- */
+.nc-sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);z-index:9700;width:min(720px,100%);max-height:74vh;
+  background:var(--nc-surface);color:var(--nc-text);border-top-left-radius:16px;border-top-right-radius:16px;
+  box-shadow:0 -10px 40px rgba(0,0,0,.28);display:flex;flex-direction:column;transition:transform .26s ease;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.nc-sheet.open{transform:translate(-50%,0)}
+.nc-sheet__grip{width:42px;height:4px;border-radius:2px;background:var(--nc-border);margin:.55rem auto .15rem}
+.nc-sheet__head{display:flex;align-items:center;justify-content:space-between;padding:.05rem 1rem .35rem}
+.nc-sheet__tabs{display:flex;gap:.25rem;padding:.25rem .75rem;border-bottom:1px solid var(--nc-border)}
+.nc-tab{flex:1 1 0;cursor:pointer;border:none;background:none;color:var(--nc-muted);font:inherit;font-size:.82rem;padding:.5rem .3rem;border-radius:8px;white-space:nowrap}
+.nc-tab:hover{background:var(--nc-hover)}
+.nc-tab[aria-selected="true"]{background:var(--nc-hover);color:var(--nc-text);font-weight:600}
+.nc-sheet__body{overflow:auto;padding:.5rem .85rem 1.6rem}
 .nc-panel{position:fixed;top:0;right:0;height:100%;width:min(400px,90vw);background:var(--nc-surface);color:var(--nc-text);
   z-index:9700;box-shadow:-8px 0 30px rgba(0,0,0,.2);transform:translateX(100%);transition:transform .22s ease;
   display:flex;flex-direction:column;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}

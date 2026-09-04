@@ -11,8 +11,8 @@ import { initAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
-function hbtn(icon, title, onClick) {
-  const b = el('button', 'nc-hbtn')
+function sbtn(icon, title, onClick) {
+  const b = el('button', 'nc-sbtn')
   b.type = 'button'
   b.title = title
   b.innerHTML = icon
@@ -41,26 +41,42 @@ function toggleAccountMenu(anchor) {
   setTimeout(() => document.addEventListener('mousedown', acctOutside), 0)
 }
 
-function buildHeaderControls() {
-  const host = document.querySelector('.header-icons') || document.querySelector('.header-inner')
-  if (!host) return
-  const wrap = el('div', 'nc-header')
+function buildSidebarControls() {
+  const host = document.querySelector('.sidebar')
+  if (!host || host.querySelector('.nc-side')) return // idempotent — never inject twice
+  const wrap = el('div', 'nc-side')
   wrap.setAttribute('data-nc-skip', '')
-  const nbBtn = hbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
-  nbBtn.style.display = 'none'
-  const setBtn = hbtn(ICONS.gear, 'Reading settings', () => toggleSettingsMenu(setBtn))
+  const userBtn = sbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser()) toggleAccountMenu(b); else signIn() })
+  const setBtn = sbtn(ICONS.gear, 'Reading settings', (e, b) => toggleSettingsMenu(b))
   setBtn.setAttribute('data-nc-settings-btn', '')
-  const userBtn = hbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser()) toggleAccountMenu(b); else signIn() })
-  wrap.append(nbBtn, setBtn, userBtn)
-  host.insertBefore(wrap, host.firstChild)
+  const nbBtn = sbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
+  nbBtn.style.display = 'none'
+  wrap.append(userBtn, setBtn, nbBtn)
+  host.insertBefore(wrap, host.firstChild) // top of the sidebar; pushes the nav down
+
+  // The site's mobile TOC clones `.sidebar` innerHTML into `.mobile-toc-sidebar-dropdown` on
+  // DOMContentLoaded (after us), which copies our controls as dead (handler-less) buttons. Strip any
+  // such clone now and whenever the dropdown is (re)built.
+  const stripClones = () => document.querySelectorAll('.mobile-toc-sidebar-dropdown .nc-side').forEach((n) => n.remove())
+  stripClones()
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType === 1 && n.classList && n.classList.contains('mobile-toc-sidebar-dropdown')) {
+        n.querySelectorAll('.nc-side').forEach((x) => x.remove())
+      }
+    }
+  }).observe(document.body, { childList: true })
+
   onUser((u) => {
     nbBtn.style.display = u ? '' : 'none'
-    userBtn.classList.toggle('nc-hbtn--in', !!u)
+    userBtn.classList.toggle('nc-sbtn--in', !!u)
     userBtn.title = u ? 'Account' : 'Sign in to save your highlights, notes & answers'
   })
 }
 
 function boot() {
+  if (window.__ncBooted) return // guard against the bundle evaluating/booting more than once
+  window.__ncBooted = true
   const root = document.querySelector('.session-content')
   if (!root) return
   const ctx = window.__READER_CTX
@@ -68,7 +84,7 @@ function boot() {
   injectStyles()
   initFirebase()
   initSettings()
-  buildHeaderControls()
+  buildSidebarControls()
   initAnswers(ctx)
   initAnnotations(ctx)
 }

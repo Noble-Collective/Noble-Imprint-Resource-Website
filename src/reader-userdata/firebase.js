@@ -11,7 +11,7 @@ import { warn } from './util.js'
 
 const CONFIG = {
   apiKey: 'AIzaSyC3dwU9dR59QncPWsSgHG2CQxg4_jVqbrc',
-  authDomain: 'noble-imprint-463519.firebaseapp.com',
+  authDomain: 'account.noblecollective.org', // custom auth domain -> popup reads "noblecollective.org"
   projectId: 'noble-imprint-463519',
   appId: '1:160156401404:web:39385683295e00348de179',
   messagingSenderId: '160156401404',
