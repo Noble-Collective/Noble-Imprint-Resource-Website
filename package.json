@@ -7,7 +7,8 @@
     "start": "node src/server/index.js",
     "dev": "node --watch src/server/index.js",
     "test:unit": "node --test \"tests/unit/*.test.js\"",
-    "build:editor": "esbuild src/editor-entry.js --bundle --format=esm --outfile=src/public/js/codemirror-bundle.js"
+    "build:editor": "esbuild src/editor-entry.js --bundle --format=esm --outfile=src/public/js/codemirror-bundle.js",
+    "build:reader": "esbuild src/reader-userdata-entry.js --bundle --format=esm --outfile=src/public/js/reader-userdata-bundle.js --minify"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^9.0.3",
@@ -31,9 +32,11 @@
   "devDependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/state": "^6.6.0",
+    "@noble-collective/userdata": "file:vendor/noble-collective-userdata-0.1.0.tgz",
     "@playwright/test": "^1.59.1",
     "codemirror": "^6.0.2",
     "esbuild": "^0.28.0",
+    "firebase": "^11.7.1",
     "tributejs": "^5.1.3"
   }
 }

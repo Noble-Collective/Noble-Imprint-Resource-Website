@@ -705,6 +705,13 @@ async function getSessionPageData(req, resolvedRoute) {
     pendingReplies: editingSharedFile ? editingSharedFile.replies : allReplies,
     sessionFilePath: canEdit ? (editingSharedFile ? editingSharedFile.path : session.path) : null,
     bookRepoPath: canEdit ? (editingSharedFile ? editingSharedFile.dir : book.repoPath) : null,
+    // Always-present reader context for the per-user data layer (answers/bookmarks). Keyed to the
+    // shared convergence store; independent of edit access. contentVersion = the session file SHA.
+    readerContext: {
+      bookPath: book.repoPath,
+      sessionFile: session.filename,
+      contentVersion: sessionData.sha || null,
+    },
     editUnavailable,
     rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
     audioSession,
@@ -904,6 +911,9 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         content,
         title: `${data.session.title} — ${data.book.title}`,
         audioFormatDuration: audio.formatDuration,
+        // Convergence per-user data layer (answers/bookmarks). Flag-gated; off by default so this
+        // ships dark until enabled. Reading is fully server-rendered and unaffected either way.
+        featureUserData: process.env.FEATURE_USER_DATA === '1',
       });
     }
   } catch (err) {
