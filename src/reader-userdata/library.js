@@ -53,7 +53,17 @@ function closeSheet() {
 
 function scrollToMark(id) {
   const m = document.querySelector(`mark[data-annot-id="${esc(id)}"], .nc-bm-marker[data-annot-id="${esc(id)}"]`)
-  if (m) { closeSheet(); m.scrollIntoView({ behavior: 'smooth', block: 'center' }); const t = m.closest('p, li, h1, h2, h3, h4, blockquote') || m; t.classList.add('nc-flash'); setTimeout(() => t.classList.remove('nc-flash'), 1600) }
+  if (!m) return
+  closeSheet()
+  // Wait a frame so the closing sheet doesn't interrupt the smooth scroll, then jump + emphasize.
+  requestAnimationFrame(() => {
+    m.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const t = m.closest('p, li, h1, h2, h3, h4, h5, blockquote') || m
+    t.classList.remove('nc-jumpflash')
+    void t.offsetWidth // restart the animation if the same item is clicked again
+    t.classList.add('nc-jumpflash')
+    setTimeout(() => t.classList.remove('nc-jumpflash'), 2600)
+  })
 }
 function focusItem(id) {
   const node = sheet && sheet.querySelector(`.nc-panel__item[data-annot-id="${esc(id)}"]`)

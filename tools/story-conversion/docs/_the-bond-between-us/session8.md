@@ -1,0 +1,219 @@
+# **Session 8: The Community**
+
+## **Session Overview**
+
+### **Creedal Statement**
+
+### **Key Elements**
+
+* **Key Passage**: Matthew 17:22–18:35
+
+* **Scripture Memory**: For the kingdom of God is not a matter of eating and drinking, but of righteousness, peace, and joy in the Holy Spirit. For whoever serves Christ in this way is pleasing to God and approved by men. So then, let us pursue what leads to peace and to mutual edification. Romans 14:17–19
+
+* **Catechism**: Q: How should Christians relate to one another? A: Community.
+
+## **Introduction**
+
+Behold, how good and pleasant it is when brothers live together in harmony\! It is like fine oil on the head, running down on the beard, running down Aaron’s beard over the collar of his robes\! Psalm 133:1–2
+
+His church … is the signet on his hand, as a bracelet upon his arm; this is his garden which he delights to dress; if he prunes it, it is to purge it; if he digs about his vine, and wounds the branches, it is to make it beautiful with new clusters, and restore it to a fruitful vigor. Stephen Charnock, *The Existence and Attributes of God*
+
+The church is Jesus’ family of faithful followers. As such, the church gains its core identity through its relationship to Christ. Jesus is the all-defining nucleus of his people, and devotion to Christ determines those who belong to the church community. As a faith family, the church bears mutual responsibility for its other members as it declares its exclusive allegiance to Christ. Although the church was officially established after Jesus’ resurrection and ascension (along with the coming of the Holy Spirit), Jesus began to form his family of faithful followers during his earthly ministry. Shared faith in Jesus brings Christ followers into a deep relationship with one another. Consequently, even before the church was formally established, Jesus taught his followers what it would mean to relate to one another.
+
+The myriad blessings of Christian community do not come without significant challenge. While humans tend to associate with people who share a common ethnic, linguistic, social, or class affinity, this is not the case with the faith-based family of Jesus’ disciples. The church community is composed of Christ followers who are culturally, economically, and socially diverse. Outside of faith in Christ, these individuals would not normally affiliate with one another. Yet in Christ, the mixed and varied body of believers is brought together as one family. Common faith in Jesus is the inseparable bond that unites disciples together. Because the church is a spiritual community of faith, believers cannot rely upon human instinct, social mores, personal preference, or any external affinity to relate to one another in harmony or accord. In Christ, the church embraces Christlike ways of relating to one another.
+
+In Matthew 17:22–18:35, Jesus instructed his followers in what it means to live together as a community of faith. Rooting his community in the gospel truth, Jesus demonstrated that the church community is defined by its loving concern for others. Christians do not use their newfound freedom in Christ to bring offense but to demonstrate self-denying care for others. Confronting his disciples’ desire for personal greatness, Jesus taught that self-lowering and childlike humility should define our self-understanding and interactions with others. We must do nothing that would cause other members of the church community to fall into sin. Like a shepherd that goes after even one straying sheep, Christians should show genuine concern and compassion toward one another, especially those who are far from the fold. Having instructed his disciples in what to do when one member sins against the other, Jesus provided a blueprint for a life of accountability with one another. With a dramatic story detailing the danger of unforgiveness, Jesus informed his disciples that they must practice forgiveness with one another.
+
+As believers in Christ, we must mature in our interpersonal relationships with other believers. To do this in a way that honors God, we cannot rely on the habits and practices of our old life. Knowing that Jesus has formed a new family called his church, we must begin to embody Jesus’ character in order to properly function as a part of Jesus’ family. Those who belong to the church are those who have pledged their loyalties to Christ. While we affirm faith in our Savior, we recognize that pettiness, envy, pride, gossip, jealousy, and any number of other vices can threaten the harmony and unity of the church community. To be mature in the faith, we must not only grow our faith in Christ but also cultivate our relationships with one another. Jesus forms his people into a family unit, a strong and intimate communion unparalleled in any other human relationship. Although we exist as a diverse people, may we heed Jesus’ example and instruction as we learn to further grow the bond between us.
+
+## **Biblical Interpretation: Hearing the Word**
+
+### **Observation Questions**
+
+1. **Read Matthew 17:22–27**: After Jesus predicted his work on the cross, what interactions took place between tax collectors, Peter, and Jesus? 
+
+2. **Read Matthew 18:1–4**: How did Jesus address his disciples’ desire for greatness? 
+
+3. **Read Matthew 18:5–9**: What caution did Jesus give his disciples about how they would treat other Christians? 
+
+4. **Read Matthew 18:10–14**: What story did Jesus give to explain the kind of concern disciples should share with one another? 
+
+5. **Read Matthew 18:15–20**: How did Jesus teach his disciples to deal with sin that takes place in the community of faith? 
+
+6. **Read Matthew 18:21–35**: What parable did Jesus give to explain the importance of practicing forgiveness? 
+
+### **Storycraft**
+
+## **Theological Dialogue: Discussing the Plot**
+
+### **Discussion Questions**
+
+1. **Loving Concern**: How is loving concern for others an important aspect of Christian community? How does the way Jesus addressed the issue of the two-drachma tax give insight into this?
+
+2. **Genuine Humility**: What does humility look like, and why is it important for the Christian community? How does Jesus go about explaining the nature and importance of humility?
+
+3. **Addressing Sin**: What does it look like for the church to address sin in the church? How does Jesus teach his followers to address sin in the midst of the community?
+
+4. **Gracious Forgiveness**: How should Christians practice forgiveness? How does Jesus’ parable of the unforgiving servant give insight into this?
+
+### **Biblical Commentary**
+
+#### **Passage Introduction**
+
+##### **Key Idea**
+
+Sharing a common faith in Christ, Christian community expresses itself in the care members show for one another.
+
+##### **Passage Overview**
+
+As a family of Christ followers, the church is made up of many members who are united into one faith community. While diverse and varied, these members all share a common faith in Christ. The unity and harmony of the church is something that we must carefully guard. Grounded in the gospel truth, Christians must show loving concern for one another, practice self-lowering humility, seek to edify other members (rather than causing one to stumble into sin), express committed compassion for each disciple, build an environment of accountability, and extend unconditional forgiveness to one another. Through these community practices, we can grow the bond between believers. While many challenges and enemies will seek to divide the church community, we can be resilient to these attacks as we cultivate these key community virtues. Use the following commentary as a means to help you understand this extended Gospel narrative, molding your understanding and practice of Christian interpersonal relationships.
+
+##### **Passage Outline**
+
+1.   
+2.   
+3. 
+
+#### **Communion of Saints**
+
+Love must be sincere. Detest what is evil; cling to what is good. Be devoted to one another in brotherly love. Outdo yourselves in honoring one another. Romans 12:9–10
+
+Church fellowship, rightly managed, is the glory of all the world. No place, no community, no fellowship, is adorned and bespangled with those beauties as is a church rightly knit together to their head, and lovingly serving one another … Hence the church is called the place of God’s desire on earth. John Bunyan, “The Desire of the Righteous”
+
+##### **Introduction**
+
+Christians enjoy a relationship with Jesus that invites them into a relationship with one another. Christian maturity is rooted in meaningful participation in a healthy church community. As part of Jesus’ redemptive plan for his world, Jesus builds his family from people with diverse backgrounds, languages, and cultures; he connects them into a unified group. As we depend upon Christ for eternal life, Christ calls believers to enjoy mutual interdependence with one another as they grow in faith. In a sinful and broken world, humans do not naturally approach community or interpersonal relationships in a Christ-honoring way. After coming to faith in Christ, we often bring with us habits and life rhythms from an old way of life. Christians need to remove old habits and develop new ones, habits aligned with Jesus’ vision for Christian community.
+
+In Matthew 17:22–18:35, we encounter Jesus establishing his followers in what it looks like to be a community of faith. This narrative of Jesus’ teaching and parables instructs Christians on how they should relate to one another. Jesus predicted his death and resurrection, emphasizing the gospel as the only sure foundation of meaningful Christian community. He then addressed an inquiry from tax collectors and called his followers to show loving concern for others. Addressing his disciples’ question about greatness, Jesus highlighted the importance of childlike humility. He warned his followers about causing others to stumble in sin. Telling a parable about a shepherd pursuing a straying sheep, he taught his disciples about compassionate care for all members. Jesus instructed his disciples about how to resolve conflict and restore people from sin. In this, Jesus casts a vision of a community defined by healthy accountability and loving discipline. Finally, Jesus told a parable of an unforgiving servant and taught his disciples the importance of practicing forgiveness with one another.
+
+Christian community is a precious joy for the believer. However, it does not come without its challenges. When we follow human instinct or fleshly habits, Christian community is sure to become a source of pain and heartache. When we align ourselves with Jesus’ vision for his community, we can nurture the community life of the church in a way that makes it a meaningful and loving family of mutual care. Christian community seeks to cultivate its relationships with one another with loving concern, self-lowering humility, others-focused edification, genuine compassion, healthy accountability, and merciful forgiveness. When the church approaches its relationships with one another in this way, it becomes a compelling witness of the gospel to the surrounding world.
+
+##### **Not to Give Offense: Limiting Personal Freedom in the Name of Loving Concern for Others**
+
+###### Biblical Narrative (Matthew 17:22–27)
+
+As Jesus and his disciples gathered in Galilee, Jesus predicted his upcoming work on the cross. Referring to himself, Jesus foretold that “the Son of Man is about to be delivered into the hands of men” (17:22). He continued to say that “they will kill Him, and on the third day He will be raised to life” (17:23). Jesus would predict his death and resurrection other times in his ministry (cf. 16:21–28; 20:17–19). In this passage, the prediction speaks about Jesus’ deliverance to men (17:22), death on the cross (17:23), and resurrection from the grave (17:23). This prediction not only summarized the events that would take place at the end of Jesus’ earthly life and ministry, but it also served as a succinct gospel summary. When Christ’s followers heard this news, they were “deeply grieved” (17:23). At this time, they had yet to fully understand the good news of Jesus’ prophetic words. Although Jesus would tread a path of suffering and crucifixion, it would ultimately lead to victory and life.
+
+When they arrived in Capernaum, tax collectors came to Peter and asked suspiciously if Jesus paid “the two-drachma tax” (17:24). Peter affirmed that Jesus did pay the tax. When Peter came into the house, Jesus first addressed Peter (17:25). Inviting his disciple to consider the situation, Jesus asked Peter “from whom do the kings of the earth collect customs and taxes” (17:25). He further inquired as to whether kings require their sons to pay the tax or if those outside the family are responsible for the tax (17:25). Peter answered that “others” (17:26)—those outside the family—are the ones who pay the tax. Jesus explained to Peter that “the sons are exempt” (17:26). In a powerful display of selflessness and forbearance, Jesus told Peter to cast his hook in the sea and “take the first fish you catch” (17:27). The fish had a shekel (worth about four drachmas) in its mouth, enough to pay the tax for Jesus and Peter (17:27).
+
+###### Biblical Principles
+
+*Gospel as Foundation of Christian Community*. The gospel is foundational to the community life of the church. Without common confession in Christ (17:22–23), Christians cannot experience the joy of loving fellowship with one another. The selfless and loving concern Jesus showed for sinful humanity on the cross makes it possible for Christians to show concern and compassion toward one another. Without the foundation of the gospel in place, a harmonious Christian community is impossible. More than a mere example of sacrificial love, Jesus’ death on the cross and resurrection infuse us with divine power to transform interpersonal relationships into Christ-centered and God-honoring community life. Inevitably, a wrong understanding of the gospel handicaps the full functioning and blessing of Christian community. As an illustration of this point, the unfolding narrative will prove that the disciple’s initial distress over the gospel message (17:23) was followed by a misplaced question of the greatest in God’s kingdom (18:1). In summary, common belief in the gospel—the good news of Christ’s saving work for sinners—makes Christian community possible.
+
+*Loving Concern*. With the foundation of the gospel laid, Jesus instructed Peter about a core virtue of Christian community. Through Peter’s encounter with the tax collectors, Jesus taught Peter that Christians should act with a loving concern so as “not \[to\] offend” (17:27). Jesus is not instructing people to tailor their conduct to avoid all forms of conflict—the gospel message itself is an offense (17:22–23). Instead, Jesus is inviting his disciples into a selfless and others-oriented concern: to do things for others that they are not necessarily obligated to do. Christians enjoy freedom as God’s children (17:26). God is their highest authority. There is a tendency for people to fully express their freedom in a way that might create an unnecessary breach in their relationship with others. Jesus, however, taught Peter (and us) that loving concern for others should cause us to place their needs before our own. While this should never cause us to abandon faith in the gospel or fidelity to God, we should consider how love toward others will cause us to limit our freedom for the benefit of others.
+
+##### **Who Is the Greatest: Embracing Childlike Humility as God’s Kingdom Way**
+
+###### Biblical Narrative (Matthew 18:1–6)
+
+It was “at that time” that Jesus’ disciples came to him and asked, “Who then is the greatest in the kingdom of heaven?” (18:1). To answer their question, Jesus called a child to himself and placed the child among his disciples (18:2). Then, Jesus explained that “unless you change and become like little children, you will never enter the kingdom of heaven” (18:3). Important in this explanation is Jesus’ instruction to “change and become” (18:3). This hinted at the fact that his disciples (and all humans) are not naturally inclined to childlike humility. Jesus continued his explanation as he stated, “whoever humbles himself like this little child is the greatest in the kingdom of heaven” (18:4). According to this teaching of Jesus, **the greatness of God’s kingdom would be defined by lowliness, meekness, and humility**.
+
+Such childlike humility is the only way that someone could come to receive Jesus. Christ continued his teaching to his disciples along this line and explained that “whoever welcomes a little child like this in My name welcomes Me” (18:5). This teaching highlights the importance of humility in receiving Jesus. One cannot come to faith in Christ without lowering oneself in submission to Jesus. It takes this kind of self-lowering to accept a child; it also takes this kind of condescension and self-effacement to accept Jesus. Implicit in this statement is the fact that how one treats others (in this case, children in particular) reveals the condition of our relationship with Jesus. Inseparably joined together, our relationship with Jesus and our interpersonal relationship with others are inextricably bound. Our lack of humility is also exposed in the mistreatment of others. Jesus explained that whoever “causes one of these little ones who believe in Me to stumble” (18:6) would be seriously judged. Flagrant misuse of our freedom, vain pursuit of greatness, or unchecked harboring of a prideful spirit can lead another into sin. Acting pridefully brings severe consequences. Speaking of a proud person who leads another into sin, Jesus warned that “it would be better for him to have a large millstone hung around his neck and to be drowned in the depths of the sea.” (18:6). In this statement, Jesus was not just referring to believing children. He was also referring to disciples in Christ who have come to follow Jesus.
+
+###### Biblical Principles
+
+*Childlike Humility*. How we treat others is a direct reflection of what we (really) think of Jesus. Childlike humility is a distinctive Christian virtue shaping our faith in Christ and how believers should relate to one another. Having already described his followers as sons who are free (17:26), Jesus then used an actual child as an object lesson to show what it means to be Christ’s follower. While this object lesson taught about Jesus’ loving concern for children, it was also a picture of what it means to be a disciple of Christ. Christians are God’s children. Christ’s followers must remove their pride and “become like little children” (18:3) to enter the kingdom. In this way, Christians are as much the little children Jesus is referring to as the believing child. Childlike humility is the only way people can enter into God’s kingdom. When believers guard their hearts against the deadly poison of pride, they also stand sentry against pride in the community of faith.
+
+*Greatness, Worth, and Identity*. Childlike humility is not only an indispensable virtue to enter God’s kingdom, it is also the path to kingdom greatness (18:4). While the world relishes self-exaltation and encourages self-aggrandizement, Jesus overturned these worldly inclinations. Instead, Jesus described how people can find importance, worth, significance, and greatness: self-lowering. The kingdom of Christ is “upside down” to how much of the world works. People who aim for a sense of dignity and worth can easily get caught up in an unending competition of self-promotion. Christian community works the opposite way. This does not mean that Christians should practice unhealthy self-hatred, self-abasement, or self-loathing. Even Jesus highlights the value and worth of the lowly child in this story. On the contrary, our worth and value are most fully (and properly) experienced as we embrace a Christ-centered humility. Such humility will cause us to place the needs of others before our own. With humility, we become more concerned about the spiritual condition of others than our own popularity. Armed with such humility, we will restrain our desire for greatness and seek the greatness of Jesus. We will suspend our own needs and put the needs of others before ourselves. Humility unravels the tangled knot of pride and self-exaltation, finding personal worth in allegiance to Jesus, not in a self-made image we have projected to the world.
+
+##### **Temptations Must Come: Displaying Godly Edification for Community Upbuilding**
+
+###### Biblical Narrative (Matthew 18:7–9)
+
+After explaining the consequences of causing a little one to sin, Jesus continued to explain how Christians should deal with the threat of sinful temptation in the community. Lamenting the presence of sin in the world, Jesus pronounced a warning and protest against sin and its enticement: “woe to the world for the causes of sin” (18:7). Jesus admitted that “stumbling blocks must come” (18:7). Temptation to sin is an inevitable reality in this sinful world. However, the one who becomes a conduit of temptation should be greatly alarmed. In this regard, Jesus offered another lament: “woe to the man through whom they come” (18:7). Being a cause of temptation, a stumbling block to sin, is the opposite of what the community of faith should be.
+
+So serious is the possibility of causing another to sin that Jesus offered the following instruction: “If your hand or your foot causes you to sin, cut it off and throw it away” (18:8). Jesus explained that it would be better for a person to be crippled or lame and receive eternal life than to have all their limbs and be “thrown into the eternal fire” (18:8). In turn, Jesus offered a second and similar scenario: “if your eye causes you to sin, gouge it out and throw it away” (18:9). In the same way, Jesus explained that it would be better to enter life with only one eye than to have both eyes and be sent to hell (18:9). In this passage, Jesus was not endorsing self-mutilation. He was emphasizing an important point of the Christian faith and the Christian community. God’s people build each other up and take extreme measures to protect themselves from temptations to sin.
+
+###### Biblical Principles
+
+*Community of Edification*. Jesus presented a somber warning against causing others to sin. When Jesus referred to “a little child like this” (18:5) or “one of these little ones who believe in Me” (18:6; cf. 18:10, 14), he was not only referring to children but also believers who have humbled themselves and become childlike in their faith (cf. 18:3–5). As much as children represent humility and receptivity to the gospel, they also represent those who are vulnerable to sin. The world is a place where temptations and stumbling blocks necessarily exist (18:7). Temptation to sin and the seductions of evil are inevitable dynamics of living in a fallen world. Jesus’ “double woe” is a gripping rebuke. While Jesus lamented the “causes of sin” that are in the world (18:7), he also warned those “through whom \[temptations\] come” (18:7). People can lead others into sin (18:6) and temptation (18:7), but body parts cannot be fully responsible for personal acts of sin. In essence, Jesus was warning against those who would destroy and break down the community of faith by leading others into sin.
+
+The Christian community is vulnerable to temptation, sin, and wrongdoing. Rather than being a place that causes others to stumble, the Christian community should be a place of edification and encouragement. Christians bear responsibility for one another. Part of this responsibility is to help others mature in their faith. Contrary to the descriptions of sinners in this passage, godly Christians are causes of godliness: they help others to grow in their faith, encourage them to resist temptation, and enjoin them to overcome strongholds of sin. The church is meant to be a community of uplifting, upbuilding, and uprightness. Since temptations are necessary, Christ followers band together during this earthly life in preparation for the heavenly life to come (18:8, 9). 
+
+*Community of Purity*. To grow in the faith is to renounce sin, to become repellant to evil, and to develop resistance to temptation. One crucial aim of Christian fellowship is to help fellow believers eradicate sin in the flesh. Rather than being a cause of sin or a stumbling block to evil, believers should be instruments of sanctification and purity in the lives of others. To show the gravity of sin and temptation, Jesus said that if one’s hand, foot, or eye caused sin, then it should be removed (18:8–9). To be clear, Jesus was not encouraging his followers to practice self-mutilation. Emphasizing what was at stake, Jesus explained that it would be better for one to be crippled, lame, or half-blind than to preserve one’s body and be eternally punished. In reality, hands, feet, and eyes do not cause people to sin. Sin is born in the sinful human heart. Jesus was inviting his followers to take extreme measures to remove sin from their lives. As a community of believers, the church is to grow in holiness and purity,
+
+##### **Do Not Despise: Showing Daring Compassion for Each Other’s Well-Being**
+
+###### Biblical Narrative (Matthew 18:10–14)
+
+After warning against complicity in causing others to sin, Jesus told a parable that would highlight compassion as a key component of Christian community. Jesus commanded his followers to “not look down on any of these little ones” (18:10). Again, this reference to little ones was not just a reference to children but also to followers of Christ who have humbled themselves with a childlike faith. Jesus explained that God’s angelic servants care for his people and “always see the face of \[the\] Father in heaven” (18:10). If angels have compassionate concern for God’s people, Christ’s followers should show compassion to one another. If these angelic servants have access to God in heaven, so are God’s people recipients of God’s care and compassion.
+
+Jesus offered the example of a lost sheep to evidence this claim. If someone had one hundred sheep and one of the sheep had gone astray, the man would “leave the ninety-nine on the hills and go out to search for the one that is lost” (18:12). In doing this, not only would the man show earnest love for all of his sheep, but extravagant compassion for the lost sheep. He certainly rejoiced over “the ninety-nine that did not go astray,” but he also “rejoices more over that one sheep” (18:13) that was lost. The daring compassion of this man teaches us about God’s own heart for his people: God “is not willing that any of these little ones should perish” (18:14). As much as God’s people should be cautioned about causing another to stumble into sin, God’s people should be earnest in going after each and every Christ follower who goes astray.
+
+###### Biblical Principles
+
+*Compassionate Concern for Others*. At the beginning of this section, Jesus identified a deadly poison of the church community: contempt. He warned Christ followers against despising others or looking down on them (18:10). The opposite of despising involves showing compassion and merciful concern for others. Compassion is a vital lifeblood of Christian fellowship. Christian community does not simply work by trying to avoid sin (cf. 18:6–9); it must be built on a rigorous commitment to one another in which we will pursue erring brothers or sisters—those who go “astray” (18:12)—and bring them back into the fold. **In a healthy community of the church, Christians show daring compassion to protect, preserve, and restore other Christians.** Like angels who serve God’s people (by serving God’s purposes) (18:10), Christians should discover how they can serve other Christians before God. The demanding (and risky) work of restoring a straying brother or sister should be an instinct for the healthy church community that functions as Christ’s family. Moreover, God’s people rejoice more when a straying follower returns than over the others who remain in the fold (18:13). The Christian life is a demanding journey. We are all being shepherded along life’s way. Rather than seeking to make the journey alone, God has given us a community of faith—a most precious gift—that functions to pursue, protect, and restore us should we ever stray.
+
+*Learning from God the Father*. Christians show compassion to others because this is the way that God has treated them. When we experience God’s grace, mercy, and care, God wants us to extend these to others. Importantly, this is the first time in this passage that God is referred to as Father. Jesus spoke about the angels: they “always see the face of My father in heaven” (18:10). He later compared the joy of the man over finding his lost sheep to the “Father in heaven \[who\] is not willing that any of these little ones should perish” (18:14). By referring to God as “Father,” we learn of God’s tender mercy toward his children. God’s mercy for his children should permeate the Christian community. We care for one another the way that God has cared for us.
+
+##### **If Your Brother Sins: Practicing Healthy Accountability for Hopeful Restoration**
+
+###### Biblical Narrative (Matthew 18:15–20)
+
+Although sin should be avoided (cf. 18:6–9) and Christians should seek after those who go astray (cf. 18:10–14), Christians should also be prepared to confront sin and restore the repentant when sin arises in the church community. If one Christian sins against another, Jesus explained that the offended brother should “go and confront him privately” (18:15). If the brother responds appropriately to this conversation, the one Christian has “won \[the\] brother over” (18:15). However, if the brother refuses to listen, the offended brother should take along one or two people who can act as witnesses (18:16). If the unrepentant sinner still refuses to listen to this small group, the brother should “tell it to the church” (18:17). If the sinner is still resilient in his sin and refuses to heed the church, the person should “regard him as you would a pagan or a tax collector” (18:17).
+
+Seeking to restore another believer (and confront sin in the church community) is an important task. So important is what happens inside the life of the church that it has enduring consequences. God works through his church on earth to accomplish his heavenly purposes (18:18). This being the case, the church should seek God’s presence and ask for him to intervene. For those who follow Christ, “if two of you on the earth agree about anything you ask for, it will be done for you by My Father in heaven” (18:19). When it comes to the restoration of a sinning brother or sister, God desires for his people to be unified together and resilient against sin. Where Christians fellowship in unity—even when “two or three gather together in \[Jesus’\] name” (18:20)—Jesus promises his presence. In short, the restoration of a fallen disciple, the confrontation of sin, and the loving discipline of believers are important ways God accomplishes his purposes among his people and in his world.
+
+###### Biblical Principles
+
+*Confronting Sin, Restoring Sinners*. God’s people must seriously address sin. When sin has harmed a relationship between Christians, the community should follow each of Jesus’ steps until the conflict is resolved and the sin is ousted: addressing the sin in private, including one or two witnesses, bringing it before the church, and then, if necessary, treating the unrepentant like an unbeliever (18:15–17). If sin is not addressed, it can become a dangerous poison to the community life of the church. If God’s people act hastily in ostracizing a sinning brother or sister, they may lose the opportunity of restoration and healing. God knows that his church will not be perfect until Christ returns. Nevertheless, the church must learn to address sin when it arises in its midst. **Discipline is not to be harsh, punitive, or unloving. Instead, it aims for restoration.** Loving discipline, healthy accountability, and conflict resolution are means to address sin and preserve the unity and purity of the church. In short, the church is to be a community of Christ followers that confronts sin and restores sinners with patience and honesty.
+
+*Gathering and Praying Community*. A vibrant Christian community enjoys unity while it confronts the destructive presence of sin. Because God works through his church to accomplish his purposes in the world, it is vital that the church practice godly accountability that leads to restoration and renewal. In addition to church discipline (18:15–17), the gathering of the church (18:20) and prayerful intercession (18:19) are essential practices of the church community. The earthly presence and activity of believers as a community of faith carry God’s authority. The church does not have this authority on its own. Rather, she exercises authority in the world as a representative of Christ. The praying church invokes God’s intervention, blessing, and help. The gathered church invites God’s presence. These dual promises—“it will be done for you” (18:19) and “there I am with them” (18:20)—are profound realities that inform the church’s influence and impact in the world.
+
+##### **Even Seventy-Seven Times: Extending Gracious Forgiveness From a Grateful Heart**
+
+###### Biblical Narrative (Matthew 18:21–35)
+
+One of the last community virtues Jesus offers in this teaching narrative is that of forgiveness. As important as it is to show a loving concern and genuine humility in the edification, preservation, and restoration of God’s people, it is also vital that the church embrace gracious forgiveness. After Jesus had just taught his disciples about how to confront sin when one brother sins against another (cf. 18:15–20), Peter asked Jesus how many times he should forgive his brother (18:21). Although Peter suggested that seven times might be a fitting amount (18:21), Jesus told Peter that he should forgive “seventy-seven times” (18:22). As seven is a number of completion, seventy-seven would suggest that there is no limit to the forgiveness we extend to others.
+
+To explain that God’s kingdom community was founded upon such lavish forgiveness, Jesus told a parable. He told the story of “a king who wanted to settle accounts with his servants” (18:23). The one servant owed the king “ten thousand talents” (18:24). As one talent was about twenty years’ wages, this was such an enormous amount of money that it was impossible for the servant to repay it. He and his family would be sold to pay back the debt (18:25). When the servant humbly knelt before the king and begged for patience so that he could repay his debt (18:26), the master pitied him and “forgave his debt, and released him” (18:27). The servant’s debt was completely removed.
+
+Sadly, after having his insurmountable debt forgiven, the servant went to “one of his fellow servants who owed him a hundred denarii” (18:28). A denarii was about a day’s wage; this was significantly less than his debt to the king. Nevertheless, the forgiven servant grabbed, choked, and demanded his fellow servant pay his debt (18:28). Much like the first servant did before the king, the fellow servant begged for patience to repay the debt (18:29). Rather than extending pity on his fellow servant, he refused to extend patience (or mercy) to this servant and “had the man thrown into prison until he could pay his debt” (18:30). The other servants were “greatly distressed” over this harsh treatment of his fellow servant and reported him to the master (18:31). The master summoned the servant and called him a “wicked servant” (18:32). Since he had been forgiven of all of his debt (18:32), he should have similarly shown mercy to his fellow servant (18:33). The king put the servant in prison for his unforgiving action (18:34). At the end of this parable, Jesus explained, “That is how My heavenly Father will treat each of you unless you forgive your brother from your heart” (18:35).
+
+###### Biblical Principles
+
+*Divine Forgiveness*. The Christian community is founded upon forgiveness. Just like the indebted servant in this parable, all humans have amassed a debt before God that is impossible to repay (18:24–25). Our debt of sin before God can only be dealt with by God’s gracious forgiveness (18:26–27). In Jesus, we have been forgiven of our debt. God does not ask us to slowly pay back our debt (18:28). He wipes away (or cancels) the debt against us (18:32). The community of the church is established by divine forgiveness. Like the master in this passage, God forgives, releases, and shows compassion on penitent sinners (18:27). What was true for this servant is true for every believer: our enormous debt is canceled, and eternal punishment is averted by God’s mercy and grace. Essentially, the church is a community of Christ followers who have experienced God’s kind and loving pardon.
+
+*Community of Forgiveness*. The natural response for those who have been forgiven such a large debt is to forgive others of lesser debts (18:32). If the greater debt of our sin has been forgiven before God, there is no reason why we should not extend forgiveness to one another. Jesus teaches us that we should forgive others “just as” (18:33) God has had mercy on us. Since God forgives believers of their inestimable debt of sin, there is no limit to the forgiveness we should extend to others (18:21–22). Those who refuse to extend forgiveness to others put themselves in great jeopardy (18:30–31, 34–35). God will hold accountable those who exhibit bitter unforgiveness. Without forgiveness, no human relationship can thrive in this fallen world. The Christian community that practices forgiveness can experience a depth of community life unparalleled elsewhere. Christians have the power and grounds to extend forgiveness to others: their massive debt of sin before a holy God has been absolved. There is no greater testimony in the world to God’s mercy and grace than a community of sinful humans who extend extravagant mercy and unconditional grace to one another, especially when it is undeserved. This call for Christians to forgive freely is not a license to sin freely, as the previous portions of the narrative have already shown (cf. 18:6–9, 15–20). Instead, this parable is an invitation for Christians to enjoy a relationship with one another modeled after God’s relationship with us. No greater vision for Christian community can exist.
+
+##### **Conclusion**
+
+The invitation to follow Jesus is an invitation to a life of faith, freedom, and forgiveness. As we align our lives to Christ, we are initiated into a community of faith where we care for other members as a part of Christ’s family. We must learn how to care for one another the way that God has cared for us. Members of the Christian community must establish themselves in the truth of the gospel. This common foundation enables us to show genuine concern for other members in a way that does not offend. Like a child, we should exhibit selfless humility. Practicing a life of purity, we must keep ourselves from becoming conduits of sin and temptation for others. If any member strays, like a compassionate shepherd, we must go after one another that none should perish. In the event that sin arises between other members, we must have healthy structures of accountability in order to resolve conflict and practice discipline. Remembering how much we have been forgiven of our sins, we need to exhibit mercy and forgiveness to other members of the church.
+
+Life in the Christian community can be challenging. We cannot rely upon human affinities, shared ethnicities, or natural interests to unite us. We are united as one body by a greater power, the saving gospel of Christ. As we are knit together as Christ’s family, we must guard the bond of community life between us. While we rejoice in our relationship with Jesus, our faith in Christ brings us into a relationship with one another. If we can catch Jesus’ vision for the church community, enduring the challenges of a diverse community life in Christ can make our relationship with one another a rich joy.
+
+#### **Session Synopsis**
+
+| SESSION 8 SYNOPSIS |  |
+| :---- | :---- |
+| **Community** | In this passage, we learn the core characteristics of Christian community. After Jesus predicted his death and resurrection, he taught about paying a tax so that he would not unnecessarily offend. He used children as an illustration of greatness in his kingdom. He warned his disciples about temptation to sin, called them to compassionate concern, and taught about conflict resolution. In the end, Jesus told a parable of the deadly fate of an unforgiving servant. This narrative teaching of Jesus helps us see core aspects of interpersonal relationships in Christian fellowship and community. A summary of this story’s principles is outlined below. |
+| **Gospel Foundations of Christian Community** | The gospel is the foundation of Christian community (17:22–23). The foundation of the gospel enables God’s people to show loving concern for others with self-denial and sacrifice (17:24–27). |
+| **Childlike Humility** | Christian community runs on childlike humility (18:2–5). Rather than seeking importance through self-promotion or self-exaltation, believers find their personal significance—greatness in God’s kingdom (18:1, 4)—by self-lowering humility. Humility is not self-loathing, but honest admission of one’s lowliness and unreserved trust in God. |
+| **Mutual Edification and Purity** | The church should be a community of people who build each other up and help each other grow in godliness (not being agents that cause each other to stumble into sin) (18:6–7). The church should grow in purity and holiness (18:8–9). |
+| **Compassionate Concern** | Like a man who searches after a lost sheep, God has shown compassionate concern for his people. We should not look down on others in contempt (18:10), but we should extend grace to others that we have received from God (18:12–14).  |
+| **Discipline and Corporate Habit** | The church should be a community discipline, reconciliation, and Christian habit. Christ’s followers should lovingly confront sin (18:15) and aim for restoration (18:15–17). The aim of church discipline is restoration (18:15). The church bears authority and influence in the world (18:18). Christians bear witness to God in their commitment to prayer and gathered assembly (18:19–20). |
+| **Forgiveness and Mercy** | God has shown extravagant mercy to forgive human sin (18:23–27). We should forgive others (18:32–33) the way that God has forgiven us (18:33), with no limit to our forgiveness (18:21–22). We have been warned of the severe consequences of withholding forgiveness from a brother (18:28–31, 34–35). |
+
+## **Personal Reflection: Entering the Story**
+
+### **Reflection Questions**
+
+1. **Christian Relationships**: What positive and negative examples can you remember about relationships within the church community?
+
+2. **Experiences of Life Change**: What are the most significant challenges you are experiencing in church community life at the moment?
+
+3. **Growing as a Community Member**: What aspects of Jesus’ example and teaching most challenge you in your own growth as a community member?
+
+4. **Community Virtues**: What steps can you take to implement these virtues in your own life and church community?
+
+### **Spiritual Practice**
+
+## **Ministry Practice: Rehearsing the Script**
+
+Insert Movement 4 template.
+
+## **Missional Outreach: Publicizing the Truth**
+
+Insert Movement 5 template.
+
+### 

@@ -170,4 +170,11 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-panel__empty{color:var(--nc-muted);font-size:.8rem;padding:.3rem .25rem}
 .nc-flash{animation:nc-flash 1.6s ease}
 @keyframes nc-flash{0%,40%{background:var(--nc-amber-wash)}100%{background:transparent}}
+/* Clear "here's the spot" emphasis when jumping from the notebook: amber wash + left accent bar,
+   held then faded, visible in both themes. box-shadow avoids any layout shift. */
+.nc-jumpflash{border-radius:4px;animation:nc-jump 2.4s cubic-bezier(.4,0,.2,1)}
+@keyframes nc-jump{
+  0%,68%{background:var(--nc-amber-wash);box-shadow:inset 4px 0 0 var(--nc-amber),0 0 0 4px var(--nc-amber-wash)}
+  100%{background:transparent;box-shadow:inset 4px 0 0 transparent,0 0 0 4px transparent}
+}
 `
