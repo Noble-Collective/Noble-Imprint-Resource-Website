@@ -80,6 +80,10 @@ app.use((req, res, next) => {
   res.locals.firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY || '',
   };
+  // Convergence per-user data layer (account/settings site-wide; answers/notes/highlights on
+  // session pages only). Flag-gated so it ships dark until enabled. The footer loads the bundle
+  // on every page when this is on; the reading features additionally require window.__READER_CTX.
+  res.locals.featureUserData = process.env.FEATURE_USER_DATA === '1';
   // Canonical analytics content identity — set per content route below, echoed
   // into the page as window.__analyticsContext (see footer.ejs). null by default
   // (non-content pages fall back to the server's coarse path parse).

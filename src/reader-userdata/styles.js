@@ -63,7 +63,7 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-iconbtn[aria-pressed="true"]{color:var(--nc-accent)}
 
 /* ---- control cluster at the TOP of the left sidebar (Coram-Deo-style) ---- */
-.nc-side{display:flex;align-items:center;gap:.15rem;padding:.6rem .85rem;border-bottom:1px solid var(--color-border,#e2e6df)}
+.nc-side{display:flex;align-items:center;gap:.15rem;margin-top:-.9rem;padding:.15rem .85rem .5rem;border-bottom:1px solid var(--color-border,#e2e6df)}
 .nc-sbtn{cursor:pointer;border:none;background:none;color:var(--color-text-light,#6b6b6b);padding:.42rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
 .nc-sbtn:hover{background:rgba(120,120,120,.16);color:var(--color-text,#3a3a3a)}
 .nc-sbtn--in{color:var(--color-gold,#dfb53b)}

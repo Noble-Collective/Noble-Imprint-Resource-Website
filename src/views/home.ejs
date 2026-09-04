@@ -2,16 +2,15 @@
 
   <!-- ===== SIDEBAR: Library Navigation Tree ===== -->
   <aside class="sidebar">
-    <div class="sidebar-title">Library</div>
     <ul class="nav-series">
       <% tree.series.forEach(function(series, si) { %>
         <li class="nav-series-group">
-          <button class="nav-series-link" data-toggle-series aria-expanded="true">
+          <button class="nav-series-link" data-toggle-series aria-expanded="false">
             <span><%= series.title %></span>
             <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <% if (series.children && series.children.length > 0) { %>
-            <ul class="nav-subseries is-expanded">
+            <ul class="nav-subseries">
               <% series.children.forEach(function(child) { %>
                 <% if (child.type === 'subseries') { %>
                   <li class="nav-subseries-group">
@@ -59,11 +58,11 @@
       <% }); %>
       <% if (bibles && bibles.length > 0) { %>
         <li class="nav-series-group">
-          <button class="nav-series-link" data-toggle-series aria-expanded="true">
+          <button class="nav-series-link" data-toggle-series aria-expanded="false">
             <span>Bibles</span>
             <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <ul class="nav-subseries is-expanded">
+          <ul class="nav-subseries">
             <% bibles.forEach(function(b) { %>
               <li>
                 <a href="/bible/<%= b.id %>" class="nav-book-item">

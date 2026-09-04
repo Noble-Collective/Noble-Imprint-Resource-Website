@@ -20,6 +20,7 @@ function sbtn(icon, title, onClick) {
   return b
 }
 
+let isSession = false // true only on a reading page (has a session context + .session-content)
 let acctMenu = null
 const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn')) closeAcct() }
 function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('mousedown', acctOutside) }
@@ -50,7 +51,7 @@ function buildSidebarControls() {
   const setBtn = sbtn(ICONS.gear, 'Reading settings', (e, b) => toggleSettingsMenu(b))
   setBtn.setAttribute('data-nc-settings-btn', '')
   const nbBtn = sbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
-  nbBtn.style.display = 'none'
+  nbBtn.style.display = 'none' // shown only on session pages (needs a reading context) once signed in
   wrap.append(userBtn, setBtn, nbBtn)
   host.insertBefore(wrap, host.firstChild) // top of the sidebar; pushes the nav down
 
@@ -68,32 +69,31 @@ function buildSidebarControls() {
   }).observe(document.body, { childList: true })
 
   onUser((u) => {
-    nbBtn.style.display = u ? '' : 'none'
+    nbBtn.style.display = (isSession && u) ? '' : 'none'
     userBtn.classList.toggle('nc-sbtn--in', !!u)
-    userBtn.title = u ? 'Account' : 'Sign in to save your highlights, notes & answers'
+    userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
   })
 }
 
 function boot() {
   if (window.__ncBooted) return // guard against the bundle evaluating/booting more than once
   window.__ncBooted = true
-  const root = document.querySelector('.session-content')
-  if (!root) return
   const ctx = window.__READER_CTX
-  ctx.root = root
+  const root = ctx && ctx.bookPath && ctx.sessionFile ? document.querySelector('.session-content') : null
+  isSession = !!root
   injectStyles()
   initFirebase()
   initSettings()
-  buildSidebarControls()
-  initAnswers(ctx)
-  initAnnotations(ctx)
+  buildSidebarControls() // account + settings on every page; notebook + reading features only on sessions
+  if (isSession) {
+    ctx.root = root
+    initAnswers(ctx)
+    initAnnotations(ctx)
+  }
 }
 
 try {
-  const ctx = window.__READER_CTX
-  if (ctx && ctx.bookPath && ctx.sessionFile) {
-    applyCachedSettings() // instant theme/text-size, before sign-in
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { try { boot() } catch (e) { warn(e) } })
-    else boot()
-  }
+  applyCachedSettings() // instant theme/text-size (site-wide, before sign-in)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { try { boot() } catch (e) { warn(e) } })
+  else boot()
 } catch (e) { warn('bootstrap', e) }
