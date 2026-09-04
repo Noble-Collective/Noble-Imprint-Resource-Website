@@ -179,6 +179,12 @@
         window.__reinitAfterSwap();
       }
 
+      // Reader per-user data layer: re-bind highlights/notes/bookmarks/answers + re-inject the
+      // sidebar controls (the swap replaced .session-content and wiped .sidebar).
+      if (typeof window.__ncReattach === 'function' && data.readerContext) {
+        window.__ncReattach(data.readerContext);
+      }
+
       // Audio player integration
       if (window.__audioPlayer) {
         // Rebuild highlight container inside the new session-content

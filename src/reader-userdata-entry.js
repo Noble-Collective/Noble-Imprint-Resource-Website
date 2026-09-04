@@ -6,8 +6,8 @@
 import { injectStyles } from './reader-userdata/styles.js'
 import { applyCachedSettings, initSettings, toggleSettingsMenu } from './reader-userdata/settings.js'
 import { initFirebase, onUser, getUser, signIn, doSignOut } from './reader-userdata/firebase.js'
-import { initAnswers } from './reader-userdata/answers.js'
-import { initAnnotations } from './reader-userdata/annotations.js'
+import { initAnswers, attachAnswers } from './reader-userdata/answers.js'
+import { initAnnotations, attachAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
@@ -94,8 +94,18 @@ function buildCluster(host, { atTop, extraClass } = {}) {
   wrap.append(nbBtn)
   if (atTop) host.insertBefore(wrap, host.firstChild)
   else host.appendChild(wrap)
-  clusters.push({ userBtn, nbBtn })
+  clusters.push({ wrap, userBtn, nbBtn })
   return wrap
+}
+
+// Apply the current sign-in state to every live cluster (notebook visibility + account icon).
+function updateClusters() {
+  const u = getUser()
+  for (const c of clusters) {
+    c.nbBtn.style.display = (isSession && u) ? '' : 'none'
+    c.userBtn.classList.toggle('nc-sbtn--in', !!u)
+    c.userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
+  }
 }
 
 function buildSidebarControls() {
@@ -119,13 +129,27 @@ function buildSidebarControls() {
     }
   }).observe(document.body, { childList: true })
 
-  onUser((u) => {
-    for (const c of clusters) {
-      c.nbBtn.style.display = (isSession && u) ? '' : 'none'
-      c.userBtn.classList.toggle('nc-sbtn--in', !!u)
-      c.userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
-    }
-  })
+  onUser(() => updateClusters())
+}
+
+// Re-attach the reader to freshly-swapped session content (AJAX nav within a book). ajax-nav.js
+// replaces #reading-content (new .session-content) and wipes the sidebar, so we update the context,
+// re-inject the sidebar cluster, and re-bind answers + annotations to the new DOM.
+function reattach(newCtx) {
+  try {
+    if (!newCtx) return
+    const root = document.querySelector('.session-content')
+    if (!root) return
+    newCtx.root = root
+    window.__READER_CTX = newCtx
+    isSession = true
+    // The sidebar cluster was destroyed by the swap; drop any detached clusters, then re-inject it.
+    for (let i = clusters.length - 1; i >= 0; i--) if (!clusters[i].wrap.isConnected) clusters.splice(i, 1)
+    buildCluster(document.querySelector('.sidebar'), { atTop: true })
+    attachAnswers(newCtx)
+    attachAnnotations(newCtx)
+    updateClusters()
+  } catch (e) { warn('reattach', e) }
 }
 
 function boot() {
@@ -144,6 +168,7 @@ function boot() {
     window.logout = () => doSignOut()
   }
   buildSidebarControls() // account + settings on every page; notebook + reading features only on sessions
+  window.__ncReattach = reattach // let ajax-nav re-bind the reader after an in-page session swap
   if (isSession) {
     ctx.root = root
     initAnswers(ctx)

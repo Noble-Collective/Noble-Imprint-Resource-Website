@@ -815,6 +815,9 @@ app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
       audioSession: data.audioSession,
       bookPath: data.book.repoPath.replace(/^series\//, ''),
       bookUrl: content.bookUrl(data.series, data.subseries, data.book),
+      // Reader per-user data layer: the new session's context, so ajax-nav can re-attach
+      // highlights/notes/bookmarks/answers without a full page reload.
+      readerContext: data.readerContext || null,
       nextSessionUrl: data.nextSession ? content.sessionUrl(data.series, data.subseries, data.book, data.nextSession) : '',
       audioDurationFormatted: data.audioSession ? audio.formatDuration(data.audioSession.durationSeconds) : '',
       editData: data.editRole ? {

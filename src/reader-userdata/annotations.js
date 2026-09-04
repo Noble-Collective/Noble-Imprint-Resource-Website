@@ -8,6 +8,8 @@ import { buildIndex, selectionToNorm, anchorFromNorm, anchorToDomRange, paintRan
 
 let CTX = null
 let ROOT = null
+let clickRoot = null
+let wired = false
 let items = []
 let pendingSel = null
 let toolbar = null
@@ -24,29 +26,47 @@ export const subscribeItems = onChange
 export const removeById = (id) => { const a = items.find((x) => x.id === id); if (a) removeAnnot(a) }
 export const isCurrentSession = (a) => !!(a && a.locator && CTX && a.locator.sessionFile === CTX.sessionFile)
 
+// One-time wiring (selectionchange + auth subscription) + first attach.
 export function initAnnotations(ctx) {
-  CTX = ctx
-  ROOT = ctx.root
-  document.addEventListener('selectionchange', debounce(onSelChange, 130))
-  ROOT.addEventListener('click', onContentClick)
-  onUser(async (u, client) => {
-    clearAll()
-    if (!client) { emitChange(); return }
-    try {
-      const all = await client.listAnnotations()
-      // Whole book (so the notebook spans every session); only current-session items are painted.
-      items = all.filter((a) => a.locator && a.locator.bookPath === CTX.bookPath)
-      repaintAll()
-      emitChange()
-    } catch (e) { warn('load annotations', e) }
-  })
+  if (!wired) {
+    wired = true
+    document.addEventListener('selectionchange', debounce(onSelChange, 130)) // single global listener
+    onUser((u, client) => reloadForBook(client)) // reload the whole-book set on sign-in/out
+  }
+  attachAnnotations(ctx)
 }
 
-function clearAll() {
+// Per-session (re)attach. Within the same book (the only case AJAX nav produces) the whole-book
+// item set is unchanged, so we just re-bind the click handler to the new content and repaint the
+// new session's marks — no network reload. A different book triggers a fresh load.
+export function attachAnnotations(ctx) {
   hideToolbar(); closeNotePop()
-  items.forEach((a) => unpaint(a.id))
+  const sameBook = !!(CTX && ctx.bookPath === CTX.bookPath)
   document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
-  items = []
+  items.forEach((a) => unpaint(a.id))
+  if (clickRoot) clickRoot.removeEventListener('click', onContentClick)
+  CTX = ctx
+  ROOT = ctx.root
+  clickRoot = ROOT
+  ROOT.addEventListener('click', onContentClick)
+  const client = getClient()
+  if (!sameBook) { items = []; if (client) { reloadForBook(client); return } }
+  repaintAll()
+  emitChange()
+}
+
+async function reloadForBook(client) {
+  hideToolbar(); closeNotePop()
+  document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
+  items.forEach((a) => unpaint(a.id))
+  if (!client) { items = []; emitChange(); return }
+  try {
+    const all = await client.listAnnotations()
+    // Whole book (so the notebook spans every session); only current-session items are painted.
+    items = all.filter((a) => a.locator && a.locator.bookPath === CTX.bookPath)
+    repaintAll()
+    emitChange()
+  } catch (e) { warn('load annotations', e) }
 }
 
 // ---------- locator + display ----------
