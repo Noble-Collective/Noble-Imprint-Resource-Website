@@ -1,4 +1,5 @@
 node_modules/
+test-harness/
 .env
 service-account-key.json
 *.log
