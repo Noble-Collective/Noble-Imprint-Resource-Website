@@ -45,7 +45,9 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
   padding:.35rem .7rem;font:inherit;font-size:.82rem;color:var(--nc-text);display:inline-flex;align-items:center;gap:.35rem;line-height:1}
 .nc-btn:hover{background:var(--nc-hover)}
 .nc-btn--primary{background:var(--nc-accent);color:#fff;border-color:transparent}
-.nc-btn--primary:hover{filter:brightness(1.05)}
+/* keep the accent bg on hover \u2014 .nc-btn:hover (class+pseudo) would otherwise outrank the base
+   .nc-btn--primary rule and wash it to --nc-hover, leaving white-on-near-white (invisible) text */
+.nc-btn--primary:hover{background:var(--nc-accent);color:#fff;filter:brightness(1.08)}
 .nc-iconbtn{cursor:pointer;border:1px solid transparent;background:none;border-radius:8px;padding:.35rem;color:var(--nc-muted);
   display:inline-flex;align-items:center;justify-content:center}
 .nc-iconbtn:hover{background:var(--nc-hover);color:var(--nc-text)}
