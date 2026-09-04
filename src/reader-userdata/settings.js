@@ -21,11 +21,15 @@ function resolveDark(theme) {
   return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
 }
 
+const SANS_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+const SERIF_STACK = "'Lora', Georgia, 'Times New Roman', serif"
+
 export function apply() {
   const root = document.documentElement
   root.style.setProperty('--nc-font-scale', String(FONT_SCALE[current.fontSize] ?? 1))
-  root.classList.toggle('nc-font-serif', current.fontFamily === 'serif')
-  root.classList.toggle('nc-font-sans', current.fontFamily !== 'serif')
+  // Override the site's own reading-font variable so the toggle actually changes the body text
+  // (paragraphs set font-family: var(--font-reading) directly).
+  root.style.setProperty('--font-reading', current.fontFamily === 'serif' ? SERIF_STACK : SANS_STACK)
   root.classList.toggle('nc-dark', resolveDark(current.theme))
 }
 

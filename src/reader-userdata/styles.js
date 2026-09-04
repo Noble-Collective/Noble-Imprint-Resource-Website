@@ -22,10 +22,13 @@ html.nc-dark{
   --nc-surface:#1c1917; --nc-border:#292524; --nc-text:#e7e5e4; --nc-muted:#a8a29e;
   --nc-hover:#292524; --nc-accent:#fbbf24;
 }
-/* ---- reading-area font controls (Text Size / Font Style) ---- */
-.session-content{ font-size: calc(1.0625rem * var(--nc-font-scale,1)) !important; }
-.nc-font-serif .session-content{ font-family: Georgia, 'Times New Roman', serif !important; }
-.nc-font-sans .session-content{ font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; }
+/* ---- reading-area Text Size (scales paragraphs + headings proportionally). Font Style is
+   handled by overriding the site's --font-reading variable in settings.js. ---- */
+.session-content p, .reading-content p, .session-content li, .reading-content li{ font-size:calc(17px * var(--nc-font-scale,1)) !important; }
+.session-content h1, .reading-content h1{ font-size:calc(2rem * var(--nc-font-scale,1)) !important; }
+.session-content h2, .reading-content h2{ font-size:calc(1.6rem * var(--nc-font-scale,1)) !important; }
+.session-content h3, .reading-content h3{ font-size:calc(1.35rem * var(--nc-font-scale,1)) !important; }
+.session-content h4, .reading-content h4{ font-size:calc(1.15rem * var(--nc-font-scale,1)) !important; }
 
 /* ---- dark theme: flip the site's own CSS custom properties (whole-site, clean) ---- */
 html.nc-dark{
@@ -128,9 +131,18 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-panel__body{overflow:auto;padding:.5rem .75rem 2rem}
 .nc-panel__section{margin-top:1rem}
 .nc-panel__h{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nc-muted);margin:.4rem .25rem}
-.nc-panel__item{display:block;width:100%;text-align:left;border:1px solid var(--nc-border);background:none;color:inherit;
-  border-radius:8px;padding:.5rem .6rem;margin:.3rem 0;cursor:pointer;font:inherit;font-size:.85rem}
+.nc-panel__item{display:flex;align-items:flex-start;gap:.5rem;border:1px solid var(--nc-border);background:none;color:inherit;
+  border-radius:8px;padding:.5rem .6rem;margin:.3rem 0;font:inherit;font-size:.85rem}
 .nc-panel__item:hover{background:var(--nc-hover)}
+.nc-panel__item--focus{outline:2px solid var(--nc-accent);outline-offset:1px}
+.nc-panel__main{flex:1 1 auto;min-width:0;cursor:pointer;text-align:left;background:none;border:none;color:inherit;font:inherit;padding:0}
+.nc-panel__sess{font-size:.7rem;color:var(--nc-muted);margin-top:.2rem}
+.nc-panel__del{flex:none;border:none;background:none;color:var(--nc-muted);cursor:pointer;padding:.15rem;border-radius:6px;line-height:0}
+.nc-panel__del:hover{color:var(--nc-rose);background:var(--nc-hover)}
+/* Always-reachable floating button to open the notebook */
+.nc-fab{position:fixed;right:20px;bottom:20px;z-index:9400;width:48px;height:48px;border-radius:999px;border:none;
+  background:var(--nc-accent);color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;display:none;align-items:center;justify-content:center}
+.nc-fab:hover{filter:brightness(1.08)}
 .nc-panel__item .nc-dot{display:inline-block;width:.7rem;height:.7rem;border-radius:999px;margin-right:.4rem;vertical-align:middle}
 .nc-panel__q{color:var(--nc-muted);font-size:.78rem;margin-bottom:.15rem}
 .nc-panel__empty{color:var(--nc-muted);font-size:.8rem;padding:.3rem .25rem}

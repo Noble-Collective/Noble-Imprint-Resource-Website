@@ -16,7 +16,7 @@ function buildBar(root) {
   const msg = el('span', 'nc-bar__msg', 'Sign in to save your highlights, notes & answers.')
   const spacer = el('span', 'nc-bar__spacer')
   const libBtn = el('button', 'nc-btn')
-  libBtn.innerHTML = `${ICONS.list}<span>Library</span>`
+  libBtn.innerHTML = `${ICONS.notebook}<span>Notebook</span>`
   libBtn.style.display = 'none'
   libBtn.onclick = () => openLibrary()
   const gear = el('button', 'nc-iconbtn')
@@ -31,13 +31,22 @@ function buildBar(root) {
   signOutBtn.onclick = () => doSignOut()
   bar.append(msg, spacer, libBtn, gear, signInBtn, signOutBtn)
   root.parentNode.insertBefore(bar, root)
+
+  // Always-reachable floating notebook button (so you don't have to scroll up).
+  const fab = el('button', 'nc-fab')
+  fab.setAttribute('data-nc-skip', '')
+  fab.title = 'My Notebook'
+  fab.innerHTML = ICONS.notebook
+  fab.onclick = () => openLibrary()
+  document.body.appendChild(fab)
+
   onUser((u) => {
     if (u) {
       msg.textContent = `Signed in as ${u.displayName || u.email}`
-      signInBtn.style.display = 'none'; signOutBtn.style.display = ''; libBtn.style.display = ''
+      signInBtn.style.display = 'none'; signOutBtn.style.display = ''; libBtn.style.display = ''; fab.style.display = 'flex'
     } else {
       msg.textContent = 'Sign in to save your highlights, notes & answers.'
-      signInBtn.style.display = ''; signOutBtn.style.display = 'none'; libBtn.style.display = 'none'
+      signInBtn.style.display = ''; signOutBtn.style.display = 'none'; libBtn.style.display = 'none'; fab.style.display = 'none'
     }
   })
 }

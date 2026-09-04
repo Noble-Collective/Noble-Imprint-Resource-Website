@@ -11,6 +11,8 @@ let ROOT = null
 let items = []
 let pendingSel = null
 let toolbar = null
+let toolbarMode = null
+let editOutside = null
 let notePop = null
 const listeners = []
 
@@ -19,6 +21,8 @@ const onChange = (cb) => listeners.push(cb)
 const emitChange = () => listeners.forEach((cb) => { try { cb(items) } catch (e) { warn(e) } })
 export const getItems = () => items
 export const subscribeItems = onChange
+export const removeById = (id) => { const a = items.find((x) => x.id === id); if (a) removeAnnot(a) }
+export const isCurrentSession = (a) => !!(a && a.locator && CTX && a.locator.sessionFile === CTX.sessionFile)
 
 export function initAnnotations(ctx) {
   CTX = ctx
@@ -30,7 +34,8 @@ export function initAnnotations(ctx) {
     if (!client) { emitChange(); return }
     try {
       const all = await client.listAnnotations()
-      items = all.filter((a) => a.locator && a.locator.bookPath === CTX.bookPath && a.locator.sessionFile === CTX.sessionFile)
+      // Whole book (so the notebook spans every session); only current-session items are painted.
+      items = all.filter((a) => a.locator && a.locator.bookPath === CTX.bookPath)
       repaintAll()
       emitChange()
     } catch (e) { warn('load annotations', e) }
@@ -58,13 +63,18 @@ function displayFor(text) {
 
 // ---------- selection -> toolbar ----------
 function onSelChange() {
-  if (!getClient()) { hideToolbar(); return }
   const sel = window.getSelection()
-  if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hideToolbar(); return }
-  if (!ROOT.contains(sel.getRangeAt(0).commonAncestorContainer)) { hideToolbar(); return }
+  const inContent = sel && sel.rangeCount > 0 && ROOT.contains(sel.getRangeAt(0).commonAncestorContainer)
+  const valid = getClient() && sel && !sel.isCollapsed && inContent
+  if (!valid) {
+    // A collapsed selection (e.g. a click on a highlight) must NOT dismiss the edit toolbar —
+    // that caused the flash-and-hide. The edit toolbar is dismissed by an outside click instead.
+    if (toolbarMode !== 'edit') hideToolbar()
+    return
+  }
   const idx = buildIndex(ROOT)
   const info = selectionToNorm(idx)
-  if (!info) { hideToolbar(); return }
+  if (!info) { if (toolbarMode !== 'edit') hideToolbar(); return }
   pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), rect: info.rect }
   showCreateToolbar(info.rect)
 }
@@ -103,7 +113,10 @@ function positionToolbar(rect) {
   toolbar.style.left = left + 'px'
   toolbar.style.top = top + 'px'
 }
-function hideToolbar() { toolbar?.remove(); toolbar = null }
+function hideToolbar() {
+  toolbar?.remove(); toolbar = null; toolbarMode = null
+  if (editOutside) { document.removeEventListener('mousedown', editOutside, true); editOutside = null }
+}
 
 function showCreateToolbar(rect) {
   const kids = HIGHLIGHT_COLORS.map((c) => swatch(c, () => createHighlight(c)))
@@ -112,6 +125,7 @@ function showCreateToolbar(rect) {
   kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
   kids.push(tbBtn(ICONS.copy, 'Copy', () => copySelection()))
   buildToolbar(kids)
+  toolbarMode = 'create'
   positionToolbar(rect)
 }
 function showEditToolbar(rect, annot) {
@@ -119,7 +133,10 @@ function showEditToolbar(rect, annot) {
   kids.push(el('span', 'nc-toolbar__div'))
   kids.push(tbBtn(ICONS.trash, 'Remove', () => removeAnnot(annot), true))
   buildToolbar(kids)
+  toolbarMode = 'edit'
   positionToolbar(rect)
+  editOutside = (e) => { if (toolbar && !toolbar.contains(e.target) && !e.target.closest('mark[data-annot-id]')) hideToolbar() }
+  setTimeout(() => document.addEventListener('mousedown', editOutside, true), 0)
 }
 
 // ---------- create / edit ----------
@@ -223,6 +240,7 @@ export function repaintAll() {
 function paintOne(annot) {
   const anchor = annot.locator?.textAnchor
   if (!anchor) return
+  if (annot.locator.sessionFile !== CTX.sessionFile) return // only paint the current session
   const idx = buildIndex(ROOT)
   const range = anchorToDomRange(idx, anchor)
   if (!range) return
@@ -241,9 +259,9 @@ function placeBookmarkMarker(range, annot) {
   const span = el('span', 'nc-bm-marker')
   span.setAttribute('data-nc-skip', '')
   span.dataset.annotId = annot.id
-  span.title = 'Bookmark — click to remove'
+  span.title = 'Bookmark — open in notebook'
   span.innerHTML = ICONS.bookmarkFill
-  span.onclick = (e) => { e.stopPropagation(); removeAnnot(annot) }
+  span.onclick = (e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('nc:open-notebook', { detail: { focusId: annot.id } })) }
   block.insertBefore(span, block.firstChild)
 }
 
