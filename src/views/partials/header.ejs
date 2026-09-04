@@ -73,6 +73,9 @@
           <li><a href="https://noblecollective.org/pages/conferences" class="menu-drawer__menu-item">Conferences</a></li>
           <li><a href="https://noblecollective.org/pages/store" class="menu-drawer__menu-item">Store</a></li>
           <li><a href="/" class="menu-drawer__menu-item menu-drawer__menu-item--active">Resources</a></li>
+          <% if (typeof featureAuthUnified === 'undefined' || !featureAuthUnified) { %>
+          <%# Legacy mobile auth. Under AUTH_UNIFIED the top-header control cluster (Account/Settings/
+              Admin/Notebook) owns identity on mobile too, so these drawer items are suppressed. %>
           <% if (user) { %>
             <li class="menu-drawer__divider"></li>
             <% if (user.isAdmin) { %>
@@ -82,6 +85,7 @@
           <% } else { %>
             <li class="menu-drawer__divider"></li>
             <li><button onclick="loginWithGoogle()" class="menu-drawer__menu-item menu-drawer__menu-item--btn">Sign In</button></li>
+          <% } %>
           <% } %>
         </ul>
       </nav>

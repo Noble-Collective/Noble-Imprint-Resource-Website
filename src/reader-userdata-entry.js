@@ -71,18 +71,18 @@ function toggleAccountMenu(anchor) {
   placeMenu(anchor, 214)
 }
 
-function buildSidebarControls() {
-  const host = document.querySelector('.sidebar')
-  if (!host || host.querySelector('.nc-side')) return // idempotent — never inject twice
-  const wrap = el('div', 'nc-side')
+const clusters = [] // every rendered control cluster (desktop sidebar + mobile header), for onUser
+
+// Build one Account · Settings · [Admin] · Notebook cluster into `host`.
+function buildCluster(host, { atTop, extraClass } = {}) {
+  if (!host || host.querySelector('.nc-side')) return null // idempotent per host
+  const wrap = el('div', 'nc-side' + (extraClass ? ' ' + extraClass : ''))
   wrap.setAttribute('data-nc-skip', '')
   const userBtn = sbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser() || ncUser()) toggleAccountMenu(b); else showSignInIntro(b) })
   if (ncUser()) userBtn.classList.add('nc-sbtn--in') // server already knows we're signed in (unified)
   const setBtn = sbtn(ICONS.gear, 'Reading settings', (e, b) => toggleSettingsMenu(b))
   setBtn.setAttribute('data-nc-settings-btn', '')
   wrap.append(userBtn, setBtn)
-  // Admin shield — only when the server says this account is an admin (unified identity). Sits next
-  // to Settings; links to the console.
   const su = ncUser()
   if (su && su.isAdmin) {
     const adminBtn = sbtn(ICONS.shield, 'Admin Console', () => { location.href = '/admin' })
@@ -92,11 +92,23 @@ function buildSidebarControls() {
   const nbBtn = sbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
   nbBtn.style.display = 'none' // shown only on session pages (needs a reading context) once signed in
   wrap.append(nbBtn)
-  host.insertBefore(wrap, host.firstChild) // top of the sidebar; pushes the nav down
+  if (atTop) host.insertBefore(wrap, host.firstChild)
+  else host.appendChild(wrap)
+  clusters.push({ userBtn, nbBtn })
+  return wrap
+}
+
+function buildSidebarControls() {
+  // Desktop: top of the left sidebar (hidden on mobile, where .sidebar is display:none).
+  buildCluster(document.querySelector('.sidebar'), { atTop: true })
+  // Mobile: the top header's right slot (`.header-icons` is empty on phones — GIVE hides ≤1024px).
+  // CSS shows this cluster only ≤989px, so desktop keeps a single sidebar cluster.
+  buildCluster(document.querySelector('.site-header .header-icons') || document.querySelector('.header-inner'),
+    { atTop: false, extraClass: 'nc-side--mobile' })
 
   // The site's mobile TOC clones `.sidebar` innerHTML into `.mobile-toc-sidebar-dropdown` on
-  // DOMContentLoaded (after us), which copies our controls as dead (handler-less) buttons. Strip any
-  // such clone now and whenever the dropdown is (re)built.
+  // DOMContentLoaded (after us), copying the sidebar cluster as dead (handler-less) buttons. Strip
+  // any such clone now and whenever the dropdown is (re)built. (The header cluster is never cloned.)
   const stripClones = () => document.querySelectorAll('.mobile-toc-sidebar-dropdown .nc-side').forEach((n) => n.remove())
   stripClones()
   new MutationObserver((muts) => {
@@ -108,9 +120,11 @@ function buildSidebarControls() {
   }).observe(document.body, { childList: true })
 
   onUser((u) => {
-    nbBtn.style.display = (isSession && u) ? '' : 'none'
-    userBtn.classList.toggle('nc-sbtn--in', !!u)
-    userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
+    for (const c of clusters) {
+      c.nbBtn.style.display = (isSession && u) ? '' : 'none'
+      c.userBtn.classList.toggle('nc-sbtn--in', !!u)
+      c.userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
+    }
   })
 }
 

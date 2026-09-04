@@ -69,6 +69,15 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-sbtn{cursor:pointer;border:none;background:none;color:var(--color-text-light,#6b6b6b);padding:.42rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
 .nc-sbtn:hover{background:rgba(120,120,120,.16);color:var(--color-text,#3a3a3a)}
 .nc-sbtn--in{color:var(--color-gold,#dfb53b)}
+/* mobile: a second cluster in the (dark) top header, shown only where the sidebar is hidden */
+.nc-side--mobile{display:none}
+@media (max-width:989px){
+  .sidebar .nc-side{display:none}
+  .nc-side--mobile{display:flex;align-items:center;gap:.05rem;margin:0;padding:0;border:none}
+  .nc-side--mobile .nc-sbtn{color:#e7e5e4}
+  .nc-side--mobile .nc-sbtn:hover{background:rgba(255,255,255,.16);color:#fff}
+  .nc-side--mobile .nc-sbtn--in{color:var(--color-gold,#dfb53b)}
+}
 .nc-acct{width:214px}
 .nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-acct__email{font-size:.75rem;color:var(--nc-muted);margin-bottom:.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
