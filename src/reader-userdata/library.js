@@ -46,7 +46,10 @@ export function openLibrary(focusId) {
   input.addEventListener('input', () => { query = input.value.trim().toLowerCase(); renderBody() })
   search.appendChild(input)
   const body = el('div', 'nc-sheet__body')
-  sheet.append(grip, head, tabs, search, body)
+  const foot = el('div', 'nc-sheet__foot')
+  const allLink = el('a', 'nc-sheet__all'); allLink.href = '/notes'; allLink.textContent = 'See all across books →'
+  foot.appendChild(allLink)
+  sheet.append(grip, head, tabs, search, body, foot)
   document.body.append(backdrop, sheet)
   requestAnimationFrame(() => { backdrop.classList.add('open'); sheet.classList.add('open') })
   render()

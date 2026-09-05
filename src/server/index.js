@@ -851,6 +851,12 @@ app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
   }
 });
 
+// "My Notes" — a personal page listing everything the signed-in user has saved across all books.
+// Server renders a shell; the reader bundle fills it client-side from the shared store.
+app.get('/notes', (req, res) => {
+  res.render('my-notes', { title: 'My Notes' });
+});
+
 // Content routes — catch-all resolver
 app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
   try {

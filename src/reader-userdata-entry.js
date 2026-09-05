@@ -11,6 +11,7 @@ import { initAnnotations, attachAnnotations } from './reader-userdata/annotation
 import { openLibrary } from './reader-userdata/library.js'
 import { maybeOnboard } from './reader-userdata/onboarding.js'
 import { recordReading, mountContinueReading } from './reader-userdata/progress.js'
+import { mountMyNotes } from './reader-userdata/mynotes.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
 function sbtn(icon, title, onClick) {
@@ -78,6 +79,11 @@ function toggleAccountMenu(anchor) {
   if (email) info.appendChild(el('div', 'nc-acct__email', email))
   head.appendChild(info)
   acctMenu.appendChild(head)
+  // My Notes — everything saved across all books (any signed-in user).
+  const notes = el('button', 'nc-acct__link')
+  notes.innerHTML = `<span class="nc-acct__ico">${ICONS.notebook}</span>My Notes`
+  notes.onclick = () => { location.href = '/notes' }
+  acctMenu.appendChild(notes)
   if (su && su.isEditor) {
     const notif = el('button', 'nc-acct__link', 'Notifications')
     notif.innerHTML = `<span class="nc-acct__ico">${ICONS.bell}</span>Notifications`
@@ -240,6 +246,8 @@ function boot() {
     maybeOnboard() // one-time coach-mark introducing the reader features
   } else if (location.pathname === '/') {
     mountContinueReading() // resume strip at the top of the home page
+  } else if (location.pathname === '/notes') {
+    mountMyNotes() // the cross-book "My Notes" page
   }
 }
 

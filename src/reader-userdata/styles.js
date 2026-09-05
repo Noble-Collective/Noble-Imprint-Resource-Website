@@ -157,9 +157,10 @@ html.nc-dark .nc-seg__btn[aria-pressed="true"]{background:#e7e5e4;color:#1c1917}
 .nc-toolbar{position:fixed;z-index:9500;display:flex;align-items:center;gap:.15rem;background:var(--nc-surface);
   border:1px solid var(--nc-border);border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:.3rem .45rem;
   transform:translateX(-50%)}
-.nc-swatch{cursor:pointer;border:none;background:none;padding:.35rem;display:inline-flex}
-.nc-swatch>span{display:block;width:1.05rem;height:1.05rem;border-radius:999px;transition:opacity .12s,box-shadow .12s;opacity:.85}
-.nc-swatch:hover>span{opacity:1}
+.nc-swatch{cursor:pointer;border:none;background:none;padding:.35rem;display:inline-flex;border-radius:6px;transition:background .12s}
+.nc-swatch:hover{background:var(--nc-hover)}
+.nc-swatch>span{display:block;width:1.05rem;height:1.05rem;border-radius:999px;transition:opacity .12s,box-shadow .12s,transform .12s;opacity:.85}
+.nc-swatch:hover>span{opacity:1;transform:scale(1.14);box-shadow:0 0 0 2px var(--nc-surface),0 0 0 3px rgba(0,0,0,.14)}
 .nc-swatch[aria-pressed="true"]>span{opacity:1;box-shadow:0 0 0 2px var(--nc-surface),0 0 0 4px #a8a29e}
 .nc-swatch--amber>span{background:var(--nc-amber)}.nc-swatch--sky>span{background:var(--nc-sky)}
 .nc-swatch--rose>span{background:var(--nc-rose)}.nc-swatch--emerald>span{background:var(--nc-emerald)}
@@ -245,6 +246,24 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-panel__item .nc-dot{display:inline-block;width:.7rem;height:.7rem;border-radius:999px;margin-right:.4rem;vertical-align:middle}
 .nc-panel__q{color:var(--nc-muted);font-size:.78rem;margin-bottom:.15rem}
 .nc-panel__empty{color:var(--nc-muted);font-size:.8rem;padding:.3rem .25rem}
+/* notebook sheet footer (link to the full cross-book page) */
+.nc-sheet__foot{border-top:1px solid var(--nc-border);padding:.5rem .85rem;text-align:center}
+.nc-sheet__all{font-size:.8rem;color:var(--nc-accent);text-decoration:none}
+.nc-sheet__all:hover{text-decoration:underline}
+/* "My Notes" cross-book page (/notes) */
+.nc-mynotes__bar{display:flex;align-items:center;gap:.6rem;margin:.5rem 0 1.1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.nc-mynotes__bar .nc-search{flex:1 1 auto}
+.nc-mynotes__count{font-size:.75rem;color:var(--nc-muted);white-space:nowrap}
+.nc-mynotes__book{margin-bottom:1.4rem}
+.nc-mynotes__book-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--nc-muted);
+  margin:0 0 .4rem;padding-bottom:.3rem;border-bottom:1px solid var(--nc-border)}
+.nc-mynotes__item{display:block;text-decoration:none;color:var(--nc-text);border:1px solid var(--nc-border);border-radius:8px;
+  padding:.6rem .7rem;margin:.4rem 0;font-size:.9rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;transition:border-color .12s}
+.nc-mynotes__item:hover{border-color:var(--nc-accent)}
+.nc-mynotes__item .nc-dot{display:inline-block;width:.7rem;height:.7rem;border-radius:999px;margin-right:.45rem;vertical-align:middle}
+.nc-mynotes__body{color:var(--nc-muted);font-size:.82rem;margin-top:.25rem}
+.nc-mynotes__empty{color:var(--nc-muted);margin-bottom:.6rem}
+.nc-mynotes-page .page-title{margin-bottom:.2rem}
 .nc-flash{animation:nc-flash 1.6s ease}
 @keyframes nc-flash{0%,40%{background:var(--nc-amber-wash)}100%{background:transparent}}
 /* Clear "here's the spot" emphasis when jumping from the notebook: amber wash + left accent bar,
