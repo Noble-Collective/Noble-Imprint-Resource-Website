@@ -247,9 +247,13 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-panel__q{color:var(--nc-muted);font-size:.78rem;margin-bottom:.15rem}
 .nc-panel__empty{color:var(--nc-muted);font-size:.8rem;padding:.3rem .25rem}
 /* notebook sheet footer (link to the full cross-book page) */
-.nc-sheet__foot{border-top:1px solid var(--nc-border);padding:.5rem .85rem;text-align:center}
+.nc-sheet__foot{border-top:1px solid var(--nc-border);padding:.5rem .85rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
 .nc-sheet__all{font-size:.8rem;color:var(--nc-accent);text-decoration:none}
 .nc-sheet__all:hover{text-decoration:underline}
+.nc-sheet__exportlink{border:none;background:none;cursor:pointer;font:inherit;font-size:.72rem;color:var(--nc-muted);opacity:.8;padding:.1rem .2rem}
+.nc-sheet__exportlink:hover{color:var(--nc-text);text-decoration:underline}
+.nc-mn-export{border:none;background:none;cursor:pointer;font:inherit;font-size:.75rem;color:var(--nc-muted);opacity:.8;white-space:nowrap;padding:.1rem .2rem}
+.nc-mn-export:hover{color:var(--nc-text);text-decoration:underline}
 /* "My Notes" cross-book page (/notes) */
 .nc-mynotes__bar{display:flex;align-items:center;gap:.6rem;margin:.5rem 0 1.1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .nc-mynotes__bar .nc-search{flex:1 1 auto}

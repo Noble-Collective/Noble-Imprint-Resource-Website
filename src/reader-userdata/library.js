@@ -29,11 +29,9 @@ export function openLibrary(focusId) {
   sheet = el('div', 'nc-sheet'); sheet.setAttribute('data-nc-skip', '')
   const grip = el('div', 'nc-sheet__grip')
   const head = el('div', 'nc-sheet__head')
-  head.appendChild(el('div', 'nc-panel__title', 'My Notebook'))
-  const exportBtn = el('button', 'nc-iconbtn nc-sheet__export'); exportBtn.title = 'Export this book’s notes (Markdown)'
-  exportBtn.innerHTML = ICONS.download; exportBtn.onclick = exportMarkdown
+  head.appendChild(el('div', 'nc-panel__title', 'Notebook'))
   const close = el('button', 'nc-iconbtn'); close.title = 'Close'; close.innerHTML = ICONS.close; close.onclick = closeSheet
-  head.append(exportBtn, close)
+  head.append(close)
   const tabs = el('div', 'nc-sheet__tabs')
   for (const [key] of TABS) {
     const t = el('button', 'nc-tab'); t.dataset.tab = key
@@ -47,8 +45,9 @@ export function openLibrary(focusId) {
   search.appendChild(input)
   const body = el('div', 'nc-sheet__body')
   const foot = el('div', 'nc-sheet__foot')
-  const allLink = el('a', 'nc-sheet__all'); allLink.href = '/notes'; allLink.textContent = 'See all across books →'
-  foot.appendChild(allLink)
+  const allLink = el('a', 'nc-sheet__all'); allLink.href = '/notes'; allLink.textContent = 'See all my Notebooks →'
+  const exp = el('button', 'nc-sheet__exportlink', 'Export'); exp.onclick = exportMarkdown
+  foot.append(allLink, exp)
   sheet.append(grip, head, tabs, search, body, foot)
   document.body.append(backdrop, sheet)
   requestAnimationFrame(() => { backdrop.classList.add('open'); sheet.classList.add('open') })
@@ -167,7 +166,7 @@ function exportMarkdown() {
     setTimeout(() => { a.remove(); URL.revokeObjectURL(url) }, 500)
     flashExport('Exported')
   } catch (e) {
-    try { navigator.clipboard.writeText(md); flashExport('Copied to clipboard') } catch { flashExport('Export failed') }
+    Promise.resolve(navigator.clipboard && navigator.clipboard.writeText(md)).then(() => flashExport('Copied to clipboard')).catch(() => flashExport('Export failed'))
   }
 }
 function flashExport(msg) {

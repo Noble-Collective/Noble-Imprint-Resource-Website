@@ -865,7 +865,7 @@ app.get('/notes', async (req, res, next) => {
         else if (child.type === 'subseries') for (const b of child.books) books[b.repoPath] = { title: b.title, cover: b.coverPath || null, url: content.bookUrl(series, child, b) };
       }
     }
-    res.render('my-notes', { title: 'My Notes', booksMeta: books });
+    res.render('my-notes', { title: 'My Notebooks', booksMeta: books });
   } catch (err) { next(err); }
 });
 

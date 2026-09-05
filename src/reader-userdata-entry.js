@@ -81,7 +81,7 @@ function toggleAccountMenu(anchor) {
   acctMenu.appendChild(head)
   // My Notes — everything saved across all books (any signed-in user).
   const notes = el('button', 'nc-acct__link')
-  notes.innerHTML = `<span class="nc-acct__ico">${ICONS.notebook}</span>My Notes`
+  notes.innerHTML = `<span class="nc-acct__ico">${ICONS.notebook}</span>My Notebooks`
   notes.onclick = () => { location.href = '/notes' }
   acctMenu.appendChild(notes)
   if (su && su.isEditor) {
@@ -147,7 +147,7 @@ function buildCluster(host, { atTop, extraClass } = {}) {
     adminBtn.setAttribute('data-nc-admin-btn', '')
     wrap.append(adminBtn)
   }
-  const nbBtn = sbtn(ICONS.notebook, 'My Notebook', () => openLibrary())
+  const nbBtn = sbtn(ICONS.notebook, 'Notebook', () => openLibrary())
   nbBtn.style.display = 'none' // shown only on session pages (needs a reading context) once signed in
   wrap.append(nbBtn)
   if (atTop) host.insertBefore(wrap, host.firstChild)

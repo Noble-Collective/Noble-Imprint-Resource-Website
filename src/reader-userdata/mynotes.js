@@ -39,7 +39,7 @@ function render(host, annots) {
   const bar = el('div', 'nc-mynotes__bar')
   const search = el('input', 'nc-search'); search.type = 'search'; search.placeholder = 'Search all your notes…'
   const count = el('span', 'nc-mynotes__count', `${annots.length} saved`)
-  const exportBtn = el('button', 'nc-btn', 'Export all'); exportBtn.onclick = () => exportMarkdown(annots)
+  const exportBtn = el('button', 'nc-mn-export', 'Export'); exportBtn.title = 'Export all as Markdown'; exportBtn.onclick = () => exportMarkdown(annots)
   bar.append(search, count, exportBtn)
   host.appendChild(bar)
   const listWrap = el('div', 'nc-mynotes__list')
