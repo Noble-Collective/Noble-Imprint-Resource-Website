@@ -89,6 +89,12 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
   display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;border-radius:8px;text-align:left;margin-bottom:.35rem}
 .nc-acct__link:hover{background:var(--nc-hover)}
 .nc-acct__ico{display:inline-flex;align-items:center;color:var(--nc-muted)}
+.nc-acct__data{margin-top:.55rem;border-top:1px solid var(--nc-border);padding-top:.35rem}
+.nc-acct__data-sum{cursor:pointer;font-size:.68rem;color:var(--nc-muted);opacity:.75;padding:.3rem .5rem;list-style:none;user-select:none}
+.nc-acct__data-sum::-webkit-details-marker{display:none}
+.nc-acct__data-sum:hover{color:var(--nc-text)}
+.nc-acct__link--danger{color:var(--nc-rose)}
+.nc-acct__link--danger:hover{background:var(--nc-rose-wash)}
 .nc-signin{width:260px}
 .nc-signin__body{font-size:.82rem;color:var(--nc-muted);line-height:1.4;margin:.15rem 0 .7rem}
 .nc-signin .nc-btn--primary{width:100%;justify-content:center;padding:.5rem}

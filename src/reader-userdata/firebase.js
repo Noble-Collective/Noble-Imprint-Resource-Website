@@ -4,6 +4,7 @@ import { initializeApp } from 'firebase/app'
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut,
   onAuthStateChanged, setPersistence, browserLocalPersistence, connectAuthEmulator,
+  deleteUser, reauthenticateWithPopup,
 } from 'firebase/auth'
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { createUserDataClient } from '@noble-collective/userdata/client'
@@ -74,4 +75,29 @@ export const doSignOut = async () => {
     await signOut(_auth)
     if (window.__NC_UNIFIED) location.reload()
   } catch { /* ignore */ }
+}
+
+// Erase all of the signed-in user's converged data (highlights/notes/bookmarks/answers/activity/
+// settings). Irreversible. Keeps the account.
+export async function deleteAllData() {
+  if (_client) await _client.eraseAll()
+  try { localStorage.removeItem('nc:reader-settings') } catch { /* ignore */ }
+}
+
+// Erase all data, then delete the Firebase account itself (re-auth if the session is too old), and
+// clear the server session. Irreversible.
+export async function deleteAccount() {
+  await deleteAllData()
+  const user = _auth && _auth.currentUser
+  if (user) {
+    try {
+      await deleteUser(user)
+    } catch (e) {
+      if (e && e.code === 'auth/requires-recent-login') {
+        await reauthenticateWithPopup(user, new GoogleAuthProvider())
+        await deleteUser(user)
+      } else { throw e }
+    }
+  }
+  if (window.__NC_UNIFIED) { try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ } }
 }

@@ -32,7 +32,7 @@
   "devDependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/state": "^6.6.0",
-    "@noble-collective/userdata": "file:vendor/noble-collective-userdata-0.2.3.tgz",
+    "@noble-collective/userdata": "file:vendor/noble-collective-userdata-0.2.4.tgz",
     "@playwright/test": "^1.59.1",
     "codemirror": "^6.0.2",
     "esbuild": "^0.28.0",

@@ -5,7 +5,7 @@
 // Entirely additive and self-contained; any failure is swallowed so reading is never affected.
 import { injectStyles } from './reader-userdata/styles.js'
 import { applyCachedSettings, initSettings, toggleSettingsMenu } from './reader-userdata/settings.js'
-import { initFirebase, onUser, getUser, signIn, doSignOut } from './reader-userdata/firebase.js'
+import { initFirebase, onUser, getUser, signIn, doSignOut, deleteAllData, deleteAccount } from './reader-userdata/firebase.js'
 import { initAnswers, attachAnswers } from './reader-userdata/answers.js'
 import { initAnnotations, attachAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
@@ -22,6 +22,7 @@ function sbtn(icon, title, onClick) {
   return b
 }
 
+const confirmTwice = (msg1, msg2) => window.confirm(msg1) && window.confirm(msg2) // destructive-action guard
 let isSession = false // true only on a reading page (has a session context + .session-content)
 let acctMenu = null
 const ncUser = () => (typeof window !== 'undefined' ? window.__NC_USER : null) // server-resolved (unified only)
@@ -82,6 +83,35 @@ function toggleAccountMenu(anchor) {
   const out = el('button', 'nc-btn', 'Sign out')
   out.onclick = () => { doSignOut(); closeAcct() }
   acctMenu.appendChild(out)
+
+  // Data & privacy (parity with the app: Privacy Policy · Delete my data · Delete account)
+  const data = el('details', 'nc-acct__data')
+  const sum = el('summary', 'nc-acct__data-sum', 'Manage your data')
+  data.appendChild(sum)
+  const priv = el('a', 'nc-acct__link')
+  priv.href = 'https://noblecollective.org/policies/privacy-policy'; priv.target = '_blank'; priv.rel = 'noopener'
+  priv.innerHTML = `<span class="nc-acct__ico">${ICONS.shield}</span>Privacy Policy`
+  data.appendChild(priv)
+  const delData = el('button', 'nc-acct__link nc-acct__link--danger', 'Delete my data')
+  delData.onclick = async () => {
+    if (!confirmTwice(
+      'Delete ALL your highlights, notes, bookmarks, answers and settings?\n\nThis permanently erases your saved data (only your own account) and cannot be undone.',
+      'Are you absolutely sure? This cannot be undone.',
+    )) return
+    try { await deleteAllData(); location.reload() } catch (e) { warn('delete data', e); window.alert('Could not delete your data. Please try again.') }
+  }
+  data.appendChild(delData)
+  const delAcct = el('button', 'nc-acct__link nc-acct__link--danger', 'Delete account')
+  delAcct.onclick = async () => {
+    if (!confirmTwice(
+      'Permanently delete your ACCOUNT and all your data?\n\nThis erases your saved data and removes your Noble Collective sign-in. It cannot be undone.',
+      'Last chance — are you absolutely sure you want to delete your account?',
+    )) return
+    try { await deleteAccount(); location.href = '/' } catch (e) { warn('delete account', e); window.alert('Could not delete your account. Please sign in again and retry.') }
+  }
+  data.appendChild(delAcct)
+  acctMenu.appendChild(data)
+
   document.body.appendChild(acctMenu)
   placeMenu(anchor, 214)
 }
