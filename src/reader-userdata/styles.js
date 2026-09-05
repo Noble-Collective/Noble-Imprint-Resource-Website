@@ -161,7 +161,13 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-tab{flex:1 1 0;cursor:pointer;border:none;background:none;color:var(--nc-muted);font:inherit;font-size:.82rem;padding:.5rem .3rem;border-radius:8px;white-space:nowrap}
 .nc-tab:hover{background:var(--nc-hover)}
 .nc-tab[aria-selected="true"]{background:var(--nc-hover);color:var(--nc-text);font-weight:600}
-.nc-sheet__body{overflow:auto;padding:.5rem .85rem 1.6rem}
+.nc-sheet__search{padding:.5rem .85rem .15rem}
+.nc-search{width:100%;box-sizing:border-box;border:1px solid var(--nc-border);border-radius:8px;padding:.4rem .6rem;
+  font:inherit;font-size:.85rem;background:var(--nc-surface);color:var(--nc-text)}
+.nc-search:focus{outline:none;border-color:var(--nc-accent)}
+.nc-sheet__head .nc-iconbtn--ok{color:var(--nc-emerald)}
+.nc-panel__group{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nc-muted);margin:.7rem .25rem .15rem}
+.nc-sheet__body{overflow:auto;padding:.4rem .85rem 1.6rem}
 .nc-panel{position:fixed;top:0;right:0;height:100%;width:min(400px,90vw);background:var(--nc-surface);color:var(--nc-text);
   z-index:9700;box-shadow:-8px 0 30px rgba(0,0,0,.2);transform:translateX(100%);transition:transform .22s ease;
   display:flex;flex-direction:column;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
