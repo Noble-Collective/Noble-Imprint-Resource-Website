@@ -9,5 +9,6 @@
     <p class="page-subtitle">Everything you’ve saved across all books.</p>
     <div id="nc-mynotes"><p class="text-muted">Loading&hellip;</p></div>
   </main>
+  <script>window.__NC_BOOKS = <%- typeof booksMeta !== 'undefined' && booksMeta ? JSON.stringify(booksMeta).replace(/</g, '\\u003c') : '{}' %>;</script>
 
 <%- include('partials/footer') %>

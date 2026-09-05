@@ -254,12 +254,27 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-mynotes__bar{display:flex;align-items:center;gap:.6rem;margin:.5rem 0 1.1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .nc-mynotes__bar .nc-search{flex:1 1 auto}
 .nc-mynotes__count{font-size:.75rem;color:var(--nc-muted);white-space:nowrap}
-.nc-mynotes__book{margin-bottom:1.4rem}
-.nc-mynotes__book-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--nc-muted);
-  margin:0 0 .4rem;padding-bottom:.3rem;border-bottom:1px solid var(--nc-border)}
+/* book accordion */
+.nc-mn-book{border:1px solid var(--nc-border);border-radius:12px;margin:.7rem 0;overflow:hidden;background:var(--nc-surface)}
+.nc-mn-book[open]{box-shadow:0 2px 14px rgba(0,0,0,.06)}
+.nc-mn-book__sum{display:flex;align-items:center;gap:.85rem;padding:.7rem .85rem;cursor:pointer;list-style:none}
+.nc-mn-book__sum::-webkit-details-marker{display:none}
+.nc-mn-book__sum:hover{background:var(--nc-hover)}
+.nc-mn-book__cover{flex:none;width:46px;height:62px;border-radius:5px;overflow:hidden;background:var(--nc-hover);
+  box-shadow:0 1px 4px rgba(0,0,0,.18);display:block}
+.nc-mn-book__cover img{width:100%;height:100%;object-fit:cover;display:block}
+.nc-mn-book__cover--none{background:linear-gradient(135deg,var(--nc-hover),var(--nc-border))}
+.nc-mn-book__info{flex:1 1 auto;min-width:0}
+.nc-mn-book__title{font-weight:600;font-size:.95rem;color:var(--nc-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-mn-book__count{font-size:.78rem;color:var(--nc-muted);margin-top:.15rem}
+.nc-mn-book__chevron{flex:none;width:9px;height:9px;border-right:2px solid var(--nc-muted);border-bottom:2px solid var(--nc-muted);
+  transform:rotate(-45deg);transition:transform .18s;margin-right:.2rem}
+.nc-mn-book[open] .nc-mn-book__chevron{transform:rotate(45deg)}
+.nc-mn-book__body{padding:.2rem .85rem 1rem}
+.nc-mn-kind{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--nc-muted);margin:.8rem 0 .3rem}
 .nc-mynotes__item{display:block;text-decoration:none;color:var(--nc-text);border:1px solid var(--nc-border);border-radius:8px;
-  padding:.6rem .7rem;margin:.4rem 0;font-size:.9rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;transition:border-color .12s}
-.nc-mynotes__item:hover{border-color:var(--nc-accent)}
+  padding:.55rem .65rem;margin:.35rem 0;font-size:.9rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;transition:border-color .12s,background .12s}
+.nc-mynotes__item:hover{border-color:var(--nc-accent);background:var(--nc-hover)}
 .nc-mynotes__item .nc-dot{display:inline-block;width:.7rem;height:.7rem;border-radius:999px;margin-right:.45rem;vertical-align:middle}
 .nc-mynotes__body{color:var(--nc-muted);font-size:.82rem;margin-top:.25rem}
 .nc-mynotes__empty{color:var(--nc-muted);margin-bottom:.6rem}

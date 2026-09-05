@@ -853,8 +853,20 @@ app.get('/api/session-data/:seg1/:seg2?/:seg3?/:seg4?', async (req, res) => {
 
 // "My Notes" — a personal page listing everything the signed-in user has saved across all books.
 // Server renders a shell; the reader bundle fills it client-side from the shared store.
-app.get('/notes', (req, res) => {
-  res.render('my-notes', { title: 'My Notes' });
+app.get('/notes', async (req, res, next) => {
+  try {
+    // Book metadata (title + cover + url) keyed by repoPath, so the client can render covers/titles
+    // for saved annotations (which only store the bookPath).
+    const tree = await content.buildContentTree();
+    const books = {};
+    for (const series of tree.series) {
+      for (const child of series.children) {
+        if (child.type === 'book') books[child.repoPath] = { title: child.title, cover: child.coverPath || null, url: content.bookUrl(series, null, child) };
+        else if (child.type === 'subseries') for (const b of child.books) books[b.repoPath] = { title: b.title, cover: b.coverPath || null, url: content.bookUrl(series, child, b) };
+      }
+    }
+    res.render('my-notes', { title: 'My Notes', booksMeta: books });
+  } catch (err) { next(err); }
 });
 
 // Content routes — catch-all resolver

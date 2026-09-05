@@ -8,6 +8,12 @@ const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&am
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
 const bookLabel = (bookPath) => (String(bookPath || '').split('/').filter(Boolean).pop() || 'Notes')
 const KIND_LABEL = { highlight: 'Highlights', note: 'Notes', bookmark: 'Bookmarks' }
+const KINDS = [['highlight', 'Highlights'], ['note', 'Notes'], ['bookmark', 'Bookmarks']]
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
+function countLabel(items) {
+  return KINDS.map(([k, l]) => [items.filter((a) => a.kind === k).length, l.slice(0, -1).toLowerCase()])
+    .filter(([n]) => n > 0).map(([n, w]) => plural(n, w)).join(' · ') || 'no notes'
+}
 
 export function mountMyNotes() {
   const host = document.getElementById('nc-mynotes')
@@ -39,6 +45,7 @@ function render(host, annots) {
   const listWrap = el('div', 'nc-mynotes__list')
   host.appendChild(listWrap)
 
+  const books = (typeof window !== 'undefined' && window.__NC_BOOKS) || {}
   const draw = (q) => {
     listWrap.innerHTML = ''
     const list = annots.filter((a) => !q || (`${a.ref || ''} ${a.body || ''}`).toLowerCase().includes(q))
@@ -49,10 +56,28 @@ function render(host, annots) {
     const byBook = new Map()
     for (const a of list) { const k = (a.locator && a.locator.bookPath) || '?'; if (!byBook.has(k)) byBook.set(k, []); byBook.get(k).push(a) }
     for (const [bookPath, items] of byBook) {
-      const sec = el('div', 'nc-mynotes__book')
-      sec.appendChild(el('div', 'nc-mynotes__book-title', bookLabel(bookPath)))
-      items.forEach((a) => sec.appendChild(itemRow(a)))
-      listWrap.appendChild(sec)
+      const meta = books[bookPath] || {}
+      const d = el('details', 'nc-mn-book')
+      d.open = !!q || byBook.size === 1 // expand when searching or if there's only one book
+      const sum = el('summary', 'nc-mn-book__sum')
+      const cover = el('span', 'nc-mn-book__cover' + (meta.cover ? '' : ' nc-mn-book__cover--none'))
+      if (meta.cover) { const img = el('img'); img.src = '/cover/' + meta.cover; img.alt = ''; img.loading = 'lazy'; cover.appendChild(img) }
+      sum.appendChild(cover)
+      const info = el('div', 'nc-mn-book__info')
+      info.appendChild(el('div', 'nc-mn-book__title', meta.title || bookLabel(bookPath)))
+      info.appendChild(el('div', 'nc-mn-book__count', countLabel(items)))
+      sum.appendChild(info)
+      sum.appendChild(el('span', 'nc-mn-book__chevron'))
+      d.appendChild(sum)
+      const body = el('div', 'nc-mn-book__body')
+      for (const [kind, label] of KINDS) {
+        const grp = items.filter((a) => a.kind === kind)
+        if (!grp.length) continue
+        body.appendChild(el('div', 'nc-mn-kind', label))
+        grp.forEach((a) => body.appendChild(itemRow(a)))
+      }
+      d.appendChild(body)
+      listWrap.appendChild(d)
     }
   }
   search.addEventListener('input', () => draw(search.value.trim().toLowerCase()))
