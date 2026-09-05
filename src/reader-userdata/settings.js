@@ -31,6 +31,8 @@ export function apply() {
   // (paragraphs set font-family: var(--font-reading) directly).
   root.style.setProperty('--font-reading', current.fontFamily === 'serif' ? SERIF_STACK : SANS_STACK)
   root.classList.toggle('nc-dark', resolveDark(current.theme))
+  // Verse layout on the Bible reader: 'line' puts each verse on its own line (CSS-driven).
+  root.classList.toggle('nc-verse-line', current.verseLayout === 'line')
 }
 
 /** Apply cached settings immediately (before sign-in) to avoid a flash. */
@@ -111,6 +113,8 @@ export function toggleSettingsMenu(anchor) {
   if (trans.length > 1) {
     menuEl.appendChild(segRow('Bible Translation', trans.map((t) => [String(t.id).toUpperCase(), String(t.id).toUpperCase()]), 'translation'))
   }
+  // Verse layout for the Bible reader (mirrors Coram Deo; 'line' is shown as "Verse").
+  menuEl.appendChild(segRow('Verse Layout', [['paragraph', 'Paragraph'], ['line', 'Verse']], 'verseLayout'))
   document.body.appendChild(menuEl)
   const r = anchor.getBoundingClientRect()
   const w = 290
