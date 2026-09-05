@@ -73,6 +73,14 @@ html.nc-verse-line .bible-content .bible-verse .verse-num{ font-weight:700; }
 .nc-sbtn{cursor:pointer;border:none;background:none;color:var(--color-text-light,#6b6b6b);padding:.42rem;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
 .nc-sbtn:hover{background:rgba(120,120,120,.16);color:var(--color-text,#3a3a3a)}
 .nc-sbtn--in{color:var(--color-gold,#dfb53b)}
+/* fast custom tooltip (native title has a ~1s delay we can't shorten) */
+.nc-sbtn{position:relative}
+.nc-sbtn[data-tip]::after{content:attr(data-tip);position:absolute;top:100%;left:0;margin-top:6px;white-space:nowrap;
+  background:var(--nc-text,#292524);color:var(--nc-surface,#fff);font-size:.7rem;line-height:1.2;padding:.28rem .45rem;border-radius:6px;
+  box-shadow:0 4px 14px rgba(0,0,0,.2);opacity:0;pointer-events:none;transform:translateY(-2px);transition:opacity .1s,transform .1s;
+  transition-delay:0s;z-index:10000}
+.nc-sbtn[data-tip]:hover::after{opacity:1;transform:none;transition-delay:.15s}
+.nc-side--mobile .nc-sbtn[data-tip]::after{left:auto;right:0} /* stay on-screen from the right-aligned header cluster */
 /* mobile: a second cluster in the (dark) top header, shown only where the sidebar is hidden */
 .nc-side--mobile{display:none}
 @media (max-width:989px){
@@ -140,6 +148,8 @@ html.nc-verse-line .bible-content .bible-verse .verse-num{ font-weight:700; }
 .nc-seg{display:inline-flex;gap:.25rem}
 .nc-seg__btn{cursor:pointer;border:none;background:var(--nc-hover);color:var(--nc-muted);border-radius:6px;padding:.2rem .55rem;font:inherit;font-size:.78rem}
 .nc-seg__btn:hover{background:var(--nc-border)}
+.nc-menu__section{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--nc-muted);padding:.15rem .1rem .25rem}
+.nc-menu__section--divider{border-top:1px solid var(--nc-border);margin-top:.5rem;padding-top:.6rem}
 .nc-seg__btn[aria-pressed="true"]{background:#292524;color:#fff}
 html.nc-dark .nc-seg__btn[aria-pressed="true"]{background:#e7e5e4;color:#1c1917}
 

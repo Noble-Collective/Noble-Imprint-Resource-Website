@@ -16,7 +16,8 @@ import { el, ICONS, warn } from './reader-userdata/util.js'
 function sbtn(icon, title, onClick) {
   const b = el('button', 'nc-sbtn')
   b.type = 'button'
-  b.title = title
+  b.setAttribute('data-tip', title) // fast CSS tooltip (native title is too slow)
+  b.setAttribute('aria-label', title)
   b.innerHTML = icon
   b.onclick = (e) => onClick(e, b)
   return b
@@ -152,7 +153,9 @@ function updateClusters() {
   for (const c of clusters) {
     c.nbBtn.style.display = (isSession && u) ? '' : 'none'
     c.userBtn.classList.toggle('nc-sbtn--in', !!u)
-    c.userBtn.title = u ? 'Account' : (isSession ? 'Sign in to save your highlights, notes & answers' : 'Sign in')
+    const tip = u ? 'Account' : 'Sign in'
+    c.userBtn.setAttribute('data-tip', tip)
+    c.userBtn.setAttribute('aria-label', tip)
   }
 }
 

@@ -85,6 +85,10 @@ function closeMenu() {
   document.removeEventListener('keydown', onEsc)
 }
 
+function sectionTitle(text, divider) {
+  return el('div', 'nc-menu__section' + (divider ? ' nc-menu__section--divider' : ''), text)
+}
+
 function segRow(label, options, key) {
   const row = el('div', 'nc-menu__row')
   row.appendChild(el('span', 'nc-menu__label', label))
@@ -104,16 +108,19 @@ function segRow(label, options, key) {
 export function toggleSettingsMenu(anchor) {
   if (menuEl) { closeMenu(); return }
   menuEl = el('div', 'nc-menu')
+  // Section 1 — applies everywhere on the site.
+  menuEl.appendChild(sectionTitle('All resources'))
   menuEl.appendChild(segRow('Appearance', [['light', 'Light'], ['dark', 'Dark'], ['system', 'Auto']], 'theme'))
   menuEl.appendChild(segRow('Text Size', [['sm', 'S'], ['base', 'M'], ['lg', 'L'], ['xl', 'XL']], 'fontSize'))
   menuEl.appendChild(segRow('Font', [['sans', 'Sans'], ['serif', 'Serif']], 'fontFamily'))
-  // Default Bible translation — only when the site offers more than one (value = SDK vocabulary,
-  // e.g. 'BSB'/'KJV'; verse popups + reference links honor it). Shared with the app + Coram Deo.
+  // Section 2 — Bible reader only (divider + heading).
+  menuEl.appendChild(sectionTitle('Bible only', true))
   const trans = (typeof window !== 'undefined' && window.__NC_TRANSLATIONS) || []
   if (trans.length > 1) {
+    // value = SDK vocabulary (e.g. 'BSB'/'KJV'); verse popups + reference links honor it.
     menuEl.appendChild(segRow('Bible Translation', trans.map((t) => [String(t.id).toUpperCase(), String(t.id).toUpperCase()]), 'translation'))
   }
-  // Verse layout for the Bible reader (mirrors Coram Deo; 'line' is shown as "Verse").
+  // Verse layout (mirrors Coram Deo; 'line' is shown as "Verse").
   menuEl.appendChild(segRow('Verse Layout', [['paragraph', 'Paragraph'], ['line', 'Verse']], 'verseLayout'))
   document.body.appendChild(menuEl)
   const r = anchor.getBoundingClientRect()
