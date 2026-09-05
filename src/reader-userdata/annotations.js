@@ -142,11 +142,30 @@ function hideToolbar() {
   if (editOutside) { document.removeEventListener('mousedown', editOutside, true); editOutside = null }
 }
 
+// The bookmark id already on the current selection's block (a line can hold only one), or null.
+function existingBookmarkForSelection() {
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return null
+  let block = sel.getRangeAt(0).startContainer
+  if (block.nodeType !== 1) block = block.parentNode
+  while (block && block !== ROOT && !/^(P|LI|H1|H2|H3|H4|H5|BLOCKQUOTE|DIV)$/.test(block.tagName)) block = block.parentNode
+  const m = block && block !== ROOT && block.querySelector && block.querySelector('.nc-bm-marker[data-annot-id]')
+  return m ? m.dataset.annotId : null
+}
+
 function showCreateToolbar(rect) {
   const kids = HIGHLIGHT_COLORS.map((c) => swatch(c, () => createHighlight(c)))
   kids.push(el('span', 'nc-toolbar__div'))
   kids.push(tbBtn(ICONS.note, 'Add note', () => startNote(rect)))
-  kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
+  // A line holds at most one bookmark: if it already has one, the button is filled and toggles it off.
+  const existingBm = existingBookmarkForSelection()
+  if (existingBm) {
+    const bm = tbBtn(ICONS.bookmarkFill, 'Remove bookmark', () => { hideToolbar(); removeById(existingBm) })
+    bm.classList.add('nc-toolbar__btn--on')
+    kids.push(bm)
+  } else {
+    kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
+  }
   kids.push(tbBtn(ICONS.copy, 'Copy', () => copySelection()))
   buildToolbar(kids)
   toolbarMode = 'create'
@@ -196,6 +215,7 @@ async function removeAnnot(annot) {
 }
 async function createBookmark() {
   if (!getClient()) return needSignIn()
+  if (existingBookmarkForSelection()) { hideToolbar(); return } // one bookmark per line
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
@@ -207,8 +227,22 @@ async function createBookmark() {
 }
 function copySelection() {
   const t = pendingSel?.text || ''
+  const rect = pendingSel?.rect
   hideToolbar()
   try { navigator.clipboard?.writeText(t) } catch (e) { warn('copy', e) }
+  showToast('Copied', rect)
+}
+
+// Brief floating confirmation (e.g. after Copy) near the selection.
+function showToast(msg, rect) {
+  const t = el('div', 'nc-toast', msg)
+  t.setAttribute('data-nc-skip', '')
+  document.body.appendChild(t)
+  const r = rect || { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0 }
+  t.style.left = Math.round(r.left + (r.width || 0) / 2) + 'px'
+  t.style.top = Math.round(r.top - 6) + 'px'
+  requestAnimationFrame(() => t.classList.add('nc-toast--show'))
+  setTimeout(() => { t.classList.remove('nc-toast--show'); setTimeout(() => t.remove(), 220) }, 1100)
 }
 
 // ---------- notes ----------

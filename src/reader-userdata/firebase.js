@@ -66,8 +66,14 @@ async function bridgeSession(cred) {
   location.reload()
 }
 
+function googleProvider() {
+  const p = new GoogleAuthProvider()
+  p.addScope('profile') // ensure the ID token carries the avatar (picture) + name
+  p.addScope('email')
+  return p
+}
 export const signIn = () =>
-  signInWithPopup(_auth, new GoogleAuthProvider()).then(bridgeSession).catch((e) => warn('sign-in', e))
+  signInWithPopup(_auth, googleProvider()).then(bridgeSession).catch((e) => warn('sign-in', e))
 
 export const doSignOut = async () => {
   try {

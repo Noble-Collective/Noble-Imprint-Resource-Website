@@ -167,6 +167,13 @@ html.nc-dark .nc-seg__btn[aria-pressed="true"]{background:#e7e5e4;color:#1c1917}
 .nc-toolbar__btn{cursor:pointer;border:none;background:none;padding:.35rem;color:var(--nc-muted);display:inline-flex;border-radius:6px}
 .nc-toolbar__btn:hover{color:var(--nc-text);background:var(--nc-hover)}
 .nc-toolbar__btn--danger:hover{color:var(--nc-rose)}
+.nc-toolbar__btn--on{color:var(--nc-accent)}
+/* brief floating confirmation toast (e.g. "Copied") */
+.nc-toast{position:fixed;z-index:9600;transform:translate(-50%,-100%);background:var(--nc-text,#292524);color:var(--nc-surface,#fff);
+  font-size:.72rem;font-weight:500;padding:.3rem .55rem;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.25);
+  opacity:0;pointer-events:none;transition:opacity .15s ease,transform .15s ease;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.nc-toast--show{opacity:1;transform:translate(-50%,-120%)}
 
 /* ---- painted highlights ---- */
 mark.nc-hl{border-radius:3px;padding:0 .02em;color:inherit;cursor:pointer;background:var(--nc-amber-wash)}

@@ -63,12 +63,15 @@ function toggleAccountMenu(anchor) {
   const email = u?.email || su?.email
   const photo = u?.photoURL || (su && su.photoURL)
   const head = el('div', 'nc-acct__head')
+  const initialsAvatar = () => el('span', 'nc-acct__avatar nc-acct__avatar--initials', (name[0] || '?').toUpperCase())
   if (photo) {
     const img = el('img', 'nc-acct__avatar')
-    img.src = photo; img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
+    img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
+    img.onerror = () => img.replaceWith(initialsAvatar()) // fall back to initials if it fails to load
+    img.src = photo
     head.appendChild(img)
   } else {
-    head.appendChild(el('span', 'nc-acct__avatar nc-acct__avatar--initials', (name[0] || '?').toUpperCase()))
+    head.appendChild(initialsAvatar())
   }
   const info = el('div', 'nc-acct__info')
   info.appendChild(el('div', 'nc-acct__name', name))
