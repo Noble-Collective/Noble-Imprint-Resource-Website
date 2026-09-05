@@ -170,6 +170,7 @@ function showCreateToolbar(rect) {
     kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
   }
   kids.push(tbBtn(ICONS.copy, 'Copy', () => copySelection()))
+  kids.push(tbBtn(ICONS.share, 'Share link', () => { const s = pendingSel; hideToolbar(); shareUrl(passageUrl(s && s.text), s && s.rect) }))
   buildToolbar(kids)
   toolbarMode = 'create'
   positionToolbar(rect)
@@ -177,6 +178,7 @@ function showCreateToolbar(rect) {
 function showEditToolbar(rect, annot) {
   const kids = HIGHLIGHT_COLORS.map((c) => swatch(c, () => recolor(annot, c), annot.color === c))
   kids.push(el('span', 'nc-toolbar__div'))
+  kids.push(tbBtn(ICONS.share, 'Share link', () => { hideToolbar(); shareUrl(location.origin + (annot.href || location.pathname), rect) }))
   kids.push(tbBtn(ICONS.trash, 'Remove', () => removeAnnot(annot), true))
   buildToolbar(kids)
   toolbarMode = 'edit'
@@ -234,6 +236,18 @@ function copySelection() {
   hideToolbar()
   try { navigator.clipboard?.writeText(t) } catch (e) { warn('copy', e) }
   showToast('Copied', rect)
+}
+
+// A deep link to a passage: the session URL + a native text-fragment that scrolls to & highlights it.
+function passageUrl(text) {
+  const frag = encodeURIComponent((text || '').trim().slice(0, 60))
+  return location.origin + location.pathname + (frag ? `#:~:text=${frag}` : '')
+}
+async function shareUrl(url, rect) {
+  if (navigator.share) {
+    try { await navigator.share({ title: document.title, url }); return } catch { /* cancelled or unsupported → copy */ }
+  }
+  try { await navigator.clipboard.writeText(url); showToast('Link copied', rect) } catch { showToast('Couldn’t copy link', rect) }
 }
 
 // Brief floating confirmation (e.g. after Copy) near the selection.
