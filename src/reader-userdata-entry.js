@@ -9,6 +9,7 @@ import { initFirebase, onUser, getUser, signIn, doSignOut } from './reader-userd
 import { initAnswers, attachAnswers } from './reader-userdata/answers.js'
 import { initAnnotations, attachAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
+import { maybeOnboard } from './reader-userdata/onboarding.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
 function sbtn(icon, title, onClick) {
@@ -173,6 +174,7 @@ function boot() {
     ctx.root = root
     initAnswers(ctx)
     initAnnotations(ctx)
+    maybeOnboard() // one-time coach-mark introducing the reader features
   }
 }
 

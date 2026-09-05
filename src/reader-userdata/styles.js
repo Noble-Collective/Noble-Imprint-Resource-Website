@@ -88,6 +88,14 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-signin{width:260px}
 .nc-signin__body{font-size:.82rem;color:var(--nc-muted);line-height:1.4;margin:.15rem 0 .7rem}
 .nc-signin .nc-btn--primary{width:100%;justify-content:center;padding:.5rem}
+/* one-time onboarding coach-mark */
+.nc-coach{position:fixed;z-index:9800;width:280px;background:var(--nc-surface);color:var(--nc-text);
+  border:1px solid var(--nc-border);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:.8rem .85rem;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;animation:nc-coach-in .18s ease}
+@keyframes nc-coach-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.nc-coach__title{font-size:.9rem;font-weight:700;margin-bottom:.25rem}
+.nc-coach__body{font-size:.82rem;color:var(--nc-muted);line-height:1.45;margin-bottom:.6rem}
+.nc-coach .nc-btn--primary{width:100%;justify-content:center;padding:.45rem}
 
 /* ---- answers ---- */
 .nc-answer{margin:.6rem 0 .1rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
