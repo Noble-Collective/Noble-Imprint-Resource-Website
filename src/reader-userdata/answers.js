@@ -38,10 +38,12 @@ function buildFields() {
     if (!id || fields.has(id) || block.querySelector('.nc-answer')) return
     const wrap = el('div', 'nc-answer')
     wrap.setAttribute('data-nc-skip', '')
-    const ta = el('textarea', 'nc-answer__ta')
+    const ta = el('textarea', 'nc-answer__ta nc-answer__ta--locked')
     ta.rows = 2
-    ta.placeholder = 'Sign in to write your answer…'
-    ta.disabled = true
+    ta.placeholder = 'Sign in to write your answer'
+    ta.readOnly = true // readOnly (not disabled) so it still receives clicks → prompt sign-in
+    // Clicking the locked prompt opens the sign-in flow.
+    ta.addEventListener('click', () => { if (ta.readOnly) { ta.blur(); document.dispatchEvent(new CustomEvent('nc:need-signin')) } })
     const status = el('span', 'nc-answer__status', '')
     wrap.append(ta, status)
     block.appendChild(wrap)
@@ -67,11 +69,16 @@ function buildFields() {
 function applyAuthState(client) {
   if (!client) {
     answersState.clear()
-    for (const { ta, status } of fields.values()) { ta.disabled = true; ta.value = ''; ta.placeholder = 'Sign in to write your answer…'; status.textContent = '' }
+    for (const { ta, status } of fields.values()) {
+      ta.readOnly = true; ta.classList.add('nc-answer__ta--locked')
+      ta.value = ''; ta.placeholder = 'Sign in to write your answer'; status.textContent = ''
+    }
     listeners.forEach((cb) => cb(answersState))
     return
   }
-  for (const { ta } of fields.values()) { ta.disabled = false; ta.placeholder = 'Write your answer…' }
+  for (const { ta } of fields.values()) {
+    ta.readOnly = false; ta.classList.remove('nc-answer__ta--locked'); ta.placeholder = 'Write your answer…'
+  }
   loadAnswers(client)
 }
 

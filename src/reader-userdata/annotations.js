@@ -87,7 +87,9 @@ function displayFor(text) {
 function onSelChange() {
   const sel = window.getSelection()
   const inContent = sel && sel.rangeCount > 0 && ROOT.contains(sel.getRangeAt(0).commonAncestorContainer)
-  const valid = getClient() && sel && !sel.isCollapsed && inContent
+  // Show the toolbar even when signed out — Copy works for everyone; Highlight/Note/Bookmark then
+  // prompt sign-in (see needSignIn). This makes the reader feel alive before you have an account.
+  const valid = sel && !sel.isCollapsed && inContent
   if (!valid) {
     // A collapsed selection (e.g. a click on a highlight) must NOT dismiss the edit toolbar —
     // that caused the flash-and-hide. The edit toolbar is dismissed by an outside click instead.
@@ -161,8 +163,15 @@ function showEditToolbar(rect, annot) {
   setTimeout(() => document.addEventListener('mousedown', editOutside, true), 0)
 }
 
+// Signed out: creating anything needs an account — nudge to sign in (Copy stays free).
+function needSignIn() {
+  hideToolbar()
+  document.dispatchEvent(new CustomEvent('nc:need-signin'))
+}
+
 // ---------- create / edit ----------
 async function createHighlight(color) {
+  if (!getClient()) return needSignIn()
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
@@ -186,6 +195,7 @@ async function removeAnnot(annot) {
   try { await getClient().deleteAnnotation(annot.id) } catch (e) { warn('remove', e) }
 }
 async function createBookmark() {
+  if (!getClient()) return needSignIn()
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
@@ -203,6 +213,7 @@ function copySelection() {
 
 // ---------- notes ----------
 function startNote(rect) {
+  if (!getClient()) return needSignIn()
   const sel = pendingSel
   if (!sel) return
   hideToolbar()

@@ -57,9 +57,22 @@ function toggleAccountMenu(anchor) {
   const su = ncUser()
   acctMenu = el('div', 'nc-menu nc-acct')
   acctMenu.setAttribute('data-nc-skip', '')
-  acctMenu.appendChild(el('div', 'nc-acct__name', u?.displayName || su?.displayName || 'Signed in'))
+  const name = u?.displayName || su?.displayName || 'Signed in'
   const email = u?.email || su?.email
-  if (email) acctMenu.appendChild(el('div', 'nc-acct__email', email))
+  const photo = u?.photoURL || (su && su.photoURL)
+  const head = el('div', 'nc-acct__head')
+  if (photo) {
+    const img = el('img', 'nc-acct__avatar')
+    img.src = photo; img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
+    head.appendChild(img)
+  } else {
+    head.appendChild(el('span', 'nc-acct__avatar nc-acct__avatar--initials', (name[0] || '?').toUpperCase()))
+  }
+  const info = el('div', 'nc-acct__info')
+  info.appendChild(el('div', 'nc-acct__name', name))
+  if (email) info.appendChild(el('div', 'nc-acct__email', email))
+  head.appendChild(info)
+  acctMenu.appendChild(head)
   if (su && su.isEditor) {
     const notif = el('button', 'nc-acct__link', 'Notifications')
     notif.innerHTML = `<span class="nc-acct__ico">${ICONS.bell}</span>Notifications`
@@ -80,7 +93,10 @@ function buildCluster(host, { atTop, extraClass } = {}) {
   if (!host || host.querySelector('.nc-side')) return null // idempotent per host
   const wrap = el('div', 'nc-side' + (extraClass ? ' ' + extraClass : ''))
   wrap.setAttribute('data-nc-skip', '')
+  const homeBtn = sbtn(ICONS.bookOpen, 'Resource Library — home', () => { location.href = '/' })
+  wrap.append(homeBtn)
   const userBtn = sbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser() || ncUser()) toggleAccountMenu(b); else showSignInIntro(b) })
+  userBtn.setAttribute('data-nc-account-btn', '')
   if (ncUser()) userBtn.classList.add('nc-sbtn--in') // server already knows we're signed in (unified)
   const setBtn = sbtn(ICONS.gear, 'Reading settings', (e, b) => toggleSettingsMenu(b))
   setBtn.setAttribute('data-nc-settings-btn', '')
@@ -170,6 +186,15 @@ function boot() {
     window.logout = () => doSignOut()
   }
   buildSidebarControls() // account + settings on every page; notebook + reading features only on sessions
+  // A signed-out action that needs an account (highlight/note/bookmark/answer) dispatches this →
+  // show the sign-in intro popover anchored to the account icon.
+  document.addEventListener('nc:need-signin', () => {
+    if (getUser()) return
+    const b = [...document.querySelectorAll('.nc-side [data-nc-account-btn]')].find((x) => x.offsetParent !== null)
+    if (!b) return
+    if (acctMenu) closeAcct()
+    showSignInIntro(b)
+  })
   window.__ncReattach = reattach // let ajax-nav re-bind the reader after an in-page session swap
   if (isSession) {
     ctx.root = root

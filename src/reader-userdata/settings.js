@@ -105,6 +105,12 @@ export function toggleSettingsMenu(anchor) {
   menuEl.appendChild(segRow('Appearance', [['light', 'Light'], ['dark', 'Dark'], ['system', 'Auto']], 'theme'))
   menuEl.appendChild(segRow('Text Size', [['sm', 'S'], ['base', 'M'], ['lg', 'L'], ['xl', 'XL']], 'fontSize'))
   menuEl.appendChild(segRow('Font', [['sans', 'Sans'], ['serif', 'Serif']], 'fontFamily'))
+  // Default Bible translation — only when the site offers more than one (value = SDK vocabulary,
+  // e.g. 'BSB'/'KJV'; verse popups + reference links honor it). Shared with the app + Coram Deo.
+  const trans = (typeof window !== 'undefined' && window.__NC_TRANSLATIONS) || []
+  if (trans.length > 1) {
+    menuEl.appendChild(segRow('Bible Translation', trans.map((t) => [String(t.id).toUpperCase(), String(t.id).toUpperCase()]), 'translation'))
+  }
   document.body.appendChild(menuEl)
   const r = anchor.getBoundingClientRect()
   const w = 290

@@ -88,6 +88,10 @@ app.use((req, res, next) => {
   // bundle owns sign-in (mints the __session cookie via the 463519 admin app), the legacy compat
   // login is dropped, and the account menu carries role-aware links (admin/notifications).
   res.locals.featureAuthUnified = process.env.AUTH_UNIFIED === '1';
+  // Available Bible translations (id + title) for the reader's "Default Bible Translation" setting
+  // + the verse-popup translation switch. Cheap in-memory read.
+  try { res.locals.bibleTranslations = bible.getAllTranslations().map((t) => ({ id: t.id, title: t.title })); }
+  catch { res.locals.bibleTranslations = []; }
   // Canonical analytics content identity — set per content route below, echoed
   // into the page as window.__analyticsContext (see footer.ejs). null by default
   // (non-content pages fall back to the server's coarse path parse).

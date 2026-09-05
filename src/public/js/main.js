@@ -5,6 +5,25 @@
 (function () {
   'use strict';
 
+  /* ----- Preferred Bible translation (shared reader setting) ----- */
+  // The reader stores the user's chosen translation (SDK vocabulary, e.g. "BSB"/"KJV") in
+  // localStorage under 'nc:reader-settings'. Verse popups + reference links honor it, falling back
+  // to BSB when the choice isn't available on this site. Translation ids here are lowercase.
+  function ncPreferredTranslation() {
+    try {
+      var avail = (window.__NC_TRANSLATIONS || []).map(function (t) { return t.id; });
+      if (!avail.length) return 'bsb';
+      var s = JSON.parse(localStorage.getItem('nc:reader-settings') || '{}');
+      var pref = String(s.translation || 'BSB').toLowerCase();
+      if (avail.indexOf(pref) >= 0) return pref;
+      return avail.indexOf('bsb') >= 0 ? 'bsb' : avail[0];
+    } catch (e) { return 'bsb'; }
+  }
+  function ncTranslationTitle(id) {
+    var t = (window.__NC_TRANSLATIONS || []).filter(function (x) { return x.id === id; })[0];
+    return t ? t.title : 'Berean Standard Bible';
+  }
+
   /* ----- View Mode Toggle (Visual / List) ----- */
 
   /**
@@ -177,7 +196,7 @@
       e.preventDefault();
 
       var refText = ref.getAttribute('data-ref');
-      var translation = 'bsb';
+      var translation = ncPreferredTranslation();
 
       titleEl.textContent = refText;
       bodyEl.innerHTML = '<div class="verse-popup-loading">Loading...</div>';
@@ -230,13 +249,13 @@
           });
           if (inParagraph) html += '</p>';
           bodyEl.innerHTML = html;
-          translationEl.textContent = 'Berean Standard Bible';
+          translationEl.textContent = ncTranslationTitle(translation);
 
           // Build link to Bible browsing page
           var firstRef = data.verses[0].ref;
           var match = firstRef.match(/^(.+?)\s+(\d+):/);
           if (match) {
-            linkEl.href = '/bible/bsb/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + data.verses[0].verse;
+            linkEl.href = '/bible/' + translation + '/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + data.verses[0].verse;
           }
         })
         .catch(function () {
