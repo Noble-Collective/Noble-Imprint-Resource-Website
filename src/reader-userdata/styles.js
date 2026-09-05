@@ -88,6 +88,15 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 .nc-signin{width:260px}
 .nc-signin__body{font-size:.82rem;color:var(--nc-muted);line-height:1.4;margin:.15rem 0 .7rem}
 .nc-signin .nc-btn--primary{width:100%;justify-content:center;padding:.5rem}
+/* "Continue reading" strip on the home page */
+.nc-continue{margin:0 0 1.6rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.nc-continue__title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--nc-muted);margin-bottom:.5rem}
+.nc-continue__row{display:flex;gap:.6rem;overflow-x:auto;padding-bottom:.35rem}
+.nc-continue__card{flex:0 0 auto;min-width:190px;max-width:240px;border:1px solid var(--nc-border);border-radius:10px;
+  padding:.6rem .7rem;text-decoration:none;color:var(--nc-text);background:var(--nc-surface);transition:border-color .12s}
+.nc-continue__card:hover{border-color:var(--nc-accent)}
+.nc-continue__book{font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-continue__sess{font-size:.75rem;color:var(--nc-muted);margin-top:.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* one-time onboarding coach-mark */
 .nc-coach{position:fixed;z-index:9800;width:280px;background:var(--nc-surface);color:var(--nc-text);
   border:1px solid var(--nc-border);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:.8rem .85rem;

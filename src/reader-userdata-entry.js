@@ -10,6 +10,7 @@ import { initAnswers, attachAnswers } from './reader-userdata/answers.js'
 import { initAnnotations, attachAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
 import { maybeOnboard } from './reader-userdata/onboarding.js'
+import { recordReading, mountContinueReading } from './reader-userdata/progress.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
 
 function sbtn(icon, title, onClick) {
@@ -174,7 +175,10 @@ function boot() {
     ctx.root = root
     initAnswers(ctx)
     initAnnotations(ctx)
+    recordReading(ctx) // remember this session for "Continue reading"
     maybeOnboard() // one-time coach-mark introducing the reader features
+  } else if (location.pathname === '/') {
+    mountContinueReading() // resume strip at the top of the home page
   }
 }
 
