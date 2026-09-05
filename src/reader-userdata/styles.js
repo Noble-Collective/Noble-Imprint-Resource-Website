@@ -175,6 +175,9 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-search:focus{outline:none;border-color:var(--nc-accent)}
 .nc-sheet__head .nc-iconbtn--ok{color:var(--nc-emerald)}
 .nc-panel__group{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nc-muted);margin:.7rem .25rem .15rem}
+.nc-panel__item--orphan{opacity:.7}
+.nc-panel__item--orphan .nc-panel__main{cursor:default}
+.nc-panel__orphan{font-size:.7rem;color:var(--nc-rose);margin-top:.25rem}
 .nc-sheet__body{overflow:auto;padding:.4rem .85rem 1.6rem}
 .nc-panel{position:fixed;top:0;right:0;height:100%;width:min(400px,90vw);background:var(--nc-surface);color:var(--nc-text);
   z-index:9700;box-shadow:-8px 0 30px rgba(0,0,0,.2);transform:translateX(100%);transition:transform .22s ease;

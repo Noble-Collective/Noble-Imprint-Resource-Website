@@ -4,7 +4,7 @@
 // (e.g. tapping a bookmark opens the Bookmarks tab on that item). Includes search, session grouping,
 // and Markdown export of everything saved in the book.
 import { el, ICONS } from './util.js'
-import { getItems, subscribeItems, removeById, isCurrentSession } from './annotations.js'
+import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned } from './annotations.js'
 
 let sheet = null
 let backdrop = null
@@ -83,13 +83,15 @@ function focusItem(id) {
 }
 
 function itemFor(a) {
-  const item = el('div', 'nc-panel__item')
+  const orphan = isCurrentSession(a) && isOrphaned(a.id)
+  const item = el('div', 'nc-panel__item' + (orphan ? ' nc-panel__item--orphan' : ''))
   item.dataset.annotId = a.id
   const main = el('button', 'nc-panel__main')
   main.innerHTML = (a.kind === 'note' ? '' : dot(a.kind === 'bookmark' ? 'accent' : (a.color || 'amber')))
     + escapeHtml(clip(a.ref, 90))
     + (a.kind === 'note' && a.body ? `<div class="nc-panel__q" style="margin-top:.2rem">${escapeHtml(clip(a.body, 130))}</div>` : '')
-  main.onclick = () => { if (isCurrentSession(a)) scrollToMark(a.id); else if (a.href) window.location.href = a.href }
+    + (orphan ? '<div class="nc-panel__orphan">Couldn’t find this on the page — the text may have changed.</div>' : '')
+  main.onclick = () => { if (orphan) return; if (isCurrentSession(a)) scrollToMark(a.id); else if (a.href) window.location.href = a.href }
   const del = el('button', 'nc-panel__del'); del.title = 'Delete'; del.innerHTML = ICONS.trash
   del.onclick = (e) => { e.stopPropagation(); removeById(a.id); render() }
   item.append(main, del)

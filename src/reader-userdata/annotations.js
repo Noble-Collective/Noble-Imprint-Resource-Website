@@ -18,6 +18,7 @@ let editOutside = null
 let notePop = null
 const listeners = []
 
+const orphaned = new Set() // current-session items whose anchor no longer resolves (content changed)
 const uuid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.round(performance.now()))
 const onChange = (cb) => listeners.push(cb)
 const emitChange = () => listeners.forEach((cb) => { try { cb(items) } catch (e) { warn(e) } })
@@ -25,6 +26,7 @@ export const getItems = () => items
 export const subscribeItems = onChange
 export const removeById = (id) => { const a = items.find((x) => x.id === id); if (a) removeAnnot(a) }
 export const isCurrentSession = (a) => !!(a && a.locator && CTX && a.locator.sessionFile === CTX.sessionFile)
+export const isOrphaned = (id) => orphaned.has(id)
 
 // One-time wiring (selectionchange + auth subscription) + first attach.
 export function initAnnotations(ctx) {
@@ -255,22 +257,30 @@ async function saveNote(body, sel, existing) {
 export function repaintAll() {
   document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
   items.forEach((a) => unpaint(a.id))
-  items.forEach(paintOne)
+  orphaned.clear()
+  items.forEach((a) => {
+    const isCurrent = a.locator && a.locator.sessionFile === CTX.sessionFile
+    const placed = paintOne(a)
+    // A current-session item that won't paint has lost its anchor (the text changed) → orphaned.
+    if (isCurrent && !placed) orphaned.add(a.id)
+  })
 }
 function paintOne(annot) {
   const anchor = annot.locator?.textAnchor
-  if (!anchor) return
-  if (annot.locator.sessionFile !== CTX.sessionFile) return // only paint the current session
+  if (!anchor) return false
+  if (annot.locator.sessionFile !== CTX.sessionFile) return false // only paint the current session
   const idx = buildIndex(ROOT)
   const range = anchorToDomRange(idx, anchor)
-  if (!range) return
+  if (!range) return false
   if (annot.kind === 'highlight') {
-    paintRange(range, `nc-hl nc-hl--${annot.color || 'amber'}`, annot.id)
+    return paintRange(range, `nc-hl nc-hl--${annot.color || 'amber'}`, annot.id)
   } else if (annot.kind === 'note') {
-    paintRange(range, 'nc-hl nc-note-mark', annot.id)
+    return paintRange(range, 'nc-hl nc-note-mark', annot.id)
   } else if (annot.kind === 'bookmark') {
     placeBookmarkMarker(range, annot)
+    return true
   }
+  return false
 }
 function placeBookmarkMarker(range, annot) {
   let block = range.startContainer
