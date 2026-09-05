@@ -281,6 +281,9 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-mynotes__item:hover{border-color:var(--nc-accent);background:var(--nc-hover)}
 .nc-mynotes__item .nc-dot{display:inline-block;width:.7rem;height:.7rem;border-radius:999px;margin-right:.45rem;vertical-align:middle}
 .nc-mynotes__body{color:var(--nc-muted);font-size:.82rem;margin-top:.25rem}
+.nc-mynotes__sess{font-size:.72rem;color:var(--nc-muted);margin-top:.3rem;opacity:.85}
+.nc-mynotes__q{font-weight:600;font-size:.85rem;color:var(--nc-text);margin-bottom:.2rem}
+.nc-mynotes__ans{color:var(--nc-muted);font-size:.85rem}
 .nc-mynotes__empty{color:var(--nc-muted);margin-bottom:.6rem}
 .nc-mynotes-page .page-title{margin-bottom:.2rem}
 .nc-flash{animation:nc-flash 1.6s ease}

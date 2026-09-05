@@ -32,10 +32,13 @@ export function attachAnswers(ctx) {
   applyAuthState(getClient())
 }
 
+const pageSessionTitle = () => (document.title || '').split(' — ')[0].trim()
+
 function buildFields() {
   document.querySelectorAll('.question-block[data-question-id]').forEach((block) => {
     const id = block.getAttribute('data-question-id')
     if (!id || fields.has(id) || block.querySelector('.nc-answer')) return
+    const questionText = (block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300) // before we inject the textarea
     const wrap = el('div', 'nc-answer')
     wrap.setAttribute('data-nc-skip', '')
     const ta = el('textarea', 'nc-answer__ta nc-answer__ta--locked')
@@ -55,7 +58,7 @@ function buildFields() {
       answersState.set(id, v)
       try {
         const loc = seriesLocator(CTX.bookPath, CTX.sessionFile, { questionId: id, contentVersion: CTX.contentVersion || undefined })
-        if (v) await client.putAnswer(loc, v)
+        if (v) await client.putAnswer(loc, v, { href: location.pathname, sessionTitle: pageSessionTitle(), questionText })
         else await client.deleteAnswer(loc)
         status.textContent = 'Saved'
       } catch (e) { warn('save answer', e); status.textContent = 'Save failed' }

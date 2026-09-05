@@ -82,6 +82,9 @@ function displayFor(text) {
   const href = location.pathname + (frag ? `#:~:text=${frag}` : '')
   return { ref, href }
 }
+// The current session's title (document.title is "Session — Book"), stored on each annotation so
+// list views can show "which session" without re-resolving.
+const pageSessionTitle = () => (document.title || '').split(' — ')[0].trim()
 
 // ---------- selection -> toolbar ----------
 function onSelChange() {
@@ -196,7 +199,7 @@ async function createHighlight(color) {
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
   const { ref, href } = displayFor(sel.text)
-  const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor), ref, href }
+  const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save highlight', e) }
 }
@@ -204,7 +207,7 @@ async function recolor(annot, color) {
   hideToolbar()
   annot.color = color
   unpaint(annot.id); paintOne(annot); emitChange()
-  try { await getClient().putAnnotation({ id: annot.id, kind: 'highlight', color, locator: annot.locator, ref: annot.ref, href: annot.href }) } catch (e) { warn('recolor', e) }
+  try { await getClient().putAnnotation({ id: annot.id, kind: 'highlight', color, locator: annot.locator, ref: annot.ref, href: annot.href, title: annot.title }) } catch (e) { warn('recolor', e) }
 }
 async function removeAnnot(annot) {
   hideToolbar(); closeNotePop()
@@ -221,7 +224,7 @@ async function createBookmark() {
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
   const { ref, href } = displayFor(sel.text)
-  const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor), ref, href }
+  const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save bookmark', e) }
 }
@@ -288,12 +291,12 @@ async function saveNote(body, sel, existing) {
   closeNotePop(); window.getSelection()?.removeAllRanges()
   if (existing) {
     existing.body = body; emitChange()
-    try { await getClient().putAnnotation({ id: existing.id, kind: 'note', body, locator: existing.locator, ref: existing.ref, href: existing.href }) } catch (e) { warn('note', e) }
+    try { await getClient().putAnnotation({ id: existing.id, kind: 'note', body, locator: existing.locator, ref: existing.ref, href: existing.href, title: existing.title }) } catch (e) { warn('note', e) }
     return
   }
   const id = uuid()
   const { ref, href } = displayFor(sel.text)
-  const annot = { id, kind: 'note', body, locator: locFor(sel.anchor), ref, href }
+  const annot = { id, kind: 'note', body, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('note', e) }
 }

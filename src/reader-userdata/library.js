@@ -92,6 +92,7 @@ function itemFor(a) {
   main.innerHTML = (a.kind === 'note' ? '' : dot(a.kind === 'bookmark' ? 'accent' : (a.color || 'amber')))
     + escapeHtml(clip(a.ref, 90))
     + (a.kind === 'note' && a.body ? `<div class="nc-panel__q" style="margin-top:.2rem">${escapeHtml(clip(a.body, 130))}</div>` : '')
+    + (!isCurrentSession(a) && a.title ? `<div class="nc-panel__sess">${escapeHtml(a.title)}</div>` : '')
     + (orphan ? '<div class="nc-panel__orphan">Couldn’t find this on the page — the text may have changed.</div>' : '')
   main.onclick = () => { if (orphan) return; if (isCurrentSession(a)) scrollToMark(a.id); else if (a.href) window.location.href = a.href }
   const del = el('button', 'nc-panel__del'); del.title = 'Delete'; del.innerHTML = ICONS.trash
