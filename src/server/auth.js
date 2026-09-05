@@ -143,6 +143,9 @@ function attachUser(req, res, next) {
     }
     user.isAdmin = flags.isAdmin || user.isSuperAdmin;
     user.isEditor = flags.isEditor || user.isSuperAdmin;
+    // Session cookies don't always carry name/picture — fall back to the stored Google profile.
+    user.displayName = decoded.name || flags.displayName || email;
+    user.photoURL = decoded.picture || flags.photoURL || null;
 
     req.user = user;
     res.locals.user = user;

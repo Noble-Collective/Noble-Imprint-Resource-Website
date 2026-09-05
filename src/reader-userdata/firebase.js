@@ -60,8 +60,11 @@ export const getUser = () => _user
 async function bridgeSession(cred) {
   if (!window.__NC_UNIFIED || !cred || !cred.user) return
   const idToken = await cred.user.getIdToken()
+  // Send the Google profile too — session cookies don't always carry name/picture, so this makes
+  // the server-side identity (and the account menu's avatar/name) reliable.
+  const profile = { displayName: cred.user.displayName || null, photoURL: cred.user.photoURL || null }
   await fetch('/api/auth/session', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, profile }),
   })
   location.reload()
 }

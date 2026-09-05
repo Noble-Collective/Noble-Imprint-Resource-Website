@@ -122,13 +122,13 @@ async function isAdmin(email) {
 // book (matches notification eligibility: admin | manuscript-owner | comment-suggest; 'viewer' does
 // not count). Used by attachUser to drive __NC_USER (admin icon + Notifications menu row).
 async function getRoleFlags(email) {
-  if (isSuperAdmin(email)) return { isAdmin: true, isEditor: true };
   const user = await getUser(email);
-  if (!user) return { isAdmin: false, isEditor: false };
-  const isAdm = user.globalRole === 'admin';
-  const roles = user.bookRoles ? Object.values(user.bookRoles) : [];
+  const superAdmin = isSuperAdmin(email);
+  const isAdm = superAdmin || !!(user && user.globalRole === 'admin');
+  const roles = user && user.bookRoles ? Object.values(user.bookRoles) : [];
   const isEditor = isAdm || roles.some((r) => r === 'manuscript-owner' || r === 'comment-suggest');
-  return { isAdmin: isAdm, isEditor };
+  // Carry the stored profile so attachUser can fill name/photo when the session cookie lacks them.
+  return { isAdmin: isAdm, isEditor, displayName: user && user.displayName, photoURL: user && user.photoURL };
 }
 
 // Check if a user has any role on a specific book
