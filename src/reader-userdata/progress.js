@@ -8,18 +8,26 @@ import { el, warn } from './util.js'
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
 // On a session page: record that it was viewed (session title + book title + resume URL).
+// Re-entrant: records the CURRENT session immediately if signed in (so AJAX in-book nav updates
+// "Continue reading"), and subscribes to auth exactly once (for the initial sign-in).
+let recCtx = null
+let recWired = false
+async function recordNow(client) {
+  client = client || getClient()
+  if (!client || !recCtx || !recCtx.bookPath || !recCtx.sessionFile) return
+  const [sessionTitle, bookTitle] = (document.title || '').split(' — ')
+  try {
+    await client.recordActivity(seriesLocator(recCtx.bookPath, recCtx.sessionFile), {
+      title: (sessionTitle || 'Session').trim(),
+      bookTitle: (bookTitle || '').trim() || undefined,
+      href: location.pathname,
+    })
+  } catch (e) { warn('recordActivity', e) }
+}
 export function recordReading(ctx) {
-  onUser(async (u, client) => {
-    if (!client || !ctx || !ctx.bookPath || !ctx.sessionFile) return
-    const [sessionTitle, bookTitle] = (document.title || '').split(' — ')
-    try {
-      await client.recordActivity(seriesLocator(ctx.bookPath, ctx.sessionFile), {
-        title: (sessionTitle || 'Session').trim(),
-        bookTitle: (bookTitle || '').trim() || undefined,
-        href: location.pathname,
-      })
-    } catch (e) { warn('recordActivity', e) }
-  })
+  recCtx = ctx
+  recordNow()
+  if (!recWired) { recWired = true; onUser((u, client) => recordNow(client)) }
 }
 
 // On the home page: a "Continue reading" strip — the most recently-viewed session per book.

@@ -208,6 +208,7 @@ function reattach(newCtx) {
     buildCluster(document.querySelector('.sidebar'), { atTop: true })
     attachAnswers(newCtx)
     attachAnnotations(newCtx)
+    recordReading(newCtx) // keep "Continue reading" current through in-book AJAX navigation
     updateClusters()
   } catch (e) { warn('reattach', e) }
 }

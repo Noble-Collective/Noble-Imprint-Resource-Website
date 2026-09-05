@@ -52,7 +52,7 @@
                   <% if (u.photoURL) { %>
                     <img src="<%= u.photoURL %>" alt="" class="admin-avatar" referrerpolicy="no-referrer">
                   <% } else { %>
-                    <span class="admin-avatar admin-avatar--initials"><%= (u.displayName || u.email)[0].toUpperCase() %></span>
+                    <span class="admin-avatar admin-avatar--initials"><%= String(u.displayName || u.email || '?')[0].toUpperCase() %></span>
                   <% } %>
                   <span><%= u.displayName || u.email %></span>
                 </td>

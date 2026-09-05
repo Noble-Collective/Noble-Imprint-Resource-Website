@@ -42,3 +42,7 @@ export const ICONS = {
 }
 
 export const HIGHLIGHT_COLORS = ['amber', 'sky', 'rose', 'emerald']
+
+// A CSS-var-safe color token (annotations are the user's own, but never trust a stored value in an
+// inline style). Falls back to amber for anything but plain lowercase letters (amber/sky/rose/emerald/accent).
+export const safeColor = (c) => (/^[a-z]+$/.test(String(c)) ? String(c) : 'amber')

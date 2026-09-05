@@ -7,7 +7,7 @@
           <% if (user.photoURL) { %>
             <img src="<%= user.photoURL %>" alt="" class="sidebar-auth-avatar" referrerpolicy="no-referrer">
           <% } else { %>
-            <span class="sidebar-auth-avatar sidebar-auth-avatar--initials"><%= (user.displayName || user.email)[0].toUpperCase() %></span>
+            <span class="sidebar-auth-avatar sidebar-auth-avatar--initials"><%= String(user.displayName || user.email || '?')[0].toUpperCase() %></span>
           <% } %>
           <div class="sidebar-auth-info">
             <div class="sidebar-auth-name"><%= user.displayName %></div>

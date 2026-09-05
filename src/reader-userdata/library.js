@@ -3,7 +3,7 @@
 // to their page. Each item has a delete icon. Opens focused on a specific item when asked
 // (e.g. tapping a bookmark opens the Bookmarks tab on that item). Includes search, session grouping,
 // and Markdown export of everything saved in the book.
-import { el, ICONS } from './util.js'
+import { el, ICONS, safeColor } from './util.js'
 import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned } from './annotations.js'
 
 let sheet = null
@@ -16,7 +16,7 @@ const TABS = [['highlights', 'Highlights', 'highlight'], ['notes', 'Notes', 'not
 const esc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&'))
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-const dot = (color) => `<span class="nc-dot" style="background:var(--nc-${color})"></span>`
+const dot = (color) => `<span class="nc-dot" style="background:var(--nc-${safeColor(color)})"></span>`
 const tabForKind = (k) => (k === 'highlight' ? 'highlights' : k === 'note' ? 'notes' : 'bookmarks')
 const matches = (a, q) => !q || (`${a.ref || ''} ${a.body || ''}`).toLowerCase().includes(q)
 
@@ -171,8 +171,8 @@ function exportMarkdown() {
   }
 }
 function flashExport(msg) {
-  const btn = sheet && sheet.querySelector('.nc-sheet__export')
+  const btn = sheet && sheet.querySelector('.nc-sheet__exportlink')
   if (!btn) return
-  const old = btn.title; btn.title = msg
-  btn.classList.add('nc-iconbtn--ok'); setTimeout(() => { btn.classList.remove('nc-iconbtn--ok'); btn.title = old }, 1600)
+  const old = btn.textContent; btn.textContent = msg
+  setTimeout(() => { if (btn.isConnected) btn.textContent = old }, 1600)
 }

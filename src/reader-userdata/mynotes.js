@@ -2,7 +2,7 @@
 // highlights, notes, bookmarks — grouped by book, searchable, with jump links + Markdown export.
 // Rendered entirely client-side from the shared store (listAnnotations).
 import { getClient, onUser } from './firebase.js'
-import { el, warn } from './util.js'
+import { el, warn, safeColor } from './util.js'
 
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
@@ -99,7 +99,7 @@ function sessLabel(x) { return x.title || x.sessionTitle ? `<div class="nc-mynot
 function itemRow(a) {
   const row = el('a', 'nc-mynotes__item')
   row.href = a.href || '#'
-  const dotColor = a.kind === 'bookmark' ? 'accent' : (a.color || 'amber')
+  const dotColor = a.kind === 'bookmark' ? 'accent' : safeColor(a.color || 'amber')
   row.innerHTML = (a.kind === 'note' ? '' : `<span class="nc-dot" style="background:var(--nc-${dotColor})"></span>`)
     + escapeHtml(clip(a.ref, 130))
     + (a.kind === 'note' && a.body ? `<div class="nc-mynotes__body">${escapeHtml(clip(a.body, 180))}</div>` : '')

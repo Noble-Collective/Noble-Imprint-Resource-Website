@@ -438,9 +438,11 @@ app.post('/api/auth/session', async (req, res) => {
     // Create or update user in Firestore. Verify the ID token against whichever project owns
     // identity under the current flag (463519 when AUTH_UNIFIED, else noble-imprint-website).
     const decoded = await auth.verifyIdToken(idToken);
-    // Prefer the client-sent Google profile (session cookies drop name/picture sometimes).
-    const displayName = (profile && profile.displayName) || decoded.name;
-    const photoURL = (profile && profile.photoURL) || decoded.picture;
+    // Prefer the client-sent Google profile (session cookies drop name/picture sometimes), but the
+    // client is untrusted: accept ONLY bounded strings, else fall back to the verified token's claims.
+    const str = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : undefined);
+    const displayName = str(profile && profile.displayName, 200) || decoded.name;
+    const photoURL = str(profile && profile.photoURL, 1000) || decoded.picture;
     await firestore.createOrUpdateUser(decoded.email, displayName, photoURL);
     // Drop any cached role/profile flags so the next request reflects the fresh profile immediately.
     try { require('./cache').del('roleflags:' + String(decoded.email).toLowerCase()); } catch { /* ignore */ }

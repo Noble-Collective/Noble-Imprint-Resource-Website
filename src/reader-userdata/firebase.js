@@ -96,17 +96,13 @@ export async function deleteAllData() {
 // Erase all data, then delete the Firebase account itself (re-auth if the session is too old), and
 // clear the server session. Irreversible.
 export async function deleteAccount() {
-  await deleteAllData()
   const user = _auth && _auth.currentUser
-  if (user) {
-    try {
-      await deleteUser(user)
-    } catch (e) {
-      if (e && e.code === 'auth/requires-recent-login') {
-        await reauthenticateWithPopup(user, new GoogleAuthProvider())
-        await deleteUser(user)
-      } else { throw e }
-    }
-  }
+  if (!user) { await deleteAllData(); return }
+  // Reauthenticate UP FRONT: if the user cancels, we abort with NOTHING deleted (avoids the
+  // half-completed state where data is erased but a reauth prompt then fails). Firestore erase must
+  // run while still authed, so it happens after reauth but before the account is removed.
+  await reauthenticateWithPopup(user, new GoogleAuthProvider())
+  await deleteAllData()
+  await deleteUser(user)
   if (window.__NC_UNIFIED) { try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ } }
 }
