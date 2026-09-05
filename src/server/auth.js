@@ -25,15 +25,24 @@ const READER_SIGNER_SA = process.env.AUTH_UNIFIED_SIGNER_SA
   || `firebase-adminsdk-fbsvc@${READER_PROJECT_ID}.iam.gserviceaccount.com`;
 
 let _authApp = null;
-function authAuth() {
-  if (!AUTH_UNIFIED) return admin.auth(); // default app = noble-imprint-website (today's behavior)
+function reader463519App() {
   if (!_authApp) {
     _authApp = admin.initializeApp(
       { projectId: READER_PROJECT_ID, serviceAccountId: READER_SIGNER_SA },
       'auth463519',
     );
   }
-  return _authApp.auth();
+  return _authApp;
+}
+function authAuth() {
+  if (!AUTH_UNIFIED) return admin.auth(); // default app = noble-imprint-website (today's behavior)
+  return reader463519App().auth();
+}
+// Firestore handle for the shared converged store (collective-user-data on 463519). Used by admin
+// aggregations (Reader Activity). Requires the runtime SA to have Firestore read on 463519.
+function getReaderFirestore() {
+  const { getFirestore } = require('firebase-admin/firestore');
+  return getFirestore(reader463519App(), 'collective-user-data');
 }
 
 function isSuperAdmin(email) {
@@ -207,6 +216,7 @@ module.exports = {
   createSessionCookie,
   verifyIdToken,
   verifySessionCookie,
+  getReaderFirestore,
   attachUser,
   AUTH_UNIFIED,
   requireAdmin,

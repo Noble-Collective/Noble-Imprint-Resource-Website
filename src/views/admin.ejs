@@ -267,6 +267,20 @@
       <div class="an-subtabs" role="tablist">
         <button class="an-subtab an-subtab--active" data-an-sub="resource">Resource Analytics</button>
         <button class="an-subtab" data-an-sub="basic">Basic Analytics</button>
+        <button class="an-subtab" data-an-sub="reader">Reader Activity</button>
+      </div>
+
+      <div class="an-sub an-sub--hidden" id="an-sub-reader">
+        <p class="an-card-sub" style="margin:0 0 14px">Aggregate engagement from readers’ saved highlights, notes, bookmarks &amp; answers. Private note text and identities are never shown.</p>
+        <div class="an-tiles" id="ra-tiles"></div>
+        <div class="an-card an-card--wide" style="margin-top:16px">
+          <h4 class="an-subhead">Engagement by book</h4>
+          <div id="ra-books"><p class="text-muted">Loading&hellip;</p></div>
+        </div>
+        <div class="an-card an-card--wide" style="margin-top:16px">
+          <h4 class="an-subhead">Most-highlighted passages</h4>
+          <div id="ra-passages"><p class="text-muted">Loading&hellip;</p></div>
+        </div>
       </div>
 
       <div class="an-sub" id="an-sub-resource">
@@ -463,6 +477,6 @@
 </script>
 <script src="/static/js/admin.js?v=36"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
-<script src="/static/js/admin-analytics.js?v=4"></script>
+<script src="/static/js/admin-analytics.js?v=5"></script>
 
 <%- include('partials/footer') %>

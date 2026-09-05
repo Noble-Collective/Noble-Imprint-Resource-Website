@@ -292,8 +292,37 @@
     loadResource(); // already on the Resource tab (leaderboard lives there)
   }
 
+  // Reader Activity: privacy-safe engagement aggregates (Firestore, not BigQuery).
+  function renderReader(d) {
+    var t = d.totals || {};
+    el('ra-tiles').innerHTML =
+      tile('Highlights', num(t.highlights)) +
+      tile('Notes', num(t.notes)) +
+      tile('Bookmarks', num(t.bookmarks)) +
+      tile('Answers', num(t.answers)) +
+      tile('Readers', num(t.readers), 'saved something');
+    var books = d.byBook || [];
+    el('ra-books').innerHTML = !books.length ? '<p class="text-muted">No reader activity yet.</p>' :
+      '<table class="admin-table"><thead><tr><th>Book</th><th>Highlights</th><th>Notes</th><th>Bookmarks</th><th>Answers</th><th>Readers</th></tr></thead><tbody>' +
+      books.map(function (b) {
+        return '<tr><td>' + esc(b.title) + '</td><td>' + num(b.highlights) + '</td><td>' + num(b.notes) + '</td><td>' + num(b.bookmarks) + '</td><td>' + num(b.answers) + '</td><td>' + num(b.readers) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    var ps = d.topPassages || [];
+    el('ra-passages').innerHTML = !ps.length ? '<p class="text-muted">No highlights yet.</p>' :
+      ps.map(function (p) {
+        return '<div class="ra-passage"><span class="ra-passage-count">' + num(p.count) + '×</span><span class="ra-passage-ref">“' + esc(p.ref) + '”</span><span class="ra-passage-book">' + esc(p.book) + '</span></div>';
+      }).join('');
+  }
+  function loadReader() {
+    var mySeq = ++reqSeq;
+    el('ra-books').innerHTML = '<p class="text-muted">Loading…</p>';
+    fetch('/api/admin/reader-activity', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (d) { if (mySeq !== reqSeq) return; if (d.error) throw new Error(d.error); renderReader(d); })
+      .catch(function (e) { el('ra-books').innerHTML = '<p class="text-muted">Error: ' + esc(e.message) + '</p>'; });
+  }
+
   // --- wiring ---
-  function reloadActive() { if (subTab === 'basic') loadBasic(); else loadResource(); }
+  function reloadActive() { if (subTab === 'reader') loadReader(); else if (subTab === 'basic') loadBasic(); else loadResource(); }
 
   document.addEventListener('DOMContentLoaded', function () {
     var tabBtn = document.querySelector('[data-admin-tab="analytics"]');
@@ -304,10 +333,11 @@
         document.querySelectorAll('.an-subtab').forEach(function (x) { x.classList.remove('an-subtab--active'); });
         b.classList.add('an-subtab--active');
         subTab = b.getAttribute('data-an-sub');
-        var res = el('an-sub-resource'), basic = el('an-sub-basic');
+        var res = el('an-sub-resource'), basic = el('an-sub-basic'), reader = el('an-sub-reader');
         if (res) res.classList.toggle('an-sub--hidden', subTab !== 'resource');
         if (basic) basic.classList.toggle('an-sub--hidden', subTab !== 'basic');
-        var bookSel = el('an-book'); if (bookSel) bookSel.style.display = (subTab === 'basic') ? 'none' : '';
+        if (reader) reader.classList.toggle('an-sub--hidden', subTab !== 'reader');
+        var bookSel = el('an-book'); if (bookSel) bookSel.style.display = (subTab === 'resource') ? '' : 'none';
         loaded = true;
         reloadActive();
       });

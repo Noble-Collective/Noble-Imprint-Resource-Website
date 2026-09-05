@@ -121,6 +121,16 @@ api.get('/analytics', async (req, res) => {
   }
 });
 
+// Reader Activity: privacy-safe engagement aggregates over the converged store.
+api.get('/reader-activity', async (req, res) => {
+  try {
+    res.json(await require('./reader-activity').getReaderActivity());
+  } catch (err) {
+    console.error('[admin] reader-activity error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Book comparison: leaderboard + multi-book trend.
 api.get('/analytics/books', async (req, res) => {
   try {
