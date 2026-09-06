@@ -92,9 +92,12 @@ function toggleAccountMenu(anchor) {
   const su = ncUser()
   acctMenu = el('div', 'nc-menu nc-acct')
   acctMenu.setAttribute('data-nc-skip', '')
-  const name = u?.displayName || su?.displayName || 'Signed in'
-  const email = u?.email || su?.email
-  const photo = u?.photoURL || (su && su.photoURL)
+  // Some Google accounts have no display name / photo (e.g. lundys@gmail.com). Fall back to the
+  // email for the name (not a bare "Signed in") and to an email-initial avatar.
+  const email = u?.email || su?.email || ''
+  const displayName = u?.displayName || su?.displayName || ''
+  const name = displayName || email || 'Signed in'
+  const photo = u?.photoURL || (su && su.photoURL) || ''
   const head = el('div', 'nc-acct__head')
   const initialsAvatar = () => el('span', 'nc-acct__avatar nc-acct__avatar--initials', (name[0] || '?').toUpperCase())
   if (photo) {
@@ -108,7 +111,7 @@ function toggleAccountMenu(anchor) {
   }
   const info = el('div', 'nc-acct__info')
   info.appendChild(el('div', 'nc-acct__name', name))
-  if (email) info.appendChild(el('div', 'nc-acct__email', email))
+  if (email && email !== name) info.appendChild(el('div', 'nc-acct__email', email))
   head.appendChild(info)
   acctMenu.appendChild(head)
   // My Notes — everything saved across all books (any signed-in user).
