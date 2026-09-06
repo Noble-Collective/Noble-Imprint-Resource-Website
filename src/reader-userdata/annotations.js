@@ -4,7 +4,7 @@
 import { seriesLocator, bibleLocator } from '@noble-collective/userdata/core'
 import { getClient, onUser } from './firebase.js'
 import { el, ICONS, HIGHLIGHT_COLORS, warn, debounce } from './util.js'
-import { buildIndex, selectionToNorm, anchorFromNorm, anchorToDomRange, paintRange, unpaint } from './anchor-dom.js'
+import { buildIndex, selectionToNorm, rangeToNorm, anchorFromNorm, anchorToDomRange, paintRange, unpaint } from './anchor-dom.js'
 
 let CTX = null
 let ROOT = null
@@ -146,6 +146,45 @@ function startVerseOf(range) {
   return best
 }
 
+// Split a multi-verse Bible selection into one anchor PER VERSE (over the chapter index), so we can
+// store a highlight the way Coram Deo does: one doc per verse, tied by a shared groupId. Returns
+// null for a single-verse selection (or the audio path, which has no per-verse `.bible-verse[id]`
+// wrappers) → the caller then stores a single doc.
+const inVerseNum = (node) => !!(node && node.parentElement && node.parentElement.closest('sup, .verse-num'))
+// The sub-range of `range` that lies within verse element `v`, bounded by TEXT nodes (rangeToNorm
+// can't map element-container boundaries) and excluding the verse-number <sup> so the quote is prose.
+function verseSubRange(v, range) {
+  const w = document.createTreeWalker(v, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (inVerseNum(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  })
+  const nodes = []; let n; while ((n = w.nextNode())) nodes.push(n)
+  if (!nodes.length) return null
+  const sub = document.createRange()
+  if (v.contains(range.startContainer) && !inVerseNum(range.startContainer)) sub.setStart(range.startContainer, range.startOffset)
+  else sub.setStart(nodes[0], 0)
+  if (v.contains(range.endContainer)) sub.setEnd(range.endContainer, range.endOffset)
+  else { const last = nodes[nodes.length - 1]; sub.setEnd(last, last.length) }
+  try { return sub.collapsed ? null : sub } catch { return null }
+}
+function computeVerseAnchors(idx, range) {
+  if (!range) return null
+  const verseEls = [...ROOT.querySelectorAll('.bible-verse[id]')].filter((v) => {
+    try { return range.intersectsNode(v) } catch { return false }
+  })
+  if (verseEls.length <= 1) return null
+  const out = []
+  for (const v of verseEls) {
+    const sub = verseSubRange(v, range)
+    if (!sub) continue
+    const nr = rangeToNorm(idx, sub)
+    if (!nr || nr.start >= nr.end) continue
+    const verseNum = parseInt(String(v.id).replace(/^v/, ''), 10)
+    if (!(verseNum > 0)) continue
+    out.push({ verse: verseNum, anchor: anchorFromNorm(idx, nr.start, nr.end), quote: idx.norm.slice(nr.start, nr.end) })
+  }
+  return out.length > 1 ? out : null
+}
+
 // ---------- selection -> toolbar ----------
 function onSelChange() {
   const sel = window.getSelection()
@@ -165,7 +204,13 @@ function onSelChange() {
   // `text` = normalized (for the anchor). `raw` = the actual rendered selection — used for the
   // display quote + the #:~:text= share fragment, which must match the page's ORIGINAL text
   // (curly quotes, em-dashes, whitespace) or the browser won't scroll to it.
-  pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), raw: sel.toString(), rect: info.rect, verse: isBible() ? startVerseOf(sel.getRangeAt(0)) : undefined }
+  const range = sel.getRangeAt(0)
+  pendingSel = {
+    anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end),
+    raw: sel.toString(), rect: info.rect,
+    verse: isBible() ? startVerseOf(range) : undefined,
+    verseAnchors: isBible() ? computeVerseAnchors(idx, range) : null, // multi-verse → per-verse docs
+  }
   showCreateToolbar(info.rect)
 }
 
@@ -269,24 +314,56 @@ async function createHighlight(color) {
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
+  const client = getClient()
+  const { href } = displayFor(sel.raw || sel.text)
+  // Multi-verse Bible highlight → one doc PER VERSE sharing a groupId (Coram Deo's verse-keyed
+  // model), so it paints, edits, and deletes as a single entity on every surface.
+  if (sel.verseAnchors && sel.verseAnchors.length > 1) {
+    const groupId = uuid()
+    const created = sel.verseAnchors.map((va) => ({
+      id: uuid(), kind: 'highlight', color, groupId,
+      locator: locFor(va.anchor, va.verse),
+      ref: va.quote && va.quote.length > 60 ? va.quote.slice(0, 57) + '…' : (va.quote || sel.text),
+      href, title: unitTitle(),
+    }))
+    created.forEach((a) => { items.push(a); paintOne(a) })
+    emitChange()
+    // Write the group in parallel so the live snapshot converges to all members at once (a
+    // sequential loop would let an intermediate snapshot briefly wipe not-yet-written members).
+    await Promise.all(created.map((a) => client.putAnnotation(a).catch((e) => warn('save highlight', e))))
+    return
+  }
   const id = uuid()
-  const { ref, href } = displayFor(sel.raw || sel.text)
+  const ref = displayFor(sel.raw || sel.text).ref
   const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
   items.push(annot); paintOne(annot); emitChange()
-  try { await getClient().putAnnotation(annot) } catch (e) { warn('save highlight', e) }
+  try { await client.putAnnotation(annot) } catch (e) { warn('save highlight', e) }
+}
+// A multi-verse highlight is N docs sharing a groupId — recolor/remove operate on the whole group.
+function groupMembers(annot) {
+  return annot && annot.groupId ? items.filter((a) => a.groupId === annot.groupId) : (annot ? [annot] : [])
 }
 async function recolor(annot, color) {
   hideToolbar()
-  annot.color = color
-  unpaint(annot.id); paintOne(annot); emitChange()
-  try { await getClient().putAnnotation({ id: annot.id, kind: 'highlight', color, locator: annot.locator, ref: annot.ref, href: annot.href, title: annot.title }) } catch (e) { warn('recolor', e) }
+  const members = groupMembers(annot)
+  const client = getClient()
+  for (const m of members) { m.color = color; unpaint(m.id); paintOne(m) }
+  emitChange()
+  for (const m of members) {
+    try { await client.putAnnotation({ id: m.id, kind: 'highlight', color, groupId: m.groupId, locator: m.locator, ref: m.ref, href: m.href, title: m.title }) } catch (e) { warn('recolor', e) }
+  }
 }
 async function removeAnnot(annot) {
   hideToolbar(); closeNotePop()
-  unpaint(annot.id)
-  document.querySelectorAll(`.nc-bm-marker[data-annot-id="${cssEsc(annot.id)}"]`).forEach((m) => m.remove())
-  items = items.filter((a) => a.id !== annot.id); emitChange()
-  try { await getClient().deleteAnnotation(annot.id) } catch (e) { warn('remove', e) }
+  const members = groupMembers(annot)
+  const ids = new Set(members.map((m) => m.id))
+  for (const m of members) {
+    unpaint(m.id)
+    document.querySelectorAll(`.nc-bm-marker[data-annot-id="${cssEsc(m.id)}"]`).forEach((el2) => el2.remove())
+  }
+  items = items.filter((a) => !ids.has(a.id)); emitChange()
+  const client = getClient()
+  await Promise.all(members.map((m) => client.deleteAnnotation(m.id).catch((e) => warn('remove', e))))
 }
 async function createBookmark() {
   if (!getClient()) return needSignIn()
@@ -418,7 +495,11 @@ async function saveNote(body, sel, existing) {
 // ---------- painting ----------
 export function repaintAll() {
   document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
-  items.forEach((a) => unpaint(a.id))
+  // Unpaint EVERY existing mark, not just current items — a doc can leave `items` between live
+  // snapshots (e.g. a group member deleted while another lingers), and its mark must not survive.
+  const painted = new Set()
+  document.querySelectorAll('mark[data-annot-id]').forEach((m) => painted.add(m.dataset.annotId))
+  painted.forEach((id) => unpaint(id))
   orphaned.clear()
   items.forEach((a) => {
     const isCurrent = a.locator && sameUnit(a.locator)

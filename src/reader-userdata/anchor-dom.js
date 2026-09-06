@@ -98,6 +98,20 @@ export function selectionToNorm(index) {
   return { start: ns, end: ne, rect }
 }
 
+/** An arbitrary DOM Range -> a {start,end} range in normalized space (or null). Like
+ * selectionToNorm but for a caller-supplied range (used to split a multi-verse selection per verse). */
+export function rangeToNorm(index, range) {
+  if (!range || !index.root.contains(range.commonAncestorContainer)) return null
+  let rs = nodeToRaw(range.startContainer, range.startOffset, index.nodeMap)
+  let re = nodeToRaw(range.endContainer, range.endOffset, index.nodeMap)
+  if (rs == null || re == null) return null
+  if (rs > re) [rs, re] = [re, rs]
+  const ns = index.r2n[rs]
+  const ne = index.r2n[re]
+  if (ns == null || ne == null || ns >= ne) return null
+  return { start: ns, end: ne }
+}
+
 /** Build a TextAnchor from a normalized [start,end). */
 export function anchorFromNorm(index, start, end) {
   return computeAnchor(index.norm, start, end)
