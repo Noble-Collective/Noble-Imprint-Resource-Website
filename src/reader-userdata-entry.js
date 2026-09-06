@@ -19,21 +19,31 @@ import { el, ICONS, warn } from './reader-userdata/util.js'
 // flash it. Native scroll-to-text-fragment is unreliable on some browsers (notably mobile Safari),
 // so we don't depend on it — same normalized-anchor machinery the highlights use.
 function jumpToTextFragment(root) {
-  const dir = parseTextDirective(location.hash)
+  const dir = parseTextDirective(location.search + location.hash)
   if (!dir) return
-  // Let fonts/images settle so the target's final position is stable before we scroll.
-  setTimeout(() => {
+  const id = 'nc-shared-passage'
+  const tryJump = () => {
     try {
       const range = textDirectiveToRange(root, dir.startText, dir.endText)
-      if (!range) return
-      const id = 'nc-shared-passage'
+      if (!range) return false
       unpaint(id)
-      if (!paintRange(range, 'nc-share-hl', id)) return
+      if (!paintRange(range, 'nc-share-hl', id)) return false
       const mark = document.querySelector('mark[data-annot-id="nc-shared-passage"]')
       if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
       setTimeout(() => unpaint(id), 3200) // remove the temporary emphasis; the reading text is untouched
-    } catch (e) { warn('shared-passage jump', e) }
-  }, 350)
+      return true
+    } catch (e) { warn('shared-passage jump', e); return true /* don't retry on error */ }
+  }
+  // Retry until the text is found (content is server-rendered so usually first try), then re-center
+  // a couple more times so late web-font/image reflow (which shifts the target) and any browser
+  // scroll-restoration can't leave us stranded at the top.
+  let tries = 0
+  let recenters = 0
+  const tick = () => {
+    if (tryJump()) { if (recenters++ < 2) setTimeout(tick, 500) }
+    else if (tries++ < 8) setTimeout(tick, 250)
+  }
+  setTimeout(tick, 200)
 }
 
 function sbtn(icon, title, onClick) {

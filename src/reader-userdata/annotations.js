@@ -261,22 +261,26 @@ function fragParts(text) {
   const end = t.slice(-70).replace(/^\S*\s+/, '') || t.slice(-70)          // forward to next whole word
   return { start, end }
 }
-// A shareable passage URL. We carry the text TWICE: our own `#ncq=` param (start[|end]) which the
-// reader reads on load to scroll+flash robustly in every browser — crucially it survives in
-// location.hash, whereas browsers STRIP the native `:~:text=` directive from location so script
-// can't read it — plus that native directive so desktop browsers also highlight it for free.
+// A shareable passage URL. We carry the text TWICE:
+//  (1) our own `?ncq=` QUERY param (start[|end]) — the reader reads it on load and scrolls+flashes
+//      the passage in every browser. It's a query param, NOT a fragment, on purpose: browsers strip
+//      the native `:~:text=` directive from the URL before script can read it, and share sheets
+//      (notably Safari's) drop the whole `#…` fragment — query params survive both. The server
+//      ignores unknown query params.
+//  (2) the native `#:~:text=` directive too, so desktop browsers that keep it also highlight for free.
+function ncqParam(p) { return 'ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '') }
+function nativeFrag(p) { return '#:~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '') }
 function passageUrl(text) {
   const p = fragParts(text)
   if (!p) return location.origin + location.pathname
-  const ncq = 'ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '')
-  const native = ':~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '')
-  return location.origin + location.pathname + '#' + ncq + native
+  const sep = location.search ? '&' : '?'
+  return location.origin + location.pathname + sep + ncqParam(p) + nativeFrag(p)
 }
+// Relative variant (path + query + fragment) for stored notebook links.
 function passageHash(text) {
   const p = fragParts(text)
   if (!p) return ''
-  return '#ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '') +
-    ':~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '')
+  return '?' + ncqParam(p) + nativeFrag(p)
 }
 async function shareUrl(url, rect) {
   if (navigator.share) {

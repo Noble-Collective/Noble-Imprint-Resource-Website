@@ -148,13 +148,14 @@ export function textDirectiveToRange(root, startText, endText) {
 }
 
 /**
- * Parse our `#ncq=<start>[|<end>]` passage param out of location.hash → { startText, endText }.
- * We use our own param (not the native `:~:text=` directive) because browsers strip the directive
- * from location before script can read it. `[^&:]` also tolerates a trailing native directive if a
- * browser happens NOT to strip it (encoded parts never contain a literal '|' or ':').
+ * Parse our `ncq=<start>[|<end>]` passage param → { startText, endText }. Pass
+ * `location.search + location.hash`: new links carry it as a QUERY param (survives browser
+ * directive-stripping and share-sheet fragment-dropping); older links had it in the hash — either
+ * works. `[^&#:]` also tolerates a trailing native `:~:text=` directive (encoded parts never
+ * contain a literal '|', ':', '#', or '&').
  */
-export function parseTextDirective(hash) {
-  const m = (hash || '').match(/ncq=([^&:]+)/)
+export function parseTextDirective(searchAndHash) {
+  const m = (searchAndHash || '').match(/ncq=([^&#:]+)/)
   if (!m) return null
   const segs = m[1].split('|').map((x) => { try { return decodeURIComponent(x) } catch { return x } }).filter(Boolean)
   if (!segs.length) return null
