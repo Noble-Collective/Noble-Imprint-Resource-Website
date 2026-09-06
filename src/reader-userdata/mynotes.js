@@ -2,7 +2,7 @@
 // highlights, notes, bookmarks — grouped by book, searchable, with jump links + Markdown export.
 // Rendered entirely client-side from the shared store, live via onAnnotations + onAnswers.
 import { getClient, onUser } from './firebase.js'
-import { el, warn, safeColor } from './util.js'
+import { el, warn, safeColor, dedupeGroups } from './util.js'
 
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
@@ -11,7 +11,7 @@ const KIND_LABEL = { highlight: 'Highlights', note: 'Notes', bookmark: 'Bookmark
 const KINDS = [['highlight', 'Highlights'], ['note', 'Notes'], ['bookmark', 'Bookmarks']]
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 function countLabel(ann, ans) {
-  const parts = KINDS.map(([k, l]) => [ann.filter((a) => a.kind === k).length, l.slice(0, -1).toLowerCase()])
+  const parts = KINDS.map(([k, l]) => [dedupeGroups(ann.filter((a) => a.kind === k)).length, l.slice(0, -1).toLowerCase()])
     .filter(([n]) => n > 0).map(([n, w]) => plural(n, w))
   if (ans && ans.length) parts.push(plural(ans.length, 'answer'))
   return parts.join(' · ') || 'no notes'
@@ -95,7 +95,7 @@ function render(host, annots, answers) {
       d.appendChild(sum)
       const body = el('div', 'nc-mn-book__body')
       for (const [kind, label] of KINDS) {
-        const grp = groups.ann.filter((a) => a.kind === kind)
+        const grp = dedupeGroups(groups.ann.filter((a) => a.kind === kind))
         if (!grp.length) continue
         body.appendChild(el('div', 'nc-mn-kind', label))
         grp.forEach((a) => body.appendChild(itemRow(a)))
@@ -145,7 +145,7 @@ function exportMarkdown(annots, answers) {
   for (const [bookPath, groups] of byBook) {
     lines.push(`## ${(books[bookPath] && books[bookPath].title) || bookLabel(bookPath)}`, '')
     for (const kind of ['highlight', 'note', 'bookmark']) {
-      const group = groups.ann.filter((a) => a.kind === kind)
+      const group = dedupeGroups(groups.ann.filter((a) => a.kind === kind))
       if (!group.length) continue
       lines.push(`### ${KIND_LABEL[kind]}`)
       for (const a of group) lines.push(kind === 'note' ? `- “${(a.ref || '').trim()}” — ${(a.body || '').trim()}` : `- “${(a.ref || '').trim()}”`)

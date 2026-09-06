@@ -636,10 +636,29 @@ function paintOne(annot) {
   } else if (annot.kind === 'note') {
     return paintRange(range, 'nc-hl nc-note-mark', annot.id)
   } else if (annot.kind === 'bookmark') {
+    // Verse bookmarks (no anchor) pin the marker to the verse number itself (both layouts); anchored
+    // (series) bookmarks fall back to a block-level marker.
+    if (!loc?.textAnchor && loc?.corpus === 'bible' && placeVerseBookmarkMarker(verseNumFromOsis(loc.osisRef), annot)) return true
     placeBookmarkMarker(range, annot)
     return true
   }
   return false
+}
+// Put a bookmark marker immediately before verse `num`'s number <sup> — precise on both the wrapped
+// (non-audio) and flat inline-<sup> (audio) renderings. Returns false if the verse number isn't found.
+function placeVerseBookmarkMarker(num, annot) {
+  let sup = null
+  const v = ROOT.querySelector(`.bible-verse[id="v${num}"]`)
+  if (v) sup = v.querySelector('sup, .verse-num')
+  if (!sup) sup = [...ROOT.querySelectorAll('.bible-content sup')].find((s) => parseInt(s.textContent, 10) === num)
+  if (!sup || !sup.parentNode) return false
+  const span = el('span', 'nc-bm-marker'); span.setAttribute('data-nc-skip', '')
+  span.dataset.annotId = annot.id
+  span.title = 'Bookmark — open in notebook'
+  span.innerHTML = ICONS.bookmarkFill
+  span.onclick = (e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('nc:open-notebook', { detail: { focusId: annot.id } })) }
+  sup.parentNode.insertBefore(span, sup)
+  return true
 }
 function placeBookmarkMarker(range, annot) {
   let block = range.startContainer

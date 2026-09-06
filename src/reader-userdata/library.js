@@ -3,7 +3,7 @@
 // to their page. Each item has a delete icon. Opens focused on a specific item when asked
 // (e.g. tapping a bookmark opens the Bookmarks tab on that item). Includes search, session grouping,
 // and Markdown export of everything saved in the book.
-import { el, ICONS, safeColor } from './util.js'
+import { el, ICONS, safeColor, dedupeGroups } from './util.js'
 import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned } from './annotations.js'
 
 let sheet = null
@@ -106,7 +106,7 @@ function render() {
   const items = getItems()
   sheet.querySelectorAll('.nc-tab').forEach((t) => {
     const [key, label, kind] = TABS.find((x) => x[0] === t.dataset.tab)
-    const n = items.filter((a) => a.kind === kind).length
+    const n = dedupeGroups(items.filter((a) => a.kind === kind)).length
     t.textContent = `${label} (${n})`
     t.setAttribute('aria-selected', String(key === activeTab))
   })
@@ -117,7 +117,7 @@ function render() {
 function renderBody() {
   if (!sheet || !sheet.isConnected) return
   const kind = (TABS.find((x) => x[0] === activeTab) || TABS[0])[2]
-  const list = getItems().filter((a) => a.kind === kind && matches(a, query))
+  const list = dedupeGroups(getItems().filter((a) => a.kind === kind && matches(a, query)))
   const body = sheet.querySelector('.nc-sheet__body')
   body.innerHTML = ''
   if (!list.length) {
@@ -149,7 +149,7 @@ function exportMarkdown() {
   if (!items.length) { flashExport('Nothing to export yet'); return }
   const lines = [`# My notes — ${bookName()}`, '']
   for (const [, label, kind] of TABS) {
-    const group = items.filter((a) => a.kind === kind)
+    const group = dedupeGroups(items.filter((a) => a.kind === kind))
     if (!group.length) continue
     lines.push(`## ${label}`, '')
     for (const a of group) {

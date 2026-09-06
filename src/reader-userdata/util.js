@@ -46,6 +46,19 @@ export const ICONS = {
 
 export const HIGHLIGHT_COLORS = ['amber', 'sky', 'rose', 'emerald']
 
+// Collapse multi-unit highlight groups (docs sharing a groupId — see ARCHITECTURE §3a) to a single
+// representative for list views, so a multi-verse highlight shows once, not once per verse. Items
+// without a groupId (everything else) pass through unchanged.
+export function dedupeGroups(list) {
+  const seen = new Set()
+  return (list || []).filter((a) => {
+    if (!a || !a.groupId) return true
+    if (seen.has(a.groupId)) return false
+    seen.add(a.groupId)
+    return true
+  })
+}
+
 // A CSS-var-safe color token (annotations are the user's own, but never trust a stored value in an
 // inline style). Falls back to amber for anything but plain lowercase letters (amber/sky/rose/emerald/accent).
 export const safeColor = (c) => (/^[a-z]+$/.test(String(c)) ? String(c) : 'amber')
