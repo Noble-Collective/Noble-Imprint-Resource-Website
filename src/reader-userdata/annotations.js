@@ -18,6 +18,8 @@ let toolbar = null
 let toolbarMode = null
 let editOutside = null
 let notePop = null
+let shareMenu = null      // the Copy text / Copy link / Share… dropdown off the toolbar's share button
+let shareOutside = null
 const listeners = []
 
 const orphaned = new Set() // current-session items whose anchor no longer resolves (content changed)
@@ -275,7 +277,7 @@ function tbBtn(icon, title, onClick, danger) {
   const b = el('button', 'nc-toolbar__btn' + (danger ? ' nc-toolbar__btn--danger' : ''))
   b.type = 'button'; b.setAttribute('data-tip', title); b.setAttribute('aria-label', title); b.innerHTML = icon
   b.onmousedown = (e) => e.preventDefault()
-  b.onclick = (e) => { e.stopPropagation(); onClick() }
+  b.onclick = (e) => { e.stopPropagation(); onClick(e, b) }
   return b
 }
 function buildToolbar(children) {
@@ -297,8 +299,39 @@ function positionToolbar(rect) {
   toolbar.style.top = top + 'px'
 }
 function hideToolbar() {
+  closeShareMenu()
   toolbar?.remove(); toolbar = null; toolbarMode = null
   if (editOutside) { document.removeEventListener('mousedown', editOutside, true); editOutside = null }
+}
+
+// The share dropdown (Copy text / Copy link / Share…) off the toolbar's share button — one icon that
+// expands to the three actions, matching Coram Deo (replaces the separate Copy + Share-link buttons).
+function closeShareMenu() {
+  shareMenu?.remove(); shareMenu = null
+  if (shareOutside) { document.removeEventListener('mousedown', shareOutside, true); shareOutside = null }
+}
+function openShareMenu(anchorBtn, ctx) {
+  if (shareMenu) { closeShareMenu(); return } // toggle
+  const m = el('div', 'nc-share-menu'); m.setAttribute('data-nc-skip', '')
+  const item = (label, fn) => {
+    const b = el('button', 'nc-share-menu__item', label)
+    b.type = 'button'; b.onmousedown = (e) => e.preventDefault()
+    b.onclick = (e) => { e.stopPropagation(); closeShareMenu(); hideToolbar(); fn() }
+    return b
+  }
+  const copy = async (val, msg) => { try { await navigator.clipboard.writeText(val); showToast(msg, ctx.rect) } catch (e) { warn('copy', e); showToast('Couldn’t copy', ctx.rect) } }
+  m.append(
+    item('Copy text', () => copy(ctx.text, 'Text copied')),
+    item('Copy link', () => copy(ctx.url, 'Link copied')),
+    item('Share…', () => shareUrl(ctx.url, ctx.rect)),
+  )
+  document.body.appendChild(m)
+  const r = anchorBtn.getBoundingClientRect()
+  const w = m.offsetWidth || 132
+  m.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8)) + 'px'
+  m.style.top = (r.bottom + 6) + 'px'
+  shareOutside = (e) => { if (shareMenu && !shareMenu.contains(e.target)) closeShareMenu() }
+  setTimeout(() => document.addEventListener('mousedown', shareOutside, true), 0)
 }
 
 // The bookmark id already on the current selection's block (a line can hold only one), or null.
@@ -330,8 +363,11 @@ function showCreateToolbar(rect) {
   } else {
     kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
   }
-  kids.push(tbBtn(ICONS.copy, 'Copy', () => copySelection()))
-  kids.push(tbBtn(ICONS.share, 'Share link', () => { const s = pendingSel; hideToolbar(); shareUrl(passageUrl(s && (s.raw || s.text)), s && s.rect) }))
+  kids.push(tbBtn(ICONS.shareUp, 'Share', (e, b) => {
+    const s = pendingSel
+    const text = (s && (s.raw || s.text)) || ''
+    openShareMenu(b, { text, url: passageUrl(text), rect: s && s.rect })
+  }))
   buildToolbar(kids)
   toolbarMode = 'create'
   positionToolbar(rect)
@@ -339,11 +375,12 @@ function showCreateToolbar(rect) {
 function showEditToolbar(rect, annot) {
   const kids = HIGHLIGHT_COLORS.map((c) => swatch(c, () => recolor(annot, c), annot.color === c))
   kids.push(el('span', 'nc-toolbar__div'))
-  kids.push(tbBtn(ICONS.share, 'Share link', () => {
-    // Build the fragment from the mark's CURRENT rendered text (raw) so it matches the page.
+  kids.push(tbBtn(ICONS.shareUp, 'Share', (e, b) => {
+    // Build the text/link from the mark's CURRENT rendered text (raw) so it matches the page.
     const m = document.querySelector(`mark[data-annot-id="${cssEsc(annot.id)}"]`)
-    hideToolbar()
-    shareUrl(m ? passageUrl(m.textContent) : location.origin + (annot.href || location.pathname), rect)
+    const text = m ? m.textContent : (annot.ref || '')
+    const url = m ? passageUrl(m.textContent) : (location.origin + (annot.href || location.pathname))
+    openShareMenu(b, { text, url, rect })
   }))
   kids.push(tbBtn(ICONS.trash, 'Remove', () => removeAnnot(annot), true))
   buildToolbar(kids)
@@ -436,14 +473,6 @@ async function createBookmark() {
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save bookmark', e) }
 }
-function copySelection() {
-  const t = pendingSel?.text || ''
-  const rect = pendingSel?.rect
-  hideToolbar()
-  try { navigator.clipboard?.writeText(t) } catch (e) { warn('copy', e) }
-  showToast('Copied', rect)
-}
-
 // A deep link to a passage: the session URL + a native text-fragment that scrolls to & highlights it.
 // Split a selection into word-bounded start[/end] pieces for a passage link. A fixed slice(0,60)
 // broke matching two ways: (1) native scroll-to-text only fires when the match ends on a WORD

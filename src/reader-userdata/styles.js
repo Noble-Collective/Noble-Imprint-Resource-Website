@@ -168,6 +168,13 @@ html.nc-dark .nc-seg__btn[aria-pressed="true"]{background:#e7e5e4;color:#1c1917}
 .nc-toolbar{position:fixed;z-index:9500;display:flex;align-items:center;gap:.15rem;background:var(--nc-surface);
   border:1px solid var(--nc-border);border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:.3rem .45rem;
   transform:translateX(-50%)}
+/* Share dropdown off the toolbar's share button (Copy text / Copy link / Share…). */
+.nc-share-menu{position:fixed;z-index:9600;background:var(--nc-surface);border:1px solid var(--nc-border);
+  border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:.25rem;min-width:132px;color:var(--nc-text);
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.nc-share-menu__item{display:block;width:100%;text-align:left;cursor:pointer;border:none;background:none;color:inherit;
+  font:inherit;font-size:.82rem;padding:.42rem .6rem;border-radius:6px}
+.nc-share-menu__item:hover{background:var(--nc-hover)}
 .nc-swatch{cursor:pointer;border:none;background:none;padding:.35rem;display:inline-flex;border-radius:6px;transition:background .12s}
 .nc-swatch:hover{background:var(--nc-hover)}
 .nc-swatch>span{display:block;width:1.05rem;height:1.05rem;border-radius:999px;transition:opacity .12s,box-shadow .12s,transform .12s;opacity:.85}
