@@ -38,6 +38,13 @@ html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
 /* ---- Bible verse layout: 'Verse' mode puts each verse on its own line (hanging indent) ---- */
 html.nc-verse-line .bible-content .bible-verse{ display:block; margin:.2rem 0; padding-left:1.5rem; text-indent:-1.5rem; }
 html.nc-verse-line .bible-content .bible-verse .verse-num{ font-weight:700; }
+/* Audio-enabled chapters render flat paragraphs with inline <sup>N</sup> verse numbers (no
+   .bible-verse wrapper \u2014 the DOM must match the audio timestamps). A block ::before before each
+   verse number forces a line break without touching the DOM, so verse mode works there too and
+   audio sync is unaffected. */
+html.nc-verse-line .bible-content .bible-paragraph sup{ font-weight:700; }
+html.nc-verse-line .bible-content .bible-paragraph sup::before{ content:''; display:block; margin-top:.35rem; }
+html.nc-verse-line .bible-content .bible-paragraph sup:first-child::before{ margin-top:0; }
 
 /* ---- reader top bar ---- */
 .nc-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 1.6rem;padding:.5rem .7rem;
