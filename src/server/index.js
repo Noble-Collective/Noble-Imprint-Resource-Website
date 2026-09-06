@@ -5,6 +5,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
 const bible = require('./bible');
+const osis = require('./osis');
 const github = require('./github');
 const audio = require('./audio');
 const auth = require('./auth');
@@ -404,6 +405,19 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
     bible_book: bookName,
     bible_chapter: String(chapter),
   };
+  // Reader context so the per-user data layer can enable highlights/notes/bookmarks on the Bible.
+  // corpus 'bible' + OSIS book code lets the client build the shared SDK's bibleLocator per verse.
+  // Only when the book maps to a known OSIS code (all 66 canon books do).
+  const osisBook = osis.osisCodeForBook(bookName);
+  const readerContext = osisBook ? {
+    corpus: 'bible',
+    translation: String(t.id).toUpperCase(),
+    bookName,
+    osisBook,
+    chapter,
+    title: `${bookName} ${chapter}`,
+  } : null;
+
   res.render('bible-chapter', {
     translation: t,
     bookName,
@@ -414,6 +428,7 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
     audioBlocks,
     audioBookPath,
     audioFormatDuration: audio.formatDuration,
+    readerContext,
     title: `${bookName} ${chapter} — ${t.title}`,
   });
 });

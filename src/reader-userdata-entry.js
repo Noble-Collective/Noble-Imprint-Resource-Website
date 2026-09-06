@@ -249,7 +249,8 @@ function boot() {
   if (window.__ncBooted) return // guard against the bundle evaluating/booting more than once
   window.__ncBooted = true
   const ctx = window.__READER_CTX
-  const root = ctx && ctx.bookPath && ctx.sessionFile ? document.querySelector('.session-content') : null
+  const isBibleCtx = !!(ctx && ctx.corpus === 'bible' && ctx.osisBook)
+  const root = ctx && ((ctx.bookPath && ctx.sessionFile) || isBibleCtx) ? document.querySelector('.session-content') : null
   isSession = !!root
   injectStyles()
   initFirebase()
@@ -273,11 +274,14 @@ function boot() {
   window.__ncReattach = reattach // let ajax-nav re-bind the reader after an in-page session swap
   if (isSession) {
     ctx.root = root
-    initAnswers(ctx)
-    initAnnotations(ctx)
-    recordReading(ctx) // remember this session for "Continue reading"
-    jumpToTextFragment(root) // shared #:~:text= link → scroll to + flash the quoted passage
-    maybeOnboard() // one-time coach-mark introducing the reader features
+    initAnnotations(ctx) // highlights/notes/bookmarks — works for both series sessions and the Bible
+    jumpToTextFragment(root) // shared passage link → scroll to + flash the quoted passage
+    if (!isBibleCtx) {
+      // Series-session-only features (answers, continue-reading, onboarding coach) — not on the Bible.
+      initAnswers(ctx)
+      recordReading(ctx)
+      maybeOnboard()
+    }
   } else if (location.pathname === '/') {
     mountContinueReading() // resume strip at the top of the home page
   } else if (location.pathname === '/notes') {

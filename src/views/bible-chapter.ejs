@@ -118,4 +118,10 @@
 <script src="/static/js/audio-player.js?v=27"></script>
 <% } %>
 
+<% if (typeof readerContext !== 'undefined' && readerContext) { %>
+<!-- Bible reader context (corpus 'bible') so the per-user data layer enables highlights/notes/
+     bookmarks on this chapter. The reader bundle (loaded in footer) reads window.__READER_CTX. -->
+<script>window.__READER_CTX = JSON.parse('<%- JSON.stringify(readerContext).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\u003c") %>');</script>
+<% } %>
+
 <%- include('partials/footer') %>

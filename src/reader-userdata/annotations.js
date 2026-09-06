@@ -1,7 +1,7 @@
 // Highlights, notes, and positioned bookmarks on the reading content — the superset feature set,
 // built on the shared anchor module. Selection -> floating toolbar (colors / note / bookmark / copy);
 // clicking a painted mark -> edit (recolor / remove) or note popover.
-import { seriesLocator } from '@noble-collective/userdata/core'
+import { seriesLocator, bibleLocator } from '@noble-collective/userdata/core'
 import { getClient, onUser } from './firebase.js'
 import { el, ICONS, HIGHLIGHT_COLORS, warn, debounce } from './util.js'
 import { buildIndex, selectionToNorm, anchorFromNorm, anchorToDomRange, paintRange, unpaint } from './anchor-dom.js'
@@ -25,8 +25,27 @@ const emitChange = () => listeners.forEach((cb) => { try { cb(items) } catch (e)
 export const getItems = () => items
 export const subscribeItems = onChange
 export const removeById = (id) => { const a = items.find((x) => x.id === id); if (a) removeAnnot(a) }
-export const isCurrentSession = (a) => !!(a && a.locator && CTX && a.locator.sessionFile === CTX.sessionFile)
+export const isCurrentSession = (a) => !!(a && a.locator && CTX && sameUnit(a.locator))
 export const isOrphaned = (id) => orphaned.has(id)
+
+// ---- corpus helpers: the reader works over both series sessions and Bible chapters ----
+const isBible = () => !!(CTX && CTX.corpus === 'bible')
+// osisRef prefix for the current Bible chapter, e.g. "Prov.1." — used to scope items to this page.
+const chapterOsisPrefix = () => `${CTX.osisBook}.${CTX.chapter}.`
+// Does a locator belong to the currently displayed unit (this session / this chapter)?
+function sameUnit(loc) {
+  if (!loc) return false
+  if (isBible()) return loc.corpus === 'bible' && typeof loc.osisRef === 'string' && loc.osisRef.startsWith(chapterOsisPrefix())
+  return loc.sessionFile === CTX.sessionFile
+}
+// Does a locator belong to the current "book" set (the notebook spans the whole book/Bible book)?
+function inThisBookSet(loc) {
+  if (!loc) return false
+  if (isBible()) return loc.corpus === 'bible' && typeof loc.osisRef === 'string' && loc.osisRef.startsWith(`${CTX.osisBook}.`)
+  return loc.bookPath === CTX.bookPath
+}
+// Title stored on each annotation for list views ("which session"/"which chapter").
+const unitTitle = () => (isBible() ? (CTX.title || `${CTX.bookName} ${CTX.chapter}`) : pageSessionTitle())
 
 // One-time wiring (selectionchange + auth subscription) + first attach.
 export function initAnnotations(ctx) {
@@ -34,6 +53,7 @@ export function initAnnotations(ctx) {
     wired = true
     document.addEventListener('selectionchange', debounce(onSelChange, 130)) // single global listener
     onUser((u, client) => reloadForBook(client)) // reload the whole-book set on sign-in/out
+    window.__ncGetItems = getItems // read-only debug hook (the user's own annotations) + E2E assertions
   }
   attachAnnotations(ctx)
 }
@@ -43,7 +63,11 @@ export function initAnnotations(ctx) {
 // new session's marks — no network reload. A different book triggers a fresh load.
 export function attachAnnotations(ctx) {
   hideToolbar(); closeNotePop()
-  const sameBook = !!(CTX && ctx.bookPath === CTX.bookPath)
+  // Same "book" as before → reuse the loaded item set (AJAX in-book nav). Bible pages don't AJAX,
+  // so on a fresh load CTX is null and this is false, triggering a normal reload.
+  const sameBook = !!(CTX && (ctx.corpus === 'bible'
+    ? (CTX.corpus === 'bible' && ctx.osisBook === CTX.osisBook)
+    : ctx.bookPath === CTX.bookPath))
   document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
   items.forEach((a) => unpaint(a.id))
   if (clickRoot) clickRoot.removeEventListener('click', onContentClick)
@@ -64,15 +88,26 @@ async function reloadForBook(client) {
   if (!client) { items = []; emitChange(); return }
   try {
     const all = await client.listAnnotations()
-    // Whole book (so the notebook spans every session); only current-session items are painted.
-    items = all.filter((a) => a.locator && a.locator.bookPath === CTX.bookPath)
+    // Whole book / whole Bible book (so the notebook spans every session/chapter); only the current
+    // unit's items are painted.
+    items = all.filter((a) => a.locator && inThisBookSet(a.locator))
     repaintAll()
     emitChange()
   } catch (e) { warn('load annotations', e) }
 }
 
 // ---------- locator + display ----------
-function locFor(anchor) {
+// Build the shared-SDK locator for a new annotation. Series → seriesLocator; Bible → bibleLocator
+// keyed to the verse the selection STARTS in (osisRef = book.chapter.verse). The textAnchor is
+// computed over the whole chapter, so it resolves reliably on this renderer; the osisRef pins the
+// verse for cross-surface use (Coram Deo / the app resolve via the quote within that verse).
+function locFor(anchor, verse) {
+  if (isBible()) {
+    const osisRef = `${CTX.osisBook}.${CTX.chapter}.${verse || 1}`
+    const extra = { textAnchor: anchor, contentVersion: CTX.contentVersion || undefined }
+    if (CTX.translation) extra.translation = CTX.translation
+    return bibleLocator({ osisRef }, extra)
+  }
   return seriesLocator(CTX.bookPath, CTX.sessionFile, { textAnchor: anchor, contentVersion: CTX.contentVersion || undefined })
 }
 function displayFor(text) {
@@ -84,6 +119,26 @@ function displayFor(text) {
 // The current session's title (document.title is "Session — Book"), stored on each annotation so
 // list views can show "which session" without re-resolving.
 const pageSessionTitle = () => (document.title || '').split(' — ')[0].trim()
+
+// Which Bible verse does a DOM range START in? Non-audio chapters wrap verses in
+// `.bible-verse[id="vN"]`; audio-enabled chapters render flat paragraphs with inline <sup>N</sup>
+// verse numbers, so we take the number of the last <sup> at or before the range start. Defaults 1.
+function startVerseOf(range) {
+  if (!range) return 1
+  const node = range.startContainer
+  const startEl = node.nodeType === 3 ? node.parentElement : node
+  const bv = startEl && startEl.closest && startEl.closest('.bible-verse[id]')
+  if (bv) { const n = parseInt(String(bv.id).replace(/^v/, ''), 10); if (n > 0) return n }
+  let best = 1
+  for (const sup of ROOT.querySelectorAll('.bible-paragraph sup, .bible-verse .verse-num, sup')) {
+    // sup is at/before the range start if the start node follows it in document order.
+    const rel = sup.compareDocumentPosition(node)
+    if (sup === node || sup.contains(node) || (rel & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      const n = parseInt(sup.textContent, 10); if (n > 0) best = n
+    } else break
+  }
+  return best
+}
 
 // ---------- selection -> toolbar ----------
 function onSelChange() {
@@ -104,7 +159,7 @@ function onSelChange() {
   // `text` = normalized (for the anchor). `raw` = the actual rendered selection — used for the
   // display quote + the #:~:text= share fragment, which must match the page's ORIGINAL text
   // (curly quotes, em-dashes, whitespace) or the browser won't scroll to it.
-  pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), raw: sel.toString(), rect: info.rect }
+  pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), raw: sel.toString(), rect: info.rect, verse: isBible() ? startVerseOf(sel.getRangeAt(0)) : undefined }
   showCreateToolbar(info.rect)
 }
 
@@ -210,7 +265,7 @@ async function createHighlight(color) {
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
   const { ref, href } = displayFor(sel.raw || sel.text)
-  const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
+  const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save highlight', e) }
 }
@@ -235,7 +290,7 @@ async function createBookmark() {
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
   const { ref, href } = displayFor(sel.raw || sel.text)
-  const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
+  const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save bookmark', e) }
 }
@@ -307,7 +362,7 @@ function startNote(rect) {
   const sel = pendingSel
   if (!sel) return
   hideToolbar()
-  openNotePopover(rect, { anchor: sel.anchor, text: sel.text, raw: sel.raw }, null)
+  openNotePopover(rect, { anchor: sel.anchor, text: sel.text, raw: sel.raw, verse: sel.verse }, null)
 }
 function openNotePopover(rect, sel, existing) {
   closeNotePop()
@@ -349,7 +404,7 @@ async function saveNote(body, sel, existing) {
   }
   const id = uuid()
   const { ref, href } = displayFor(sel.raw || sel.text)
-  const annot = { id, kind: 'note', body, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
+  const annot = { id, kind: 'note', body, locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('note', e) }
 }
@@ -360,7 +415,7 @@ export function repaintAll() {
   items.forEach((a) => unpaint(a.id))
   orphaned.clear()
   items.forEach((a) => {
-    const isCurrent = a.locator && a.locator.sessionFile === CTX.sessionFile
+    const isCurrent = a.locator && sameUnit(a.locator)
     const placed = paintOne(a)
     // A current-session item that won't paint has lost its anchor (the text changed) → orphaned.
     if (isCurrent && !placed) orphaned.add(a.id)
@@ -369,7 +424,7 @@ export function repaintAll() {
 function paintOne(annot) {
   const anchor = annot.locator?.textAnchor
   if (!anchor) return false
-  if (annot.locator.sessionFile !== CTX.sessionFile) return false // only paint the current session
+  if (!sameUnit(annot.locator)) return false // only paint items belonging to the current unit
   const idx = buildIndex(ROOT)
   const range = anchorToDomRange(idx, anchor)
   if (!range) return false
