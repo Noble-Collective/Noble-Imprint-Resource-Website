@@ -102,7 +102,10 @@ function onSelChange() {
   const idx = buildIndex(ROOT)
   const info = selectionToNorm(idx)
   if (!info) { if (toolbarMode !== 'edit') hideToolbar(); return }
-  pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), rect: info.rect }
+  // `text` = normalized (for the anchor). `raw` = the actual rendered selection — used for the
+  // display quote + the #:~:text= share fragment, which must match the page's ORIGINAL text
+  // (curly quotes, em-dashes, whitespace) or the browser won't scroll to it.
+  pendingSel = { anchor: anchorFromNorm(idx, info.start, info.end), text: idx.norm.slice(info.start, info.end), raw: sel.toString(), rect: info.rect }
   showCreateToolbar(info.rect)
 }
 
@@ -170,7 +173,7 @@ function showCreateToolbar(rect) {
     kids.push(tbBtn(ICONS.bookmark, 'Bookmark', () => createBookmark()))
   }
   kids.push(tbBtn(ICONS.copy, 'Copy', () => copySelection()))
-  kids.push(tbBtn(ICONS.share, 'Share link', () => { const s = pendingSel; hideToolbar(); shareUrl(passageUrl(s && s.text), s && s.rect) }))
+  kids.push(tbBtn(ICONS.share, 'Share link', () => { const s = pendingSel; hideToolbar(); shareUrl(passageUrl(s && (s.raw || s.text)), s && s.rect) }))
   buildToolbar(kids)
   toolbarMode = 'create'
   positionToolbar(rect)
@@ -178,7 +181,12 @@ function showCreateToolbar(rect) {
 function showEditToolbar(rect, annot) {
   const kids = HIGHLIGHT_COLORS.map((c) => swatch(c, () => recolor(annot, c), annot.color === c))
   kids.push(el('span', 'nc-toolbar__div'))
-  kids.push(tbBtn(ICONS.share, 'Share link', () => { hideToolbar(); shareUrl(location.origin + (annot.href || location.pathname), rect) }))
+  kids.push(tbBtn(ICONS.share, 'Share link', () => {
+    // Build the fragment from the mark's CURRENT rendered text (raw) so it matches the page.
+    const m = document.querySelector(`mark[data-annot-id="${cssEsc(annot.id)}"]`)
+    hideToolbar()
+    shareUrl(m ? passageUrl(m.textContent) : location.origin + (annot.href || location.pathname), rect)
+  }))
   kids.push(tbBtn(ICONS.trash, 'Remove', () => removeAnnot(annot), true))
   buildToolbar(kids)
   toolbarMode = 'edit'
@@ -200,7 +208,7 @@ async function createHighlight(color) {
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
-  const { ref, href } = displayFor(sel.text)
+  const { ref, href } = displayFor(sel.raw || sel.text)
   const annot = { id, kind: 'highlight', color, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save highlight', e) }
@@ -225,7 +233,7 @@ async function createBookmark() {
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
   const id = uuid()
-  const { ref, href } = displayFor(sel.text)
+  const { ref, href } = displayFor(sel.raw || sel.text)
   const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save bookmark', e) }
@@ -268,7 +276,7 @@ function startNote(rect) {
   const sel = pendingSel
   if (!sel) return
   hideToolbar()
-  openNotePopover(rect, { anchor: sel.anchor, text: sel.text }, null)
+  openNotePopover(rect, { anchor: sel.anchor, text: sel.text, raw: sel.raw }, null)
 }
 function openNotePopover(rect, sel, existing) {
   closeNotePop()
@@ -309,7 +317,7 @@ async function saveNote(body, sel, existing) {
     return
   }
   const id = uuid()
-  const { ref, href } = displayFor(sel.text)
+  const { ref, href } = displayFor(sel.raw || sel.text)
   const annot = { id, kind: 'note', body, locator: locFor(sel.anchor), ref, href, title: pageSessionTitle() }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('note', e) }
