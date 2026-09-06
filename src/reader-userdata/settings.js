@@ -46,23 +46,33 @@ export function applyCachedSettings() {
   }
 }
 
-/** Sync from the shared store once signed in (server wins), then re-apply. */
+/**
+ * Live-sync from the shared store once signed in (server wins), re-applying on every change.
+ * onSettingsRaw fires immediately with the current stored settings and again whenever they change -
+ * including a change made on another device or on Coram Deo - so a signed-in setting change reaches
+ * this reader within a second, no reload. No-clobber: apply only the keys the server actually stores;
+ * seed the user's local choices up once if the store is empty.
+ */
+let unsubSettings = null
 export function initSettings() {
-  onUser(async (u, client) => {
+  onUser((u, client) => {
+    // Rebind on user change (sign-in/out/switch).
+    if (unsubSettings) { try { unsubSettings() } catch { /* ignore */ } unsubSettings = null }
     if (!client) return
-    try {
-      const raw = await client.getSettingsRaw()
+    let seeded = false
+    unsubSettings = client.onSettingsRaw((raw) => {
       const { updatedAt, ...vals } = raw || {}
       if (Object.keys(vals).length) {
         // Server has settings -> apply only the keys it actually stores (don't clobber local with defaults).
         current = { ...current, ...vals }
         saveCache()
         apply()
-      } else {
-        // No server settings yet -> migrate the user's local choices up.
-        await client.setSettings(current)
+      } else if (!seeded) {
+        // No server settings yet -> migrate the user's local choices up, once.
+        seeded = true
+        client.setSettings(current).catch((e) => warn('seed settings', e))
       }
-    } catch (e) { warn('load settings', e) }
+    }, (e) => warn('load settings', e))
   })
 }
 
