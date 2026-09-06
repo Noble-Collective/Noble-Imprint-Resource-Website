@@ -185,6 +185,33 @@ function computeVerseAnchors(idx, range) {
   return out.length > 1 ? out : null
 }
 
+// ---- whole-verse (no-anchor) Bible annotations — Coram Deo's canonical model ----
+// Notes and bookmarks on the Bible are stored at the VERSE level: no textAnchor, a DETERMINISTIC id
+// per verse (so they converge with CD and never duplicate across products), and translation-AGNOSTIC
+// (a verse mark shows in both BSB and KJV). Phrase HIGHLIGHTS stay anchored + translation-scoped
+// (locFor / createHighlight). Series notes/bookmarks (prose, no verses) are unaffected — anchored.
+function verseLocFor(verse) {
+  const osisRef = `${CTX.osisBook}.${CTX.chapter}.${verse || 1}`
+  return bibleLocator({ osisRef }) // no textAnchor, no translation → cross-fills verseId
+}
+// Deterministic verse-annotation id — MUST match Coram Deo (userdata-adapter.ts hl__/bm__/nt__).
+const VERSE_ID_PREFIX = { highlight: 'hl', bookmark: 'bm', note: 'nt' }
+const verseAnnId = (kind, verseId) => `${VERSE_ID_PREFIX[kind]}__${verseId}`
+const verseNumFromOsis = (osisRef) => { const m = /\.(\d+)$/.exec(osisRef || ''); return m ? parseInt(m[1], 10) : 0 }
+// A DOM range over verse `v`'s prose (text nodes, excluding the verse-number <sup>) — used to paint a
+// whole-verse (no-anchor) mark. Same node walk as verseSubRange.
+function verseProseRange(v) {
+  const w = document.createTreeWalker(v, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (inVerseNum(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  })
+  const nodes = []; let n; while ((n = w.nextNode())) nodes.push(n)
+  if (!nodes.length) return null
+  const r = document.createRange()
+  r.setStart(nodes[0], 0)
+  const last = nodes[nodes.length - 1]; r.setEnd(last, last.length)
+  return r.collapsed ? null : r
+}
+
 // ---------- selection -> toolbar ----------
 function onSelChange() {
   const sel = window.getSelection()
@@ -259,6 +286,11 @@ function hideToolbar() {
 function existingBookmarkForSelection() {
   const sel = window.getSelection()
   if (!sel || !sel.rangeCount) return null
+  if (isBible()) {
+    // One bookmark per VERSE on the Bible.
+    const id = verseAnnId('bookmark', verseLocFor(startVerseOf(sel.getRangeAt(0))).verseId)
+    return items.some((a) => a.id === id) ? id : null
+  }
   let block = sel.getRangeAt(0).startContainer
   if (block.nodeType !== 1) block = block.parentNode
   while (block && block !== ROOT && !/^(P|LI|H1|H2|H3|H4|H5|BLOCKQUOTE|DIV)$/.test(block.tagName)) block = block.parentNode
@@ -367,13 +399,21 @@ async function removeAnnot(annot) {
 }
 async function createBookmark() {
   if (!getClient()) return needSignIn()
-  if (existingBookmarkForSelection()) { hideToolbar(); return } // one bookmark per line
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
-  const id = uuid()
   const { ref, href } = displayFor(sel.raw || sel.text)
-  const annot = { id, kind: 'bookmark', locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
+  let annot
+  if (isBible()) {
+    // Verse-level (Coram Deo model): one bookmark per verse, deterministic id, no anchor.
+    const locator = verseLocFor(sel.verse)
+    const id = verseAnnId('bookmark', locator.verseId)
+    if (items.some((a) => a.id === id)) return // already bookmarked (one per verse)
+    annot = { id, kind: 'bookmark', locator, ref, href, title: unitTitle() }
+  } else {
+    if (existingBookmarkForSelection()) return // one bookmark per line (series)
+    annot = { id: uuid(), kind: 'bookmark', locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
+  }
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('save bookmark', e) }
 }
@@ -445,7 +485,14 @@ function startNote(rect) {
   const sel = pendingSel
   if (!sel) return
   hideToolbar()
-  openNotePopover(rect, { anchor: sel.anchor, text: sel.text, raw: sel.raw, verse: sel.verse }, null)
+  // Bible notes are one-per-verse: if this verse already has a note, edit it (pre-filled) instead of
+  // silently overwriting it with a blank create.
+  let existing = null
+  if (isBible()) {
+    const id = verseAnnId('note', verseLocFor(sel.verse).verseId)
+    existing = items.find((a) => a.kind === 'note' && a.id === id) || null
+  }
+  openNotePopover(rect, { anchor: sel.anchor, text: sel.text, raw: sel.raw, verse: sel.verse }, existing)
 }
 function openNotePopover(rect, sel, existing) {
   closeNotePop()
@@ -485,9 +532,17 @@ async function saveNote(body, sel, existing) {
     try { await getClient().putAnnotation({ id: existing.id, kind: 'note', body, locator: existing.locator, ref: existing.ref, href: existing.href, title: existing.title }) } catch (e) { warn('note', e) }
     return
   }
-  const id = uuid()
   const { ref, href } = displayFor(sel.raw || sel.text)
-  const annot = { id, kind: 'note', body, locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
+  let annot
+  if (isBible()) {
+    // Verse-level (Coram Deo model): one note per verse, deterministic id, no anchor.
+    const locator = verseLocFor(sel.verse)
+    annot = { id: verseAnnId('note', locator.verseId), kind: 'note', body, locator, ref, href, title: unitTitle() }
+  } else {
+    annot = { id: uuid(), kind: 'note', body, locator: locFor(sel.anchor, sel.verse), ref, href, title: unitTitle() }
+  }
+  // Deterministic id ⇒ replace any existing paint/item for this verse's note (upsert semantics).
+  unpaint(annot.id); items = items.filter((a) => a.id !== annot.id)
   items.push(annot); paintOne(annot); emitChange()
   try { await getClient().putAnnotation(annot) } catch (e) { warn('note', e) }
 }
@@ -504,16 +559,25 @@ export function repaintAll() {
   items.forEach((a) => {
     const isCurrent = a.locator && sameUnit(a.locator)
     const placed = paintOne(a)
-    // A current-session item that won't paint has lost its anchor (the text changed) → orphaned.
-    if (isCurrent && !placed) orphaned.add(a.id)
+    // Only an ANCHOR-bearing item that fails to paint is "orphaned" (its text changed). A no-anchor
+    // whole-verse mark that didn't paint is just on a render without per-verse wrappers (audio) —
+    // it's verse-keyed, not lost.
+    if (isCurrent && !placed && a.locator?.textAnchor) orphaned.add(a.id)
   })
 }
 function paintOne(annot) {
-  const anchor = annot.locator?.textAnchor
-  if (!anchor) return false
-  if (!sameUnit(annot.locator)) return false // only paint items belonging to the current unit
-  const idx = buildIndex(ROOT)
-  const range = anchorToDomRange(idx, anchor)
+  const loc = annot.locator
+  if (!sameUnit(loc)) return false // only paint items belonging to the current unit
+  let range
+  if (loc?.textAnchor) {
+    range = anchorToDomRange(buildIndex(ROOT), loc.textAnchor)
+  } else if (loc?.corpus === 'bible') {
+    // Whole-verse (no-anchor) mark — Coram Deo's model. Paint over the verse's prose element.
+    // Audio chapters have no per-verse `.bible-verse[id]` wrappers → not painted here (still listed
+    // in the notebook); that path is a known edge.
+    const v = ROOT.querySelector(`.bible-verse[id="v${verseNumFromOsis(loc.osisRef)}"]`)
+    range = v ? verseProseRange(v) : null
+  }
   if (!range) return false
   if (annot.kind === 'highlight') {
     return paintRange(range, `nc-hl nc-hl--${annot.color || 'amber'}`, annot.id)
