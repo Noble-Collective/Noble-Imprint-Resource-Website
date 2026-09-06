@@ -78,8 +78,7 @@ function locFor(anchor) {
 function displayFor(text) {
   const quote = (text || '').trim()
   const ref = quote.length > 60 ? quote.slice(0, 57) + '…' : quote
-  const frag = textFrag(quote)
-  const href = location.pathname + (frag ? `#:~:${frag}` : '')
+  const href = location.pathname + passageHash(quote)
   return { ref, href }
 }
 // The current session's title (document.title is "Session — Book"), stored on each annotation so
@@ -249,23 +248,35 @@ function copySelection() {
 }
 
 // A deep link to a passage: the session URL + a native text-fragment that scrolls to & highlights it.
-// Build a #:~:text= directive that actually matches on load. The naive slice(0,60) broke two
-// rules: (1) Chrome only scrolls when the match ends on a WORD boundary, so a mid-word cut
-// silently no-ops; (2) long / multi-block selections need textStart,textEnd, not one truncated
-// run. We also percent-encode '-' (encodeURIComponent misses it, and the directive grammar treats
-// '-' as a prefix/suffix delimiter); '&' and ',' are already handled by encodeURIComponent.
-function fragEnc(s) { return encodeURIComponent(s).replace(/-/g, '%2D') }
-function textFrag(text) {
+// Split a selection into word-bounded start[/end] pieces for a passage link. A fixed slice(0,60)
+// broke matching two ways: (1) native scroll-to-text only fires when the match ends on a WORD
+// boundary, so a mid-word cut no-ops; (2) long / multi-block selections need start+end, not one
+// truncated run. So we back off each side to a whole word.
+function fragEnc(s) { return encodeURIComponent(s).replace(/-/g, '%2D') } // encodeURIComponent misses '-'
+function fragParts(text) {
   const t = (text || '').replace(/\s+/g, ' ').trim()
-  if (!t) return ''
-  if (t.length <= 160) return 'text=' + fragEnc(t)
+  if (!t) return null
+  if (t.length <= 160) return { start: t, end: null }
   const start = t.slice(0, 70).replace(/\s+\S*$/, '') || t.slice(0, 70)   // back off to last whole word
   const end = t.slice(-70).replace(/^\S*\s+/, '') || t.slice(-70)          // forward to next whole word
-  return 'text=' + fragEnc(start) + ',' + fragEnc(end)
+  return { start, end }
 }
+// A shareable passage URL. We carry the text TWICE: our own `#ncq=` param (start[|end]) which the
+// reader reads on load to scroll+flash robustly in every browser — crucially it survives in
+// location.hash, whereas browsers STRIP the native `:~:text=` directive from location so script
+// can't read it — plus that native directive so desktop browsers also highlight it for free.
 function passageUrl(text) {
-  const frag = textFrag(text)
-  return location.origin + location.pathname + (frag ? `#:~:${frag}` : '')
+  const p = fragParts(text)
+  if (!p) return location.origin + location.pathname
+  const ncq = 'ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '')
+  const native = ':~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '')
+  return location.origin + location.pathname + '#' + ncq + native
+}
+function passageHash(text) {
+  const p = fragParts(text)
+  if (!p) return ''
+  return '#ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '') +
+    ':~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '')
 }
 async function shareUrl(url, rect) {
   if (navigator.share) {

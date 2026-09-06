@@ -12,7 +12,29 @@ import { openLibrary } from './reader-userdata/library.js'
 import { maybeOnboard } from './reader-userdata/onboarding.js'
 import { recordReading, mountContinueReading } from './reader-userdata/progress.js'
 import { mountMyNotes } from './reader-userdata/mynotes.js'
+import { textDirectiveToRange, parseTextDirective, paintRange, unpaint } from './reader-userdata/anchor-dom.js'
 import { el, ICONS, warn } from './reader-userdata/util.js'
+
+// Robustly honor a shared `#:~:text=` link: find the quoted text ourselves, scroll to it, and
+// flash it. Native scroll-to-text-fragment is unreliable on some browsers (notably mobile Safari),
+// so we don't depend on it — same normalized-anchor machinery the highlights use.
+function jumpToTextFragment(root) {
+  const dir = parseTextDirective(location.hash)
+  if (!dir) return
+  // Let fonts/images settle so the target's final position is stable before we scroll.
+  setTimeout(() => {
+    try {
+      const range = textDirectiveToRange(root, dir.startText, dir.endText)
+      if (!range) return
+      const id = 'nc-shared-passage'
+      unpaint(id)
+      if (!paintRange(range, 'nc-share-hl', id)) return
+      const mark = document.querySelector('mark[data-annot-id="nc-shared-passage"]')
+      if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setTimeout(() => unpaint(id), 3200) // remove the temporary emphasis; the reading text is untouched
+    } catch (e) { warn('shared-passage jump', e) }
+  }, 350)
+}
 
 function sbtn(icon, title, onClick) {
   const b = el('button', 'nc-sbtn')
@@ -244,6 +266,7 @@ function boot() {
     initAnswers(ctx)
     initAnnotations(ctx)
     recordReading(ctx) // remember this session for "Continue reading"
+    jumpToTextFragment(root) // shared #:~:text= link → scroll to + flash the quoted passage
     maybeOnboard() // one-time coach-mark introducing the reader features
   } else if (location.pathname === '/') {
     mountContinueReading() // resume strip at the top of the home page

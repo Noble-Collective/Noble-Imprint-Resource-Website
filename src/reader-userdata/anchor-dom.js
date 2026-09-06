@@ -5,7 +5,7 @@
 // (norm<->raw). We then use the shared computeAnchor/resolveAnchor over that normalized string, and
 // translate the resulting offsets back into a DOM Range to paint <mark>s. Rebuilding the index per
 // paint keeps it correct as the DOM mutates (marks contain their text, so normalized text is stable).
-import { computeAnchor, resolveAnchor } from '@noble-collective/userdata/core'
+import { computeAnchor, resolveAnchor, normalize } from '@noble-collective/userdata/core'
 
 const DASHES = /[‐-―−]/
 const SINGLE_Q = /[‘’‚‛]/
@@ -115,6 +115,50 @@ export function anchorToDomRange(index, anchor) {
   const range = document.createRange()
   try { range.setStart(a.node, a.offset); range.setEnd(b.node, b.offset) } catch { return null }
   return range
+}
+
+/**
+ * Resolve a `#:~:text=` directive (textStart or textStart,textEnd) to a DOM Range in `root`.
+ * Browser-independent — we find the text ourselves via the normalized index, so a shared link
+ * jumps to the spot even where native scroll-to-text-fragment is unreliable (e.g. mobile Safari).
+ */
+export function textDirectiveToRange(root, startText, endText) {
+  const qs = normalize(startText || '')
+  if (!qs) return null
+  const index = buildIndex(root)
+  const s = index.norm.indexOf(qs)
+  if (s < 0) return null
+  let normStart = s
+  let normEnd = s + qs.length
+  if (endText) {
+    const qe = normalize(endText)
+    if (qe) {
+      const e = index.norm.indexOf(qe, normEnd)
+      if (e >= 0) normEnd = e + qe.length
+    }
+  }
+  const rawStart = index.n2r[normStart]
+  const rawEnd = index.n2r[normEnd - 1] != null ? index.n2r[normEnd - 1] + 1 : index.n2r[normEnd]
+  const a = rawToNode(rawStart, index.nodeMap)
+  const b = rawToNode(rawEnd, index.nodeMap)
+  if (!a || !b) return null
+  const range = document.createRange()
+  try { range.setStart(a.node, a.offset); range.setEnd(b.node, b.offset) } catch { return null }
+  return range
+}
+
+/**
+ * Parse our `#ncq=<start>[|<end>]` passage param out of location.hash → { startText, endText }.
+ * We use our own param (not the native `:~:text=` directive) because browsers strip the directive
+ * from location before script can read it. `[^&:]` also tolerates a trailing native directive if a
+ * browser happens NOT to strip it (encoded parts never contain a literal '|' or ':').
+ */
+export function parseTextDirective(hash) {
+  const m = (hash || '').match(/ncq=([^&:]+)/)
+  if (!m) return null
+  const segs = m[1].split('|').map((x) => { try { return decodeURIComponent(x) } catch { return x } }).filter(Boolean)
+  if (!segs.length) return null
+  return { startText: segs[0], endText: segs.length > 1 ? segs[segs.length - 1] : null }
 }
 
 /** Wrap a DOM Range's text in <mark> pieces sharing className + data-annot-id. */

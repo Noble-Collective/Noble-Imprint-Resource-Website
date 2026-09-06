@@ -304,4 +304,7 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
   0%,68%{background:var(--nc-amber-wash);box-shadow:inset 4px 0 0 var(--nc-amber),0 0 0 4px var(--nc-amber-wash)}
   100%{background:transparent;box-shadow:inset 4px 0 0 transparent,0 0 0 4px transparent}
 }
+/* Temporary emphasis on the passage a shared #:~:text= link points at — hold, then fade. */
+mark.nc-share-hl{background:var(--nc-amber-wash);color:inherit;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone;animation:nc-share-fade 3.2s ease forwards}
+@keyframes nc-share-fade{0%,70%{background:var(--nc-amber-wash)}100%{background:transparent}}
 `
