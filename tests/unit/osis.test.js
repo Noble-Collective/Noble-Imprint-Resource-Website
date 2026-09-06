@@ -4,11 +4,20 @@
 // codes round-trip through the SDK's bibleLocator.
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { osisCodeForBook, OSIS_CANON } = require('../../src/server/osis');
-const { bibleLocator } = require('@noble-collective/userdata/core');
+const { osisCodeForBook, OSIS_CANON, OSIS_CODES } = require('../../src/server/osis');
+// osis.js hardcodes the codes (it must not require the SDK at server runtime — zod isn't a prod
+// dep). Here in the test env the SDK IS present, so we cross-check the hardcoded table against it.
+const { bibleLocator, OSIS_BOOKS } = require('@noble-collective/userdata/core');
+
+test('hardcoded OSIS codes match the SDK OSIS_BOOKS canonical order (no drift)', () => {
+  assert.strictEqual(OSIS_CANON.length, 66, 'expected 66 canon book names');
+  assert.strictEqual(OSIS_CODES.length, 66, 'expected 66 OSIS codes');
+  for (let i = 0; i < 66; i++) {
+    assert.strictEqual(OSIS_CODES[i], OSIS_BOOKS[i + 1], `code drift at #${i + 1} (${OSIS_CANON[i]})`);
+  }
+});
 
 test('all 66 canon books resolve to an OSIS code accepted by bibleLocator', () => {
-  assert.strictEqual(OSIS_CANON.length, 66, 'expected 66 canon book names');
   for (const name of OSIS_CANON) {
     const code = osisCodeForBook(name);
     assert.ok(code, `no OSIS code for ${name}`);
