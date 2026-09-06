@@ -575,7 +575,13 @@ export function repaintAll() {
   document.querySelectorAll('mark[data-annot-id]').forEach((m) => painted.add(m.dataset.annotId))
   painted.forEach((id) => unpaint(id))
   orphaned.clear()
-  items.forEach((a) => {
+  // Paint whole-verse (no-anchor) marks BEFORE anchored (phrase) marks. A no-anchor mark covers the
+  // whole verse; if it paints last it wraps over — and hides — an overlapping phrase highlight
+  // (e.g. a CD whole-verse highlight + a CD phrase highlight on the same verse). Painting phrase
+  // marks last nests them inside the verse mark so both colors show. (Firestore returns docs in
+  // doc-id order, which put the random-uuid phrase before the hl__ verse mark — hence this sort.)
+  const ordered = [...items].sort((a, b) => (a.locator?.textAnchor ? 1 : 0) - (b.locator?.textAnchor ? 1 : 0))
+  ordered.forEach((a) => {
     const isCurrent = a.locator && sameUnit(a.locator)
     const placed = paintOne(a)
     // Only an ANCHOR-bearing item that fails to paint is "orphaned" (its text changed). A no-anchor
