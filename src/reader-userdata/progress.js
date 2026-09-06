@@ -31,37 +31,44 @@ export function recordReading(ctx) {
 }
 
 // On the home page: a "Continue reading" strip — the most recently-viewed session per book.
+// LIVE (Phase 2.6): subscribes to activity so viewing a session in another product (Coram Deo,
+// the app) updates the strip here without a reload. One subscription per signed-in session.
+let actUnsub = null
 export function mountContinueReading() {
   const main = document.querySelector('.main')
   if (!main) return
-  onUser(async (u, client) => {
+  onUser((u, client) => {
+    if (actUnsub) { actUnsub(); actUnsub = null } // never leak across auth changes
     document.querySelector('.nc-continue')?.remove()
     if (!client) return
-    let acts
-    try { acts = await client.listActivity() } catch (e) { warn('listActivity', e); return }
-    if (!acts || !acts.length) return
-    // newest per book
-    const byBook = new Map()
-    for (const a of acts) {
-      const key = (a.locator && a.locator.bookPath) || a.id
-      const prev = byBook.get(key)
-      if (!prev || (a.viewedAt || 0) > (prev.viewedAt || 0)) byBook.set(key, a)
-    }
-    const list = [...byBook.values()].filter((a) => a.href).sort((x, y) => (y.viewedAt || 0) - (x.viewedAt || 0)).slice(0, 6)
-    if (!list.length) return
-    if (document.querySelector('.nc-continue')) return
-    const sec = el('section', 'nc-continue')
-    sec.setAttribute('data-nc-skip', '')
-    sec.appendChild(el('div', 'nc-continue__title', 'Continue reading'))
-    const row = el('div', 'nc-continue__row')
-    for (const a of list) {
-      const card = el('a', 'nc-continue__card')
-      card.href = a.href
-      card.innerHTML = `<div class="nc-continue__book">${escapeHtml(a.bookTitle || 'Continue')}</div>`
-        + `<div class="nc-continue__sess">${escapeHtml(a.title || '')}</div>`
-      row.appendChild(card)
-    }
-    sec.appendChild(row)
-    main.insertBefore(sec, main.firstChild)
+    actUnsub = client.onActivity((acts) => renderContinue(main, acts || []), (e) => warn('activity subscription', e))
   })
+}
+
+// Rebuild the strip from the whole snapshot (REPLACE, never append).
+function renderContinue(main, acts) {
+  document.querySelector('.nc-continue')?.remove()
+  if (!acts.length) return
+  // newest per book
+  const byBook = new Map()
+  for (const a of acts) {
+    const key = (a.locator && a.locator.bookPath) || a.id
+    const prev = byBook.get(key)
+    if (!prev || (a.viewedAt || 0) > (prev.viewedAt || 0)) byBook.set(key, a)
+  }
+  const list = [...byBook.values()].filter((a) => a.href).sort((x, y) => (y.viewedAt || 0) - (x.viewedAt || 0)).slice(0, 6)
+  if (!list.length) return
+  const sec = el('section', 'nc-continue')
+  sec.setAttribute('data-nc-skip', '')
+  sec.appendChild(el('div', 'nc-continue__title', 'Continue reading'))
+  const row = el('div', 'nc-continue__row')
+  for (const a of list) {
+    const card = el('a', 'nc-continue__card')
+    card.href = a.href
+    card.innerHTML = `<div class="nc-continue__book">${escapeHtml(a.bookTitle || 'Continue')}</div>`
+      + `<div class="nc-continue__sess">${escapeHtml(a.title || '')}</div>`
+    row.appendChild(card)
+  }
+  sec.appendChild(row)
+  main.insertBefore(sec, main.firstChild)
 }

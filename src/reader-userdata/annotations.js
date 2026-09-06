@@ -10,7 +10,9 @@ let CTX = null
 let ROOT = null
 let clickRoot = null
 let wired = false
-let items = []
+let items = []          // annotations for the CURRENT unit (painted), derived from allAnnots
+let allAnnots = []      // the full live snapshot across all books (from onAnnotations)
+let annUnsub = null     // active onAnnotations subscription teardown (per signed-in session)
 let pendingSel = null
 let toolbar = null
 let toolbarMode = null
@@ -52,22 +54,44 @@ export function initAnnotations(ctx) {
   if (!wired) {
     wired = true
     document.addEventListener('selectionchange', debounce(onSelChange, 130)) // single global listener
-    onUser((u, client) => reloadForBook(client)) // reload the whole-book set on sign-in/out
+    onUser((u, client) => manageAnnotationSub(client)) // live subscription on sign-in/out (Phase 2.6)
     window.__ncGetItems = getItems // read-only debug hook (the user's own annotations) + E2E assertions
   }
   attachAnnotations(ctx)
 }
 
-// Per-session (re)attach. Within the same book (the only case AJAX nav produces) the whole-book
-// item set is unchanged, so we just re-bind the click handler to the new content and repaint the
-// new session's marks — no network reload. A different book triggers a fresh load.
+// LIVE cross-surface sync: subscribe to the whole annotations collection so a highlight/note/
+// bookmark made in another product (Coram Deo, the app) appears here within ~a second, no reload.
+// One subscription per signed-in session (all books); in-book AJAX nav re-filters the cached
+// snapshot rather than re-subscribing. Torn down on sign-out (client === null).
+function manageAnnotationSub(client) {
+  if (annUnsub) { annUnsub(); annUnsub = null } // never leak a listener across auth changes
+  if (!client) {
+    document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
+    items.forEach((a) => unpaint(a.id))
+    allAnnots = []; items = []; emitChange()
+    return
+  }
+  annUnsub = client.onAnnotations((rows) => {
+    allAnnots = rows || [] // snapshot REPLACES the slice (never append); local writes echo by id
+    refreshItemsFromSnapshot()
+  }, (e) => warn('annotations subscription', e))
+}
+
+// Derive the current unit's painted set from the live snapshot + repaint. Re-resolves anchors
+// against the CURRENT rendered text every time (offsets are a paint-time artifact — see §7a).
+function refreshItemsFromSnapshot() {
+  if (!CTX) { items = []; emitChange(); return }
+  items = allAnnots.filter((a) => a.locator && inThisBookSet(a.locator))
+  if (ROOT) repaintAll()
+  emitChange()
+}
+
+// Per-session (re)attach. The live subscription persists across in-book AJAX nav (it's user-scoped,
+// all books), so we just re-bind the click handler to the new content and re-filter/repaint the
+// cached snapshot for the new unit — no network, no new listener.
 export function attachAnnotations(ctx) {
   hideToolbar(); closeNotePop()
-  // Same "book" as before → reuse the loaded item set (AJAX in-book nav). Bible pages don't AJAX,
-  // so on a fresh load CTX is null and this is false, triggering a normal reload.
-  const sameBook = !!(CTX && (ctx.corpus === 'bible'
-    ? (CTX.corpus === 'bible' && ctx.osisBook === CTX.osisBook)
-    : ctx.bookPath === CTX.bookPath))
   document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
   items.forEach((a) => unpaint(a.id))
   if (clickRoot) clickRoot.removeEventListener('click', onContentClick)
@@ -75,25 +99,7 @@ export function attachAnnotations(ctx) {
   ROOT = ctx.root
   clickRoot = ROOT
   ROOT.addEventListener('click', onContentClick)
-  const client = getClient()
-  if (!sameBook) { items = []; if (client) { reloadForBook(client); return } }
-  repaintAll()
-  emitChange()
-}
-
-async function reloadForBook(client) {
-  hideToolbar(); closeNotePop()
-  document.querySelectorAll('.nc-bm-marker').forEach((m) => m.remove())
-  items.forEach((a) => unpaint(a.id))
-  if (!client) { items = []; emitChange(); return }
-  try {
-    const all = await client.listAnnotations()
-    // Whole book / whole Bible book (so the notebook spans every session/chapter); only the current
-    // unit's items are painted.
-    items = all.filter((a) => a.locator && inThisBookSet(a.locator))
-    repaintAll()
-    emitChange()
-  } catch (e) { warn('load annotations', e) }
+  refreshItemsFromSnapshot()
 }
 
 // ---------- locator + display ----------

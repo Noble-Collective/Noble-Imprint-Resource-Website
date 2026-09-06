@@ -7,6 +7,8 @@ import { el, warn, debounce } from './util.js'
 const SAVE_MS = 800
 let CTX = null
 let wired = false
+let ansUnsub = null       // active onAnswers subscription teardown (per signed-in session)
+let ansSnapshot = []      // last live snapshot of ALL answers (across sessions)
 const fields = new Map()
 const listeners = []
 export const onAnswers = (cb) => listeners.push(cb)
@@ -17,7 +19,7 @@ export const getAnswers = () => answersState
 export function initAnswers(ctx) {
   if (!wired) {
     wired = true
-    onUser((u, client) => applyAuthState(client)) // single subscription; reads current CTX/fields
+    onUser((u, client) => { applyAuthState(client); manageAnswerSub(client) })
   }
   attachAnswers(ctx)
 }
@@ -30,6 +32,37 @@ export function attachAnswers(ctx) {
   answersState.clear()
   buildFields()
   applyAuthState(getClient())
+  applyAnswersToFields() // fill from the cached live snapshot (subscription persists across nav)
+}
+
+// LIVE cross-surface sync (Phase 2.6): subscribe to the answers collection so a same-account answer
+// saved elsewhere shows here without a reload. One subscription per signed-in session; teardown on
+// sign-out. NOTE: cross-surface answers are rare today (Coram Deo has no answers) but cross-DEVICE
+// sync is real. We never clobber a field the user is actively editing (see applyAnswersToFields).
+function manageAnswerSub(client) {
+  if (ansUnsub) { ansUnsub(); ansUnsub = null }
+  if (!client) { ansSnapshot = []; return }
+  ansUnsub = client.onAnswers((rows) => { ansSnapshot = rows || []; applyAnswersToFields() },
+    (e) => warn('answers subscription', e))
+}
+
+// Apply the current session's answers from the cached snapshot into the textareas — but SKIP any
+// field the user is focused on or has unsaved edits in, so live updates never eat in-progress typing.
+function applyAnswersToFields() {
+  if (!CTX || !getClient()) return
+  const mine = new Map()
+  for (const a of ansSnapshot) {
+    const l = a.locator || {}
+    if (l.bookPath === CTX.bookPath && l.sessionFile === CTX.sessionFile && l.questionId) mine.set(l.questionId, a.answer)
+  }
+  for (const [id, f] of fields) {
+    const { ta, status } = f
+    if (ta === document.activeElement || f.dirty) continue // don't clobber active/unsaved edits
+    const v = mine.has(id) ? mine.get(id) : ''
+    if (ta.value !== v) { ta.value = v; status.textContent = v ? 'Saved' : '' }
+    answersState.set(id, v)
+  }
+  listeners.forEach((cb) => cb(answersState))
 }
 
 const pageSessionTitle = () => (document.title || '').split(' — ')[0].trim()
@@ -50,6 +83,7 @@ function buildFields() {
     const status = el('span', 'nc-answer__status', '')
     wrap.append(ta, status)
     block.appendChild(wrap)
+    const rec = { ta, status, dirty: false } // `dirty` shields in-progress typing from live updates
     const save = debounce(async () => {
       const client = getClient()
       if (!client) return
@@ -61,11 +95,12 @@ function buildFields() {
         if (v) await client.putAnswer(loc, v, { href: location.pathname, sessionTitle: pageSessionTitle(), questionText })
         else await client.deleteAnswer(loc)
         status.textContent = 'Saved'
+        if (ta.value.trim() === v) rec.dirty = false // no new typing during the save → safe to unshield
       } catch (e) { warn('save answer', e); status.textContent = 'Save failed' }
       listeners.forEach((cb) => cb(answersState))
     }, SAVE_MS)
-    ta.addEventListener('input', () => { status.textContent = 'Editing…'; save() })
-    fields.set(id, { ta, status })
+    ta.addEventListener('input', () => { status.textContent = 'Editing…'; rec.dirty = true; save() })
+    fields.set(id, rec)
   })
 }
 
@@ -82,22 +117,7 @@ function applyAuthState(client) {
   for (const { ta } of fields.values()) {
     ta.readOnly = false; ta.classList.remove('nc-answer__ta--locked'); ta.placeholder = 'Write your answer…'
   }
-  loadAnswers(client)
-}
-
-async function loadAnswers(client) {
-  try {
-    const all = await client.listAnswers()
-    const mine = new Map()
-    for (const a of all) {
-      const l = a.locator || {}
-      if (l.bookPath === CTX.bookPath && l.sessionFile === CTX.sessionFile && l.questionId) mine.set(l.questionId, a.answer)
-    }
-    for (const [id, { ta, status }] of fields) {
-      if (mine.has(id)) { ta.value = mine.get(id); status.textContent = 'Saved'; answersState.set(id, mine.get(id)) }
-    }
-    listeners.forEach((cb) => cb(answersState))
-  } catch (e) { warn('load answers', e) }
+  applyAnswersToFields() // data comes from the live snapshot (manageAnswerSub), not a one-shot read
 }
 
 /** Scroll to and flash a question by id (for the library panel). */

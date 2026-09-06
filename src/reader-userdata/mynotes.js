@@ -1,6 +1,6 @@
 // "My Notes" page (/notes): everything the signed-in user has saved across ALL books —
 // highlights, notes, bookmarks — grouped by book, searchable, with jump links + Markdown export.
-// Rendered entirely client-side from the shared store (listAnnotations).
+// Rendered entirely client-side from the shared store, live via onAnnotations + onAnswers.
 import { getClient, onUser } from './firebase.js'
 import { el, warn, safeColor } from './util.js'
 
@@ -17,10 +17,18 @@ function countLabel(ann, ans) {
   return parts.join(' · ') || 'no notes'
 }
 
+// LIVE (Phase 2.6): subscribe to annotations + answers so notes saved in another product/device
+// appear here without a reload. We wait for BOTH initial snapshots before the first render, and
+// preserve the search query + focus across live re-renders so typing isn't interrupted.
+let mnUnsubs = []
+let mnAnnots = null
+let mnAnswers = null
 export function mountMyNotes() {
   const host = document.getElementById('nc-mynotes')
   if (!host) return
-  onUser(async (u, client) => {
+  onUser((u, client) => {
+    mnUnsubs.forEach((fn) => { try { fn() } catch { /* ignore */ } }); mnUnsubs = []
+    mnAnnots = null; mnAnswers = null
     if (!client) {
       host.innerHTML = ''
       host.appendChild(el('p', 'nc-mynotes__empty', 'Sign in to see your notes across all books.'))
@@ -30,10 +38,20 @@ export function mountMyNotes() {
       return
     }
     host.innerHTML = '<p class="text-muted">Loading…</p>'
-    let annots = []; let answers = []
-    try { [annots, answers] = await Promise.all([client.listAnnotations(), client.listAnswers()]) } catch (e) { warn('mynotes', e); host.innerHTML = '<p class="text-muted">Could not load your notes.</p>'; return }
-    render(host, annots, answers)
+    mnUnsubs.push(client.onAnnotations((rows) => { mnAnnots = rows || []; maybeRenderMyNotes(host) }, (e) => warn('mynotes annotations', e)))
+    mnUnsubs.push(client.onAnswers((rows) => { mnAnswers = rows || []; maybeRenderMyNotes(host) }, (e) => warn('mynotes answers', e)))
   })
+}
+
+function maybeRenderMyNotes(host) {
+  if (mnAnnots == null || mnAnswers == null) return // hold until both initial snapshots land
+  const prev = host.querySelector('.nc-search')
+  const q = prev ? prev.value : ''
+  const wasFocused = prev === document.activeElement
+  render(host, mnAnnots, mnAnswers)
+  const next = host.querySelector('.nc-search')
+  if (next && q) { next.value = q; next.dispatchEvent(new Event('input')) }
+  if (next && wasFocused) next.focus()
 }
 
 function render(host, annots, answers) {
