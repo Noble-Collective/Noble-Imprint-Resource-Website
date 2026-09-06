@@ -211,6 +211,25 @@ function verseProseRange(v) {
   const last = nodes[nodes.length - 1]; r.setEnd(last, last.length)
   return r.collapsed ? null : r
 }
+// A DOM range covering verse `num`'s prose, handling BOTH Bible renderings:
+//  - non-audio: a `.bible-verse[id="vN"]` wrapper → its prose (verseProseRange).
+//  - audio-enabled: flat `.bible-paragraph` with inline `<sup>N</sup>` and NO per-verse wrapper →
+//    the run from just after this verse's <sup> to just before the next <sup> (or the paragraph end).
+function verseRange(num) {
+  const v = ROOT.querySelector(`.bible-verse[id="v${num}"]`)
+  if (v) return verseProseRange(v)
+  const sups = [...ROOT.querySelectorAll('.bible-content sup')]
+  const startSup = sups.find((s) => parseInt(s.textContent, 10) === num)
+  if (!startSup) return null
+  const nextSup = sups[sups.indexOf(startSup) + 1] || null
+  const r = document.createRange()
+  try {
+    r.setStartAfter(startSup)
+    if (nextSup) r.setEndBefore(nextSup)
+    else { const para = startSup.closest('.bible-paragraph') || startSup.parentElement; r.setEnd(para, para.childNodes.length) }
+  } catch { return null }
+  return r.collapsed ? null : r
+}
 
 // ---------- selection -> toolbar ----------
 function onSelChange() {
@@ -572,11 +591,9 @@ function paintOne(annot) {
   if (loc?.textAnchor) {
     range = anchorToDomRange(buildIndex(ROOT), loc.textAnchor)
   } else if (loc?.corpus === 'bible') {
-    // Whole-verse (no-anchor) mark — Coram Deo's model. Paint over the verse's prose element.
-    // Audio chapters have no per-verse `.bible-verse[id]` wrappers → not painted here (still listed
-    // in the notebook); that path is a known edge.
-    const v = ROOT.querySelector(`.bible-verse[id="v${verseNumFromOsis(loc.osisRef)}"]`)
-    range = v ? verseProseRange(v) : null
+    // Whole-verse (no-anchor) mark — Coram Deo's model. Paint over the verse's prose; verseRange
+    // handles both the wrapped (non-audio) and flat inline-<sup> (audio) renderings.
+    range = verseRange(verseNumFromOsis(loc.osisRef))
   }
   if (!range) return false
   if (annot.kind === 'highlight') {
