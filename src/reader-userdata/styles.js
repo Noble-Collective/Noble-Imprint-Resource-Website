@@ -169,6 +169,15 @@ html.nc-dark .nc-seg__btn[aria-pressed="true"]{background:#e7e5e4;color:#1c1917}
 .nc-toolbar__btn:hover{color:var(--nc-text);background:var(--nc-hover)}
 .nc-toolbar__btn--danger:hover{color:var(--nc-rose)}
 .nc-toolbar__btn--on{color:var(--nc-accent)}
+/* fast custom tooltip on the selection toolbar (swatches + action buttons) — matches the sidebar
+   cluster tips; native title has a ~1s delay we can't shorten. Rendered ABOVE the button so it
+   never covers the selected text the toolbar sits over. */
+.nc-swatch,.nc-toolbar__btn{position:relative}
+.nc-swatch[data-tip]::after,.nc-toolbar__btn[data-tip]::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;margin-bottom:7px;white-space:nowrap;
+  background:var(--nc-text,#292524);color:var(--nc-surface,#fff);font-size:.68rem;line-height:1.2;padding:.26rem .45rem;border-radius:6px;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translateX(-50%) translateY(2px);transition:opacity .1s,transform .1s;
+  transition-delay:0s;z-index:10001}
+.nc-swatch[data-tip]:hover::after,.nc-toolbar__btn[data-tip]:hover::after{opacity:1;transform:translateX(-50%);transition-delay:.15s}
 /* brief floating confirmation toast (e.g. "Copied") */
 .nc-toast{position:fixed;z-index:9600;transform:translate(-50%,-100%);background:var(--nc-text,#292524);color:var(--nc-surface,#fff);
   font-size:.72rem;font-weight:500;padding:.3rem .55rem;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.25);

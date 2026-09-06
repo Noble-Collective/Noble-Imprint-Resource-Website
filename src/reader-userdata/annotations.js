@@ -78,8 +78,8 @@ function locFor(anchor) {
 function displayFor(text) {
   const quote = (text || '').trim()
   const ref = quote.length > 60 ? quote.slice(0, 57) + '…' : quote
-  const frag = encodeURIComponent(quote.slice(0, 40))
-  const href = location.pathname + (frag ? `#:~:text=${frag}` : '')
+  const frag = textFrag(quote)
+  const href = location.pathname + (frag ? `#:~:${frag}` : '')
   return { ref, href }
 }
 // The current session's title (document.title is "Session — Book"), stored on each annotation so
@@ -112,6 +112,8 @@ function onSelChange() {
 function swatch(color, onClick, active) {
   const b = el('button', `nc-swatch nc-swatch--${color}`)
   b.type = 'button'
+  const label = color.charAt(0).toUpperCase() + color.slice(1)
+  b.setAttribute('data-tip', label); b.setAttribute('aria-label', label + ' highlight')
   if (active) b.setAttribute('aria-pressed', 'true')
   b.appendChild(el('span'))
   b.onmousedown = (e) => e.preventDefault()
@@ -120,7 +122,7 @@ function swatch(color, onClick, active) {
 }
 function tbBtn(icon, title, onClick, danger) {
   const b = el('button', 'nc-toolbar__btn' + (danger ? ' nc-toolbar__btn--danger' : ''))
-  b.type = 'button'; b.title = title; b.innerHTML = icon
+  b.type = 'button'; b.setAttribute('data-tip', title); b.setAttribute('aria-label', title); b.innerHTML = icon
   b.onmousedown = (e) => e.preventDefault()
   b.onclick = (e) => { e.stopPropagation(); onClick() }
   return b
@@ -247,9 +249,23 @@ function copySelection() {
 }
 
 // A deep link to a passage: the session URL + a native text-fragment that scrolls to & highlights it.
+// Build a #:~:text= directive that actually matches on load. The naive slice(0,60) broke two
+// rules: (1) Chrome only scrolls when the match ends on a WORD boundary, so a mid-word cut
+// silently no-ops; (2) long / multi-block selections need textStart,textEnd, not one truncated
+// run. We also percent-encode '-' (encodeURIComponent misses it, and the directive grammar treats
+// '-' as a prefix/suffix delimiter); '&' and ',' are already handled by encodeURIComponent.
+function fragEnc(s) { return encodeURIComponent(s).replace(/-/g, '%2D') }
+function textFrag(text) {
+  const t = (text || '').replace(/\s+/g, ' ').trim()
+  if (!t) return ''
+  if (t.length <= 160) return 'text=' + fragEnc(t)
+  const start = t.slice(0, 70).replace(/\s+\S*$/, '') || t.slice(0, 70)   // back off to last whole word
+  const end = t.slice(-70).replace(/^\S*\s+/, '') || t.slice(-70)          // forward to next whole word
+  return 'text=' + fragEnc(start) + ',' + fragEnc(end)
+}
 function passageUrl(text) {
-  const frag = encodeURIComponent((text || '').trim().slice(0, 60))
-  return location.origin + location.pathname + (frag ? `#:~:text=${frag}` : '')
+  const frag = textFrag(text)
+  return location.origin + location.pathname + (frag ? `#:~:${frag}` : '')
 }
 async function shareUrl(url, rect) {
   if (navigator.share) {

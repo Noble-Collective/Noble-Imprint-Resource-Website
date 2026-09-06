@@ -2233,6 +2233,9 @@ body.text-mode .home-text {
   color: #536942;
   font-family: var(--font-sans);
   border-top: 1px solid rgba(83, 105, 66, 0.08);
+  /* Paint above the position:fixed sidebar (z-index 20) so it doesn't overlap the footer. */
+  position: relative;
+  z-index: 30;
 }
 
 .footer-top {
