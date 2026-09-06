@@ -101,6 +101,10 @@ html.nc-verse-line .bible-content .bible-paragraph sup:first-child::before{ marg
 .nc-acct__head{display:flex;align-items:center;gap:.5rem;margin-bottom:.7rem}
 .nc-acct__avatar{width:34px;height:34px;border-radius:999px;flex:none;object-fit:cover;background:var(--nc-hover)}
 .nc-acct__avatar--initials{display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:600;color:var(--nc-text)}
+/* Account BUTTON avatar (signed in) — replaces the account icon, matching Coram Deo. */
+.nc-sbtn__avatar{width:22px;height:22px;border-radius:999px;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.nc-sbtn__avatar--initials{background:var(--color-gold,#dfb53b);color:#fff;font-size:.7rem;font-weight:700;line-height:1}
+.nc-sbtn--avatar{padding:.34rem}
 .nc-acct__info{min-width:0}
 .nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-acct__email{font-size:.75rem;color:var(--nc-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -60,6 +60,22 @@ const confirmTwice = (msg1, msg2) => window.confirm(msg1) && window.confirm(msg2
 let isSession = false // true only on a reading page (has a session context + .session-content)
 let acctMenu = null
 const ncUser = () => (typeof window !== 'undefined' ? window.__NC_USER : null) // server-resolved (unified only)
+
+// The signed-in user's avatar as an element (Google photo → <img>, else an initials chip) — used as
+// the account BUTTON face (matches Coram Deo). `base` is the class prefix so it works on the button
+// (nc-sbtn__avatar) or elsewhere.
+function userAvatarEl(base) {
+  const u = getUser(); const su = ncUser()
+  const name = (u?.displayName || (su && su.displayName) || u?.email || (su && su.email) || '?').trim()
+  const photo = u?.photoURL || (su && su.photoURL) || ''
+  const initials = () => el('span', `${base} ${base}--initials`, (name[0] || '?').toUpperCase())
+  if (!photo) return initials()
+  const img = el('img', base)
+  img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
+  img.onerror = () => img.replaceWith(initials())
+  img.src = photo
+  return img
+}
 const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn') && !e.target.closest('.nc-sbtn')) closeAcct() }
 function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('mousedown', acctOutside) }
 
@@ -97,18 +113,8 @@ function toggleAccountMenu(anchor) {
   const email = u?.email || su?.email || ''
   const displayName = u?.displayName || su?.displayName || ''
   const name = displayName || email || 'Signed in'
-  const photo = u?.photoURL || (su && su.photoURL) || ''
+  // The avatar now lives on the account BUTTON (see updateClusters) — the menu shows just name/email.
   const head = el('div', 'nc-acct__head')
-  const initialsAvatar = () => el('span', 'nc-acct__avatar nc-acct__avatar--initials', (name[0] || '?').toUpperCase())
-  if (photo) {
-    const img = el('img', 'nc-acct__avatar')
-    img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
-    img.onerror = () => img.replaceWith(initialsAvatar()) // fall back to initials if it fails to load
-    img.src = photo
-    head.appendChild(img)
-  } else {
-    head.appendChild(initialsAvatar())
-  }
   const info = el('div', 'nc-acct__info')
   info.appendChild(el('div', 'nc-acct__name', name))
   if (email && email !== name) info.appendChild(el('div', 'nc-acct__email', email))
@@ -194,10 +200,20 @@ function buildCluster(host, { atTop, extraClass } = {}) {
 // Apply the current sign-in state to every live cluster (notebook visibility + account icon).
 function updateClusters() {
   const u = getUser()
+  const signedIn = !!u || !!ncUser() // client user OR server-resolved (unified) — show avatar for both
   for (const c of clusters) {
     c.nbBtn.style.display = (isSession && u) ? '' : 'none'
-    c.userBtn.classList.toggle('nc-sbtn--in', !!u)
-    const tip = u ? 'Account' : 'Sign in'
+    // Signed in → the button face IS the avatar (photo/initials), pulled out of the menu (matches CD).
+    // Signed out → the generic account icon.
+    if (signedIn) {
+      c.userBtn.replaceChildren(userAvatarEl('nc-sbtn__avatar'))
+      c.userBtn.classList.add('nc-sbtn--avatar')
+    } else {
+      c.userBtn.innerHTML = ICONS.user
+      c.userBtn.classList.remove('nc-sbtn--avatar')
+    }
+    c.userBtn.classList.toggle('nc-sbtn--in', signedIn)
+    const tip = signedIn ? 'Account' : 'Sign in'
     c.userBtn.setAttribute('data-tip', tip)
     c.userBtn.setAttribute('aria-label', tip)
   }
@@ -224,6 +240,7 @@ function buildSidebarControls() {
     }
   }).observe(document.body, { childList: true })
 
+  updateClusters() // paint the avatar immediately from the server-resolved user (unified), pre client restore
   onUser(() => updateClusters())
 }
 
