@@ -82,30 +82,30 @@
   <p>These 22 are the strongest candidates the system could find. Reading the surrounding text proves each one is an <strong>alignment/recognition artifact, not an audio defect</strong> — in every case the flagged word is present in the source (shown highlighted in the context). Nothing needs to be regenerated.</p>
   <div style="overflow-x:auto">
   <table class="av-t">
-    <thead><tr><th>Chapter</th><th>Flag</th><th>Context (source text)</th><th>Verdict</th></tr></thead>
+    <thead><tr><th>Reference</th><th>Flag</th><th>Context (source text)</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Exodus 28</td><td class="av-flag drop">dropped “ephod” ×7</td><td class="av-ctx">“…waistband of the <b>ephod</b> must be of one piece…”</td><td class="av-verd">Present — ASR can't transcribe the garment term “ephod”; spoken correctly.</td></tr>
-      <tr><td>1 Kings 10</td><td class="av-flag hall">added “nothing”</td><td class="av-ctx">“answered all her questions; <b>nothing</b> was too difficult…”</td><td class="av-verd">Present in verse; aligner double-counted.</td></tr>
-      <tr><td>Jeremiah 15</td><td class="av-flag hall">added “ruthless”</td><td class="av-ctx">“…the grasp of the <b>ruthless</b>”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Matthew 9</td><td class="av-flag hall">added “harvest”</td><td class="av-ctx">“…send out workers into His <b>harvest</b>”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Jeremiah 39</td><td class="av-flag hall">added “take”</td><td class="av-ctx">“…the guard, saying, ‘<b>Take</b> him, look after him…’”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Ezekiel 46</td><td class="av-flag hall">added “says”</td><td class="av-ctx">“…what the Lord GOD <b>says</b>: If the prince gives…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Hebrews 9</td><td class="av-flag hall">added “containing”</td><td class="av-ctx">“…the Most Holy Place, <b>containing</b> the golden altar…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Luke 7</td><td class="av-flag hall">added “experts”</td><td class="av-ctx">“…the Pharisees and <b>experts</b> in the law rejected…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Matthew 15</td><td class="av-flag hall">added “Peter”</td><td class="av-ctx">“…fall into a pit. <b>Peter</b> said to Him, ‘Explain…’”</td><td class="av-verd">Present — verse-boundary shift.</td></tr>
-      <tr><td>Psalms 83</td><td class="av-flag hall">added “how”</td><td class="av-ctx">“…your enemies rage, <b>how</b> Your foes have reared…”</td><td class="av-verd">Present — “how” repeats.</td></tr>
-      <tr><td>Mark 2</td><td class="av-flag hall">added “since”</td><td class="av-ctx">“carried by four men. <b>Since</b> they were unable…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Romans 8</td><td class="av-flag hall">added “not”</td><td class="av-ctx">“…the present time. <b>Not</b> only that, but we…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Hosea 2</td><td class="av-flag hall">added “declares”</td><td class="av-ctx">“…I will respond, <b>declares</b> the LORD…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Leviticus 15</td><td class="av-flag hall">added “semen”</td><td class="av-ctx">“…is an emission of <b>semen</b>, must be washed…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Leviticus 27</td><td class="av-flag hall">added “involves”</td><td class="av-ctx">“…but if the vow <b>involves</b> any of the unclean…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Micah 7</td><td class="av-flag hall">added “both”</td><td class="av-ctx">“…another with a net. <b>Both</b> hands are skilled…”</td><td class="av-verd">Present in verse.</td></tr>
-      <tr><td>Isaiah 48</td><td class="av-flag drop">dropped “could not”</td><td class="av-ctx">“…so that you <b>could not</b> claim, ‘My idol…’”</td><td class="av-verd">Present — negation is in the audio.</td></tr>
-      <tr><td>1 Samuel 2</td><td class="av-flag drop">dropped “no”</td><td class="av-ctx">“…from all these people. ‘<b>No</b>, my sons…’”</td><td class="av-verd">Present — the “No” is in the audio.</td></tr>
-      <tr><td>1 Kings 4</td><td class="av-flag drop">names (Elihoreph, Arubboth, Ahimaaz…)</td><td class="av-ctx">Solomon's officials &amp; district list (highest error, ~15%)</td><td class="av-verd">Rare name list — ASR can't transcribe; not dropped.</td></tr>
-      <tr><td>Proverbs 31</td><td class="av-flag drop">“strength and honor are”</td><td class="av-ctx">“…to the merchants. <b>Strength and honor are</b> her clothing…”</td><td class="av-verd">Present — verse-boundary shift.</td></tr>
-      <tr><td>Joshua 21</td><td class="av-flag drop">“manslayer, Gezer, Kibzaim”</td><td class="av-ctx">City-of-refuge / place-name list</td><td class="av-verd">Rare names + “manslayer” — ASR vocabulary.</td></tr>
-      <tr><td>Psalms 81</td><td class="av-flag drop">“Meribah. Selah. Hear”</td><td class="av-ctx">“…the waters of <b>Meribah. Selah.</b> Hear, O My people…”</td><td class="av-verd">Meribah (name) + “Selah” — recognizer noise.</td></tr>
+      <tr><td>Exodus 28:8&#8211;28</td><td class="av-flag drop">dropped “ephod” ×7</td><td class="av-ctx">“…waistband of the <b>ephod</b> must be of one piece…”</td><td class="av-verd">Present — ASR can't transcribe the garment term “ephod”; spoken correctly.</td></tr>
+      <tr><td>1 Kings 10:3</td><td class="av-flag hall">added “nothing”</td><td class="av-ctx">“answered all her questions; <b>nothing</b> was too difficult…”</td><td class="av-verd">Present in verse; aligner double-counted.</td></tr>
+      <tr><td>Jeremiah 15:21</td><td class="av-flag hall">added “ruthless”</td><td class="av-ctx">“…the grasp of the <b>ruthless</b>”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Matthew 9:38</td><td class="av-flag hall">added “harvest”</td><td class="av-ctx">“…send out workers into His <b>harvest</b>”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Jeremiah 39:12</td><td class="av-flag hall">added “take”</td><td class="av-ctx">“…the guard, saying, ‘<b>Take</b> him, look after him…’”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Ezekiel 46:16</td><td class="av-flag hall">added “says”</td><td class="av-ctx">“…what the Lord GOD <b>says</b>: If the prince gives…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Hebrews 9:4</td><td class="av-flag hall">added “containing”</td><td class="av-ctx">“…the Most Holy Place, <b>containing</b> the golden altar…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Luke 7:30</td><td class="av-flag hall">added “experts”</td><td class="av-ctx">“…the Pharisees and <b>experts</b> in the law rejected…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Matthew 15:15</td><td class="av-flag hall">added “Peter”</td><td class="av-ctx">“…fall into a pit. <b>Peter</b> said to Him, ‘Explain…’”</td><td class="av-verd">Present — verse-boundary shift.</td></tr>
+      <tr><td>Psalm 83:2</td><td class="av-flag hall">added “how”</td><td class="av-ctx">“…your enemies rage, <b>how</b> Your foes have reared…”</td><td class="av-verd">Present — “how” repeats.</td></tr>
+      <tr><td>Mark 2:3</td><td class="av-flag hall">added “since”</td><td class="av-ctx">“carried by four men. <b>Since</b> they were unable…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Romans 8:23</td><td class="av-flag hall">added “not”</td><td class="av-ctx">“…the present time. <b>Not</b> only that, but we…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Hosea 2:21</td><td class="av-flag hall">added “declares”</td><td class="av-ctx">“…I will respond, <b>declares</b> the LORD…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Leviticus 15:16</td><td class="av-flag hall">added “semen”</td><td class="av-ctx">“…is an emission of <b>semen</b>, must be washed…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Leviticus 27:11</td><td class="av-flag hall">added “involves”</td><td class="av-ctx">“…but if the vow <b>involves</b> any of the unclean…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Micah 7:3</td><td class="av-flag hall">added “both”</td><td class="av-ctx">“…another with a net. <b>Both</b> hands are skilled…”</td><td class="av-verd">Present in verse.</td></tr>
+      <tr><td>Isaiah 48:5</td><td class="av-flag drop">dropped “could not”</td><td class="av-ctx">“…so that you <b>could not</b> claim, ‘My idol…’”</td><td class="av-verd">Present — negation is in the audio.</td></tr>
+      <tr><td>1 Samuel 2:24</td><td class="av-flag drop">dropped “no”</td><td class="av-ctx">“…from all these people. ‘<b>No</b>, my sons…’”</td><td class="av-verd">Present — the “No” is in the audio.</td></tr>
+      <tr><td>1 Kings 4:2&#8211;19</td><td class="av-flag drop">names (Elihoreph, Arubboth, Ahimaaz…)</td><td class="av-ctx">Solomon's officials &amp; district list (highest error, ~15%)</td><td class="av-verd">Rare name list — ASR can't transcribe; not dropped.</td></tr>
+      <tr><td>Proverbs 31:25</td><td class="av-flag drop">“strength and honor are”</td><td class="av-ctx">“…to the merchants. <b>Strength and honor are</b> her clothing…”</td><td class="av-verd">Present — verse-boundary shift.</td></tr>
+      <tr><td>Joshua 21:21&#8211;22</td><td class="av-flag drop">“manslayer, Gezer, Kibzaim”</td><td class="av-ctx">City-of-refuge / place-name list</td><td class="av-verd">Rare names + “manslayer” — ASR vocabulary.</td></tr>
+      <tr><td>Psalm 81:7</td><td class="av-flag drop">“Meribah. Selah. Hear”</td><td class="av-ctx">“…the waters of <b>Meribah. Selah.</b> Hear, O My people…”</td><td class="av-verd">Meribah (name) + “Selah” — recognizer noise.</td></tr>
     </tbody>
   </table>
   </div>
