@@ -103,6 +103,16 @@ page.get('/', async (req, res, next) => {
   }
 });
 
+// Bible audiobook audio-fidelity validation report (static, point-in-time). Admin-gated by the
+// `app.use('/admin', auth.requireAdmin, adminRoutes.page)` mount in index.js.
+page.get('/audio-validation', (req, res, next) => {
+  try {
+    res.render('admin-audio-validation', { title: 'Bible Audio Validation' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --- API routes ---
 const api = express.Router();
 
