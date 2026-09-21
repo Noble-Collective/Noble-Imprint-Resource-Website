@@ -13,6 +13,7 @@ let wired = false
 let items = []          // annotations for the CURRENT unit (painted), derived from allAnnots
 let allAnnots = []      // the full live snapshot across all books (from onAnnotations)
 let annUnsub = null     // active onAnnotations subscription teardown (per signed-in session)
+let snapshotLoaded = false // true once the live snapshot has arrived at least once (authoritative)
 let pendingSel = null
 let toolbar = null
 let toolbarMode = null
@@ -76,6 +77,7 @@ function manageAnnotationSub(client) {
   }
   annUnsub = client.onAnnotations((rows) => {
     allAnnots = rows || [] // snapshot REPLACES the slice (never append); local writes echo by id
+    snapshotLoaded = true // authoritative data has arrived — safe to (re)write the pre-paint cache
     refreshItemsFromSnapshot()
   }, (e) => warn('annotations subscription', e))
 }
@@ -85,8 +87,55 @@ function manageAnnotationSub(client) {
 function refreshItemsFromSnapshot() {
   if (!CTX) { items = []; emitChange(); return }
   items = allAnnots.filter((a) => a.locator && inThisBookSet(a.locator))
-  if (ROOT) repaintAll()
+  if (ROOT) {
+    repaintAll()
+    // Only refresh the cache from AUTHORITATIVE live data. The initial (pre-snapshot) call has empty
+    // data and must NOT clear the cache — that would defeat the boot-time pre-paint below.
+    if (snapshotLoaded) writeBookmarkCache()
+  }
   emitChange()
+}
+
+// ---- bookmark pre-paint cache (no-jump on load) --------------------------------------------------
+// A positioned bookmark's marker is an inline icon inserted BEFORE the first word, so when it's added
+// after the (async) live snapshot arrives it reflows the paragraph — the text visibly "jumps". To
+// avoid that we cache the current page's bookmark anchors in localStorage and re-paint their markers
+// synchronously at boot, before the snapshot loads, so the text lays out with the icon already there.
+// The cache is NEVER a source of truth: repaintAll() below wipes every marker and repaints from the
+// authoritative live snapshot on each load (and writeBookmarkCache rewrites the cache to match), so a
+// stale entry can only flash for ~1s on a page not reloaded since an add/delete on another device.
+const BM_CACHE_KEY = 'nc:bm-cache'
+const unitKey = () => (CTX ? `${CTX.bookPath || CTX.osisBook || ''}\u0000${CTX.sessionFile || CTX.chapter || ''}` : '')
+function readBmCache() { try { return JSON.parse(localStorage.getItem(BM_CACHE_KEY) || '{}') } catch { return {} } }
+function writeBookmarkCache() {
+  try {
+    const key = unitKey(); if (!key) return
+    const bms = items
+      .filter((a) => a.kind === 'bookmark' && a.locator && a.locator.textAnchor)
+      .map((a) => ({ id: a.id, anchor: a.locator.textAnchor }))
+    const cache = readBmCache()
+    if (bms.length) cache[key] = bms
+    else delete cache[key] // a page with no bookmarks must not keep painting an old one
+    const keys = Object.keys(cache)
+    if (keys.length > 60) for (const k of keys.slice(0, keys.length - 60)) delete cache[k] // bound size
+    localStorage.setItem(BM_CACHE_KEY, JSON.stringify(cache))
+  } catch { /* localStorage unavailable/full → skip; live data still paints */ }
+}
+// Paint bookmark markers from cache at boot, before the live snapshot arrives. Only when we expect to
+// be signed in (server-resolved user) and no live data is present yet; repaintAll reconciles shortly.
+function paintCachedBookmarks() {
+  try {
+    if (!ROOT || !CTX || items.length) return
+    if (typeof window !== 'undefined' && !window.__NC_USER) return // signed out → nothing to show
+    const bms = readBmCache()[unitKey()]
+    if (!bms || !bms.length) return
+    const index = buildIndex(ROOT)
+    for (const bm of bms) {
+      if (document.querySelector(`.nc-bm-marker[data-annot-id="${cssEsc(bm.id)}"]`)) continue
+      const range = anchorToDomRange(index, bm.anchor)
+      if (range) placeBookmarkMarker(range, { id: bm.id })
+    }
+  } catch (e) { warn('cached bookmark paint', e) }
 }
 
 // Per-session (re)attach. The live subscription persists across in-book AJAX nav (it's user-scoped,
@@ -102,6 +151,9 @@ export function attachAnnotations(ctx) {
   clickRoot = ROOT
   ROOT.addEventListener('click', onContentClick)
   refreshItemsFromSnapshot()
+  // If the live snapshot hasn't loaded yet (initial page load), pre-paint bookmark markers from the
+  // cache so the text doesn't reflow when the real data arrives a moment later.
+  paintCachedBookmarks()
 }
 
 // ---------- locator + display ----------

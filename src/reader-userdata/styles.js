@@ -232,8 +232,11 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 /* ---- positioned bookmark markers ---- */
 /* Bookmark marker: zero inline width with the icon rendered in the left gutter (absolute), so it can
    be inserted after annotations load WITHOUT reflowing the text (no "the text jumped" on page load). */
-.nc-bm-marker{display:inline-block;width:0;color:var(--nc-accent);cursor:pointer;user-select:none}
-.nc-bm-marker svg{position:relative;left:-1em;vertical-align:middle;width:15px;height:15px}
+/* Inline marker before the first word (shifts text, always on-screen). It's inserted after the async
+   annotation load, so to avoid a visible reflow ("the text jumps") the bookmarked line is pre-marked
+   from a localStorage cache during boot — see initAnnotations. */
+.nc-bm-marker{color:var(--nc-accent);margin-right:.2em;cursor:pointer;user-select:none;vertical-align:middle}
+.nc-bm-marker svg{width:15px;height:15px}
 
 /* ---- library slide-out panel ---- */
 .nc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9600;opacity:0;transition:opacity .18s}
