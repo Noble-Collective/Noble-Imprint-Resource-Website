@@ -74,7 +74,7 @@ function scrollToMark(id) {
     t.classList.remove('nc-jumpflash')
     void t.offsetWidth // restart the animation if the same item is clicked again
     t.classList.add('nc-jumpflash')
-    setTimeout(() => t.classList.remove('nc-jumpflash'), 2600)
+    setTimeout(() => t.classList.remove('nc-jumpflash'), 1300)
   })
 }
 function focusItem(id) {

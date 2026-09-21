@@ -24,9 +24,12 @@ function jumpToTextFragment(root) {
   const id = 'nc-shared-passage'
   const tryJump = () => {
     try {
+      // Paint the emphasis exactly ONCE. Re-centering ticks (below) must NOT repaint — re-adding the
+      // mark restarts its fade animation, which reads as the passage flashing on and off repeatedly.
+      const existing = document.querySelector('mark[data-annot-id="nc-shared-passage"]')
+      if (existing) { existing.scrollIntoView({ behavior: 'smooth', block: 'center' }); return true }
       const range = textDirectiveToRange(root, dir.startText, dir.endText)
       if (!range) return false
-      unpaint(id)
       if (!paintRange(range, 'nc-share-hl', id)) return false
       const mark = document.querySelector('mark[data-annot-id="nc-shared-passage"]')
       if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' })

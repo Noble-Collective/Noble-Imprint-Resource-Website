@@ -230,7 +230,10 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-note-quote{font-size:.75rem;color:var(--nc-muted);margin-bottom:.4rem;border-left:2px solid var(--nc-accent);padding-left:.5rem;font-style:italic}
 
 /* ---- positioned bookmark markers ---- */
-.nc-bm-marker{color:var(--nc-accent);margin-right:.15em;cursor:pointer;user-select:none}
+/* Bookmark marker: zero inline width with the icon rendered in the left gutter (absolute), so it can
+   be inserted after annotations load WITHOUT reflowing the text (no "the text jumped" on page load). */
+.nc-bm-marker{position:relative;display:inline-block;width:0;color:var(--nc-accent);cursor:pointer;user-select:none;vertical-align:baseline}
+.nc-bm-marker svg{position:absolute;right:.1em;top:.1em;width:15px;height:15px}
 
 /* ---- library slide-out panel ---- */
 .nc-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9600;opacity:0;transition:opacity .18s}
@@ -325,9 +328,9 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 @keyframes nc-flash{0%,40%{background:var(--nc-amber-wash)}100%{background:transparent}}
 /* Clear "here's the spot" emphasis when jumping from the notebook: amber wash + left accent bar,
    held then faded, visible in both themes. box-shadow avoids any layout shift. */
-.nc-jumpflash{border-radius:4px;animation:nc-jump 2.4s cubic-bezier(.4,0,.2,1)}
+.nc-jumpflash{border-radius:4px;animation:nc-jump 1.2s ease forwards}
 @keyframes nc-jump{
-  0%,68%{background:var(--nc-amber-wash);box-shadow:inset 4px 0 0 var(--nc-amber),0 0 0 4px var(--nc-amber-wash)}
+  0%,45%{background:var(--nc-share-wash);box-shadow:inset 4px 0 0 var(--nc-muted),0 0 0 4px var(--nc-share-wash)}
   100%{background:transparent;box-shadow:inset 4px 0 0 transparent,0 0 0 4px transparent}
 }
 /* Brief emphasis on the passage a jump (shared link / notebook bookmark) points at — a subtle,

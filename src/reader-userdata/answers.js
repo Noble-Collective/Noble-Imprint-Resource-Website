@@ -123,5 +123,5 @@ function applyAuthState(client) {
 /** Scroll to and flash a question by id (for the library panel). */
 export function scrollToQuestion(id) {
   const block = document.querySelector(`.question-block[data-question-id="${window.CSS && CSS.escape ? CSS.escape(id) : id}"]`)
-  if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); block.classList.remove('nc-jumpflash'); void block.offsetWidth; block.classList.add('nc-jumpflash'); setTimeout(() => block.classList.remove('nc-jumpflash'), 2600) }
+  if (block) { block.scrollIntoView({ behavior: 'smooth', block: 'center' }); block.classList.remove('nc-jumpflash'); void block.offsetWidth; block.classList.add('nc-jumpflash'); setTimeout(() => block.classList.remove('nc-jumpflash'), 1300) }
 }
