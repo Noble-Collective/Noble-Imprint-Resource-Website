@@ -3,6 +3,7 @@
 // Rendered entirely client-side from the shared store, live via onAnnotations + onAnswers.
 import { getClient, onUser } from './firebase.js'
 import { el, warn, safeColor, dedupeGroups, annotationText } from './util.js'
+import { navigateToAnnotation } from './annotations.js'
 
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
@@ -117,6 +118,8 @@ function sessLabel(x) { return x.title || x.sessionTitle ? `<div class="nc-mynot
 function itemRow(a) {
   const row = el('a', 'nc-mynotes__item')
   row.href = a.href || '#'
+  // App-created items store only the locator (no denormalized href). Resolve the session URL on click.
+  if (!a.href) row.onclick = (e) => { e.preventDefault(); navigateToAnnotation(a) }
   const dotColor = a.kind === 'bookmark' ? 'accent' : safeColor(a.color || 'amber')
   row.innerHTML = (a.kind === 'note' ? '' : `<span class="nc-dot" style="background:var(--nc-${dotColor})"></span>`)
     + escapeHtml(clip(annotationText(a), 130))

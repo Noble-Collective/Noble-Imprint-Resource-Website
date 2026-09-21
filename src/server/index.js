@@ -886,6 +886,26 @@ app.get('/notes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Resolve a stored annotation locator (bookPath + sessionFile) to its session URL + title, so the
+// reader's Notebook / "My Notes" can navigate to an annotation whose denormalized `href` is absent
+// (e.g. a bookmark created in the mobile app, which stores only the locator). Public content-route
+// info — no auth needed. Serves the committed content-tree snapshot, so it's fast + offline-safe.
+app.get('/api/reader/resolve-locator', async (req, res) => {
+  try {
+    const bookPath = String(req.query.bookPath || '');
+    const sessionFile = String(req.query.sessionFile || '');
+    if (!bookPath || !sessionFile) return res.status(400).json({ error: 'bookPath and sessionFile required' });
+    const tree = await content.buildContentTree();
+    const hit = content.findByRepoPath(tree, bookPath, sessionFile);
+    if (!hit || !hit.session) return res.status(404).json({ error: 'not found' });
+    const url = content.sessionUrl(hit.series, hit.subseries, hit.book, hit.session);
+    res.json({ url, sessionTitle: hit.session.title || hit.session.displayName || null });
+  } catch (err) {
+    console.error('[resolve-locator]', err.message);
+    res.status(500).json({ error: 'resolve failed' });
+  }
+});
+
 // Content routes — catch-all resolver
 app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
   try {

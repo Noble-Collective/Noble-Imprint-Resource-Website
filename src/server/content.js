@@ -425,6 +425,33 @@ function sessionUrl(series, subseries, book, session) {
   return `/${series.slug}/${book.slug}/${session.slug}`;
 }
 
+// Reverse lookup: a stored annotation locator (book.repoPath [+ session.filename]) -> its route
+// nodes {series, subseries?, book, session?}, or null. This is the inverse of resolveRoute (URL ->
+// content); it lets us build a session URL from a locator whose denormalized `href` is absent — e.g.
+// bookmarks written by a peer product (the mobile app) that stores only the locator. Route slugs
+// derive from meta titles, so this can't be reconstructed client-side; it must run server-side.
+function findByRepoPath(tree, bookPath, sessionFile) {
+  const inBook = (series, subseries, book) => {
+    if (book.repoPath !== bookPath) return null;
+    const session = sessionFile ? (book.sessions || []).find(s => s.filename === sessionFile) || null : null;
+    return { series, subseries: subseries || null, book, session };
+  };
+  for (const series of tree.series || []) {
+    for (const child of series.children || []) {
+      if (child.type === 'book') {
+        const hit = inBook(series, null, child);
+        if (hit) return hit;
+      } else if (child.type === 'subseries') {
+        for (const b of child.books || []) {
+          const hit = inBook(series, child, b);
+          if (hit) return hit;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 // Load config
 function loadConfig() {
   try {
@@ -729,6 +756,7 @@ module.exports = {
   resolveRoute,
   bookUrl,
   sessionUrl,
+  findByRepoPath,
   loadConfig,
   loadSessionContent,
   loadSessionTitles,

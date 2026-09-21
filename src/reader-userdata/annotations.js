@@ -503,10 +503,30 @@ function passageUrl(text) {
   return location.origin + location.pathname + sep + ncqParam(p) + nativeFrag(p)
 }
 // Relative variant (path + query + fragment) for stored notebook links.
-function passageHash(text) {
+export function passageHash(text) {
   const p = fragParts(text)
   if (!p) return ''
   return '?' + ncqParam(p) + nativeFrag(p)
+}
+
+// Navigate to an annotation from a list view (Notebook, /notes), even when it's in another session.
+// Website annotations carry a stored `href` — use it directly. App-created ones (bookmarks) store
+// only the locator, so we resolve its session URL server-side (route slugs derive from meta titles,
+// so the client can't build it) and jump to url + a `?ncq=` passage fragment, which the destination
+// page scrolls to on load. No-ops for Bible annotations (no bookPath) and on a failed resolve.
+export async function navigateToAnnotation(a) {
+  if (!a) return
+  if (a.href) { window.location.href = a.href; return }
+  const loc = a.locator
+  if (!loc || !loc.bookPath || !loc.sessionFile) return
+  try {
+    const q = `bookPath=${encodeURIComponent(loc.bookPath)}&sessionFile=${encodeURIComponent(loc.sessionFile)}`
+    const r = await fetch(`/api/reader/resolve-locator?${q}`)
+    if (!r.ok) return
+    const { url } = await r.json()
+    if (!url) return
+    window.location.href = url + passageHash(loc.textAnchor?.quote || a.ref || '')
+  } catch { /* offline / resolve failed → leave the user where they are */ }
 }
 async function shareUrl(url, rect) {
   if (navigator.share) {

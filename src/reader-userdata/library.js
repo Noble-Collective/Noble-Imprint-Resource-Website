@@ -4,7 +4,7 @@
 // (e.g. tapping a bookmark opens the Bookmarks tab on that item). Includes search, session grouping,
 // and Markdown export of everything saved in the book.
 import { el, ICONS, safeColor, dedupeGroups, annotationText } from './util.js'
-import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned } from './annotations.js'
+import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned, navigateToAnnotation } from './annotations.js'
 
 let sheet = null
 let backdrop = null
@@ -94,7 +94,7 @@ function itemFor(a) {
     + (a.kind === 'note' && a.body ? `<div class="nc-panel__q" style="margin-top:.2rem">${escapeHtml(clip(a.body, 130))}</div>` : '')
     + (!isCurrentSession(a) && a.title ? `<div class="nc-panel__sess">${escapeHtml(a.title)}</div>` : '')
     + (orphan ? '<div class="nc-panel__orphan">Couldn’t find this on the page — the text may have changed.</div>' : '')
-  main.onclick = () => { if (orphan) return; if (isCurrentSession(a)) scrollToMark(a.id); else if (a.href) window.location.href = a.href }
+  main.onclick = () => { if (orphan) return; if (isCurrentSession(a)) scrollToMark(a.id); else navigateToAnnotation(a) }
   const del = el('button', 'nc-panel__del'); del.title = 'Delete'; del.innerHTML = ICONS.trash
   del.onclick = (e) => { e.stopPropagation(); removeById(a.id); render() }
   item.append(main, del)
