@@ -69,8 +69,25 @@ export function buildIndex(root) {
   return { root, rawText, nodeMap, norm: text, n2r, r2n }
 }
 
-/** Locate a raw offset within the node map -> {node, offset}. */
-function rawToNode(idx, nodeMap) {
+/**
+ * Locate a raw offset within the node map -> {node, offset}.
+ *
+ * `preferForward` disambiguates an offset that lands exactly on the boundary between two adjacent
+ * text nodes (idx === prev.end === next.start). Default (false) attributes it to the trailing edge
+ * of the PRECEDING node — correct for a range END so the range doesn't spill into the next node.
+ * When true (a range START) it attaches to the START of the FOLLOWING content node. This matters
+ * because an anchor whose quote begins at the very start of a block resolves to that boundary, and
+ * the preceding node is usually the inter-block whitespace text node markdown-it emits between
+ * blocks (a direct child of `.session-content`); without this, a bookmark's range would start on
+ * that whitespace node and its marker would be placed above the H1. Exported for unit testing.
+ */
+export function rawToNode(idx, nodeMap, preferForward = false) {
+  if (preferForward) {
+    // Prefer the node where idx maps to an interior/start offset (offset < length), so a boundary
+    // offset skips the trailing edge of the previous node and lands on the following content node.
+    for (const m of nodeMap) if (idx >= m.start && idx < m.end) return { node: m.node, offset: idx - m.start }
+    // idx is at end-of-text (or only a boundary matched) — fall through to the inclusive scan.
+  }
   for (const m of nodeMap) if (idx >= m.start && idx <= m.end) return { node: m.node, offset: idx - m.start }
   const last = nodeMap[nodeMap.length - 1]
   return last ? { node: last.node, offset: last.node.length } : null
@@ -123,7 +140,7 @@ export function anchorToDomRange(index, anchor) {
   if (!r) return null
   const rawStart = index.n2r[r.start]
   const rawEnd = index.n2r[r.end - 1] != null ? index.n2r[r.end - 1] + 1 : index.n2r[r.end]
-  const a = rawToNode(rawStart, index.nodeMap)
+  const a = rawToNode(rawStart, index.nodeMap, true) // START: a boundary offset attaches to the following content node
   const b = rawToNode(rawEnd, index.nodeMap)
   if (!a || !b) return null
   const range = document.createRange()
@@ -153,7 +170,7 @@ export function textDirectiveToRange(root, startText, endText) {
   }
   const rawStart = index.n2r[normStart]
   const rawEnd = index.n2r[normEnd - 1] != null ? index.n2r[normEnd - 1] + 1 : index.n2r[normEnd]
-  const a = rawToNode(rawStart, index.nodeMap)
+  const a = rawToNode(rawStart, index.nodeMap, true) // START: a boundary offset attaches to the following content node
   const b = rawToNode(rawEnd, index.nodeMap)
   if (!a || !b) return null
   const range = document.createRange()

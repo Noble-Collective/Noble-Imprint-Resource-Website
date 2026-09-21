@@ -660,17 +660,28 @@ function placeVerseBookmarkMarker(num, annot) {
   sup.parentNode.insertBefore(span, sup)
   return true
 }
+// Block-level containers a bookmark marker can hang off. Includes leaf cells (TD/TH) and other
+// block types beyond the common P/LI/headings so the walk-up stops at the nearest real block rather
+// than running to ROOT (which would strand the marker above the H1). TD/TH deliberately stop the
+// walk BEFORE TABLE — inserting a <span> as a <table>'s first child is invalid and gets relocated.
+const BOOKMARK_BLOCK_TAGS = /^(P|LI|H1|H2|H3|H4|H5|H6|BLOCKQUOTE|DIV|TD|TH|DD|DT|FIGCAPTION|PRE|ASIDE|FIGURE|SECTION)$/
 function placeBookmarkMarker(range, annot) {
-  let block = range.startContainer
-  while (block && block !== ROOT && !(block.nodeType === 1 && /^(P|LI|H1|H2|H3|H4|H5|BLOCKQUOTE|DIV)$/.test(block.tagName))) block = block.parentNode
-  if (!block || block === ROOT) block = range.startContainer.parentNode
   const span = el('span', 'nc-bm-marker')
   span.setAttribute('data-nc-skip', '')
   span.dataset.annotId = annot.id
   span.title = 'Bookmark — open in notebook'
   span.innerHTML = ICONS.bookmarkFill
   span.onclick = (e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('nc:open-notebook', { detail: { focusId: annot.id } })) }
-  block.insertBefore(span, block.firstChild)
+  // Walk up from the range's start to the nearest block-level ELEMENT.
+  let block = range.startContainer
+  while (block && block !== ROOT && !(block.nodeType === 1 && BOOKMARK_BLOCK_TAGS.test(block.tagName))) block = block.parentNode
+  if (block && block !== ROOT) { block.insertBefore(span, block.firstChild); return }
+  // No block ancestor (loose content directly under ROOT, or a boundary/whitespace start node).
+  // Insert the marker immediately BEFORE the range's start node — never at ROOT.firstChild, which
+  // would place it above the H1. Anchor to whichever node under ROOT the range actually begins at.
+  let ref = range.startContainer
+  while (ref && ref.parentNode !== ROOT) ref = ref.parentNode
+  ROOT.insertBefore(span, ref || ROOT.firstChild)
 }
 
 // ---------- clicks on painted marks ----------
