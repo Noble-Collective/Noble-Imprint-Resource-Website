@@ -15,13 +15,21 @@ const CSS = `
   --nc-amber-wash:#fef3c7; --nc-sky-wash:#e0f2fe; --nc-rose-wash:#ffe4e6; --nc-emerald-wash:#d1fae5;
   --nc-surface:#fff; --nc-border:#e7e5e4; --nc-text:#292524; --nc-muted:#78716c;
   --nc-hover:#f5f5f4; --nc-accent:#b45309;
+  /* Neutral gray used only for the brief "here's the spot" jump emphasis — deliberately NOT one of
+     the four highlight washes, so a jump never looks like a saved highlight. */
+  --nc-share-wash:#e7e5e4;
   --nc-font-scale:1;
 }
 html.nc-dark{
   --nc-amber-wash:#78350f; --nc-sky-wash:#0c4a6e; --nc-rose-wash:#881337; --nc-emerald-wash:#064e3b;
   --nc-surface:#1c1917; --nc-border:#292524; --nc-text:#e7e5e4; --nc-muted:#a8a29e;
-  --nc-hover:#292524; --nc-accent:#fbbf24;
+  --nc-hover:#292524; --nc-accent:#fbbf24; --nc-share-wash:#44403c;
 }
+/* Neutralize the browser's native scroll-to-text-fragment highlight (::target-text). We append a
+   text-fragment directive to jump links, but we paint our own brief gray emphasis (nc-share-hl) --
+   the native highlight is an off-brand, PERSISTENT purple that reads like a real highlight, so hide
+   it. Also covers older stored bookmark hrefs that already carry the directive. */
+::target-text{ background-color:transparent; color:inherit; }
 /* ---- reading-area Text Size (scales paragraphs + headings proportionally). Font Style is
    handled by overriding the site's --font-reading variable in settings.js. ---- */
 .session-content p, .reading-content p, .session-content li, .reading-content li{ font-size:calc(17px * var(--nc-font-scale,1)) !important; }
@@ -322,7 +330,9 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
   0%,68%{background:var(--nc-amber-wash);box-shadow:inset 4px 0 0 var(--nc-amber),0 0 0 4px var(--nc-amber-wash)}
   100%{background:transparent;box-shadow:inset 4px 0 0 transparent,0 0 0 4px transparent}
 }
-/* Temporary emphasis on the passage a shared #:~:text= link points at — hold, then fade. */
-mark.nc-share-hl{background:var(--nc-amber-wash);color:inherit;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone;animation:nc-share-fade 3.2s ease forwards}
-@keyframes nc-share-fade{0%,70%{background:var(--nc-amber-wash)}100%{background:transparent}}
+/* Brief emphasis on the passage a jump (shared link / notebook bookmark) points at — a subtle,
+   neutral GRAY that fades in ~1.2s. Intentionally not an amber/sky/rose/emerald wash so it never
+   looks like a saved highlight. */
+mark.nc-share-hl{background:var(--nc-share-wash);color:inherit;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone;animation:nc-share-fade 1.2s ease forwards}
+@keyframes nc-share-fade{0%,45%{background:var(--nc-share-wash)}100%{background:transparent}}
 `

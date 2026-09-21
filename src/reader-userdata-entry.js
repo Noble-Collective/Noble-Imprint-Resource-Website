@@ -30,7 +30,7 @@ function jumpToTextFragment(root) {
       if (!paintRange(range, 'nc-share-hl', id)) return false
       const mark = document.querySelector('mark[data-annot-id="nc-shared-passage"]')
       if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setTimeout(() => unpaint(id), 3200) // remove the temporary emphasis; the reading text is untouched
+      setTimeout(() => unpaint(id), 1300) // remove the temporary emphasis (matches the ~1.2s fade); reading text untouched
       return true
     } catch (e) { warn('shared-passage jump', e); return true /* don't retry on error */ }
   }
