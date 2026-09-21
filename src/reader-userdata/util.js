@@ -62,3 +62,11 @@ export function dedupeGroups(list) {
 // A CSS-var-safe color token (annotations are the user's own, but never trust a stored value in an
 // inline style). Falls back to amber for anything but plain lowercase letters (amber/sky/rose/emerald/accent).
 export const safeColor = (c) => (/^[a-z]+$/.test(String(c)) ? String(c) : 'amber')
+
+// Display text for an annotation in list views (Notebook, /notes) + exports + search.
+// The anchored text (locator.textAnchor.quote) is the source of truth; `ref` is a denormalized
+// display snippet that only SOME writers store — the website populates it, but a peer product may
+// not (e.g. the mobile app's bookmarks store just the anchor). Fall back to the anchor quote so
+// such items still render their text instead of a blank row. Bible whole-verse annotations carry a
+// `ref` and no textAnchor, so they resolve via the first branch. Never returns undefined.
+export const annotationText = (a) => String((a && (a.ref || a.locator?.textAnchor?.quote)) || '').trim()

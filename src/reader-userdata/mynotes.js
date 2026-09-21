@@ -2,7 +2,7 @@
 // highlights, notes, bookmarks — grouped by book, searchable, with jump links + Markdown export.
 // Rendered entirely client-side from the shared store, live via onAnnotations + onAnswers.
 import { getClient, onUser } from './firebase.js'
-import { el, warn, safeColor, dedupeGroups } from './util.js'
+import { el, warn, safeColor, dedupeGroups, annotationText } from './util.js'
 
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s }
@@ -69,7 +69,7 @@ function render(host, annots, answers) {
   const bookKey = (x) => (x.locator && x.locator.bookPath) || '?'
   const draw = (q) => {
     listWrap.innerHTML = ''
-    const annMatch = annots.filter((a) => !q || (`${a.ref || ''} ${a.body || ''} ${a.title || ''}`).toLowerCase().includes(q))
+    const annMatch = annots.filter((a) => !q || (`${annotationText(a)} ${a.body || ''} ${a.title || ''}`).toLowerCase().includes(q))
     const ansMatch = answers.filter((a) => !q || (`${a.answer || ''} ${a.questionText || ''} ${a.sessionTitle || ''}`).toLowerCase().includes(q))
     if (!annMatch.length && !ansMatch.length) {
       listWrap.appendChild(el('div', 'nc-panel__empty', q ? `Nothing matches “${q}”.` : 'Nothing saved yet — highlight text or answer a question while reading.'))
@@ -119,7 +119,7 @@ function itemRow(a) {
   row.href = a.href || '#'
   const dotColor = a.kind === 'bookmark' ? 'accent' : safeColor(a.color || 'amber')
   row.innerHTML = (a.kind === 'note' ? '' : `<span class="nc-dot" style="background:var(--nc-${dotColor})"></span>`)
-    + escapeHtml(clip(a.ref, 130))
+    + escapeHtml(clip(annotationText(a), 130))
     + (a.kind === 'note' && a.body ? `<div class="nc-mynotes__body">${escapeHtml(clip(a.body, 180))}</div>` : '')
     + sessLabel(a)
   return row
@@ -148,7 +148,7 @@ function exportMarkdown(annots, answers) {
       const group = dedupeGroups(groups.ann.filter((a) => a.kind === kind))
       if (!group.length) continue
       lines.push(`### ${KIND_LABEL[kind]}`)
-      for (const a of group) lines.push(kind === 'note' ? `- “${(a.ref || '').trim()}” — ${(a.body || '').trim()}` : `- “${(a.ref || '').trim()}”`)
+      for (const a of group) lines.push(kind === 'note' ? `- “${annotationText(a)}” — ${(a.body || '').trim()}` : `- “${annotationText(a)}”`)
       lines.push('')
     }
     if (groups.ans.length) {

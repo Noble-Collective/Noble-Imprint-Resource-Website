@@ -3,7 +3,7 @@
 // to their page. Each item has a delete icon. Opens focused on a specific item when asked
 // (e.g. tapping a bookmark opens the Bookmarks tab on that item). Includes search, session grouping,
 // and Markdown export of everything saved in the book.
-import { el, ICONS, safeColor, dedupeGroups } from './util.js'
+import { el, ICONS, safeColor, dedupeGroups, annotationText } from './util.js'
 import { getItems, subscribeItems, removeById, isCurrentSession, isOrphaned } from './annotations.js'
 
 let sheet = null
@@ -18,7 +18,7 @@ const clip = (s, n) => { s = (s || '').trim(); return s.length > n ? s.slice(0, 
 const escapeHtml = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const dot = (color) => `<span class="nc-dot" style="background:var(--nc-${safeColor(color)})"></span>`
 const tabForKind = (k) => (k === 'highlight' ? 'highlights' : k === 'note' ? 'notes' : 'bookmarks')
-const matches = (a, q) => !q || (`${a.ref || ''} ${a.body || ''}`).toLowerCase().includes(q)
+const matches = (a, q) => !q || (`${annotationText(a)} ${a.body || ''}`).toLowerCase().includes(q)
 
 document.addEventListener('nc:open-notebook', (e) => openLibrary(e && e.detail && e.detail.focusId))
 
@@ -90,7 +90,7 @@ function itemFor(a) {
   item.dataset.annotId = a.id
   const main = el('button', 'nc-panel__main')
   main.innerHTML = (a.kind === 'note' ? '' : dot(a.kind === 'bookmark' ? 'accent' : (a.color || 'amber')))
-    + escapeHtml(clip(a.ref, 90))
+    + escapeHtml(clip(annotationText(a), 90))
     + (a.kind === 'note' && a.body ? `<div class="nc-panel__q" style="margin-top:.2rem">${escapeHtml(clip(a.body, 130))}</div>` : '')
     + (!isCurrentSession(a) && a.title ? `<div class="nc-panel__sess">${escapeHtml(a.title)}</div>` : '')
     + (orphan ? '<div class="nc-panel__orphan">Couldn’t find this on the page — the text may have changed.</div>' : '')
@@ -153,8 +153,8 @@ function exportMarkdown() {
     if (!group.length) continue
     lines.push(`## ${label}`, '')
     for (const a of group) {
-      if (kind === 'note') lines.push(`- “${(a.ref || '').trim()}” — ${(a.body || '').trim()}`)
-      else lines.push(`- “${(a.ref || '').trim()}”`)
+      if (kind === 'note') lines.push(`- “${annotationText(a)}” — ${(a.body || '').trim()}`)
+      else lines.push(`- “${annotationText(a)}”`)
     }
     lines.push('')
   }
