@@ -67,6 +67,7 @@ export function initSettings() {
         current = { ...current, ...vals }
         saveCache()
         apply()
+        refreshOpenMenu() // if the gear menu is open, track the change in its toggles too
       } else if (!seeded) {
         // No server settings yet -> migrate the user's local choices up, once.
         seeded = true
@@ -86,11 +87,21 @@ function set(key, value) {
 
 // ---- gear menu ----
 let menuEl = null
+let menuRefreshers = [] // per-row fns that re-sync toggle states from `current` (for live updates)
 const onEsc = (e) => { if (e.key === 'Escape') closeMenu() }
 const onOutside = (e) => { if (menuEl && !menuEl.contains(e.target) && !e.target.closest('[data-nc-settings-btn]')) closeMenu() }
 
+// Re-sync the OPEN menu's toggles to `current` — called when a live settings snapshot arrives (a
+// change on another device / Coram Deo) so the popup's pressed states track the reader, which apply()
+// already updated. No-op when the menu is closed.
+function refreshOpenMenu() {
+  if (!menuEl) return
+  menuRefreshers.forEach((fn) => { try { fn() } catch { /* ignore */ } })
+}
+
 function closeMenu() {
   menuEl?.remove(); menuEl = null
+  menuRefreshers = []
   document.removeEventListener('mousedown', onOutside)
   document.removeEventListener('keydown', onEsc)
 }
@@ -111,12 +122,14 @@ function segRow(label, options, key) {
     seg.appendChild(b)
   }
   refresh()
+  menuRefreshers.push(refresh) // let live settings updates re-sync this row's pressed state
   row.appendChild(seg)
   return row
 }
 
 export function toggleSettingsMenu(anchor) {
   if (menuEl) { closeMenu(); return }
+  menuRefreshers = []
   menuEl = el('div', 'nc-menu')
   // Section 1 — applies everywhere on the site.
   menuEl.appendChild(sectionTitle('All resources'))
