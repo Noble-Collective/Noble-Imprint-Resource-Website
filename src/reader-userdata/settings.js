@@ -1,9 +1,16 @@
 // Settings: load/apply/persist the shared user settings, and the gear menu. Applies from a local
 // cache instantly (no-flash), then syncs from the shared store on sign-in. Mirrors Coram Deo:
 // theme -> .nc-dark class, fontSize -> --nc-font-scale, fontFamily -> font class.
-import { FONT_SCALE, DEFAULT_SETTINGS } from '@noble-collective/userdata/core'
+import { DEFAULT_SETTINGS } from '@noble-collective/userdata/core'
 import { onUser, getClient } from './firebase.js'
 import { el, warn } from './util.js'
+
+// fontSize token -> numeric scale. Per-product presentation: the shared store carries the ABSTRACT
+// token (sm/base/lg/xl), and each product maps it to its own scale — so bumping lg/xl here is a pure
+// presentation change with no effect on the shared contract or cross-device sync. Owned locally (not
+// imported from the SDK) so this site can render "Large"/"Extra Large" bigger, closer to the mobile
+// app's feel (mobile: lg 1.2, xl 2.0), without coupling presentation to the contract package.
+const FONT_SCALE = { sm: 0.9, base: 1, lg: 1.2, xl: 1.75 }
 
 const CACHE_KEY = 'nc:reader-settings'
 let current = load()
