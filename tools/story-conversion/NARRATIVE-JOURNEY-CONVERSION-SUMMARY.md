@@ -632,3 +632,93 @@ promoted into the finished sessions.**
   Licensing line uses the full title + subtitle (`_<Title>: A Narrative Journey of Christian
   <Domain>_, Pre-Release Edition`); Introductory Quotes populated per book from each book's
   interior PDF (Story: Chesterton/Tolkien/Lewis; Best: Augustine/1 Peter 2:11–12).
+
+---
+
+## Book 6 — The Kingdom Come  (Christian Witness)
+
+**Status:** Converted & verified locally 2026-09-24 (deploy pending Steve's go-ahead). Built IN PLACE in
+`Essentials/The Kingdom Come/` — `status: public`, banner `Pre-Release`, accent **`#5f5fe0`** (from
+`cover.svg`, confirmed by Steve), `order` 6. Stale preview `session1.md` ("The Mission", old format) +
+`.DS_Store` removed. **No interior PDF**, but all 15 Docs exist (Drive folder
+`1tkanlU4QvuY-QR0_6QCQ1gvpkZSj2e_b`; IDs below). Final Essentials book.
+
+- **12 sessions** (`01-The-Mission … 12-The-Bush`): `completeness.py` **12/12 at 100%**, 0 WARN beyond the
+  expected empty Passage Outline (all 12 manuscripts leave it empty). **No draft appendices** (unlike book 5).
+  `verify.js`: all 16 files clean — 303 `@include` directives, 302 unique Question ids, 5 infographics + 5
+  movement intros + 1 creed per session.
+- **Creed:** placeholder `<WitnessCreed>Coming soon.</WitnessCreed>` (`CREED_KEY="WitnessCreed"`) — every
+  session Doc's Creedal Statement is empty. Rename the key everywhere if a real creed arrives.
+- **Spiritual Practice — FIRST book with genuine practice content in all 12 sessions** (title + instructions,
+  then 0–3 short fill-in prompt labels, e.g. "People Focus" / "Missionary Prayer"; S3/S5/S12 have no labels).
+  Converter flag `PRACTICE_PROMPTS=True` renders each label as an answerable
+  `<Question id=TheKingdomComeSes{N}-SpiritualPractice-Q{n}><Accent>Label</Accent></Question>` (answer box).
+  ⚠ PENDING Steve's format call: books 2–3 had the SAME bare-label pattern (book 2 S2 day names; book 3
+  S2/S6/S8, plus "Label: prompt" lines in S4/S6) and shipped them as **plain paragraphs** (no box, no
+  accent). Flip the flag to False + re-run to match that precedent.
+- **Catechism:** book-6 Docs omit "Q:/A:" — converter now normalizes `What …? Answer.` → `Q: What …? A:
+  Answer.` (house form of books 1–5; no-op when already present).
+
+**Matter (genuine book-6 content kept; stale book-1 carryover → generic placeholders, per Steve):**
+built by `scratchpad/build_matter_kingdom.py` (templates off book 5's matter, pulls prose from the Doc exports).
+- **Front Matter:** §12 structure; Introductory Quotes "Coming soon." (no PDF p.1).
+- **The Opening — genuine:** Key Elements (Mark 16:15; Q: What work does God call his people to? A: Witness),
+  Introduction (Colossians 1:5–6 + Alexander Duff epigraphs + 10 prose paragraphs; the "(1500 words)" heading
+  suffix is an authoring note, dropped), **Core Content** focus lines, Key Idea, Personal Interest questions.
+  Core Content: the Doc used OLD working titles (The Fish/Testimony/Lake/Seed/Neighbor/Portico/Hill) → final
+  titles + session-Doc Key Passages; the Doc paired the S6/S7 descriptions with the wrong passages → S6 Luke
+  15 = "seeking after the lost", S7 Luke 10 = Good Samaritan (script asserts every Doc passage == session Key
+  Passage). **Stale → placeholder:** Planning Calendar (book-1 sessions → rebuilt from the real lineup),
+  Discussion Questions + Significant Quote (verbatim book-1 copies — "How do people pursue the truth?" / Ryle
+  jellyfish quote) → "Coming soon."; Project Preview + Example Creed (book-1 "creedal statement … Christian
+  belief" / "==We believe in God Almighty==" stub) → "Coming soon."; Growth Outcomes + Imaginative
+  Storytelling = shared boilerplate (as books 3–5).
+- **The Recall — genuine:** Key Elements (1 Corinthians 2:2; Witness catechism), Conclusion (2 Corinthians 4:5 +
+  Justin Martyr epigraphs + 5 prose paragraphs). **Stale → placeholder:** Selected Passages + Recommended
+  Reading (book-1 Faith/Creation/… topics) → blank Session tables; Growth-Evaluation rubric (book-1/Bond mix)
+  → generic `____` skeleton; "Creedal Confession" capstone → `### Witness Creed` "Coming soon."
+- **Further Resources — genuine:** bibliography intro paragraph (per-session headings, no entries in the Doc);
+  reading-plan epigraphs (2 Timothy 2:8–10; Arthur T. Pierson) + intro; **reading-plan tables for S1–S5 + S12**
+  (complete 4 weeks × 5 in the Doc, Bond-style Week tables, weeks 1–20 / 45–48). **S6–S11 heading-only** —
+  the Doc has only 1–7 stray passages each (incomplete); trailing "Scripture Verses/Quotes…" notes dropped.
+
+**Typos / inconsistencies in source Docs (reproduced faithfully unless noted — fix in the Docs):**
+- Opening Key Idea: "that **the the** gospel" (double "the").
+- Opening intro: "by **become** a substitute" (→ becoming); "honestly assess **own** hesitations"; "help you
+  **understanding**"; "sure up" (→ shore up); missing space "orientation.The narrative".
+- Recall intro: "emotions **associate** with evangelism" (→ associated); Scripture Memory lacks a period
+  before "1 Corinthians 2:2".
+- Further reading plan: "Revelation **21:-22:5**" → **CORRECTED** to 21:1–22:5 (book-4 ref-fix precedent).
+- Opening/Further Docs still use the old working session titles; Opening S6/S7 descriptions swapped — fix in Docs.
+- Hint: the Opening's stale Example text says "write your own **mission manifesto**" — likely the intended
+  book-6 capstone (book 4's Doc carried the same phrase). Author call.
+
+**Found in OTHER live books while surveying (flagged, NOT changed):**
+- Book 3 (The Open Invitation) S4/S5/S6/S7/S9/S10/S12 render a literal `**` line at the end of Spiritual
+  Practice (an escaped-asterisk export artifact the converter passed through).
+- Book 3's live Opening Discussion Questions + Significant Quote are the **book-1 copies** (same as book 6's
+  stale Doc).
+- Book 2 S2–S12 Key Elements still say "**Catechism Question**" (converted before the label normalization).
+
+**Google Doc IDs** (curl `…/document/d/<ID>/export?format=md`):
+
+| # | Title | Key Passage | Doc ID |
+|---|-------|-------------|--------|
+| 1 | The Mission | Jonah 1:1–4:11 | 1rZ976b8XYJz8LFhWVneKJuLM8AT4pEnsqtVLlxBeKwI |
+| 2 | The Work | John 1:1–51 | 1aZv59zPti9TIp3rJvRmgrrMnsBsVlccBO41-OH2ZVQw |
+| 3 | The Call | Luke 5:1–32 | 1hGCtVfBCC_BMRi9NT7A1cm6opHhPduL7U5H6pM0jv1I |
+| 4 | The Harvest | Matthew 9:35–11:1 | 1ff0Q36jKjDcDCvC9FC6WiA7LXaYvXFmOBBzosAM3Zoo |
+| 5 | The Soils | Mark 4:1–34 | 1hx6xYtsuT_Tnytl3_Nl50FkobWTHeCza1_654TSO5XM |
+| 6 | The Lost | Luke 15:1–32 | 159MBpf4dSjtJ_o-50ZEP7Kcy0sAp5nBK6mgUCkFoPSg |
+| 7 | The Samaritan | Luke 10:25–37 | 1sb1XmkTFo8oPBxFeFxCrDNZrrWDIlqi-j3RmM01dcnI |
+| 8 | The Encounter | Acts 3:1–4:31 | 1-dBOl7TVDUggI4zF_kshj8Ba6Wd9jCIs6sb93DAXD5s |
+| 9 | The Stones | Acts 6:1–8:4 | 1eGeZfkLLD2SZaEJlU3Q-0GEyj5JT-7r7zXj3PLERQ6U |
+| 10 | The Forum | Acts 17:16–34 | 1kWOioK6t9F1Hvs3Waa9o7ueHZsDyXQwTneVwMreA-kg |
+| 11 | The Speech | Acts 26:1–32 | 12ole4Bjpp8sTxyG2S2O1Cdg02u9pxvUubXOTckbJefs |
+| 12 | The Bush | Exodus 3:1–4:17 | 1CvHi3kIUCl3VVqtnuOTQyVTBeizt9wMw6qePMFpsOro |
+
+Matter: Opening `1J3_n9cIjPufLGjlEkYmYVSXX-jN7zVBUkE_vrPEigIA`, Recall
+`1phHxex4fYSBDIvzek4uN9h2DgJfJ-ciKvHkXp_hnaFM`, Further `18JeA75LkK2qXONRq4TAuaB-mUsEXGPxlq09epVATchQ`.
+Book-5 Doc exports backed up to `docs/_the-glory-due-his-name/`. Drive folder IDs were parsed from the
+folder page's `data-id` attributes (`curl` the public folder URL; `html.unescape`; each id is followed by
+its title in a `data-tooltip`).

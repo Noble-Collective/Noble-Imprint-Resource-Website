@@ -5,7 +5,9 @@ markdown used by the Noble Imprint website/app. Built for **"The Story Behind It
 All"** (Narrative Journey Series → Essentials); the same pipeline is meant
 to be reused for the rest of the series.
 
-_Last updated: 2026-07-29 — **books 1–4 complete & live** (book 4 = "The Bond Between Us",
+_**2026-09-24 — Book 6 "The Kingdom Come" (Witness, accent `#5f5fe0`, placeholder `WitnessCreed`) converted & verified locally** — 15 Docs, no PDF; genuine matter kept, stale book-1 carryover -> placeholders (`scratchpad/build_matter_kingdom.py`); new `verify.js` real-parser check (`node tools/story-conversion/verify.js "<Book>"` from the website repo); converter adds `PRACTICE_PROMPTS` (practice fill-in labels -> answer-box Questions) + Catechism Q:/A: normalization. See the SUMMARY Book-6 section._
+
+_Earlier: 2026-07-29 — **books 1–4 complete & live** (book 4 = "The Bond Between Us",
 Community / A Christian Community Covenant, accent `#de6d36`, DEPLOYED + PUBLIC; the "home" book for
 the genuine Recall + community Growth-Evaluation rubric extracted from its PDF p.408). The Opening AND
 The Recall are **commonized**: identical framework text lives once in `commonSeries.md` as 16
@@ -102,7 +104,7 @@ Steps:
    `<!-- @include: PublishingLicensing -->`) → `## Series Introduction` +
    `<!-- @include: SeriesIntroduction -->` → `## Session Overview` +
    `<!-- @include: SessionOverview -->`.
-8. **Verify:** `python completeness.py` (expect 12/12 100%); structural sweep (5 infographics,
+8. **Verify:** `python completeness.py` (expect 12/12 100%) + `node tools/story-conversion/verify.js "<Book>"` (website repo; does the sweep + real-parser resolve/render below in one pass); structural sweep (5 infographics,
    5 movement intros, 1 creed include, 0 literal `<Item>`/`<Infographic>`, 0 un-commented
    `@include`); resolve ALL `@include` keys with the REAL parser (require + `resolveIncludes`)
    and `renderMarkdown` a spot-check (tables merge, links, no throw). See the node one-liners in

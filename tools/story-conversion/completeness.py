@@ -16,7 +16,7 @@ import re, sys, os, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(HERE, 'docs')
-BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Glory Due His Name/sessions'
+BOOK = 'C:/Users/Steve/Dev/Noble-Imprint-Resources/series/Narrative Journey Series/Essentials/The Kingdom Come/sessions'
 
 def norm(s):
     s = s.replace('’',"'").replace('‘',"'").replace('“','"').replace('”','"')
@@ -66,11 +66,9 @@ def check(n, src_path, out_path):
     return (n, dropped == 0, len(S), len(O), gaps)
 
 # map session number -> output filename
-# NOTE: S1 and S5 are BOTH "The Water" (S1 Genesis 6:1–9:17 flood; S5 Acts 8:1–40
-# baptism) — left as-is per Steve (2026-07-29); files 01-The-Water + 05-The-Water.
-titles = {1:'01-The-Water',2:'02-The-Sea',3:'03-The-River',4:'04-The-Jordan',
- 5:'05-The-Water',6:'06-The-Cleansing',7:'07-The-Valley',8:'08-The-Lamb',
- 9:'09-The-Mount',10:'10-The-Feeding',11:'11-The-Supper',12:'12-The-Banquet'}
+titles = {1:'01-The-Mission',2:'02-The-Work',3:'03-The-Call',4:'04-The-Harvest',
+ 5:'05-The-Soils',6:'06-The-Lost',7:'07-The-Samaritan',8:'08-The-Encounter',
+ 9:'09-The-Stones',10:'10-The-Forum',11:'11-The-Speech',12:'12-The-Bush'}
 
 allok = True
 for n in range(1,13):

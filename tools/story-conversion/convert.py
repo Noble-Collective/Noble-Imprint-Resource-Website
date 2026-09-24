@@ -18,14 +18,20 @@ OUTDIR = os.path.join(HERE, 'out'); os.makedirs(OUTDIR, exist_ok=True)
 OUT = os.path.join(OUTDIR, f'session{N}.md')
 
 # PER-BOOK setting: question-id prefix, e.g. f"{ID_PREFIX}Ses3-Hearing-Q1"
-ID_PREFIX = "TheGloryDueHisName"
+ID_PREFIX = "TheKingdomCome"
 # PER-BOOK setting: the include key for this book's Creedal Statement block (lives
 # in the book's commonBook.md). "The Story Behind It All" = ApostlesCreed; "The Best
 # Possible Life" (Christian Living) = TenCommandments; "The Open Invitation"
 # (Christian Formation) = LordsPrayer; "The Bond Between Us" (Christian Community)
 # = CommunityCovenant; "The Glory Due His Name" (Christian Devotion) = DevotionCreed
-# (PLACEHOLDER — no creed source yet; commonBook.md ships "<DevotionCreed>Coming soon.</DevotionCreed>").
-CREED_KEY = "DevotionCreed"
+# (PLACEHOLDER — no creed source yet; commonBook.md ships "<DevotionCreed>Coming soon.</DevotionCreed>");
+# "The Kingdom Come" (Christian Witness) = WitnessCreed (PLACEHOLDER, same pattern).
+CREED_KEY = "WitnessCreed"
+# PER-BOOK setting (added for book 6): Spiritual-Practice fill-in prompt labels. Book-6
+# Docs end each practice with short label lines ("People Focus", "Missionary Prayer")
+# that are blanks for the reader to write in. True -> emit each as an answerable
+# <Question> (answer box on the site). False -> old behavior (plain paragraph).
+PRACTICE_PROMPTS = True
 
 warnings = []
 def warn(m): warnings.append(m)
@@ -269,6 +275,7 @@ while i < len(paras):
                 # Emit any manuscript practice content (most sessions have none), then
                 # the shared infographic — mirrors session 1's order (practice, then chart).
                 practice_titled = False
+                practice_body = False; prompt_n = 0
                 while i < len(paras) and not (hd(paras[i]) and hd(paras[i])[0] <= 2):
                     pp = paras[i]; i += 1
                     if re.fullmatch(r'#{1,6}', pp.strip()):
@@ -282,12 +289,23 @@ while i < len(paras):
                     if ' | ' in pp and not pp.lstrip().startswith('|'):  # "Label | prompt"
                         label, _, rest = pp.partition(' | ')
                         out += ['', f'<Accent>{clean(label)}:</Accent> {clean(rest)}']; continue
+                    title_like = (not pp.lstrip().startswith('*') and '\n' not in pp.strip()
+                                  and len(pp.split()) <= 6 and not re.search(r'[.!?:]$', pp.strip()))
                     # first plain, title-like line = the practice's name (unstyled in the
                     # Doc, e.g. "Reflective Walk"): promote to a #### heading like a bold one.
-                    if (not practice_titled and not pp.lstrip().startswith('*')
-                            and len(pp.split()) <= 6 and not re.search(r'[.!?:]$', pp.strip())):
+                    if not practice_titled and title_like:
                         flush_heading(4, clean(pp)); practice_titled = True; continue
-                    out += ['', clean(pp)]
+                    # later title-like lines = fill-in prompt labels (book 6) -> answer boxes
+                    # (labels can run long, e.g. "Truths and Experiences That Build Courageous
+                    # Witness" or "… Activity (i.e., …)", so a looser cap — a single
+                    # non-italic line without sentence-ending punctuation, ≤ 20 words)
+                    prompt_like = (not pp.lstrip().startswith(('*', '_')) and '\n' not in pp.strip()
+                                   and len(pp.split()) <= 20 and not re.search(r'[.!?:]$', pp.strip()))
+                    if PRACTICE_PROMPTS and practice_titled and practice_body and prompt_like:
+                        prompt_n += 1
+                        out += ['', f'<Question id={ID_PREFIX}Ses{N}-SpiritualPractice-Q{prompt_n}><Accent>{clean(pp)}</Accent></Question>']
+                        continue
+                    out += ['', clean(pp)]; practice_body = True
                 out += ['', '<!-- @include: SpiritualPracticesInfographic -->']
                 continue
             flush_heading(3, text); continue
@@ -316,9 +334,15 @@ while i < len(paras):
             label = clean(lm.group(1))
             # Normalize the catechism run-in label so the bold term is uniform across
             # books (some Docs write "Catechism Question", others "Catechism"). Per Steve.
+            val = clean(lm.group(2))
             if label.lower().startswith('catechism'):
                 label = 'Catechism'
-            out.append(f'- **{label}** - {clean(lm.group(2))}')
+                # Books 1-5 write "Q: … A: …"; book-6 Docs drop the markers
+                # ("What …? Witness."). Normalize to the house form. No-op if present.
+                mq = re.match(r'^(?!Q:)(.+\?)\s+(\S.*)$', val)
+                if mq:
+                    val = f'Q: {mq.group(1)} A: {mq.group(2)}'
+            out.append(f'- **{label}** - {val}')
         else:
             out.append('- ' + clean(item))
         continue
