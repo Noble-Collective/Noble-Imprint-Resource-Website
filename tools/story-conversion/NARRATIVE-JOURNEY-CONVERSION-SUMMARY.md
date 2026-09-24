@@ -752,3 +752,19 @@ artifacts, and treats book 1's creed `bold=`/`active=` as a note (NB: all 12 boo
 `bold=`, not only S1 as earlier notes said). Also corrected: the book-3 `**` and book-2 "Catechism Question"
 items above were FIXED 2026-09-24 (commit 014e154). Open: Group B (stale matter in books 1–3), Group C
 (cleanup), author placeholder checklist.
+
+### Group B / C decisions (Steve, 2026-09-24)
+- **B1** The Open Invitation Opening: book-1 Scripture Memory / Catechism → `____`, book-1 epigraphs (2 Tim 1:13,
+  Schaff) removed (genuine intro prose kept), book-1 Key Idea → "Coming soon."; Recall Catechism → `____`.
+- **B2** Wrong-book Core Project wording → "Coming soon." under the heading: book 2 Project Preview, Example Code,
+  Recall Code of Conduct; book 3 Example ____. Book 1: stale "mission manifesto" lead-in removed, example creed kept.
+  "Mission manifesto" now appears nowhere.
+- **B3** Book 3 Recall capstone added as `### ____` + "Coming soon." (author names it).
+- **B4** Book 1 Opening Creedal Statement: KEEP the inline "A Christian Creed" for now (not ApostlesCreed).
+- **C1** Emptied the demo `<DeepDivePrompt>`/`<WrapUpNotes>` blocks from `Essentials/commonSubseries.md`; removed 2
+  `.DS_Store` files. (`<TestSharedSeriesNote>` kept — used by the hidden Test Book fixture/tests.)
+- **C2** Book 1 S2–S4 trial infographic themes (`ig-theme-blush/card/outline` wrappers): KEEP (Steve).
+- **C3** SeriesIntroduction Essentials row: "…community, and devotion" → "…community, devotion, and witness";
+  `Essentials/meta.json` subtitle "Core discipline" → "Core discipleship for local churches".
+- Note: book 1's per-session creed `bold=` on ALL 12 sessions is intentional (thematic partition of the Apostles'
+  Creed, per the book-1 build notes) — the earlier "only S1" wording in this doc was out of date.
