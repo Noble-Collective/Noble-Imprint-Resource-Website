@@ -142,6 +142,32 @@ NOT here — they come from the shared store via the SDK's `core/dashboard.ts` s
 `recordActivity` now sends `source: 'resources-web'` (SDK 0.2.9) so the app can say "On the website".
 Plans: `plans/2026-09-24-api-home-endpoint.md`, `Collective-Shared/plans/2026-09-24-shared-home-dashboard.md`.
 
+### Combine accounts — `POST /api/account/merge` (added 2026-09-24)
+
+When a reader connects a Google/Apple login that already belongs to ANOTHER account, the client signs in
+to that account on a secondary Firebase app and posts both ID tokens here. `src/server/account-merge.js`
+verifies both (the other must be fresh ≤5 min; the removed account needs a recent sign-in only if it has
+data), keeps the account with the verified real email (`pickSurvivor`), folds the loser's shared-store
+data in (`mergeUserData` — CommonJS port of Collective-Shared `core/merge.ts`, tested against the shared
+`tests/unit/fixtures/merge.golden.json`), deletes the loser, moves its sign-in identities
+(`updateUser providerToLink`), and returns a custom token when the survivor isn't the caller's current
+account. FAILS CLOSED: 409 `legacy-data` (un-migrated default-DB app data) or `institute-data`
+(`src/server/institute-data.js` checks the Institute's `institute-data` DB; refuses if the check can't
+run). Uses `auth.readerAuth()` / `getReaderFirestore()` / `getReaderLegacyFirestore()`. IAM (granted
+2026-09-24, conditioned to one DB each): runtime SA `471081269328-compute@` has `datastore.user` on
+463519 `collective-user-data` and `datastore.viewer` on `noble-collective-institute` `institute-data`.
+Plan: `Collective-Shared/plans/2026-09-24-account-merge.md`. Not yet exercised live.
+
+### Known cross-product gaps (website side, TODO)
+
+- **Quotes drop whitespace at paragraph boundaries.** `anchor-dom.js` builds the quote from DOM text, so a
+  selection across paragraphs stores e.g. `"…at the front.19They…"`. The mobile app now tolerates it
+  (whitespace-insensitive fallback), but Coram Deo / future consumers may not. Fix: insert a space at
+  block boundaries when computing AND resolving (keep resolving old anchors).
+- **Multi-verse Bible highlights are saved as ONE doc** (verse locator = the first verse, one long quote).
+  The contract (Collective-Shared ARCHITECTURE §3b) is ONE doc PER VERSE with a shared `groupId`, which is
+  what the app and Coram Deo write. Seen on Bryan's Exodus 39:15–20 highlight (2026-09-24).
+
 ### Audiobook System
 
 Audio is generated in a separate repo (`Noble-Imprint-Audiobooks`) via ElevenLabs TTS. This website serves audio via GCS signed URLs. The `audio-player.js` provides a floating icon → sticky bottom bar player with sentence-level text sync from timestamp data.
