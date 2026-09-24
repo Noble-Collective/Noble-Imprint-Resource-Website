@@ -5877,3 +5877,31 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 /* Small inline spinner for async loads */
 .bv-spin { display: inline-block; width: 15px; height: 15px; border: 2px solid #e6ddc7; border-top-color: #b8923a; border-radius: 50%; animation: bv-spin 0.7s linear infinite; vertical-align: -3px; }
 @keyframes bv-spin { to { transform: rotate(360deg); } }
+
+/* ===== Admin: Home tab (shared Home content) ===== */
+.hm-wrap{max-width:820px;padding:8px 0 32px}
+.hm-intro,.hm-desc{color:#666;font-size:.9rem;line-height:1.5;margin:.25rem 0 1rem}
+.hm-h{font-size:1.15rem;margin:1.6rem 0 .25rem}
+.hm-h3{font-size:.95rem;margin:1.2rem 0 .5rem}
+.hm-status{padding:10px 0;color:#666}
+.hm-status--error{color:#b3261e}
+.hm-books{list-style:decimal;padding-left:1.4rem;margin:0}
+.hm-book{padding:10px 0;border-bottom:1px solid #eee}
+.hm-book-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.hm-book-title{font-weight:600}
+.hm-book-series{color:#888;font-size:.8rem}
+.hm-book-btns{margin-left:auto;display:flex;gap:4px}
+.hm-book-sub{color:#777;font-style:italic;font-size:.85rem;margin-top:2px}
+.hm-tag{font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:999px;background:#f8ecd3;color:#835f16}
+.hm-tag--muted{background:#eee;color:#666}
+.hm-tag--warn{background:#fde7e7;color:#8a1c1c}
+.hm-sessions{margin-top:6px;font-size:.85rem}
+.hm-sessions summary{cursor:pointer;color:#555}
+.hm-session{display:block;padding:2px 0 2px 4px}
+.hm-add{display:flex;gap:8px;margin-top:12px;align-items:center}
+.hm-preview td{font-size:.85rem}
+.hm-grid{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;align-items:center;max-width:620px}
+.hm-grid label{font-size:.85rem;color:#555}
+.hm-actions{margin-top:16px;display:flex;align-items:center;gap:12px}
+.hm-saved{font-size:.85rem;color:#666}
+@media (max-width:600px){.hm-grid{grid-template-columns:1fr}.hm-book-btns{margin-left:0}}

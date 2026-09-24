@@ -21,6 +21,8 @@ async function recordNow(client) {
       title: (sessionTitle || 'Session').trim(),
       bookTitle: (bookTitle || '').trim() || undefined,
       href: location.pathname,
+      // Lets the shared Home dashboard say "On the website" (Collective-Shared core/dashboard.ts).
+      source: 'resources-web',
     })
   } catch (e) { warn('recordActivity', e) }
 }

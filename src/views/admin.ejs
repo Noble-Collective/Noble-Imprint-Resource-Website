@@ -12,6 +12,7 @@
       <button class="admin-tab" data-admin-tab="analytics">Analytics</button>
       <button class="admin-tab" data-admin-tab="bible-validation">Bible Validation</button>
       <button class="admin-tab" data-admin-tab="notifications">Notifications</button>
+      <button class="admin-tab" data-admin-tab="home">Home</button>
     </div>
 
     <!-- ===== USERS TAB ===== -->
@@ -249,6 +250,34 @@
       </div>
     </div>
 
+    <!-- ===== HOME TAB (shared Home content: Resource of the day + Partner with us) ===== -->
+    <div class="admin-panel admin-panel--hidden" id="panel-home">
+      <div class="hm-wrap">
+        <p class="hm-intro">What every Noble Collective app shows on its Home screen. Changes apply to the app within about an hour, with no app update. Served by <code>GET /api/home</code>.</p>
+        <div id="hm-status" class="hm-status" role="status" aria-live="polite">Loading…</div>
+        <div id="hm-body" hidden>
+          <h2 class="hm-h">Resource of the day</h2>
+          <p class="hm-desc">One session per day from these books, the same for everyone that day. Books take turns; front matter is skipped automatically. Untick a session to leave it out.</p>
+          <ol id="hm-books" class="hm-books"></ol>
+          <div class="hm-add">
+            <select id="hm-add-book" class="admin-select" aria-label="Add a book"></select>
+            <button type="button" id="hm-add-btn" class="admin-btn admin-btn--sm">Add book</button>
+          </div>
+          <h3 class="hm-h3">Next 14 days</h3>
+          <table class="admin-table hm-preview"><thead><tr><th>Date</th><th>Book</th><th>Session</th></tr></thead><tbody id="hm-preview"></tbody></table>
+
+          <h2 class="hm-h">Partner with us</h2>
+          <div class="hm-grid">
+            <label for="hm-p-title">Title</label><input id="hm-p-title" class="admin-input" maxlength="80">
+            <label for="hm-p-body">Text</label><textarea id="hm-p-body" class="admin-input" rows="2" maxlength="300"></textarea>
+            <label for="hm-p-button">Button</label><input id="hm-p-button" class="admin-input" maxlength="40">
+            <label for="hm-p-url">Donate link</label><input id="hm-p-url" class="admin-input" type="url" maxlength="500">
+          </div>
+          <div class="hm-actions"><button type="button" id="hm-save" class="admin-btn admin-btn--primary">Save</button><span id="hm-saved" class="hm-saved"></span></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== ANALYTICS TAB ===== -->
     <div class="admin-panel admin-panel--hidden" id="panel-analytics">
       <div class="an-controls">
@@ -483,5 +512,6 @@
 <script src="/static/js/admin.js?v=36"></script>
 <script src="/static/js/vendor/chart.umd.js?v=1"></script>
 <script src="/static/js/admin-analytics.js?v=5"></script>
+<script src="/static/js/admin-home.js?v=1"></script>
 
 <%- include('partials/footer') %>

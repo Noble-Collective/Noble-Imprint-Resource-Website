@@ -1,6 +1,7 @@
 const express = require('express');
 const firestore = require('./firestore');
 const content = require('./content');
+const home = require('./home');
 const github = require('./github');
 const cache = require('./cache');
 const { isSuperAdmin, SUPER_ADMIN_EMAIL } = require('./auth');
@@ -983,6 +984,54 @@ api.get('/bible-quote-audit/stream', async (req, res) => {
 });
 
 // Read the pinned version label for a translation (or null if not pinned yet).
+// --- Home (shared Home content: Resource of the day + Partner with us) ---
+// Config lives in Firestore siteConfig/home; the public GET /api/home serves it (see home.js).
+api.get('/home-config', async (req, res) => {
+  try {
+    const [tree, config] = await Promise.all([content.buildContentTree(), home.getConfig({ fresh: true })]);
+    // Every public book, so the editor can add/remove books (with its audio + subtitle shown).
+    const books = content.getAllBooks(tree)
+      .filter((b) => (b.status || 'public') === 'public')
+      .map((b) => ({
+        bookPath: b.repoPath,
+        title: b.title,
+        subtitle: b.subtitle || '',
+        series: [b.seriesTitle, b.subseriesTitle].filter(Boolean).join(' › '),
+        hasAudio: !!(b.audiobook && b.audiobook.enabled === true),
+        sessions: (b.sessions || []).map((s) => ({
+          filename: s.filename,
+          title: s.title || s.displayName || s.filename,
+          numbered: content.sessionNumber(b, s) !== '',
+        })),
+      }));
+    res.json({ config, books, preview: home.previewPicks(tree, config, home.todayKeyNewYork(), 14) });
+  } catch (err) {
+    console.error('[admin home-config]', err.message);
+    res.status(500).json({ error: 'Failed to load Home config' });
+  }
+});
+
+api.put('/home-config', async (req, res) => {
+  try {
+    const saved = await home.saveConfig(req.body || {}, req.user && req.user.email);
+    const tree = await content.buildContentTree();
+    res.json({ config: saved, preview: home.previewPicks(tree, saved, home.todayKeyNewYork(), 14) });
+  } catch (err) {
+    console.error('[admin home-config save]', err.message);
+    res.status(500).json({ error: 'Failed to save Home config' });
+  }
+});
+
+// Preview an unsaved config (the editor shows the next 14 days before saving).
+api.post('/home-config/preview', async (req, res) => {
+  try {
+    const tree = await content.buildContentTree();
+    res.json(home.previewPicks(tree, home.normalizeConfig(req.body || {}), home.todayKeyNewYork(), 14));
+  } catch (err) {
+    res.status(500).json({ error: 'Preview failed' });
+  }
+});
+
 api.get('/bible-version', async (req, res) => {
   const translationId = req.query.translationId || 'bsb';
   try {

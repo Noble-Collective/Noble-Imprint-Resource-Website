@@ -4,6 +4,7 @@ const compression = require('compression');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
+const home = require('./home');
 const bible = require('./bible');
 const osis = require('./osis');
 const github = require('./github');
@@ -903,6 +904,32 @@ app.get('/api/reader/resolve-locator', async (req, res) => {
   } catch (err) {
     console.error('[resolve-locator]', err.message);
     res.status(500).json({ error: 'resolve failed' });
+  }
+});
+
+// Shared Home content (Resource of the day + Partner with us) for every Noble Collective product —
+// the app's Home first. Public, cacheable, per-IP rate-limited. `date` = the caller's local
+// YYYY-MM-DD (so the pick flips at the reader's midnight; same date ⇒ same pick for everyone).
+// Plan: plans/2026-09-24-api-home-endpoint.md.
+const homeHits = new Map();
+app.get('/api/home', async (req, res) => {
+  try {
+    const now = Date.now();
+    const key = req.ip || 'unknown';
+    const hit = homeHits.get(key);
+    if (!hit || now - hit.start > 60000) homeHits.set(key, { start: now, n: 1 });
+    else if (++hit.n > 120) return res.status(429).json({ error: 'rate limited' });
+    if (homeHits.size > 5000) homeHits.clear();
+
+    const q = String(req.query.date || '');
+    const dateKey = home.dayNumberOf(q) != null ? q : home.todayKeyNewYork();
+    const [tree, config] = await Promise.all([content.buildContentTree(), home.getConfig()]);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json(home.buildHome(tree, config, dateKey));
+  } catch (err) {
+    console.error('[api/home]', err.message);
+    res.status(500).json({ error: 'home failed' });
   }
 });
 
