@@ -71,9 +71,18 @@ for (const f of files) {
     if (nInfo !== 5) issues.push(`infographics ${nInfo}/5`);
     if (nMove !== 5) issues.push(`movement intros ${nMove}/5`);
     if (creed !== 1) issues.push(`creed includes ${creed} (want 1)`);
-    if (/\b(bold|active)="/.test(src)) issues.push('bold=/active= param present (series convention: none)');
+    // book 1 intentionally carries creed bold= / S1 active= — note it, don't fail
+    if (/\b(bold|active)="/.test(src)) summary += ' [note: bold=/active= param]';
     summary += `, ${nInfo} infographics, ${nMove} movements, ${creed} creed`;
   }
+  // questions that never became <Question> answer boxes (e.g. "1. **Read John 1:1–18**: …"),
+  // bold labels inside a Question (should be <Accent>), and empty-blockquote artifacts ("> >")
+  const lines = src.split(/\r?\n/);
+  lines.forEach((l, k) => {
+    if (/^\d+\.\s+\*\*[^*]+\*\*:?/.test(l)) issues.push(`line ${k + 1}: numbered question not converted to <Question>`);
+    if (/<Question [^>]*>\d+\.\s+\*\*/.test(l)) issues.push(`line ${k + 1}: bold label inside <Question> (should be <Accent>)`);
+    if (/^>\s*>\s*$/.test(l)) issues.push(`line ${k + 1}: empty blockquote artifact`);
+  });
   problems += issues.length;
   console.log(`${issues.length ? 'FAIL' : 'ok  '} ${f.padEnd(26)} ${summary}${issues.length ? '\n       ' + issues.join('\n       ') : ''}`);
 }

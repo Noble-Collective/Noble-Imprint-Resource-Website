@@ -722,3 +722,33 @@ Matter: Opening `1J3_n9cIjPufLGjlEkYmYVSXX-jN7zVBUkE_vrPEigIA`, Recall
 Book-5 Doc exports backed up to `docs/_the-glory-due-his-name/`. Drive folder IDs were parsed from the
 folder page's `data-id` attributes (`curl` the public folder URL; `html.unescape`; each id is followed by
 its title in a `data-tooltip`).
+
+---
+
+## Series audit + Group-A fixes (2026-09-24)
+
+Four parallel read-only audits covered all 6 books (session consistency, matter pages, source completeness,
+rendering + editor readiness). **Word-for-word complete in all 72 sessions; nothing leaked between books;
+all 96 pages pass the editor segment-map invariants; nothing throws.** Fixed (Steve approved as a batch):
+1. **Book 6 S2/S3** — 13 Observation/Discussion questions had not become `<Question>`s (a stray `> > ` line
+   under the heading + an unspaced question block). `convert.py` now skips empty-blockquote artifacts and splits
+   packed question blocks; S2/S3 re-converted (no other session changed).
+2. **Synopsis headings** with a copy-pasted session number — Bond S2 ("SESSION 3") and Kingdom S6 ("SESSION 8")
+   → correct numbers; `convert.py` now forces `SESSION {N} SYNOPSIS`.
+3. **Book 1 S7** `##### Biblical Principle` → `###### Biblical Principles` (+ its label accented).
+4. **9 question labels** in books 2–3 rendered plain bold (colon-inside-bold Docs, pre-fix conversions) → `<Accent>`.
+5. **7 Biblical-Principles labels** written `*Label.*` (books 1, 2, 5, 6) → `<Accent>_Label._</Accent>`;
+   `convert.py` now matches that form (`RUNIN_INNER`).
+6. **Book 1** 4 mis-split attributions (first name left in the quote: Gilbert K. Chesterton ×2, C. H. Spurgeon,
+   William B. Johnson) + S7's intro verse (1 Peter 2:24) now a quote with attribution.
+7. **Book 2 Opening** literal `==We live==` stub → "Coming soon." (the stale "mission manifesto" lead-in above it
+   is left for the Group-B stale-content decision).
+8. **Book 1 Further** reading plan: range dashes had become `·` (only first verses linked) → rebuilt as 12
+   Bond-style 4-week tables (243 linked refs).
+9. **Book 2 S8** Key Passage `Judges 13:1–16:36` (Judges 16 has 31 verses) → `16:31` ×3, matching the matter
+   (source-Doc typo — fix there too).
+`verify.js` now also fails on unconverted numbered questions, bold labels inside `<Question>`, and `> >`
+artifacts, and treats book 1's creed `bold=`/`active=` as a note (NB: all 12 book-1 sessions carry a creed
+`bold=`, not only S1 as earlier notes said). Also corrected: the book-3 `**` and book-2 "Catechism Question"
+items above were FIXED 2026-09-24 (commit 014e154). Open: Group B (stale matter in books 1–3), Group C
+(cleanup), author placeholder checklist.

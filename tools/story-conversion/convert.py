@@ -92,9 +92,10 @@ def callouts(s):
                   lambda m: f"<Callout>{m.group(1)}</Callout>" if ' ' in m.group(1) else m.group(0), s)
 
 RUNIN = re.compile(r'^\*([^*]+?)\*(?:\*\*)?\.(?:\*\*)?\s+(.+)$')
+RUNIN_INNER = re.compile(r'^\*([^*]+?)\.\*\s+(.+)$')  # "*Label.* rest" (period inside the italics)
 def commentary_para(p, in_principles):
     if in_principles:
-        m = RUNIN.match(p)
+        m = RUNIN.match(p) or RUNIN_INNER.match(p)
         if m:
             label = clean(m.group(1)).strip('_')
             return f"<Accent>_{label}._</Accent> {clean(callouts(m.group(2)))}"
@@ -110,6 +111,8 @@ def emit_synopsis(tbl, out):
     if not rows:
         return
     title = rows[0][0].strip()
+    # Docs sometimes carry a copy-pasted number (Bond S2 said 3, Kingdom S6 said 8) — use the real one
+    title = re.sub(r'^SESSION \d+ SYNOPSIS$', f'SESSION {N} SYNOPSIS', title)
     out.append(''); out.append(f'| {title} |'); out.append('| :--- |')
     out.append(''); out.append('| | |'); out.append('| :--- | :--- |')
     for r in rows[1:]:
@@ -149,9 +152,18 @@ def flush_heading(level, text, extra=None):
 def emit_questions(idkey):
     global i
     out.append('')
-    while i < len(paras) and qnum(paras[i]):
-        n, qt = qnum(paras[i]); i += 1
-        out.append(f'<Question id={ID_PREFIX}Ses{N}-{idkey}-Q{n}>{n}. {convert_question(qt)}</Question>')
+    # skip a stray empty-blockquote artifact ("> > ") left right under the heading (book-6 S2/S3)
+    while i < len(paras) and re.fullmatch(r'[>\s]+', paras[i]):
+        i += 1
+    while i < len(paras) and qnum(paras[i].split('\n')[0].strip()):
+        # questions may be packed in one paragraph with no blank lines between them
+        lines = paras[i].split('\n'); i += 1
+        if all(qnum(l.strip()) for l in lines):
+            items = [qnum(l.strip()) for l in lines]
+        else:
+            items = [qnum(' '.join(l.strip() for l in lines))]
+        for n, qt in items:
+            out.append(f'<Question id={ID_PREFIX}Ses{N}-{idkey}-Q{n}>{n}. {convert_question(qt)}</Question>')
 
 def skip_to_h2():
     global i
