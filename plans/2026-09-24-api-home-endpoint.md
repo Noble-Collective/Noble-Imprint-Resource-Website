@@ -1,6 +1,6 @@
 # `GET /api/home` — shared Home content endpoint (build plan)
 
-**Status:** PLAN — approved direction (Steve, 2026-09-24). Nothing built.
+**Status:** BUILT + LIVE (2026-09-24, `fc5e16f`): `GET /api/home`, admin Home tab, `source: 'resources-web'` on activity, SDK 0.2.9 vendored. First consumer: the app's Home v2 (TestFlight 2026-09-24). ⚠ Admin **Save** (PUT → Firestore `siteConfig/home`) not yet exercised against prod; defaults apply until the first save.
 **Cross-product plan (read first):** `../Collective-Shared/plans/2026-09-24-shared-home-dashboard.md`.
 **First consumer:** the mobile app's new Home (`Noble-Imprint-App/plans/2026-09-24-home-redesign.md`).
 Later: this site's own home, Coram Deo, the Institute.
