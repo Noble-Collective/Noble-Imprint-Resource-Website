@@ -38,6 +38,17 @@ function authAuth() {
   if (!AUTH_UNIFIED) return admin.auth(); // default app = noble-imprint-website (today's behavior)
   return reader463519App().auth();
 }
+// Admin Auth on the shared identity project (463519) regardless of AUTH_UNIFIED — for account-level
+// operations on reader accounts (combine accounts: POST /api/account/merge).
+function readerAuth() {
+  return reader463519App().auth();
+}
+// The shared project's DEFAULT Firestore (pre-cutover mobile-app data, users/{uid}/…) — read-only use:
+// the account merge refuses to delete an account that still has legacy data.
+function getReaderLegacyFirestore() {
+  const { getFirestore } = require('firebase-admin/firestore');
+  return getFirestore(reader463519App());
+}
 // Firestore handle for the shared converged store (collective-user-data on 463519). Used by admin
 // aggregations (Reader Activity). Requires the runtime SA to have Firestore read on 463519.
 function getReaderFirestore() {
@@ -217,6 +228,8 @@ module.exports = {
   verifyIdToken,
   verifySessionCookie,
   getReaderFirestore,
+  getReaderLegacyFirestore,
+  readerAuth,
   attachUser,
   AUTH_UNIFIED,
   requireAdmin,

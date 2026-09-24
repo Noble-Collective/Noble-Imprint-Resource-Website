@@ -1,0 +1,222 @@
+{
+  "survivor": [
+    {
+      "name": "verified real email beats relay even with less data",
+      "a": {
+        "uid": "apple1",
+        "email": "x7@privaterelay.appleid.com",
+        "emailVerified": true,
+        "createdAt": 100,
+        "dataCount": 9
+      },
+      "b": {
+        "uid": "google1",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": true,
+        "createdAt": 200,
+        "dataCount": 0
+      },
+      "expected": "google1"
+    },
+    {
+      "name": "both real: more data wins",
+      "a": {
+        "uid": "a",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": true,
+        "createdAt": 200,
+        "dataCount": 3
+      },
+      "b": {
+        "uid": "b",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": true,
+        "createdAt": 200,
+        "dataCount": 5
+      },
+      "expected": "b"
+    },
+    {
+      "name": "both real, same data: older wins",
+      "a": {
+        "uid": "a",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": true,
+        "createdAt": 300,
+        "dataCount": 0
+      },
+      "b": {
+        "uid": "b",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": true,
+        "createdAt": 100,
+        "dataCount": 0
+      },
+      "expected": "b"
+    },
+    {
+      "name": "unverified real email does not count as trusted",
+      "a": {
+        "uid": "a",
+        "email": "bryan@noblecitychurch.org",
+        "emailVerified": false,
+        "createdAt": 200,
+        "dataCount": 0
+      },
+      "b": {
+        "uid": "b",
+        "email": "x7@privaterelay.appleid.com",
+        "emailVerified": true,
+        "createdAt": 100,
+        "dataCount": 1
+      },
+      "expected": "b"
+    },
+    {
+      "name": "full tie: lower uid",
+      "a": {
+        "uid": "b"
+      },
+      "b": {
+        "uid": "a"
+      },
+      "expected": "a"
+    }
+  ],
+  "merge": {
+    "survivor": {
+      "annotations": {
+        "hl__1": {
+          "kind": "highlight",
+          "color": "amber",
+          "updatedAt": 10
+        },
+        "bm__1001003": {
+          "kind": "bookmark",
+          "updatedAt": 50
+        }
+      },
+      "answers": {
+        "q1": {
+          "text": "old",
+          "updatedAt": 10
+        }
+      },
+      "settings": {
+        "prefs": {
+          "theme": "dark",
+          "fontSize": "lg"
+        }
+      },
+      "planProgress": {
+        "p1": {
+          "completedDays": [
+            1,
+            2
+          ],
+          "updatedAt": 5
+        }
+      }
+    },
+    "loser": {
+      "annotations": {
+        "hl__2": {
+          "kind": "highlight",
+          "color": "sky",
+          "updatedAt": 20
+        },
+        "bm__1001003": {
+          "kind": "bookmark",
+          "updatedAt": 40
+        }
+      },
+      "answers": {
+        "q1": {
+          "text": "new",
+          "updatedAt": 30
+        },
+        "q2": {
+          "text": "only loser",
+          "updatedAt": 1
+        }
+      },
+      "activity": {
+        "u1": {
+          "title": "S1",
+          "viewedAt": 7
+        }
+      },
+      "settings": {
+        "prefs": {
+          "theme": "light",
+          "translation": "KJV"
+        }
+      },
+      "planProgress": {
+        "p1": {
+          "completedDays": [
+            2,
+            3
+          ],
+          "updatedAt": 9
+        }
+      }
+    },
+    "expected": [
+      {
+        "collection": "activity",
+        "docId": "u1",
+        "data": {
+          "title": "S1",
+          "viewedAt": 7
+        }
+      },
+      {
+        "collection": "annotations",
+        "docId": "hl__2",
+        "data": {
+          "kind": "highlight",
+          "color": "sky",
+          "updatedAt": 20
+        }
+      },
+      {
+        "collection": "answers",
+        "docId": "q1",
+        "data": {
+          "text": "new",
+          "updatedAt": 30
+        }
+      },
+      {
+        "collection": "answers",
+        "docId": "q2",
+        "data": {
+          "text": "only loser",
+          "updatedAt": 1
+        }
+      },
+      {
+        "collection": "planProgress",
+        "docId": "p1",
+        "data": {
+          "completedDays": [
+            1,
+            2,
+            3
+          ],
+          "updatedAt": 9
+        }
+      },
+      {
+        "collection": "settings",
+        "docId": "prefs",
+        "data": {
+          "theme": "dark",
+          "fontSize": "lg",
+          "translation": "KJV"
+        }
+      }
+    ]
+  }
+}

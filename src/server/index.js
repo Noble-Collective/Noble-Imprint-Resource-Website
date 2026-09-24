@@ -5,6 +5,8 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
 const home = require('./home');
+const accountMerge = require('./account-merge');
+const instituteData = require('./institute-data');
 const bible = require('./bible');
 const osis = require('./osis');
 const github = require('./github');
@@ -930,6 +932,42 @@ app.get('/api/home', async (req, res) => {
   } catch (err) {
     console.error('[api/home]', err.message);
     res.status(500).json({ error: 'home failed' });
+  }
+});
+
+// Combine accounts — the client tried to connect a sign-in method that already belongs to another
+// account, signed in to that account on a secondary Firebase app, and sends both ID tokens. See
+// src/server/account-merge.js + Collective-Shared/plans/2026-09-24-account-merge.md.
+const mergeHits = new Map();
+app.post('/api/account/merge', async (req, res) => {
+  const now = Date.now();
+  const key = req.ip || 'unknown';
+  const hit = mergeHits.get(key);
+  if (!hit || now - hit.start > 600000) mergeHits.set(key, { start: now, n: 1 });
+  else if (++hit.n > 10) return res.status(429).json({ error: 'rate-limited' });
+  if (mergeHits.size > 5000) mergeHits.clear();
+  try {
+    const { Timestamp } = require('firebase-admin/firestore');
+    const result = await accountMerge.mergeAccounts(
+      {
+        currentIdToken: req.body && req.body.currentIdToken,
+        otherIdToken: req.body && req.body.otherIdToken,
+        dryRun: !!(req.body && req.body.dryRun),
+      },
+      {
+        auth: auth.readerAuth(),
+        db: auth.getReaderFirestore(),
+        legacyDb: auth.getReaderLegacyFirestore(),
+        hasOtherProductData: instituteData.hasInstituteData,
+        Timestamp,
+        log: (o) => console.log(JSON.stringify(o)),
+      },
+    );
+    res.json(result);
+  } catch (err) {
+    if (err instanceof accountMerge.MergeError) return res.status(err.status).json({ error: err.code });
+    console.error('[api/account/merge]', err.message);
+    res.status(500).json({ error: 'merge-failed' });
   }
 });
 
