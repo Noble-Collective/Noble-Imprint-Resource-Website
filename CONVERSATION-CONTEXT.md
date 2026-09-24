@@ -178,6 +178,8 @@ Decision: **Bibles are excluded from the website entirely.** Only `series/` cont
 ### Decision: Authentication approach
 **Decided**: Firebase Authentication with Google sign-in provider. Simple, managed OAuth. Free tier sufficient.
 
+> **Superseded in part (2026-09-24):** still Firebase Auth, but Google is no longer the only provider — Sign in with Apple is now a first-class, equal option ecosystem-wide (Steve, 2026-09-23). Site plan: `plans/2026-09-24-apple-sign-in.md`; contract: `Collective-Shared/ARCHITECTURE.md` §9a.
+
 **Roles** (final naming after user feedback):
 | Role | Can do |
 |---|---|

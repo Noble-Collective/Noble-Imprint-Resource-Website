@@ -219,6 +219,8 @@ An admin reviews the suggestion, seeing the changes rendered visually (deletions
 
 The website uses Google sign-in for authentication. Access levels are defined in a simple configuration file:
 
+> **Update 2026-09-24:** Google is no longer the only intended provider — Sign in with Apple is planned as an equal, first-class option across the Noble Collective ecosystem (see `plans/2026-09-24-apple-sign-in.md` and `Collective-Shared/ARCHITECTURE.md` §9a). Roles below stay keyed on the account's primary email (the same whichever provider is used once linked), and only a verified email will count. (Roles are also now stored in Firestore and managed in `/admin`, not a configuration file.)
+
 | Role | Browse public | See hidden books | Suggest edits & comment | Accept / reject | Manage users |
 |---|---|---|---|---|---|
 | **Anyone** (no login) | Yes | — | — | — | — |

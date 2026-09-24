@@ -145,7 +145,9 @@ Suggestions are tracked per-hunk (each contiguous change is a separate Firestore
 
 ### Authentication and Roles
 
-Firebase Auth with Google sign-in. Session cookies (httpOnly, 5-day expiry). API key auth for bots via `x-api-key` header.
+Firebase Auth with Google sign-in (on the shared `noble-imprint-463519` identity under `AUTH_UNIFIED`). Session cookies (httpOnly, 5-day expiry). API key auth for bots via `x-api-key` header.
+
+> **2026-09-24:** Sign in with **Apple** is planned as a first-class option alongside Google (ecosystem-wide decision; the mobile app already has it). Site plan: `plans/2026-09-24-apple-sign-in.md` (behind `FEATURE_APPLE_SIGNIN`); cross-product contract: `Collective-Shared/ARCHITECTURE.md` §9a. Roles stay keyed on the account's primary email, and will require `email_verified`.
 
 | Role | Scope | Can edit | Can review | Can manage users |
 |------|-------|----------|------------|-----------------|
@@ -212,7 +214,8 @@ src/
                                      readonlyExtension() locks shared/param ranges
     main.js                          Reading view: sidebar, drawer, view toggle,
                                      verse popups, user menu
-    auth.js                          Firebase Auth client (Google sign-in/out)
+    auth.js                          Legacy Firebase Auth client (Google sign-in/out; only when
+                                     AUTH_UNIFIED is off — the reader bundle owns sign-in otherwise)
     admin.js                         Admin console client JS
     audio-player.js                  Audio player controls + sentence-level text sync
 
