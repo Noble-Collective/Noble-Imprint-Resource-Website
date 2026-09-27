@@ -384,9 +384,11 @@ The site serves audiobook versions of books that have been processed through the
 
 **Player UI** (`src/public/js/audio-player.js`): A floating headphones icon appears on audiobook-enabled sessions. Clicking it opens a sticky bottom bar with play/pause, a scrubber, playback speed control, skip forward/back 15 seconds, and a close button.
 
-**Sentence-level text sync**: Timestamp data is fetched from GCS alongside the audio manifest. Timestamps are mapped to DOM text nodes via normalized string matching. Active sentences are highlighted using the Range API, which wraps matched text in `<mark>` elements. The view smooth-scrolls to keep the highlighted sentence visible.
+**Sentence-level text sync**: the narrated sentences are lined up with the page ONCE per session/chapter by the shared narration engine (`@noble-collective/userdata/narration`, bundled as `src/public/js/narration-bundle.js` → `window.NCNarration`; the mobile app's `NarrationAlignment`, ported — Collective-Shared ARCHITECTURE §9b). The narration's text is the spoken form (spelled-out references, removed parentheticals, sentences across list items), so it is never matched against a paragraph directly. The highlight is drawn as positioned overlay rects over a DOM Range (the page's HTML is never modified) and re-measured on resize. Bible sentences that cross verses are split at the word each verse begins (one verse lit at a time). The view scrolls only when the sentence drifts away from ~⅓ down the reading area.
 
-**Auto-advance**: When a chapter's audio ends, playback automatically advances to the next chapter.
+**Auto-advance**: When a session's audio ends, the next session is swapped in (AJAX, `ajax-nav.js`); a Bible chapter swaps the next chapter into the page and keeps playing on the same audio element (a new page's un-gestured play is blocked on phones).
+
+**Audit**: `node scripts/audio-audit.js` scores every audiobook session + a Bible sample (share of listening time lit, exact vs spoken-form differences, multi-verse highlights) against a running site; `tests/audio-highlight.spec.js` is the regression gate.
 
 **Resume**: Playback position is persisted to `localStorage` so users can pick up where they left off.
 

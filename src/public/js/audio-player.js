@@ -33,11 +33,16 @@
   let audioEl = null;
   let signedUrl = null;
   let timestamps = null;
-  let segmentMap = null; // [{start, end, needle, parentEl}]
-  let activeSegIdx = -1;
-  let highlightSpan = null;
+  // Highlight sync (window.NCNarration = the shared @noble-collective/userdata/narration engine —
+  // the same alignment the mobile app uses; see Collective-Shared ARCHITECTURE §9b).
+  let segs = null;        // prepared segments: timings repaired, Bible sentences split at verse starts
+  let align = null;       // NarrationAlignment over blockEls
+  let blockEls = [];      // the rendered blocks, reading order
+  let activeShown = -1;   // the segment whose highlight is painted
+  let pinnedIdx = -1;     // a heading playback was just started at (wins during its lead-in)
   let userScrolledAway = false;
   let programmaticScroll = false;
+  const N = window.NCNarration;
 
   function getStorageKey() { return `audio-pos:${getBookPath()}/${getAudioFile()}`; }
 
@@ -46,14 +51,6 @@
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
-  }
-
-  function norm(s) {
-    return s.replace(/[\u201c\u201d\u2018\u2019\u00ab\u00bb\u201e\u201f""'']/g, '"')
-            .replace(/[\u2014\u2013]/g, '-')
-            .replace(/\u2026/g, '...')
-            .replace(/\s+/g, ' ')
-            .trim();
   }
 
   // --- Fetch signed URL ---
@@ -65,7 +62,7 @@
     return signedUrl;
   }
 
-  // --- Fetch timestamps and build segment map ---
+  // --- Fetch timestamps and align them to the page ---
   // Only the latest load may land: an auto-advance can start one for the next session while an
   // earlier one is still in flight, and the older response must not overwrite the newer.
   let timestampsLoadSeq = 0;
@@ -80,152 +77,151 @@
       const data = await tsRes.json();
       if (seq !== timestampsLoadSeq) return;
       timestamps = data;
-      buildSegmentMap();
+      buildSync();
     } catch (err) {
       console.warn('[audio] Failed to load timestamps:', err);
     }
   }
 
-  function buildSegmentMap() {
-    if (!timestamps || !timestamps.segments) return;
+  // The blocks a sentence can light, in reading order: the innermost of these (a <p> inside an <li>
+  // is the block, not the <li>). Pull-quotes repeat text already in the flow, so they're skipped.
+  // Keep in step with Collective-Shared scripts/narration-golden/build-inputs.cjs (BLOCKS_FN).
+  const BLOCK_SEL = 'h1,h2,h3,h4,h5,h6,p,li,div.attribution,td,th';
+  // Text a block shows but the narrator doesn't read, and our own UI: verse numbers + footnote
+  // refs (<sup>), bookmark markers ([data-nc-skip]), heading headphones.
+  const SKIP_SEL = 'sup,[data-nc-skip],.heading-audio-icon,button,script,style,textarea';
+
+  function collectBlocks(root) {
+    const all = Array.from(root.querySelectorAll(BLOCK_SEL))
+      .filter(el => !el.closest('aside.pullquote') && !el.closest('#audio-highlight-overlays'));
+    const set = new Set(all);
+    const hasChild = new Set();
+    for (const el of all) {
+      for (let p = el.parentElement; p && p !== root; p = p.parentElement) {
+        if (set.has(p)) { hasChild.add(p); break; }
+      }
+    }
+    return all.filter(el => !hasChild.has(el));
+  }
+
+  // The block's narratable text nodes (in order) — the coordinate the alignment's offsets are in.
+  function textNodesOf(el) {
+    const out = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.parentElement.closest(SKIP_SEL)) out.push(n);
+    }
+    return out;
+  }
+  function blockText(el) { return textNodesOf(el).map(n => n.nodeValue).join(''); }
+
+  // Bible chapter data for the verse split (bible-chapter.ejs): {verses:[{verse,text}], headings}.
+  function bibleAudioData() {
+    const el = document.getElementById('bible-audio-data');
+    if (!el) return null;
+    try { return JSON.parse(el.textContent); } catch { return null; }
+  }
+
+  function buildSync() {
+    if (!timestamps || !N) return;
     const contentEl = document.querySelector('.session-content');
     if (!contentEl) return;
-
-    const blockEls = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6, p'));
-    segmentMap = [];
-
-    // Pre-compute normalized text for all DOM elements once
-    const blockTexts = blockEls.map(el => norm(el.textContent));
-
-    // Hybrid matching: use blockIndex as a starting hint, then search nearby
-    // for the element whose text matches. Track which elements are already
-    // matched to avoid duplicate assignments (e.g., "Conclusion" matching
-    // an H6 when the H2 is the correct target).
-    let offsetAdjust = 0;
-    const matchedEls = new Set();
-
-    for (const seg of timestamps.segments) {
-      const needle = norm(seg.text).replace(/\.\s*$/, '');
-      if (!needle) continue;
-
-      const shortNeedle = needle.substring(0, 30);
-      const hintIdx = (seg.blockIndex || 0) + offsetAdjust;
-      let el = null;
-      let foundIdx = -1;
-
-      // Search outward from hint in expanding distance — finds the CLOSEST
-      // matching element, not just the first forward or backward match.
-      // Critical for duplicate headings like "Core Principle", "Introduction".
-      const center = Math.max(0, Math.min(hintIdx, blockEls.length - 1));
-      for (let dist = 0; dist < blockEls.length; dist++) {
-        for (const i of (dist === 0 ? [center] : [center + dist, center - dist])) {
-          if (i < 0 || i >= blockEls.length) continue;
-          if (!blockTexts[i].includes(shortNeedle)) continue;
-          if (seg.sentenceIndex === 0 && matchedEls.has(i)) continue;
-          el = blockEls[i];
-          foundIdx = i;
-          break;
-        }
-        if (el) break;
-      }
-
-      if (!el) continue;
-
-      if (seg.sentenceIndex === 0) matchedEls.add(foundIdx);
-
-      // Update offset adjustment for future segments
-      const expectedIdx = seg.blockIndex || 0;
-      offsetAdjust = foundIdx - expectedIdx;
-
-      segmentMap.push({
-        start: seg.start,
-        end: seg.end,
-        el: el,
-        sentenceIndex: seg.sentenceIndex,
-        needle: needle,
-        matchStr: shortNeedle,
-      });
-    }
-    console.log(`[audio] Mapped ${segmentMap.length}/${timestamps.segments.length} segments to ${blockEls.length} block elements`);
+    let s = N.repairSegmentTimings(N.parseNarrationSegments(timestamps));
+    const bible = bibleAudioData();
+    // One verse lit at a time: a sentence read across verses is cut at the word each verse begins.
+    if (bible && bible.verses) s = N.splitSegmentsAtVerses(s, bible.verses, bible.headings || []);
+    segs = s;
+    blockEls = collectBlocks(contentEl);
+    align = N.NarrationAlignment.build(blockEls.map(blockText), segs.map(x => x.text));
+    activeShown = -1;
+    const placed = segs.filter((_, i) => align.spansFor(i).length > 0).length;
+    console.log(`[audio] Mapped ${placed}/${segs.length} segments to ${blockEls.length} block elements`);
     renderH2Markers();
     renderHeadingAudioIcons();
   }
 
+  function resetSync() {
+    timestamps = null;
+    segs = null;
+    align = null;
+    blockEls = [];
+    activeShown = -1;
+    pinnedIdx = -1;
+  }
+
+  // The first sentence that starts in each heading block → [{el, seg}].
+  function headingStarts(tags) {
+    const out = [];
+    if (!align) return out;
+    blockEls.forEach((el, b) => {
+      if (!tags.has(el.tagName)) return;
+      const seg = align.firstSegmentStartingInBlock(b);
+      if (seg !== null) out.push({ el, seg });
+    });
+    return out;
+  }
+
+  // Start playback at sentence `i`, a moment early (a seek lands late and can clip the first word),
+  // with its highlight pinned through that lead-in.
+  function seekToSegment(i) {
+    if (!audioEl || !segs || !segs[i]) return;
+    audioEl.currentTime = Math.max(0, segs[i].start - N.leadInBefore(segs, i));
+    forceHighlightUpdate();
+    pinnedIdx = i;
+    updateHighlight(true);
+  }
+
   // --- H2 section markers on the scrubber ---
   function renderH2Markers() {
-    if (!segmentMap || !getTotalDuration()) return;
+    if (!segs || !getTotalDuration()) return;
 
     // Clear existing markers
     scrubberContainer.querySelectorAll('.scrubber-h2-marker').forEach(m => m.remove());
 
-    // Collect unique H2 segments (first segment per H2 element)
-    const seen = new Set();
-    const h2Segments = [];
-    for (const seg of segmentMap) {
-      if (seg.el && seg.el.tagName === 'H2' && !seen.has(seg.el)) {
-        seen.add(seg.el);
-        h2Segments.push(seg);
-      }
-    }
+    const h2s = headingStarts(new Set(['H2']));
+    if (h2s.length === 0) return;
 
-    if (h2Segments.length === 0) return;
-
-    for (const seg of h2Segments) {
-      const pct = (seg.start / getTotalDuration()) * 100;
+    for (const { el, seg } of h2s) {
+      const pct = (segs[seg].start / getTotalDuration()) * 100;
       const marker = document.createElement('div');
       marker.className = 'scrubber-h2-marker';
       marker.style.left = pct + '%';
-      marker.title = seg.el.textContent.trim();
+      marker.title = blockText(el).trim();
       marker.addEventListener('click', function (e) {
         e.stopPropagation();
-        if (audioEl) {
-          audioEl.currentTime = seg.start;
-          forceHighlightUpdate();
-        }
+        seekToSegment(seg);
       });
       scrubberContainer.appendChild(marker);
     }
-    console.log(`[audio] Rendered ${h2Segments.length} H2 markers on scrubber`);
+    console.log(`[audio] Rendered ${h2s.length} H2 markers on scrubber`);
   }
 
   // --- Heading audio icons (clickable jump-to-audio links) ---
   function renderHeadingAudioIcons() {
-    if (!segmentMap || !getTotalDuration()) return;
+    if (!segs || !getTotalDuration()) return;
 
-    const headingTags = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
-    const seen = new Set();
-
-    for (const seg of segmentMap) {
-      if (!seg.el || !headingTags.has(seg.el.tagName) || seen.has(seg.el)) continue;
-      seen.add(seg.el);
-
+    for (const { el, seg } of headingStarts(new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']))) {
+      if (el.querySelector('.heading-audio-icon')) continue;
       const icon = document.createElement('a');
       icon.className = 'heading-audio-icon';
       icon.href = '#';
       icon.title = 'Jump to audio';
       icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>';
-      const startTime = seg.start;
       icon.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         if (!audioEl) {
           // Start audio and seek after it loads
-          togglePlay().then(function () {
-            if (audioEl) {
-              audioEl.currentTime = startTime;
-              forceHighlightUpdate();
-            }
-          });
+          togglePlay().then(function () { seekToSegment(seg); });
         } else {
-          audioEl.currentTime = startTime;
+          seekToSegment(seg);
           if (audioEl.paused) {
             audioEl.play();
             showPlaying();
           }
-          forceHighlightUpdate();
         }
       });
-      seg.el.appendChild(icon);
+      el.appendChild(icon);
     }
   }
 
@@ -240,84 +236,47 @@
     overlayContainer.innerHTML = '';
   }
 
-  function applySentenceHighlight(seg) {
-    clearHighlight();
-
-    const el = seg.el;
-    if (!el) return;
-    const cp = overlayContainer.parentElement;
-    if (!cp) return;
-
-    // Step 1: element found by blockIndex (no text matching needed)
-    // Step 2: split element text into sentences, find sentenceIndex
-    const fullText = el.textContent || '';
-    const elSentences = fullText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
-
-    // Single sentence or no sentenceIndex — highlight whole element
-    if (elSentences.length <= 1 || seg.sentenceIndex === undefined) {
-      highlightWholeElement(el, cp);
-      return;
-    }
-
-    const target = elSentences[seg.sentenceIndex];
-    if (!target) {
-      highlightWholeElement(el, cp);
-      return;
-    }
-
-    // Step 3: find sentence position in element text (reliable — correct element)
-    const sentStart = fullText.indexOf(target);
-    if (sentStart < 0) {
-      highlightWholeElement(el, cp);
-      return;
-    }
-    const sentEnd = sentStart + target.length;
-
-    // Step 4: walk text nodes to build Range spanning the sentence
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let charsSeen = 0;
+  // A DOM Range over raw [s, e) of a block's narratable text (computed fresh: the annotation layer
+  // may have split text nodes since, but the text itself — and so the offsets — is unchanged).
+  function rangeInBlock(el, s, e) {
+    let seen = 0;
     let startNode = null, startOff = 0, endNode = null, endOff = 0;
-    let tn;
-    while ((tn = walker.nextNode())) {
-      const len = tn.textContent.length;
-      if (!startNode && charsSeen + len > sentStart) {
-        startNode = tn;
-        startOff = sentStart - charsSeen;
-      }
-      if (charsSeen + len >= sentEnd) {
-        endNode = tn;
-        endOff = sentEnd - charsSeen;
-        break;
-      }
-      charsSeen += len;
+    for (const n of textNodesOf(el)) {
+      const len = n.nodeValue.length;
+      if (!startNode && seen + len > s) { startNode = n; startOff = s - seen; }
+      if (startNode && seen + len >= e) { endNode = n; endOff = e - seen; break; }
+      seen += len;
     }
+    if (!startNode || !endNode) return null;
+    const range = document.createRange();
+    range.setStart(startNode, Math.max(0, startOff));
+    range.setEnd(endNode, Math.min(endOff, endNode.nodeValue.length));
+    return range;
+  }
 
-    if (!startNode || !endNode) {
-      highlightWholeElement(el, cp);
-      return;
-    }
-
-    try {
-      const range = document.createRange();
-      range.setStart(startNode, Math.max(0, startOff));
-      range.setEnd(endNode, Math.min(endOff, endNode.textContent.length));
-
-      const rects = range.getClientRects();
-      const cRect = cp.getBoundingClientRect();
+  // Paint segment `i`'s highlight: its part in every block it covers (a sentence can run across
+  // list items, verses in separate paragraphs, …).
+  function paintSegment(i) {
+    clearHighlight();
+    const cp = overlayContainer.parentElement;
+    if (!cp || !align || i < 0) return;
+    const cRect = cp.getBoundingClientRect();
+    for (const span of align.spansFor(i)) {
+      const el = blockEls[span.block];
+      if (!el || !el.isConnected) continue;
+      const [s, e] = align.rawRange(span);
+      let rects = null;
+      try {
+        const range = rangeInBlock(el, s, e);
+        if (range) rects = range.getClientRects();
+      } catch { /* fall through */ }
+      if (!rects) rects = [el.getBoundingClientRect()];
       for (const r of rects) {
         if (r.width > 0 && r.height > 0) {
           addOverlayRect(r.left - cRect.left, r.top + window.scrollY - cp.offsetTop, r.width, r.height);
         }
       }
-    } catch {
-      highlightWholeElement(el, cp);
     }
-  }
-
-  function highlightWholeElement(el, cp) {
-    const r = el.getBoundingClientRect();
-    const cRect = cp.getBoundingClientRect();
-    addOverlayRect(r.left - cRect.left, r.top + window.scrollY - cp.offsetTop, r.width, r.height);
   }
 
   function addOverlayRect(left, top, width, height) {
@@ -325,6 +284,24 @@
     div.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(100,160,220,0.15);border-radius:3px;pointer-events:none;`;
     overlayContainer.appendChild(div);
   }
+
+  // Overlays are absolute rects: re-measure when the layout moves under them (resize, font size,
+  // a late image, the annotation layer inserting a marker).
+  let repaintQueued = false;
+  function repaintSoon() {
+    if (repaintQueued || activeShown < 0) return;
+    repaintQueued = true;
+    requestAnimationFrame(function () { repaintQueued = false; if (activeShown >= 0) paintSegment(activeShown); });
+  }
+  const layoutObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(repaintSoon) : null;
+  function observeLayout() {
+    if (!layoutObserver) return;
+    layoutObserver.disconnect();
+    const sc = document.querySelector('.session-content');
+    if (sc) layoutObserver.observe(sc);
+  }
+  observeLayout();
+  window.addEventListener('resize', repaintSoon, { passive: true });
 
   // --- Compute the visible reading area (between header/TOC and player) ---
   function getVisibleBounds() {
@@ -350,41 +327,47 @@
   jumpLink.addEventListener('click', function (e) {
     e.preventDefault();
     userScrolledAway = false;
-    scrollToHighlight();
+    scrollToHighlight(true);
     jumpLink.style.display = 'none';
   });
 
-  function scrollToHighlight() {
+  // The painted highlight's first line, in viewport coordinates (null = nothing painted).
+  function highlightTop() {
+    const first = overlayContainer.firstChild;
+    const cp = overlayContainer.parentElement;
+    if (!first || !cp) return null;
+    return cp.offsetTop + parseFloat(first.style.top) - window.scrollY;
+  }
+
+  // Keep the sentence about a third of the way down the reading area. Like the app, only move when
+  // it has drifted more than 22% of the area from there (no scroll on every sentence).
+  function scrollToHighlight(force) {
+    const top = highlightTop();
+    if (top === null) return;
+    const { top: visTop, bottom: visBottom } = getVisibleBounds();
+    const visHeight = visBottom - visTop;
+    const target = visTop + visHeight * 0.33;
+    if (!force && Math.abs(top - target) <= visHeight * 0.22) return;
     programmaticScroll = true;
-    const firstOverlay = overlayContainer.firstChild;
-    if (firstOverlay) {
-      const overlayTop = parseFloat(firstOverlay.style.top);
-      const cp = overlayContainer.parentElement;
-      const docTop = cp ? cp.offsetTop + overlayTop : overlayTop;
-      const { top: visTop, bottom: visBottom } = getVisibleBounds();
-      const visHeight = visBottom - visTop;
-      const targetY = docTop - visTop - visHeight * 0.33;
-      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-    } else if (activeSegIdx >= 0 && segmentMap[activeSegIdx]) {
-      const rect = segmentMap[activeSegIdx].el.getBoundingClientRect();
-      const { top: visTop } = getVisibleBounds();
-      const targetY = window.scrollY + rect.top - visTop - 20;
-      window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-    }
+    window.scrollTo({ top: Math.max(0, window.scrollY + top - target), behavior: 'smooth' });
     // Clear flag after smooth scroll settles
     setTimeout(function () { programmaticScroll = false; }, 600);
   }
 
+  // Whether any part of the highlight is on screen (a tall highlight can start above the fold).
   function isHighlightVisible() {
-    if (activeSegIdx < 0 || !segmentMap[activeSegIdx]) return true;
-    const el = segmentMap[activeSegIdx].el;
-    const rect = el.getBoundingClientRect();
     const { top: visTop, bottom: visBottom } = getVisibleBounds();
-    return rect.bottom > visTop && rect.top < visBottom;
+    const cp = overlayContainer.parentElement;
+    if (!cp || !overlayContainer.firstChild) return true;
+    for (const d of overlayContainer.children) {
+      const top = cp.offsetTop + parseFloat(d.style.top) - window.scrollY;
+      if (top + parseFloat(d.style.height) > visTop && top < visBottom) return true;
+    }
+    return false;
   }
 
   function updateJumpLink() {
-    if (!audioEl || audioEl.paused || activeSegIdx < 0 || !userScrolledAway) {
+    if (!audioEl || audioEl.paused || activeShown < 0 || !userScrolledAway) {
       jumpLink.style.display = 'none';
       return;
     }
@@ -393,35 +376,22 @@
 
   // --- Update highlight for a given time ---
   function updateHighlight(forceScroll) {
-    if (!segmentMap || segmentMap.length === 0) return;
+    if (!segs || !align || !audioEl) return;
     const t = audioEl.currentTime;
-    let newIdx = -1;
+    if (pinnedIdx >= 0 && segs[pinnedIdx] && t >= segs[pinnedIdx].start) pinnedIdx = -1;
+    const i = N.segmentIndexAt(segs, t, pinnedIdx);
+    const shown = i < 0 ? -1 : align.shownSegment(i, segs[i].end - segs[i].start);
 
-    // Find the segment that contains the current time (strict match only)
-    for (let i = 0; i < segmentMap.length; i++) {
-      if (t >= segmentMap[i].start && t < segmentMap[i].end) { newIdx = i; break; }
-    }
-
-    // If we're in a gap between segments, clear the highlight
-    if (newIdx < 0) {
-      if (activeSegIdx >= 0) {
+    if (shown !== activeShown) {
+      activeShown = shown;
+      if (shown < 0) {
         clearHighlight();
-        activeSegIdx = -1;
-        updateJumpLink();
-      }
-      return;
-    }
-
-    if (newIdx !== activeSegIdx) {
-      applySentenceHighlight(segmentMap[newIdx]);
-      activeSegIdx = newIdx;
-
-      // Auto-scroll unless user has scrolled away
-      if (forceScroll || !userScrolledAway) {
-        scrollToHighlight();
+      } else {
+        paintSegment(shown);
+        // Auto-scroll unless user has scrolled away
+        if (forceScroll || !userScrolledAway) scrollToHighlight(forceScroll);
       }
     }
-
     updateJumpLink();
   }
 
@@ -434,7 +404,8 @@
 
   // Force highlight recalculation after skip/scrub
   function forceHighlightUpdate() {
-    activeSegIdx = -1;
+    activeShown = -1;
+    pinnedIdx = -1;
     userScrolledAway = false;
     if (audioEl) updateHighlight(true);
   }
@@ -442,7 +413,7 @@
   function onUserScroll() {
     if (programmaticScroll) return;
     // Mark as scrolled away if the highlight is no longer visible
-    if (activeSegIdx >= 0 && !isHighlightVisible()) {
+    if (activeShown >= 0 && !isHighlightVisible()) {
       userScrolledAway = true;
     }
   }
@@ -492,12 +463,76 @@
       var currentNextUrl = getNextUrl();
       if (window.__ajaxNav && currentNextUrl) {
         window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
+      } else if (currentNextUrl && document.getElementById('bible-audio-data')) {
+        swapBibleChapter(currentNextUrl);
       } else if (currentNextUrl) {
         localStorage.setItem('audio-autoplay', 'true');
         window.location.href = currentNextUrl;
       }
     });
   }
+
+  // --- Bible: next chapter in place ---
+  // Swap the next chapter into this page and keep playing on the SAME audio element. A full page
+  // load + an un-gestured play() on a new element is blocked on phones, so listening stopped at
+  // every chapter end; the same element keeps the listener's earlier play gesture.
+  let bibleSwapped = false;
+  async function swapBibleChapter(url) {
+    let doc = null;
+    try {
+      const res = await fetch(url);
+      if (res.ok) doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    } catch { /* fall back below */ }
+    const nextReading = doc && doc.querySelector('.reading-content');
+    const nextFab = doc && doc.getElementById('audio-fab');
+    const reading = document.querySelector('.reading-content');
+    if (!nextReading || !nextFab || !reading) {
+      localStorage.setItem('audio-autoplay', 'true');
+      window.location.href = url;
+      return;
+    }
+    reading.replaceWith(document.importNode(nextReading, true));
+    for (const sel of ['.reading-top .breadcrumb', '.sidebar']) {
+      const cur = document.querySelector(sel);
+      const next = doc.querySelector(sel);
+      if (cur && next) cur.replaceWith(document.importNode(next, true));
+    }
+    document.title = doc.title;
+    history.pushState({ bibleSwap: true }, '', url);
+    bibleSwapped = true;
+    window.scrollTo(0, 0);
+    // Mobile TOC + sidebar toggles bind to the (swapped) sidebar.
+    if (typeof window.__reinitAfterSwap === 'function') window.__reinitAfterSwap();
+
+    // Annotations (highlights/notes/bookmarks) for the new chapter.
+    const ctxEl = document.getElementById('nc-reader-ctx-data');
+    if (ctxEl) {
+      try {
+        const ctx = JSON.parse(ctxEl.textContent);
+        window.__READER_CTX = ctx;
+        if (typeof window.__ncReattach === 'function') window.__ncReattach(ctx);
+      } catch { /* annotations stay as they were */ }
+    }
+    // Analytics: a pageview for the new chapter.
+    const chapter = new URL(url, location.href).searchParams.get('chapter');
+    if (window.__analyticsContext && chapter) {
+      window.__analyticsContext = Object.assign({}, window.__analyticsContext, { bible_chapter: chapter });
+    }
+    if (typeof window.__analyticsPageview === 'function') window.__analyticsPageview();
+
+    window.__audioPlayer.updateSession({
+      bookPath: nextFab.dataset.bookPath,
+      audioFile: nextFab.dataset.audioFile,
+      timestampsFile: nextFab.dataset.timestampsFile || '',
+      duration: nextFab.dataset.duration || 0,
+      nextUrl: nextFab.dataset.nextUrl || '',
+      durationFormatted: formatTime(parseFloat(nextFab.dataset.duration) || 0),
+    });
+    window.__audioPlayer.rebuildHighlightContainer();
+    window.__audioPlayer.playNextChapter();
+  }
+  // Back/forward after an in-place swap: load the page the URL names.
+  window.addEventListener('popstate', function () { if (bibleSwapped) location.reload(); });
 
   // --- UI ---
   function showPlaying() {
@@ -519,7 +554,7 @@
     player.classList.remove('is-expanded');
     fab.style.display = '';
     clearHighlight();
-    activeSegIdx = -1;
+    activeShown = -1;
     window.removeEventListener('scroll', onUserScroll);
   }
 
@@ -625,9 +660,7 @@
     playNextChapter: async function () {
       // Clear old state
       signedUrl = null;
-      timestamps = null;
-      segmentMap = null;
-      activeSegIdx = -1;
+      resetSync();
       userScrolledAway = false;
       clearHighlight();
 
@@ -675,14 +708,30 @@
       overlayContainer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:1;';
       var sc = document.querySelector('.session-content');
       if (sc) sc.appendChild(overlayContainer);
+      observeLayout();
     },
 
     /** Fetch timestamps for the new session, rebuild segment map and heading icons */
     loadNewTimestamps: function () {
-      timestamps = null;
-      segmentMap = null;
-      activeSegIdx = -1;
+      resetSync();
       loadTimestamps();
+    },
+
+    /** Audit/test hook: every sentence and the page text its highlight covers ('' = not placed). */
+    debugAlignment: function () {
+      if (!segs || !align) return null;
+      return segs.map(function (s, i) {
+        var sups = 0; // verse numbers strictly inside the highlight (Bible: must stay 0)
+        var first = align.spansFor(i)[0];
+        var at = first ? first.block + ':' + align.rawRange(first)[0] : null; // where it starts
+        var lit = align.spansFor(i).map(function (sp) {
+          var r = align.rawRange(sp);
+          var range = rangeInBlock(blockEls[sp.block], r[0], r[1]);
+          if (range) sups += range.cloneContents().querySelectorAll('sup').length;
+          return blockText(blockEls[sp.block]).slice(r[0], r[1]);
+        }).join(' ');
+        return { start: s.start, end: s.end, text: s.text, lit: lit, sups: sups, at: at };
+      });
     },
 
     /** Returns whether audio is currently playing */

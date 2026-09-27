@@ -261,9 +261,12 @@ function reattach(newCtx) {
     // The sidebar cluster was destroyed by the swap; drop any detached clusters, then re-inject it.
     for (let i = clusters.length - 1; i >= 0; i--) if (!clusters[i].wrap.isConnected) clusters.splice(i, 1)
     buildCluster(document.querySelector('.sidebar'), { atTop: true })
-    attachAnswers(newCtx)
+    // The Bible (audio's in-place next chapter) gets annotations only — like boot(), no answers or
+    // "Continue reading" there.
+    const isBible = !!(newCtx.corpus === 'bible' && newCtx.osisBook)
+    if (!isBible) attachAnswers(newCtx)
     attachAnnotations(newCtx)
-    recordReading(newCtx) // keep "Continue reading" current through in-book AJAX navigation
+    if (!isBible) recordReading(newCtx) // keep "Continue reading" current through in-book AJAX navigation
     updateClusters()
   } catch (e) { warn('reattach', e) }
 }

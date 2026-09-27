@@ -421,6 +421,13 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
     title: `${bookName} ${chapter}`,
   } : null;
 
+  // For the player's verse split (one verse lit at a time — shared narration engine): the verse
+  // text and the headings the narrator reads that aren't verse text.
+  const bibleAudio = audioBlocks ? {
+    verses: verses.map((v) => ({ verse: v.verse, text: v.text })),
+    headings: [`${bookName} ${chapter}`, ...audioBlocks.filter((b) => b.type === 'h2' || b.type === 'h3').map((b) => b.text)],
+  } : null;
+
   res.render('bible-chapter', {
     translation: t,
     bookName,
@@ -430,6 +437,7 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
     audioSession,
     audioBlocks,
     audioBookPath,
+    bibleAudio,
     audioFormatDuration: audio.formatDuration,
     readerContext,
     title: `${bookName} ${chapter} — ${t.title}`,

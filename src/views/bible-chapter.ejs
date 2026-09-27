@@ -115,11 +115,20 @@
           <div class="session-nav-link session-nav-placeholder"></div>
         <% } %>
       </div>
+      <%# Outside .session-content: annotation anchoring reads that element's text. The audio player's
+          in-place chapter advance reads both of these from the next chapter's page. %>
+      <% if (typeof bibleAudio !== 'undefined' && bibleAudio) { %>
+      <script type="application/json" id="bible-audio-data"><%- JSON.stringify(bibleAudio).replace(/</g, '\\u003c') %></script>
+      <% } %>
+      <% if (typeof readerContext !== 'undefined' && readerContext) { %>
+      <script type="application/json" id="nc-reader-ctx-data"><%- JSON.stringify(readerContext).replace(/</g, '\\u003c') %></script>
+      <% } %>
     </div>
   </main>
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
-<script src="/static/js/audio-player.js?v=28"></script>
+<script src="/static/js/narration-bundle.js?v=1"></script>
+<script src="/static/js/audio-player.js?v=29"></script>
 <% } %>
 
 <% if (typeof readerContext !== 'undefined' && readerContext) { %>
