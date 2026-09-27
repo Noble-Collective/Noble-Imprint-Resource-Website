@@ -23,8 +23,41 @@ function getBucket() {
   return bucket;
 }
 
+// LOCAL DEV ONLY: the local service account can't read the audio bucket, so with
+// AUDIO_DEV_SOURCE=https://resources.noblecollective.org the manifest + signed-URL lookups go
+// through that site's public audio API instead (the same one the mobile app uses). Never in prod.
+const AUDIO_DEV_SOURCE = process.env.NODE_ENV === 'production' ? '' : (process.env.AUDIO_DEV_SOURCE || '').replace(/\/$/, '');
+
+async function devSourceJson(apiPath) {
+  const res = await fetch(`${AUDIO_DEV_SOURCE}${apiPath.split('/').map(encodeURIComponent).join('/')}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`AUDIO_DEV_SOURCE ${apiPath}: HTTP ${res.status}`);
+  return res.json();
+}
+
+// The manifest at audio/{slugPath}/manifest.json, or null (404 / unreadable).
+async function readManifest(slugPath, label) {
+  try {
+    if (AUDIO_DEV_SOURCE) return await devSourceJson(`/api/audio/manifest/${slugPath}`);
+    const [contents] = await getBucket().file(`audio/${slugPath}/manifest.json`).download();
+    return JSON.parse(contents.toString());
+  } catch (err) {
+    if (err.code === 404) return null;
+    console.error(`[audio] Failed to load ${label}:`, err.message);
+    return null;
+  }
+}
+
 function slugify(name) {
   return name.toLowerCase().replace(/['']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// The pipeline stores a Bible book under slugify(its USFM \h name); the reader names books by
+// their references.json keys, which differ for exactly these two (see resolveRefBookName in bible.js).
+const BIBLE_AUDIO_SLUG_OVERRIDES = { 'Psalm': 'psalms', 'Song of Solomon': 'song' };
+
+function bibleAudioSlug(bookName) {
+  return BIBLE_AUDIO_SLUG_OVERRIDES[bookName] || slugify(bookName);
 }
 
 function bookRepoPathToSlugPath(repoPath) {
@@ -43,19 +76,9 @@ async function getAudioManifest(bookRepoPath) {
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const slugPath = bookRepoPathToSlugPath(bookRepoPath);
-  const file = getBucket().file(`audio/${slugPath}/manifest.json`);
-
-  try {
-    const [contents] = await file.download();
-    const manifest = JSON.parse(contents.toString());
-    cache.set(cacheKey, manifest, MANIFEST_TTL);
-    return manifest;
-  } catch (err) {
-    if (err.code === 404) return null;
-    console.error(`[audio] Failed to load manifest for ${bookRepoPath}:`, err.message);
-    return null;
-  }
+  const manifest = await readManifest(bookRepoPathToSlugPath(bookRepoPath), `manifest for ${bookRepoPath}`);
+  if (manifest) cache.set(cacheKey, manifest, MANIFEST_TTL);
+  return manifest;
 }
 
 /**
@@ -63,6 +86,7 @@ async function getAudioManifest(bookRepoPath) {
  */
 async function getSignedUrl(bookRepoPath, filename) {
   const slugPath = bookRepoPathToSlugPath(bookRepoPath);
+  if (AUDIO_DEV_SOURCE) return (await devSourceJson(`/api/audio/url/${slugPath}/${filename}`)).url;
   const file = getBucket().file(`audio/${slugPath}/${filename}`);
 
   const [url] = await file.getSignedUrl({
@@ -83,26 +107,18 @@ async function getAudioSession(bookRepoPath, sessionFilename) {
 
 /**
  * Bible-audiobook manifest, stored at audio/bible/{tx}/{book-slug}/manifest.json
- * (the audiobook pipeline's Bible path). book-slug is slugify(bookName), matching the
+ * (the audiobook pipeline's Bible path). book-slug is bibleAudioSlug(bookName), matching the
  * generation side. Returns null if the book has no audio.
  */
 async function getBibleAudioManifest(translationId, bookName) {
-  const bookSlug = slugify(bookName);
+  const bookSlug = bibleAudioSlug(bookName);
   const cacheKey = `bible-audio-manifest:${translationId}/${bookSlug}`;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const file = getBucket().file(`audio/bible/${translationId}/${bookSlug}/manifest.json`);
-  try {
-    const [contents] = await file.download();
-    const manifest = JSON.parse(contents.toString());
-    cache.set(cacheKey, manifest, MANIFEST_TTL);
-    return manifest;
-  } catch (err) {
-    if (err.code === 404) return null;
-    console.error(`[audio] Failed to load bible manifest for ${translationId}/${bookSlug}:`, err.message);
-    return null;
-  }
+  const manifest = await readManifest(`bible/${translationId}/${bookSlug}`, `bible manifest for ${translationId}/${bookSlug}`);
+  if (manifest) cache.set(cacheKey, manifest, MANIFEST_TTL);
+  return manifest;
 }
 
 /**
@@ -116,7 +132,7 @@ async function getBibleAudioChapter(translationId, bookName, chapter) {
   const sessionFile = `${String(chapter).padStart(3, '0')}.md`;
   const session = manifest.sessions.find(s => s.sessionFile === sessionFile);
   if (!session) return null;
-  return { ...session, bookPath: manifest.bookPath, bookSlug: slugify(bookName) };
+  return { ...session, bookPath: manifest.bookPath, bookSlug: bibleAudioSlug(bookName) };
 }
 
 /**
@@ -175,6 +191,7 @@ module.exports = {
   getAudioSession,
   getBibleAudioManifest,
   getBibleAudioChapter,
+  bibleAudioSlug,
   getVoiceCompareData,
   clearCache,
   formatDuration,

@@ -66,14 +66,20 @@
   }
 
   // --- Fetch timestamps and build segment map ---
+  // Only the latest load may land: an auto-advance can start one for the next session while an
+  // earlier one is still in flight, and the older response must not overwrite the newer.
+  let timestampsLoadSeq = 0;
   async function loadTimestamps() {
     if (timestamps || !getTimestampsFile()) return;
+    const seq = ++timestampsLoadSeq;
     try {
       const res = await fetch(`/api/audio/url/${getBookPath()}/${getTimestampsFile()}`);
-      if (!res.ok) return;
+      if (!res.ok || seq !== timestampsLoadSeq) return;
       const tsRes = await fetch((await res.json()).url);
-      if (!tsRes.ok) return;
-      timestamps = await tsRes.json();
+      if (!tsRes.ok || seq !== timestampsLoadSeq) return;
+      const data = await tsRes.json();
+      if (seq !== timestampsLoadSeq) return;
+      timestamps = data;
       buildSegmentMap();
     } catch (err) {
       console.warn('[audio] Failed to load timestamps:', err);
@@ -629,6 +635,10 @@
       document.querySelectorAll('.heading-audio-icon').forEach(function (el) { el.remove(); });
       scrubberContainer.querySelectorAll('.scrubber-h2-marker').forEach(function (m) { m.remove(); });
 
+      // Load the new session's timestamps now, not after play(): on iOS an un-gestured play()
+      // rejects (NotAllowedError → "Tap to continue"), and the session then had no highlight.
+      window.__audioPlayer.loadNewTimestamps();
+
       try {
         // Fetch new signed audio URL (getters read from updated FAB data attributes)
         var res = await fetch('/api/audio/url/' + getBookPath() + '/' + getAudioFile());
@@ -643,9 +653,6 @@
 
         await audioEl.play();
         showPlaying();
-
-        // Load timestamps for the new session
-        window.__audioPlayer.loadNewTimestamps();
       } catch (err) {
         if (err.name === 'NotAllowedError') {
           // Safari iOS: show tap-to-continue banner
