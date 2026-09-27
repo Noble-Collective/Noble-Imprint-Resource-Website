@@ -83,6 +83,29 @@ test('a heading headphone starts playback at that heading and lights it', async 
   expect(Math.abs(ov.y - box.y)).toBeLessThan(box.height);
 });
 
+test('the highlight keeps following when playback is resumed outside the player (lock screen)', async ({ page }) => {
+  await page.goto(BASE_URL + '/bible/bsb/Genesis?chapter=28');
+  await page.locator('#audio-fab').click();
+  await expect.poll(() => page.evaluate(() => window.__audioPlayer.isPlaying()), { timeout: 15000 }).toBe(true);
+  // Pause + play straight on the element (iOS lock screen / Control Center do this), then move on.
+  const target = await page.evaluate(async () => {
+    const a = window.__audioPlayer.getAudioElement();
+    a.pause();
+    await new Promise((r) => setTimeout(r, 400)); // a real pause (the sync loop stops)
+    await a.play();
+    const row = window.__audioPlayer.debugAlignment().find((r) => /^and that Jacob/.test(r.text));
+    a.currentTime = row.start + 0.3;
+    return row;
+  });
+  // The overlay moves to verse 7's words.
+  await expect.poll(async () => {
+    const ov = await page.locator('#audio-highlight-overlays > div').first().boundingBox();
+    const sup = await page.locator('.session-content sup', { hasText: /^7$/ }).first().boundingBox();
+    return !!(ov && sup && Math.abs(ov.y - sup.y) < 30);
+  }, { timeout: 8000 }).toBe(true);
+  expect(target.lit).toMatch(/^and that Jacob/);
+});
+
 test('Bible: the next chapter plays in place (no page load) with its own highlight', async ({ page }) => {
   await page.goto(BASE_URL + '/bible/bsb/Genesis?chapter=28');
   await page.locator('#audio-fab').click();

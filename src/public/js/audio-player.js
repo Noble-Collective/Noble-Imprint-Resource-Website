@@ -396,9 +396,17 @@
   }
 
   // --- Sync loop ---
+  // One loop at a time; (re)started by ANY resume of the element — the lock screen / Control
+  // Center play it directly, not through our button.
+  let syncRunning = false;
   function syncLoop() {
-    if (!audioEl || audioEl.paused) return;
+    if (!audioEl || audioEl.paused) { syncRunning = false; return; }
     updateHighlight(false);
+    requestAnimationFrame(syncLoop);
+  }
+  function startSync() {
+    if (syncRunning) return;
+    syncRunning = true;
     requestAnimationFrame(syncLoop);
   }
 
@@ -434,6 +442,8 @@
       });
     }
     audioEl.addEventListener('play', () => emitAudio('audio_play'));
+    audioEl.addEventListener('playing', startSync);
+    audioEl.addEventListener('seeked', () => updateHighlight(false));
     audioEl.addEventListener('pause', () => { if (!audioEl.ended) emitAudio('audio_pause'); });
 
     const saved = localStorage.getItem(getStorageKey());
@@ -541,7 +551,7 @@
     player.style.display = '';
     fab.style.display = 'none';
     window.addEventListener('scroll', onUserScroll, { passive: true });
-    requestAnimationFrame(syncLoop);
+    startSync();
   }
 
   function showPaused() {
