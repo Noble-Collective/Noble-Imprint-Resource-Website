@@ -28,7 +28,7 @@ const DEFAULT_CONFIG = Object.freeze({
   },
   partner: {
     title: 'Partner with us',
-    body: 'Keep these books and Bibles free for every church.',
+    body: 'Providing free and open resources for the global church',
     buttonLabel: 'Donate',
     url: 'https://give.noblecollective.org/',
   },

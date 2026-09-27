@@ -37,7 +37,7 @@ Store in this site's Firestore (project `noble-imprint-website`), doc `siteConfi
     ],
     "excludeSessions": {}
   },
-  "partner": { "title": "Partner with us", "body": "Keep these books and Bibles free for every church.",
+  "partner": { "title": "Partner with us", "body": "Providing free and open resources for the global church",
                "buttonLabel": "Donate", "url": "<current donate URL>" }
 }
 ```
