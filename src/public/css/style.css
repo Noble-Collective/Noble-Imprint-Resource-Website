@@ -5513,6 +5513,32 @@ body.drawer-open {
 }
 .audio-skip-btn:hover { color: #fff; border-color: #888; }
 
+/* Bible A–B loop (Scripture memory): amber when a point is set / repeat is on. */
+.audio-loop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.audio-loop-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.audio-loop-btn.is-set,
+.audio-loop-btn[aria-pressed="true"] {
+  color: #1e1e1e;
+  background: #e0a33a;
+  border-color: #e0a33a;
+}
+.audio-loop-btn:disabled { opacity: 0.4; cursor: default; }
+.audio-loop-btn:disabled:hover { color: #999; border-color: #555; }
+.audio-loop-range {
+  font-size: 12px;
+  color: #d4d4d4;
+  white-space: nowrap;
+}
+
 .audio-expand-btn {
   display: none;
 }
@@ -5619,6 +5645,7 @@ h6:hover .heading-audio-icon {
     gap: 12px;
     margin-left: 0;
     justify-content: center;
+    flex-wrap: wrap; /* the Bible's Loop group takes a second row */
   }
   .audio-player.is-expanded .audio-player-extra {
     display: flex;
@@ -5658,6 +5685,9 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
   }
   body:has(.audio-player.is-expanded:not([style*="none"])) .reading-content {
     padding-bottom: 120px;
+  }
+  body:has(.audio-player.is-expanded:not([style*="none"]) .audio-loop) .reading-content {
+    padding-bottom: 170px;
   }
 }
 

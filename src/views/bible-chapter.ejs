@@ -57,6 +57,15 @@
             <option value="1.5">1.5x</option>
           </select>
           <button class="audio-skip-btn" id="audio-skip-fwd" aria-label="Forward 15s" title="Forward 15s">+15s</button>
+          <%# A–B repeat for Scripture memory, snapped to whole verses (like the app and Coram Deo). %>
+          <div class="audio-loop" id="audio-loop" role="group" aria-label="Repeat a passage">
+            <span class="audio-loop-label">Loop</span>
+            <button class="audio-skip-btn audio-loop-btn" id="audio-loop-a" aria-label="Loop from this verse" title="Loop from this verse">A</button>
+            <button class="audio-skip-btn audio-loop-btn" id="audio-loop-b" aria-label="Loop to this verse" title="Loop to this verse">B</button>
+            <button class="audio-skip-btn audio-loop-btn" id="audio-loop-toggle" aria-label="Repeat" aria-pressed="false" title="Repeat on/off" disabled>&#x27F2;</button>
+            <button class="audio-skip-btn audio-loop-btn" id="audio-loop-clear" aria-label="Clear loop" title="Clear loop" hidden>&times;</button>
+            <span class="audio-loop-range" id="audio-loop-range"></span>
+          </div>
         </div>
         <button class="audio-close-btn" id="audio-close-btn" aria-label="Close player" title="Close player">&times;</button>
       </div>
@@ -128,7 +137,7 @@
 
 <% if (typeof audioSession !== 'undefined' && audioSession) { %>
 <script src="/static/js/narration-bundle.js?v=1"></script>
-<script src="/static/js/audio-player.js?v=30"></script>
+<script src="/static/js/audio-player.js?v=31"></script>
 <% } %>
 
 <% if (typeof readerContext !== 'undefined' && readerContext) { %>

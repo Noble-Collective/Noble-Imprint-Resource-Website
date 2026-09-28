@@ -131,6 +131,7 @@
     // One verse lit at a time: a sentence read across verses is cut at the word each verse begins.
     if (bible && bible.verses) s = N.splitSegmentsAtVerses(s, bible.verses, bible.headings || []);
     segs = s;
+    verseWins = null; // the A–B loop's verse timeline is rebuilt from these segments
     blockEls = collectBlocks(contentEl);
     align = N.NarrationAlignment.build(blockEls.map(blockText), segs.map(x => x.text));
     activeShown = -1;
@@ -141,6 +142,8 @@
   }
 
   function resetSync() {
+    if (loopUi) clearLoop();
+    verseWins = null;
     timestamps = null;
     segs = null;
     align = null;
@@ -395,12 +398,141 @@
     updateJumpLink();
   }
 
+  // --- Bible A–B loop (Scripture memory) ---
+  // Repeat a verse range with a 1 s beat between repeats. A and B snap to WHOLE verses from the
+  // verse-split segments (the shared engine's segmentVerses — the same verse placement the
+  // highlight, the app's loop and Coram Deo's use): A = start of the verse being read, B = its end;
+  // in a heading or a gap, A takes the next verse and B the previous one. Toggling repeat off keeps
+  // A/B (× clears), as on Coram Deo. Only on Bible pages (#audio-loop).
+  const loopUi = document.getElementById('audio-loop') ? {
+    a: document.getElementById('audio-loop-a'),
+    b: document.getElementById('audio-loop-b'),
+    toggle: document.getElementById('audio-loop-toggle'),
+    clear: document.getElementById('audio-loop-clear'),
+    range: document.getElementById('audio-loop-range'),
+  } : null;
+  let loopA = null; // {verse, time, seek}
+  let loopB = null; // {verse, time}
+  let loopOn = false;
+  let loopGapTimer = null; // the 1 s beat between repeats (audio paused, bar still "playing")
+  let verseWins = null; // [{verse, start, end, first}] for the current chapter
+
+  function verseWindows() {
+    if (verseWins) return verseWins;
+    const bible = bibleAudioData();
+    if (!segs || !bible || !bible.verses) return [];
+    const per = N.segmentVerses(segs, bible.verses, bible.headings || []);
+    const by = new Map();
+    per.forEach((vs, i) => {
+      for (const v of vs) {
+        const w = by.get(v);
+        if (!w) by.set(v, { verse: v, start: segs[i].start, end: segs[i].end, first: i });
+        else w.end = Math.max(w.end, segs[i].end);
+      }
+    });
+    verseWins = [...by.values()].sort((x, y) => x.verse - y.verse);
+    return verseWins;
+  }
+
+  // Where a repeat starts: a moment before A (a seek lands late and can clip a short first word) —
+  // into the pause before the verse, or a hair when the verse begins mid-sentence.
+  function loopSeek(w) {
+    const lead = N.leadInBefore(segs, w.first);
+    return Math.max(0, w.start - (lead > 0 ? lead : 0.05));
+  }
+
+  function snapLoopPoint(which) {
+    const wins = verseWindows();
+    if (!wins.length || !audioEl) return null;
+    const t = audioEl.currentTime;
+    const inside = wins.filter((w) => t >= w.start && t < w.end);
+    if (inside.length) return which === 'A' ? inside[0] : inside[inside.length - 1];
+    if (which === 'A') return wins.find((w) => w.start >= t - 0.25) || wins[wins.length - 1];
+    return [...wins].reverse().find((w) => w.end <= t + 0.25) || wins[0];
+  }
+
+  function chapterTitle() {
+    const h1 = document.querySelector('.session-content h1');
+    return h1 ? blockText(h1).trim() : '';
+  }
+
+  function renderLoop() {
+    if (!loopUi) return;
+    loopUi.a.classList.toggle('is-set', !!loopA);
+    loopUi.b.classList.toggle('is-set', !!loopB);
+    loopUi.toggle.disabled = !(loopA && loopB && loopB.time > loopA.time);
+    loopUi.toggle.setAttribute('aria-pressed', loopOn ? 'true' : 'false');
+    loopUi.clear.hidden = !(loopA || loopB);
+    const title = chapterTitle();
+    loopUi.range.textContent = !loopA && !loopB ? ''
+      : loopA && loopB ? (loopA.verse === loopB.verse ? `${title}:${loopA.verse}` : `${title}:${loopA.verse}–${loopB.verse}`)
+      : loopA ? `${title}:${loopA.verse} –` : `– ${title}:${loopB.verse}`;
+  }
+
+  function setLoopPoint(which) {
+    const w = snapLoopPoint(which);
+    if (!w) return;
+    if (which === 'A') loopA = { verse: w.verse, time: w.start, seek: loopSeek(w) };
+    else loopB = { verse: w.verse, time: w.end };
+    // Engages once both ends are set in order.
+    loopOn = !!(loopA && loopB && loopB.time > loopA.time);
+    renderLoop();
+  }
+
+  function cancelLoopGap() {
+    if (loopGapTimer) { clearTimeout(loopGapTimer); loopGapTimer = null; }
+  }
+
+  function clearLoop() {
+    cancelLoopGap();
+    loopA = loopB = null;
+    loopOn = false;
+    verseWins = null;
+    renderLoop();
+  }
+
+  // Back to A with a 1 s beat. True when it took over (the caller stops).
+  function repeatLoop() {
+    if (!audioEl || !loopA) return false;
+    cancelLoopGap();
+    audioEl.pause();
+    audioEl.currentTime = loopA.seek;
+    forceHighlightUpdate();
+    loopGapTimer = setTimeout(function () {
+      loopGapTimer = null;
+      if (audioEl) audioEl.play().catch(function () {});
+    }, 1000);
+    return true;
+  }
+
+  // Looping, and the playhead is outside [A, B] — B reached (the repeat), or a seek / ±15 s moved
+  // it out: back to A.
+  function enforceLoop() {
+    if (!loopOn || loopGapTimer || !loopA || !loopB || !audioEl) return false;
+    const t = audioEl.currentTime;
+    if (t >= loopB.time - 0.05 || t < loopA.seek - 0.05) return repeatLoop();
+    return false;
+  }
+
+  if (loopUi) {
+    loopUi.a.addEventListener('click', function (e) { e.stopPropagation(); setLoopPoint('A'); });
+    loopUi.b.addEventListener('click', function (e) { e.stopPropagation(); setLoopPoint('B'); });
+    loopUi.toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      loopOn = !loopOn && !!(loopA && loopB && loopB.time > loopA.time);
+      if (!loopOn) cancelLoopGap();
+      renderLoop();
+    });
+    loopUi.clear.addEventListener('click', function (e) { e.stopPropagation(); clearLoop(); });
+  }
+
   // --- Sync loop ---
   // One loop at a time; (re)started by ANY resume of the element — the lock screen / Control
   // Center play it directly, not through our button.
   let syncRunning = false;
   function syncLoop() {
     if (!audioEl || audioEl.paused) { syncRunning = false; return; }
+    if (enforceLoop()) { syncRunning = false; return; } // runs before the highlight (no flash of B)
     updateHighlight(false);
     requestAnimationFrame(syncLoop);
   }
@@ -444,7 +576,7 @@
     audioEl.addEventListener('play', () => emitAudio('audio_play'));
     audioEl.addEventListener('playing', startSync);
     audioEl.addEventListener('seeked', () => updateHighlight(false));
-    audioEl.addEventListener('pause', () => { if (!audioEl.ended) emitAudio('audio_pause'); });
+    audioEl.addEventListener('pause', () => { if (!audioEl.ended && !loopGapTimer) emitAudio('audio_pause'); });
 
     const saved = localStorage.getItem(getStorageKey());
     if (saved) {
@@ -467,6 +599,8 @@
     });
 
     audioEl.addEventListener('ended', () => {
+      // A loop whose B is the chapter's last verse repeats instead of moving on.
+      if (loopOn && loopA && repeatLoop()) return;
       emitAudio('audio_ended');
       showPaused();
       localStorage.removeItem(getStorageKey());
@@ -565,6 +699,7 @@
     fab.style.display = '';
     clearHighlight();
     activeShown = -1;
+    if (loopUi) clearLoop();
     window.removeEventListener('scroll', onUserScroll);
   }
 
@@ -582,6 +717,9 @@
         fab.classList.remove('audio-fab--loading');
         console.error('[audio] Playback failed:', err);
       }
+    } else if (loopGapTimer) {
+      cancelLoopGap(); // tapping pause during the 1 s beat between repeats
+      showPaused();
     } else if (audioEl.paused) {
       await audioEl.play();
       showPlaying();
@@ -742,6 +880,11 @@
         }).join(' ');
         return { start: s.start, end: s.end, text: s.text, lit: lit, sups: sups, at: at };
       });
+    },
+
+    /** Test hook: the A–B loop's state. */
+    loopState: function () {
+      return { a: loopA, b: loopB, on: loopOn, gap: !!loopGapTimer, label: loopUi ? loopUi.range.textContent : null };
     },
 
     /** Returns whether audio is currently playing */
