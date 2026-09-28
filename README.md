@@ -392,6 +392,8 @@ The site serves audiobook versions of books that have been processed through the
 
 **Resume**: Playback position is persisted to `localStorage` so users can pick up where they left off.
 
+**Bible A–B loop** (Scripture memory): the Bible player's Loop group (A / B / ⟲ / ×) repeats a verse range with a 1 s beat between repeats; A and B snap to whole verses from the shared engine's verse split, so a loop can start mid-sentence at a verse boundary. Same behaviour as the mobile app and Coram Deo.
+
 **Dependencies**: Requires `@google-cloud/storage`. The GCS bucket must have CORS configured for the website domain.
 
 **Attribution**: ElevenLabs logo appears in the site footer per the ElevenLabs Impact Program requirements.
