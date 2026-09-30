@@ -681,6 +681,10 @@ function renderMarkdown(content, options = {}) {
   const shorthandVerseSpec = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
   const shorthandPat = new RegExp(`\\(((?:cf\\.\\s?)?(?:${shorthandVerseSpec})(?:;\\s?(?:cf\\.\\s?)?(?:${shorthandVerseSpec}))*)\\)`, 'g');
 
+  // KEEP IN STEP with the mobile app's port of this bare-citation rule
+  // (Noble-Imprint-App lib/features/reader/presentation/custom-syntaxes/
+  // bible-reference/implied_scripture_book.dart, since 2026-09-29): full-ref
+  // pattern, cf./; skips, section declarations, shorthandPat. Change one, change both.
   // First pass: find all full references to build a context map.
   // Section declarations ("Biblical Narrative (Book Ch:V)") are authoritative.
   // Inline refs only update context when no section declaration is active.
