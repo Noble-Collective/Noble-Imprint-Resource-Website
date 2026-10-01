@@ -92,6 +92,7 @@ test('Media Session: lock-screen title, artwork, play/pause, ±15 s, seek and ne
   await expect.poll(async () => (await ms()).title).toBe(h1);
   const s = await ms();
   expect(s.album).toBe('The Call of Christ');
+  expect(s.artwork).toEqual([]); // its cover is an SVG, which iOS can't draw on the lock screen
   expect(s.state).toBe('playing');
   expect(s.actions).toEqual(expect.arrayContaining(['nexttrack', 'pause', 'play', 'seekbackward', 'seekforward', 'seekto']));
   await expect.poll(async () => (await ms()).position && (await ms()).position.duration > 0).toBe(true);

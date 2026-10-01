@@ -155,11 +155,15 @@ Options:
 ### 9. Media Session API — FIXED
 - **Built (2026-10-01):** `audio-player.js` sets `metadata` (title = the page's h1, album = the
   breadcrumb's book, artist "Noble Collective", artwork = the book cover via the fab's new
-  `data-artwork`; none on Bible chapters), `playbackState`, `setPositionState` (≤ 1/s on
+  `data-artwork`, raster covers only: iOS can't draw SVG artwork and 20 of 23 covers are SVG, so those
+  get the system tile; none on Bible chapters), `playbackState`, `setPositionState` (≤ 1/s on
   `timeupdate`, forced after seeks/speed), and handlers `play` / `pause` / `seekbackward` /
   `seekforward` (±15 s, or the OS's `seekOffset`) / `seekto` / `nexttrack` (the same
   `advanceToNext()` path `ended` uses, so a prefetched next unit starts at once; cleared when there
   is no next unit). Every call is guarded. Test: a recording `navigator.mediaSession` stub.
+- **Follow-up (proposal):** lock-screen art for the SVG covers needs a PNG of each cover (exported
+  into the content repo next to `cover.svg`, ~512 px) or a server-side rasterizer route; then point
+  `data-artwork` at it.
 - Original proposal:
 - There are no `navigator.mediaSession` calls today. On the iOS lock screen you see the page title
   and default controls only.

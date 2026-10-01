@@ -668,7 +668,8 @@
   function updateMediaSession() {
     if (!mediaSession || !audioEl) return;
     try {
-      const art = fab.dataset.artwork;
+      // iOS draws only raster artwork (most covers are SVG: those get the system's default tile).
+      const art = /\.(png|jpe?g|webp)$/i.test(fab.dataset.artwork || '') ? fab.dataset.artwork : '';
       mediaSession.metadata = new MediaMetadata({
         title: chapterTitle() || document.title,
         artist: 'Noble Collective',
