@@ -35,12 +35,13 @@ export function maybeOnboard() {
     const done = () => {
       try { localStorage.setItem(KEY, '1') } catch { /* ignore */ }
       pop.remove()
-      document.removeEventListener('click', outside, true)
+      document.removeEventListener('pointerdown', outside, true)
       window.removeEventListener('resize', place)
     }
     const outside = (e) => { if (!pop.contains(e.target)) done() }
     ok.onclick = done
     window.addEventListener('resize', place)
-    setTimeout(() => document.addEventListener('click', outside, true), 500)
+    // pointerdown: iOS sends no click for a tap on blank space (Safari audit #10).
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 500)
   }, 700)
 }

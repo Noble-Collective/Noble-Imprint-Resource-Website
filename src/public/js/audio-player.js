@@ -589,6 +589,8 @@
     // and the bar stays "playing".)
     audioEl.addEventListener('pause', () => { if (!loopGapTimer) showPaused(); });
     audioEl.addEventListener('play', showPlaying);
+    audioEl.addEventListener('play', updateMediaSession);
+    audioEl.addEventListener('loadedmetadata', () => updatePositionState(true));
 
     const saved = store.get(getStorageKey());
     if (saved) {
@@ -603,6 +605,7 @@
       }
       store.set(getStorageKey(), audioEl.currentTime.toFixed(1));
       maybePrefetchNext();
+      updatePositionState(false);
       const _now = Date.now();
       if (_now - lastAudioProgress >= 30000) { lastAudioProgress = _now; emitAudio('audio_progress'); }
     });
@@ -617,30 +620,94 @@
       emitAudio('audio_ended');
       showPaused();
       store.remove(getStorageKey());
-      var currentNextUrl = getNextUrl();
-      var ready = prefetch && prefetch.url === currentNextUrl ? prefetch.ready : null;
-      prefetch = null;
-      if (ready && (ready.kind === 'bible' || (window.__ajaxNav && !window.__editorView))) {
-        // Start the next track HERE, before any swap or fetch: iOS lets an un-tapped play() start
-        // only within ~1 s of the previous track ending.
-        signedUrl = ready.audioUrl;
-        audioEl.src = ready.audioUrl;
-        var started = audioEl.play();
-        if (ready.kind === 'session') {
-          window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true, prefetched: ready.payload, started: started });
-        } else {
-          swapBibleChapter(currentNextUrl, ready.payload, started);
-        }
-        return;
+      advanceToNext();
+    });
+  }
+
+  // On to the next session / chapter: at a track's end, or the lock screen's ⏭.
+  function advanceToNext() {
+    var currentNextUrl = getNextUrl();
+    if (!currentNextUrl) return;
+    var ready = prefetch && prefetch.url === currentNextUrl ? prefetch.ready : null;
+    prefetch = null;
+    if (ready && (ready.kind === 'bible' || (window.__ajaxNav && !window.__editorView))) {
+      // Start the next track HERE, before any swap or fetch: iOS lets an un-tapped play() start
+      // only within ~1 s of the previous track ending.
+      signedUrl = ready.audioUrl;
+      audioEl.src = ready.audioUrl;
+      var started = audioEl.play();
+      if (ready.kind === 'session') {
+        window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true, prefetched: ready.payload, started: started });
+      } else {
+        swapBibleChapter(currentNextUrl, ready.payload, started);
       }
-      if (window.__ajaxNav && currentNextUrl) {
-        window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
-      } else if (currentNextUrl && document.getElementById('bible-audio-data')) {
-        swapBibleChapter(currentNextUrl);
-      } else if (currentNextUrl) {
-        store.set('audio-autoplay', 'true');
-        window.location.href = currentNextUrl;
-      }
+      return;
+    }
+    if (window.__ajaxNav) {
+      window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
+    } else if (document.getElementById('bible-audio-data')) {
+      swapBibleChapter(currentNextUrl);
+    } else {
+      store.set('audio-autoplay', 'true');
+      window.location.href = currentNextUrl;
+    }
+  }
+
+  // --- Media Session (lock screen, Control Center, AirPods, the car) ---
+  // Without it iOS shows only the page title and default controls (Safari audit #9). The ⏭ is also a
+  // real gesture, so it can restart an auto-advance iOS refused.
+  const mediaSession = 'mediaSession' in navigator ? navigator.mediaSession : null;
+  function msAction(action, fn) {
+    try { mediaSession.setActionHandler(action, fn); } catch { /* an action this browser lacks */ }
+  }
+  function albumTitle() {
+    // The breadcrumb's last link: the book (a session) or the Bible book (a chapter).
+    const links = document.querySelectorAll('.reading-top .breadcrumb a');
+    return links.length ? links[links.length - 1].textContent.trim() : '';
+  }
+  function updateMediaSession() {
+    if (!mediaSession || !audioEl) return;
+    try {
+      const art = fab.dataset.artwork;
+      mediaSession.metadata = new MediaMetadata({
+        title: chapterTitle() || document.title,
+        artist: 'Noble Collective',
+        album: albumTitle(),
+        artwork: art ? [{ src: new URL(art, location.href).href, sizes: '512x512' }] : [],
+      });
+    } catch { /* MediaMetadata missing */ }
+    msAction('nexttrack', getNextUrl() ? advanceToNext : null);
+  }
+  let lastPositionState = 0;
+  function updatePositionState(force) {
+    if (!mediaSession || !mediaSession.setPositionState || !audioEl || !isFinite(audioEl.duration)) return;
+    const now = Date.now();
+    if (!force && now - lastPositionState < 1000) return;
+    lastPositionState = now;
+    try {
+      mediaSession.setPositionState({
+        duration: audioEl.duration,
+        playbackRate: audioEl.playbackRate || 1,
+        position: Math.min(audioEl.currentTime, audioEl.duration),
+      });
+    } catch { /* out-of-range while a new source loads */ }
+  }
+  function skipBy(delta) {
+    if (!audioEl) return;
+    audioEl.currentTime = Math.max(0, Math.min(audioEl.duration || Infinity, audioEl.currentTime + delta));
+    forceHighlightUpdate();
+    updatePositionState(true);
+  }
+  if (mediaSession) {
+    msAction('play', function () { if (audioEl) audioEl.play().catch(function () {}); else togglePlay(); });
+    msAction('pause', function () { if (audioEl) audioEl.pause(); });
+    msAction('seekbackward', function (d) { skipBy(-((d && d.seekOffset) || 15)); });
+    msAction('seekforward', function (d) { skipBy((d && d.seekOffset) || 15); });
+    msAction('seekto', function (d) {
+      if (!audioEl || !d || d.seekTime == null) return;
+      audioEl.currentTime = d.seekTime;
+      forceHighlightUpdate();
+      updatePositionState(true);
     });
   }
 
@@ -756,12 +823,27 @@
     fab.style.display = 'none';
     window.addEventListener('scroll', onUserScroll, { passive: true });
     startSync();
+    if (mediaSession) mediaSession.playbackState = 'playing';
   }
 
   function showPaused() {
     iconPlay.style.display = '';
     iconPause.style.display = 'none';
+    if (mediaSession) mediaSession.playbackState = 'paused';
   }
+
+  // Back from the back/forward cache (Safari uses it heavily): the page keeps its JS state, but iOS
+  // paused the media, maybe without a `pause` event. Resync the bar to the element (Safari audit #12).
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted || !audioEl) return;
+    if (audioEl.paused) showPaused(); else showPlaying();
+    if (isFinite(audioEl.duration)) {
+      scrubber.value = (audioEl.currentTime / audioEl.duration) * 1000;
+      currentTimeEl.textContent = formatTime(audioEl.currentTime);
+    }
+    updatePositionState(true);
+    repaintSoon();
+  });
 
   function hidePlayerBar() {
     player.style.display = 'none';
@@ -842,20 +924,11 @@
 
   speedSelect.addEventListener('change', () => {
     if (audioEl) audioEl.playbackRate = parseFloat(speedSelect.value);
+    updatePositionState(true);
   });
 
-  skipBack.addEventListener('click', () => {
-    if (audioEl) {
-      audioEl.currentTime = Math.max(0, audioEl.currentTime - 15);
-      forceHighlightUpdate();
-    }
-  });
-  skipFwd.addEventListener('click', () => {
-    if (audioEl) {
-      audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 15);
-      forceHighlightUpdate();
-    }
-  });
+  skipBack.addEventListener('click', () => skipBy(-15));
+  skipFwd.addEventListener('click', () => skipBy(15));
 
   // Load timestamps eagerly so heading icons and scrubber markers
   // appear immediately, not after first play
@@ -872,6 +945,7 @@
       if (opts.duration != null) fab.dataset.duration = opts.duration;
       if (opts.nextUrl != null) fab.dataset.nextUrl = opts.nextUrl;
       if (opts.durationFormatted != null) durationEl.textContent = opts.durationFormatted;
+      updateMediaSession(); // the swapped-in page's title and its next unit
     },
 
     /** Fetch new signed URL, change src, and play. Shows banner on NotAllowedError.

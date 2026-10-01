@@ -353,14 +353,14 @@ function positionToolbar(rect) {
 function hideToolbar() {
   closeShareMenu()
   toolbar?.remove(); toolbar = null; toolbarMode = null
-  if (editOutside) { document.removeEventListener('mousedown', editOutside, true); editOutside = null }
+  if (editOutside) { document.removeEventListener('pointerdown', editOutside, true); editOutside = null }
 }
 
 // The share dropdown (Copy text / Copy link / Share…) off the toolbar's share button — one icon that
 // expands to the three actions, matching Coram Deo (replaces the separate Copy + Share-link buttons).
 function closeShareMenu() {
   shareMenu?.remove(); shareMenu = null
-  if (shareOutside) { document.removeEventListener('mousedown', shareOutside, true); shareOutside = null }
+  if (shareOutside) { document.removeEventListener('pointerdown', shareOutside, true); shareOutside = null }
 }
 function openShareMenu(anchorBtn, ctx) {
   if (shareMenu) { closeShareMenu(); return } // toggle
@@ -383,7 +383,9 @@ function openShareMenu(anchorBtn, ctx) {
   m.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8)) + 'px'
   m.style.top = (r.bottom + 6) + 'px'
   shareOutside = (e) => { if (shareMenu && !shareMenu.contains(e.target)) closeShareMenu() }
-  setTimeout(() => document.addEventListener('mousedown', shareOutside, true), 0)
+  // pointerdown, not mousedown: iOS sends mouse events only for taps on "clickable" elements, so a tap
+  // on blank space never closed the menu (Safari audit #10).
+  setTimeout(() => document.addEventListener('pointerdown', shareOutside, true), 0)
 }
 
 // The bookmark id already on the current selection's block (a line can hold only one), or null.
@@ -439,7 +441,7 @@ function showEditToolbar(rect, annot) {
   toolbarMode = 'edit'
   positionToolbar(rect)
   editOutside = (e) => { if (toolbar && !toolbar.contains(e.target) && !e.target.closest('mark[data-annot-id]')) hideToolbar() }
-  setTimeout(() => document.addEventListener('mousedown', editOutside, true), 0)
+  setTimeout(() => document.addEventListener('pointerdown', editOutside, true), 0) // pointerdown: see openShareMenu
 }
 
 // Signed out: creating anything needs an account — nudge to sign in (Copy stays free).

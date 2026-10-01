@@ -80,13 +80,15 @@ function userAvatarEl(base) {
   return img
 }
 const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn') && !e.target.closest('.nc-sbtn')) closeAcct() }
-function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('mousedown', acctOutside) }
+function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('pointerdown', acctOutside) }
 
 function placeMenu(anchor, w) {
   const r = anchor.getBoundingClientRect()
   acctMenu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'
   acctMenu.style.top = (r.bottom + 8) + 'px'
-  setTimeout(() => document.addEventListener('mousedown', acctOutside), 0)
+  // pointerdown, not mousedown: iOS sends mouse events only for taps on "clickable" elements, so a tap
+  // on blank space never closed the menu (Safari audit #10).
+  setTimeout(() => document.addEventListener('pointerdown', acctOutside), 0)
 }
 
 // Signed OUT: a short intro popover (Coram-Deo-style) before the OAuth popup, rather than firing

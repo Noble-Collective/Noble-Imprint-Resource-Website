@@ -109,7 +109,7 @@ function refreshOpenMenu() {
 function closeMenu() {
   menuEl?.remove(); menuEl = null
   menuRefreshers = []
-  document.removeEventListener('mousedown', onOutside)
+  document.removeEventListener('pointerdown', onOutside)
   document.removeEventListener('keydown', onEsc)
 }
 
@@ -157,6 +157,8 @@ export function toggleSettingsMenu(anchor) {
   const w = 290
   menuEl.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'
   menuEl.style.top = (r.bottom + 8) + 'px'
-  setTimeout(() => document.addEventListener('mousedown', onOutside), 0)
+  // pointerdown, not mousedown: iOS sends mouse events only for taps on "clickable" elements, so a tap
+  // on blank space never closed the menu (Safari audit #10).
+  setTimeout(() => document.addEventListener('pointerdown', onOutside), 0)
   document.addEventListener('keydown', onEsc)
 }

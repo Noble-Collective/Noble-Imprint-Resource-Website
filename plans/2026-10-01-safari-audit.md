@@ -80,10 +80,10 @@ Options:
 | 6 | 5-day server session lapses while the client sign-in persists → Edit/Admin vanish | Medium (editors, all browsers) | **Fixed** `e1de083` (no automated test) |
 | 7 | Blocked storage (Safari "Block All Cookies") kills the entire audio player | Low (rare setting) | **Fixed** `391d04d` |
 | 8 | Auto-advance `play()` lands outside iOS's ~1 s window | **High (iOS)** | **Fixed** (option A: prefetch in the last 30 s; `tests/safari/auto-advance.spec.js`) |
-| 9 | No Media Session API (lock screen: no artwork, no ⏭/⏮/±15 s) | Medium (iOS) | Proposed |
-| 10 | Outside-tap dismiss uses `mousedown`/`click` on `document` | Low–Med (iOS) | Proposed |
+| 9 | No Media Session API (lock screen: no artwork, no ⏭/⏮/±15 s) | Medium (iOS) | **Fixed** (audio-player v=34; `tests/safari/ios-ux.spec.js`) |
+| 10 | Outside-tap dismiss uses `mousedown`/`click` on `document` | Low–Med (iOS) | **Fixed** (`pointerdown`; reader bundle v=57; `tests/safari/ios-ux.spec.js`) |
 | 11 | Selection toolbar sits where iOS draws its own callout | Low (iOS) | Proposed |
-| 12 | bfcache restore (Safari uses it heavily) | Low | Partly covered by #1; proposed |
+| 12 | bfcache restore (Safari uses it heavily) | Low | **Fixed** (`pageshow` persisted resync; `tests/safari/ios-ux.spec.js`) |
 
 ### 1. Player button out of sync with the element — FIXED
 - **Symptom:** you pause from the lock screen, Control Center or AirPods, or a call interrupts.
@@ -152,7 +152,15 @@ Options:
 - **Fix:** every access goes through a guarded `store` helper. A test fakes a throwing
   `localStorage`. `analytics.js`, `main.js` and the reader bundle were already guarded.
 
-### 9. Media Session API — PROPOSED
+### 9. Media Session API — FIXED
+- **Built (2026-10-01):** `audio-player.js` sets `metadata` (title = the page's h1, album = the
+  breadcrumb's book, artist "Noble Collective", artwork = the book cover via the fab's new
+  `data-artwork`; none on Bible chapters), `playbackState`, `setPositionState` (≤ 1/s on
+  `timeupdate`, forced after seeks/speed), and handlers `play` / `pause` / `seekbackward` /
+  `seekforward` (±15 s, or the OS's `seekOffset`) / `seekto` / `nexttrack` (the same
+  `advanceToNext()` path `ended` uses, so a prefetched next unit starts at once; cleared when there
+  is no next unit). Every call is guarded. Test: a recording `navigator.mediaSession` stub.
+- Original proposal:
 - There are no `navigator.mediaSession` calls today. On the iOS lock screen you see the page title
   and default controls only.
 - **Proposal:**
@@ -162,7 +170,13 @@ Options:
   - Update `setPositionState` on `timeupdate`.
   - This also gives a gesture path to recover a stalled advance (#8, option C).
 
-### 10. Outside-tap dismiss on iOS — PROPOSED
+### 10. Outside-tap dismiss on iOS — FIXED
+- **Built (2026-10-01):** the settings menu, account/sign-in popover, share menu, highlight edit
+  toolbar and the onboarding coach close on `document` `pointerdown` (was `mousedown`/`click`).
+  `main.js`'s popups were left alone: the verse popup closes on its overlay and the mobile TOC's
+  tap-to-toggle is a deliberate `click` behaviour. Test: a pointer-only tap closes the menus. Still
+  worth a real-iPhone check (release checklist).
+- Original notes:
 - These menus close via `document` `mousedown`:
   - Settings (`settings.js:160`), account (`reader-userdata-entry.js:89`), share (`annotations.js:386`)
     and the highlight edit toolbar (`annotations.js:442`).
@@ -180,7 +194,11 @@ Options:
 - **Options:** below the selection on `(pointer:coarse)` (Coram Deo / Kindle style), or a docked
   bottom toolbar on phones.
 
-### 12. bfcache — PROPOSED
+### 12. bfcache — FIXED
+- **Built (2026-10-01):** a `pageshow` (`persisted`) handler resyncs the play/pause icon, the
+  scrubber/time, the lock-screen position and the highlight to the element. The sign-in state needs
+  no handler: Firebase's listener is still live in the restored page.
+- Original notes:
 - Safari restores pages from bfcache with JS state intact and media paused. Fix #1 corrects the
   icon if WebKit fires `pause` on suspend; I couldn't check this (Playwright disables bfcache).
 - **Proposal:** a `pageshow` (`persisted`) handler that calls `showPaused()` when
