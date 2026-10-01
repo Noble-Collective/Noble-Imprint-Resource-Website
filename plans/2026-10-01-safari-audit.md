@@ -222,7 +222,7 @@ Options:
 
 ## Guardrails added (2026-10-01, second pass)
 
-- **Client error beacon:** `src/public/js/error-beacon.js?v=1` (first script in `<head>`) posts uncaught errors and
+- **Client error beacon:** `src/public/js/error-beacon.js?v=2` (first script in `<head>`) posts uncaught errors and
   unhandled rejections to `POST /api/client-error` (`src/server/client-error.js`): one ERROR log line
   `type="client-error"` (the runtime-errors alert sees it), rate-limited, browser/OS from the server's UA parse,
   query strings and token-like path segments cut, never the IP. At most 5 per page, repeats/noise dropped; also kept

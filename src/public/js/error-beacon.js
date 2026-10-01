@@ -12,12 +12,15 @@
   var seen = {};
   var NOISE = /^(?:Uncaught )?(?:Error: )?(Script error\.?|ResizeObserver loop (limit exceeded|completed with undelivered notifications)\.?)$/i;
   var EXT = /(chrome|moz|safari|safari-web|ms-browser)-extension:\/\//i;
+  // Firestore's own transport: Safari reports an aborted WebChannel request as "…/Listen/channel… due to access
+  // control checks"; the SDK reconnects by itself.
+  var FIRESTORE_CHANNEL = /google\.firestore\.v1\.Firestore\/(Listen|Write)\/channel/;
 
   function report(kind, message, stack) {
     try {
       message = String(message || '').slice(0, 500);
       stack = String(stack || '').slice(0, 4000);
-      if (!message || sent >= MAX || NOISE.test(message.trim()) || EXT.test(stack) || EXT.test(message)) return;
+      if (!message || sent >= MAX || NOISE.test(message.trim()) || EXT.test(stack) || EXT.test(message) || FIRESTORE_CHANNEL.test(message)) return;
       var key = kind + '|' + message;
       if (seen[key]) return;
       seen[key] = true;
