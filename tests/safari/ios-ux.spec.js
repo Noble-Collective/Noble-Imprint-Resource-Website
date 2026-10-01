@@ -30,6 +30,9 @@ test.beforeEach(async ({ page }) => {
 
 // A tap on blank page space as iOS delivers it: pointer events only.
 async function blankTap(page) {
+  // The menus arm their outside-tap listener in a setTimeout(0) after the opening click (so that click doesn't close
+  // them). A person taps much later; a test must first let that timer run (it lost the race on a busy CI runner).
+  await page.evaluate(() => new Promise((r) => setTimeout(() => requestAnimationFrame(() => r()), 50)));
   await page.evaluate(() => {
     const t = document.querySelector('.reading-top') || document.body;
     for (const type of ['pointerdown', 'pointerup']) {
