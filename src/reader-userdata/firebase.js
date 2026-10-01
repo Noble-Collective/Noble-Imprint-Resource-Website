@@ -39,7 +39,10 @@ export function initFirebase() {
     } catch (e) { warn('emu', e) }
   }
   setPersistence(_auth, browserLocalPersistence).catch(() => {})
+  let restored = false
   onAuthStateChanged(_auth, (u) => {
+    // The first callback is the sign-in RESTORED from storage (later ones are live sign-in/out).
+    if (!restored) { restored = true; healServerSession(u) }
     _user = u
     _client = u ? createUserDataClient(_db, u.uid) : null
     for (const cb of cbs) { try { cb(u, _client) } catch (e) { warn('user cb', e) } }
@@ -75,6 +78,25 @@ async function bridgeSession(cred) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, profile: { displayName, photoURL } }),
   })
   location.reload()
+}
+
+// The server __session cookie lives 5 days (auth.SESSION_EXPIRES_IN); the Firebase client sign-in
+// lives on in storage. Once the cookie lapses the page renders signed-out server-side (no Edit/Admin,
+// window.__NC_USER null) while the reader still shows the avatar — and nothing re-minted the cookie
+// short of signing out and in again. When the restored client user has no server session, quietly
+// exchange a fresh ID token for one (no reload: the next page has the editor/admin UI back).
+// Same lapse as the Institute's 2026-10 spinner. Once per tab, so a rejecting server can't loop.
+async function healServerSession(u) {
+  try {
+    if (!u || !window.__NC_UNIFIED || window.__NC_USER) return
+    if (sessionStorage.getItem('nc:session-heal')) return
+    sessionStorage.setItem('nc:session-heal', '1')
+    const idToken = await u.getIdToken()
+    await fetch('/api/auth/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, profile: { displayName: u.displayName || null, photoURL: u.photoURL || null } }),
+    })
+  } catch (e) { warn('session heal', e) }
 }
 
 function googleProvider() {

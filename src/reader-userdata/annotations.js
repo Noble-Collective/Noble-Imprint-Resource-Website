@@ -582,7 +582,11 @@ export async function navigateToAnnotation(a) {
 }
 async function shareUrl(url, rect) {
   if (navigator.share) {
-    try { await navigator.share({ title: document.title, url }); return } catch { /* cancelled or unsupported → copy */ }
+    try { await navigator.share({ title: document.title, url }); return } catch (e) {
+      // Cancelled (AbortError) = the user said no — don't copy instead. (On Safari the copy would also
+      // fail: it runs after the share sheet, outside the tap.) Anything else → fall back to copying.
+      if (e && e.name === 'AbortError') return
+    }
   }
   try { await navigator.clipboard.writeText(url); showToast('Link copied', rect) } catch { showToast('Couldn’t copy link', rect) }
 }

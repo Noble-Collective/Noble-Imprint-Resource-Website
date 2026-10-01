@@ -70,6 +70,7 @@ img {
   top: 0;
   z-index: 100;
   background-color: rgba(58, 56, 56, 0.75);
+  -webkit-backdrop-filter: blur(3px); /* Safari < 18 */
   backdrop-filter: blur(3px);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
@@ -4728,6 +4729,7 @@ body.drawer-open {
   font-size: 14px;
   color: #666;
   background: rgba(255,255,255,0.85);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 .page-reload-overlay {
@@ -4742,6 +4744,7 @@ body.drawer-open {
   font-size: 15px;
   color: #555;
   background: rgba(255,255,255,0.8);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 /* Stale card details */
@@ -5500,6 +5503,9 @@ body.drawer-open {
   padding: 2px 4px;
   font-size: 12px;
   cursor: pointer;
+  /* Safari draws <select> natively and ignores the dark background above — light-gray "1x" on a
+     white chip. A dark color-scheme makes the native control dark to match. */
+  color-scheme: dark;
 }
 
 .audio-skip-btn {
@@ -5672,6 +5678,10 @@ h6:hover .heading-audio-icon {
     padding: 4px 8px;
     font-size: 13px;
   }
+}
+/* iOS Safari zooms the page into a focused <select> under 16px (and stays zoomed). */
+@media (hover: none) and (pointer: coarse) {
+  .audio-speed { font-size: 16px; }
 }
 
 /* Pad reading content when player is visible */

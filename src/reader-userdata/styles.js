@@ -257,6 +257,8 @@ mark.nc-note-mark{background:transparent;border-bottom:2px dotted var(--nc-accen
 .nc-search{width:100%;box-sizing:border-box;border:1px solid var(--nc-border);border-radius:8px;padding:.4rem .6rem;
   font:inherit;font-size:.85rem;background:var(--nc-surface);color:var(--nc-text)}
 .nc-search:focus{outline:none;border-color:var(--nc-accent)}
+/* iOS Safari zooms the page into any focused field under 16px (and stays zoomed) — phones get 16px. */
+@media (hover:none) and (pointer:coarse){.nc-answer__ta,.nc-note-pop textarea,.nc-search{font-size:16px}}
 .nc-sheet__head .nc-iconbtn--ok{color:var(--nc-emerald)}
 .nc-panel__group{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--nc-muted);margin:.7rem .25rem .15rem}
 .nc-panel__item--orphan{opacity:.7}

@@ -13,7 +13,8 @@ module.exports = defineConfig({
   workers: 1,
   // ajax-nav-manual is an explicitly manual/--headed spec (its markers rely on
   // headed navigation); run it on its own, not in the automated baseline.
-  testIgnore: ['**/ajax-nav-manual.spec.js'],
+  // tests/safari has its own config (playwright.safari.config.js — WebKit, public pages, no server).
+  testIgnore: ['**/ajax-nav-manual.spec.js', '**/safari/**'],
   globalSetup: require.resolve('./tests/global-setup.js'),
   use: {
     baseURL: 'http://localhost:8080',

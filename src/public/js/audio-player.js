@@ -577,6 +577,11 @@
     audioEl.addEventListener('playing', startSync);
     audioEl.addEventListener('seeked', () => updateHighlight(false));
     audioEl.addEventListener('pause', () => { if (!audioEl.ended && !loopGapTimer) emitAudio('audio_pause'); });
+    // The button follows the element, not just our own taps: iOS pauses/resumes it from the lock
+    // screen, Control Center, AirPods and phone calls. (The A–B loop's 1 s beat pauses on purpose
+    // and the bar stays "playing".)
+    audioEl.addEventListener('pause', () => { if (!loopGapTimer) showPaused(); });
+    audioEl.addEventListener('play', showPlaying);
 
     const saved = localStorage.getItem(getStorageKey());
     if (saved) {
