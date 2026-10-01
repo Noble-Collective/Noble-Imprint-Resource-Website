@@ -69,6 +69,20 @@ test('reader form controls are >= 16px on touch screens (no iOS focus zoom)', as
   for (const k of ['answer', 'note', 'search', 'speed']) expect(sizes[k], k).toBeGreaterThanOrEqual(16);
 });
 
+// With storage blocked (Safari "Block All Cookies", some embedded/private contexts) every
+// localStorage access throws SecurityError — that must not take the whole audio player down.
+test('audio player works when localStorage throws', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked', 'SecurityError'); } });
+  });
+  await page.goto(SESSION);
+  expect(await page.evaluate(() => typeof window.__audioPlayer)).toBe('object');
+  await page.locator('#audio-fab').click();
+  await expect.poll(() => page.evaluate(() => !!window.__audioPlayer.isPlaying()), { timeout: 20000 }).toBe(true);
+  await page.waitForTimeout(1500); // a few timeupdates (each saves the position)
+  expect(await page.evaluate(() => window.__audioPlayer.isPlaying())).toBe(true);
+});
+
 // Safari renders <select> natively and ignores its background-color, so the player's dark speed
 // chip came out white with light-gray "1x" text (unreadable). A dark color-scheme fixes the native
 // control.

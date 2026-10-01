@@ -45,6 +45,13 @@
   const N = window.NCNarration;
 
   function getStorageKey() { return `audio-pos:${getBookPath()}/${getAudioFile()}`; }
+  // localStorage throws (SecurityError) when storage is blocked — Safari "Block All Cookies", some
+  // private/embedded contexts. Resume position + autoplay hand-off are nice-to-haves: never fatal.
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
+    remove(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+  };
 
   function formatTime(s) {
     if (!s || isNaN(s)) return '0:00';
@@ -583,7 +590,7 @@
     audioEl.addEventListener('pause', () => { if (!loopGapTimer) showPaused(); });
     audioEl.addEventListener('play', showPlaying);
 
-    const saved = localStorage.getItem(getStorageKey());
+    const saved = store.get(getStorageKey());
     if (saved) {
       const pos = parseFloat(saved);
       if (pos > 0 && pos < getTotalDuration() - 5) audioEl.currentTime = pos;
@@ -594,7 +601,7 @@
         scrubber.value = (audioEl.currentTime / audioEl.duration) * 1000;
         currentTimeEl.textContent = formatTime(audioEl.currentTime);
       }
-      localStorage.setItem(getStorageKey(), audioEl.currentTime.toFixed(1));
+      store.set(getStorageKey(), audioEl.currentTime.toFixed(1));
       const _now = Date.now();
       if (_now - lastAudioProgress >= 30000) { lastAudioProgress = _now; emitAudio('audio_progress'); }
     });
@@ -608,14 +615,14 @@
       if (loopOn && loopA && repeatLoop()) return;
       emitAudio('audio_ended');
       showPaused();
-      localStorage.removeItem(getStorageKey());
+      store.remove(getStorageKey());
       var currentNextUrl = getNextUrl();
       if (window.__ajaxNav && currentNextUrl) {
         window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
       } else if (currentNextUrl && document.getElementById('bible-audio-data')) {
         swapBibleChapter(currentNextUrl);
       } else if (currentNextUrl) {
-        localStorage.setItem('audio-autoplay', 'true');
+        store.set('audio-autoplay', 'true');
         window.location.href = currentNextUrl;
       }
     });
@@ -636,7 +643,7 @@
     const nextFab = doc && doc.getElementById('audio-fab');
     const reading = document.querySelector('.reading-content');
     if (!nextReading || !nextFab || !reading) {
-      localStorage.setItem('audio-autoplay', 'true');
+      store.set('audio-autoplay', 'true');
       window.location.href = url;
       return;
     }
@@ -735,8 +742,8 @@
   }
 
   // --- Auto-play from previous chapter ---
-  if (localStorage.getItem('audio-autoplay') === 'true') {
-    localStorage.removeItem('audio-autoplay');
+  if (store.get('audio-autoplay') === 'true') {
+    store.remove('audio-autoplay');
     setTimeout(() => togglePlay(), 500);
   }
 
