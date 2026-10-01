@@ -79,7 +79,7 @@ Options:
 | 5 | Cancelling the iOS share sheet shows "Couldn't copy link" | Low | **Fixed** `e1de083` |
 | 6 | 5-day server session lapses while the client sign-in persists → Edit/Admin vanish | Medium (editors, all browsers) | **Fixed** `e1de083` (no automated test) |
 | 7 | Blocked storage (Safari "Block All Cookies") kills the entire audio player | Low (rare setting) | **Fixed** `391d04d` |
-| 8 | Auto-advance `play()` lands outside iOS's ~1 s window | **High (iOS)** | Proposed (above) |
+| 8 | Auto-advance `play()` lands outside iOS's ~1 s window | **High (iOS)** | **Fixed** (option A: prefetch in the last 30 s; `tests/safari/auto-advance.spec.js`) |
 | 9 | No Media Session API (lock screen: no artwork, no ⏭/⏮/±15 s) | Medium (iOS) | Proposed |
 | 10 | Outside-tap dismiss uses `mousedown`/`click` on `document` | Low–Med (iOS) | Proposed |
 | 11 | Selection toolbar sits where iOS draws its own callout | Low (iOS) | Proposed |

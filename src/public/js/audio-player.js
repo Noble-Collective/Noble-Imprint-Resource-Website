@@ -602,6 +602,7 @@
         currentTimeEl.textContent = formatTime(audioEl.currentTime);
       }
       store.set(getStorageKey(), audioEl.currentTime.toFixed(1));
+      maybePrefetchNext();
       const _now = Date.now();
       if (_now - lastAudioProgress >= 30000) { lastAudioProgress = _now; emitAudio('audio_progress'); }
     });
@@ -617,6 +618,21 @@
       showPaused();
       store.remove(getStorageKey());
       var currentNextUrl = getNextUrl();
+      var ready = prefetch && prefetch.url === currentNextUrl ? prefetch.ready : null;
+      prefetch = null;
+      if (ready && (ready.kind === 'bible' || (window.__ajaxNav && !window.__editorView))) {
+        // Start the next track HERE, before any swap or fetch: iOS lets an un-tapped play() start
+        // only within ~1 s of the previous track ending.
+        signedUrl = ready.audioUrl;
+        audioEl.src = ready.audioUrl;
+        var started = audioEl.play();
+        if (ready.kind === 'session') {
+          window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true, prefetched: ready.payload, started: started });
+        } else {
+          swapBibleChapter(currentNextUrl, ready.payload, started);
+        }
+        return;
+      }
       if (window.__ajaxNav && currentNextUrl) {
         window.__ajaxNav.navigateToSession(currentNextUrl, { autoplay: true });
       } else if (currentNextUrl && document.getElementById('bible-audio-data')) {
@@ -633,12 +649,15 @@
   // load + an un-gestured play() on a new element is blocked on phones, so listening stopped at
   // every chapter end; the same element keeps the listener's earlier play gesture.
   let bibleSwapped = false;
-  async function swapBibleChapter(url) {
-    let doc = null;
-    try {
-      const res = await fetch(url);
-      if (res.ok) doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-    } catch { /* fall back below */ }
+  // `prefetchedDoc` + `started`: the chapter came from the prefetch and its audio is already starting.
+  async function swapBibleChapter(url, prefetchedDoc, started) {
+    let doc = prefetchedDoc || null;
+    if (!doc) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      } catch { /* fall back below */ }
+    }
     const nextReading = doc && doc.querySelector('.reading-content');
     const nextFab = doc && doc.getElementById('audio-fab');
     const reading = document.querySelector('.reading-content');
@@ -685,7 +704,46 @@
       durationFormatted: formatTime(parseFloat(nextFab.dataset.duration) || 0),
     });
     window.__audioPlayer.rebuildHighlightContainer();
-    window.__audioPlayer.playNextChapter();
+    window.__audioPlayer.playNextChapter(started);
+  }
+
+  // --- Auto-advance prefetch (iOS) ---
+  // WebKit on iOS lets an un-tapped play() start only within ~1 s of the previous track ending. The
+  // `ended` path fetched the next unit (session data / chapter HTML) and its signed audio URL before
+  // play() — 2–3 round-trips that a phone on cellular often can't finish in a second, so listening
+  // stopped at "Tap to continue" (or in silence, locked). In the last 30 s we fetch both ahead, and
+  // `ended` starts the next track at once (plans/2026-10-01-safari-audit.md #8). No prefetch, or a
+  // failed one → the old path.
+  let prefetch = null; // { url, ready: null | { kind: 'session'|'bible', payload, audioUrl } }
+  function maybePrefetchNext() {
+    const url = getNextUrl();
+    if (!url || (prefetch && prefetch.url === url)) return;
+    if (!isFinite(audioEl.duration) || audioEl.duration - audioEl.currentTime > 30) return;
+    const p = { url, ready: null };
+    prefetch = p;
+    (async () => {
+      let kind, payload, bookPath, audioFile;
+      if (document.getElementById('bible-audio-data')) {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        payload = new DOMParser().parseFromString(await res.text(), 'text/html');
+        const nextFab = payload.getElementById('audio-fab');
+        if (!nextFab || !payload.querySelector('.reading-content')) return;
+        kind = 'bible'; bookPath = nextFab.dataset.bookPath; audioFile = nextFab.dataset.audioFile;
+      } else if (window.__ajaxNav) {
+        const res = await fetch('/api/session-data' + url);
+        if (!res.ok) return;
+        payload = await res.json();
+        if (payload.error || !payload.audioSession) return;
+        kind = 'session'; bookPath = payload.bookPath; audioFile = payload.audioSession.audioFile;
+      } else {
+        return;
+      }
+      const ures = await fetch(`/api/audio/url/${bookPath}/${audioFile}`);
+      if (!ures.ok) return;
+      const audioUrl = (await ures.json()).url;
+      if (prefetch === p && audioUrl) p.ready = { kind, payload, audioUrl };
+    })().catch(() => { /* the old path takes over at the end */ });
   }
   // Back/forward after an in-place swap: load the page the URL names.
   window.addEventListener('popstate', function () { if (bibleSwapped) location.reload(); });
@@ -816,10 +874,11 @@
       if (opts.durationFormatted != null) durationEl.textContent = opts.durationFormatted;
     },
 
-    /** Fetch new signed URL, change src, and play. Shows banner on NotAllowedError. */
-    playNextChapter: async function () {
+    /** Fetch new signed URL, change src, and play. Shows banner on NotAllowedError.
+     *  `started`: the prefetched track's play() promise — `ended` already set src and started it. */
+    playNextChapter: async function (started) {
       // Clear old state
-      signedUrl = null;
+      if (!started) signedUrl = null;
       resetSync();
       userScrolledAway = false;
       clearHighlight();
@@ -833,18 +892,20 @@
       window.__audioPlayer.loadNewTimestamps();
 
       try {
-        // Fetch new signed audio URL (getters read from updated FAB data attributes)
-        var res = await fetch('/api/audio/url/' + getBookPath() + '/' + getAudioFile());
-        if (!res.ok) throw new Error('Failed to get audio URL');
-        signedUrl = (await res.json()).url;
+        if (!started) {
+          // Fetch new signed audio URL (getters read from updated FAB data attributes)
+          var res = await fetch('/api/audio/url/' + getBookPath() + '/' + getAudioFile());
+          if (!res.ok) throw new Error('Failed to get audio URL');
+          signedUrl = (await res.json()).url;
 
-        // Set new source and play
-        audioEl.src = signedUrl;
-        audioEl.currentTime = 0;
+          // Set new source and play
+          audioEl.src = signedUrl;
+          audioEl.currentTime = 0;
+        }
         scrubber.value = 0;
         currentTimeEl.textContent = '0:00';
 
-        await audioEl.play();
+        await (started || audioEl.play());
         showPlaying();
       } catch (err) {
         if (err.name === 'NotAllowedError') {

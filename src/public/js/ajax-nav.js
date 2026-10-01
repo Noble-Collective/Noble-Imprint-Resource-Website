@@ -153,12 +153,16 @@
         return;
       }
 
-      // Fetch session data
-      var apiUrl = toApiUrl(url);
-      var res = await fetch(apiUrl, { signal: currentAbortController.signal });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var data = await res.json();
-      if (data.error) throw new Error(data.error);
+      // Session data: the audio player's prefetch (an auto-advance whose next track is already
+      // starting), else fetch it now.
+      var data = options.prefetched;
+      if (!data) {
+        var apiUrl = toApiUrl(url);
+        var res = await fetch(apiUrl, { signal: currentAbortController.signal });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        data = await res.json();
+        if (data.error) throw new Error(data.error);
+      }
 
       // Swap DOM
       swapContent(data);
@@ -205,7 +209,7 @@
             nextUrl: data.nextSessionUrl || '',
             durationFormatted: data.audioDurationFormatted || '',
           });
-          window.__audioPlayer.playNextChapter();
+          window.__audioPlayer.playNextChapter(options.started);
         }
       }
 
