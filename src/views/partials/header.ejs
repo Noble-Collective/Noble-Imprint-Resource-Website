@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %> | Noble Collective Resources</title>
+  <!-- First, so it catches errors from everything after it (Safari-only crashes reach the server log). -->
+  <script src="/static/js/error-beacon.js?v=1"></script>
   <!-- Open connections to the font/icon CDNs early so their stylesheets and font
        files start downloading sooner (shaves first-paint latency). -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

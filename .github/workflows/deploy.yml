@@ -28,6 +28,8 @@ jobs:
         run: npm ci
       - name: Unit tests
         run: npm run test:unit
+      - name: Browser-compatibility lint (Safari/iOS 16.4+)
+        run: npm run lint:compat
       - name: Verify committed editor bundle is up to date
         run: |
           npm run build:editor

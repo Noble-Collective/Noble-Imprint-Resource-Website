@@ -523,6 +523,9 @@ const analytics = require('./analytics');
 const contentRegistry = require('./content-registry');
 app.post('/api/analytics/collect', analytics.collect);
 
+// --- Client error beacon (src/public/js/error-beacon.js) ---
+app.post('/api/client-error', require('./client-error').handler);
+
 // Homepage
 app.get('/', async (req, res, next) => {
   try {

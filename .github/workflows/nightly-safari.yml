@@ -1,0 +1,58 @@
+name: Nightly Safari (WebKit)
+
+# tests/safari in Safari's engine every night: iPhone WebKit, desktop WebKit and a Chromium Android baseline
+# (Collective-Shared plans/2026-10-01-safari-quality.md, Layer 1). The suite loads PUBLIC production pages read-only
+# with the working-tree client assets routed in (playwright.safari.config.js), one page at a time (--workers=1).
+# A failure opens (or comments on) one "nightly-safari" issue. No deploy, no content writes.
+
+on:
+  schedule:
+    - cron: "37 8 * * *" # 08:37 UTC daily, after the 07:10 cache refresh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-safari
+  cancel-in-progress: false
+
+jobs:
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright's WebKit + Chromium
+        run: npx playwright install --with-deps webkit chromium
+      - name: tests/safari (prod pages, local assets)
+        run: npx playwright test -c playwright.safari.config.js --workers=1 --retries=0
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-safari
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+      - name: Open or update the tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create nightly-safari --color d93f0b --description "Nightly Safari/WebKit run failed" 2>/dev/null || true
+          n=$(gh issue list --label nightly-safari --state open --json number -q '.[0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --label nightly-safari --title "Nightly Safari (WebKit) run failed" \
+              --body "tests/safari failed in the nightly run: $RUN_URL (the report is the run's artifact). Close this once it's green again."
+          fi

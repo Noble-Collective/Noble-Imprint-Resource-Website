@@ -220,6 +220,21 @@ Options:
   apply.
 - `hyphens` already has `-webkit-hyphens`, and `<html lang="en">` is set.
 
+## Guardrails added (2026-10-01, second pass)
+
+- **Client error beacon:** `src/public/js/error-beacon.js?v=1` (first script in `<head>`) posts uncaught errors and
+  unhandled rejections to `POST /api/client-error` (`src/server/client-error.js`): one ERROR log line
+  `type="client-error"` (the runtime-errors alert sees it), rate-limited, browser/OS from the server's UA parse,
+  query strings and token-like path segments cut, never the IP. At most 5 per page, repeats/noise dropped; also kept
+  in `window.__ncErrors` for the real-Safari crawl. Tests: `tests/unit/client-error.test.js`,
+  `tests/safari/error-beacon.spec.js`.
+- **Nightly WebKit:** `.github/workflows/nightly-safari.yml` runs tests/safari (iPhone + desktop WebKit + Chromium
+  Android) at 08:37 UTC, one worker, read-only; a failure opens/comments a `nightly-safari` issue.
+- **Real Safari:** Collective-Shared's `nightly-real-safari.yml` crawls the home, a session and John 3 here (with the
+  other two sites) in real Safari on a macOS runner, throttled.
+- **Compat lint:** ESLint + `eslint-plugin-compat` over the browser code only (`npm run lint:compat`, in the CI
+  check gate), against the shared browserslist (Safari/iOS 16.4+, last 2 Chrome/Firefox/Edge). Clean today.
+
 ## Ongoing Safari testing
 
 - `npx playwright test -c playwright.safari.config.js`
