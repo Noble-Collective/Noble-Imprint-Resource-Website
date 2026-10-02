@@ -1,80 +1,57 @@
 // Citation-anchored quotation audit.
 //
-// The site turns parenthetical verse references in book content into clickable
-// links (see renderMarkdown in src/renderer/parser.js). This module reuses the
-// SAME citation grammar to walk those references, and — for any citation that
-// points at a verse whose text changed upstream — pulls the quoted passage
-// beside the citation and diffs it against the verse. This finds stale
+// The site turns verse references in book content into clickable links (see
+// renderMarkdown in src/renderer/parser.js). Both find them with the shared
+// scripture parser (src/vendor/scripture.cjs; Collective-Shared ARCHITECTURE §9c),
+// so this module walks exactly the references the reader links, and — for any
+// citation that points at a verse whose text changed upstream — pulls the quoted
+// passage beside the citation and diffs it against the verse. This finds stale
 // quotations in a targeted way (we know which verse is quoted) rather than by
 // blind full-text search.
-//
-// The BIBLE_BOOKS list and the ref patterns below are COPIED from
-// src/renderer/parser.js and must be kept in sync with it (same convention as
-// usfm-audio.js ↔ the audiobook converter). If parser.js changes its citation
-// grammar, mirror it here.
 
 const { normalizeVerse, computeChangeAnchor } = require('./bible-validation');
+const scripture = require('../vendor/scripture.cjs');
 
-// --- COPIED FROM parser.js (keep in sync) ---
-const BIBLE_BOOKS = [
-  'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
-  'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
-  '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles',
-  'Ezra', 'Nehemiah', 'Esther', 'Job', 'Psalm', 'Psalms', 'Proverbs',
-  'Ecclesiastes', 'Song of Solomon', 'Isaiah', 'Jeremiah',
-  'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos',
-  'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah',
-  'Haggai', 'Zechariah', 'Malachi',
-  'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans',
-  '1 Corinthians', '2 Corinthians', 'Galatians', 'Ephesians',
-  'Philippians', 'Colossians', '1 Thessalonians', '2 Thessalonians',
-  '1 Timothy', '2 Timothy', 'Titus', 'Philemon', 'Hebrews',
-  'James', '1 Peter', '2 Peter', '1 John', '2 John', '3 John',
-  'Jude', 'Revelation',
-];
-const bookNamePat = BIBLE_BOOKS.slice().sort((a, b) => b.length - a.length)
-  .map(b => b.replace(/\s/g, '\\s')).join('|');
-const verseSpecPat = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
-// A fresh RegExp per call (global → stateful lastIndex).
-function fullRefRe() { return new RegExp(`(${bookNamePat})\\s(${verseSpecPat})`, 'g'); }
-// --- END COPIED ---
+// The book names the shared parser links (exported for callers that list them).
+const BIBLE_BOOKS = scripture.BOOKS;
 
-// All full "Book Ch:V" citations in the text: [{ book, spec, refString, index }].
+// Chapter lengths that admit every verse a chapter could have (Psalm 119 has 176): coverage and
+// expansion only need a reference's shape — whether a verse exists is the caller's hasRef.
+const anyLengthsCache = new Map();
+function anyLengths(book) {
+  const n = scripture.CHAPTER_COUNTS[book];
+  if (!n) return null;
+  if (!anyLengthsCache.has(book)) anyLengthsCache.set(book, new Map(Array.from({ length: n }, (_, i) => [i + 1, 176])));
+  return anyLengthsCache.get(book);
+}
+
+// "Book spec" → the verses it names, [{ book, chapter, verse }] (book as the BSB spells it).
+function citationVerses(refString) {
+  const m = String(refString).replace(/\u00a0/g, ' ').match(/^(.+?)\s+(\d.*)$/);
+  const book = m && scripture.canonicalBook(m[1]);
+  if (!book) return [];
+  const p = scripture.resolvePassage(book, m[2], anyLengths);
+  return p.verses.map(v => ({ book: p.book, chapter: v.chapter, verse: v.verse }));
+}
+
+// All named citations with a verse ("Book C:V", "Jude 3") in the text:
+// [{ book, spec, refString, index }]. refString is the reference as written; chapter-only
+// references ("Psalm 23") aren't quotations of a verse, so they're left out.
 function detectFullCitations(text) {
   const out = [];
-  const re = fullRefRe();
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    out.push({ book: m[1], spec: m[2], refString: `${m[1]} ${m[2]}`, index: m.index });
+  for (const r of scripture.findReferences(text)) {
+    if (r.implied || r.continuation) continue;
+    if (!r.spec.includes(':') && !scripture.ONE_CHAPTER_BOOKS.has(r.book)) continue;
+    out.push({ book: r.book, spec: r.spec, refString: r.text.replace(/\u00a0/g, ' '), index: r.start });
   }
   return out;
 }
 
 // Does a citation ("Book C:spec") cover a single target ref ("Book C:V")?
-// Handles single verses, comma lists, same-chapter ranges, and cross-chapter
-// ranges (start chapter..end chapter). Shorthand/complex specs default to false.
 function citationCoversRef(refString, targetRef) {
-  const cm = refString.match(/^(.+?)\s+(\d+):(.+)$/);
-  const tm = targetRef.match(/^(.+?)\s+(\d+):(\d+)$/);
-  if (!cm || !tm) return false;
-  if (cm[1] !== tm[1]) return false; // different book
-  const ch = parseInt(cm[2], 10);
-  const tCh = parseInt(tm[2], 10);
-  const tV = parseInt(tm[3], 10);
-  for (const seg of cm[3].split(/,\s?/)) {
-    let mm;
-    if ((mm = seg.match(/^(\d+)[–-](\d+):(\d+)$/))) { // cross-chapter range
-      const sv = +mm[1], eCh = +mm[2], eV = +mm[3];
-      if (tCh === ch && tV >= sv) return true;
-      if (tCh > ch && tCh < eCh) return true;
-      if (tCh === eCh && tV <= eV) return true;
-    } else if ((mm = seg.match(/^(\d+)[–-](\d+)$/))) { // same-chapter range
-      if (tCh === ch && tV >= +mm[1] && tV <= +mm[2]) return true;
-    } else if ((mm = seg.match(/^(\d+)$/))) {         // single verse
-      if (tCh === ch && tV === +mm[1]) return true;
-    }
-  }
-  return false;
+  const t = citationVerses(targetRef);
+  if (t.length !== 1) return false;
+  return citationVerses(refString).some(v => v.book === t[0].book && v.chapter === t[0].chapter && v.verse === t[0].verse);
 }
 
 // Extract the quoted passage associated with a citation at `index`.
@@ -154,28 +131,10 @@ function classifyQuote(quote, oldRaw, newRaw) {
   return { status: 'divergent' };
 }
 
-// Expand a citation ("Book C:spec") into the individual verse refs it covers,
-// using hasRef(ref) to probe verse existence for ranges/cross-chapter spans.
-// Returns [] for shorthand/unparseable specs.
+// Expand a citation ("Book C:spec") into the individual verse refs it covers
+// ("Book C:V", the BSB's spelling), keeping those hasRef(ref) says exist.
 function expandCitationRefs(refString, hasRef) {
-  const m = refString.match(/^(.+?)\s+(\d+):(.+)$/);
-  if (!m) return [];
-  const book = m[1], ch = parseInt(m[2], 10);
-  const refs = [];
-  for (const seg of m[3].split(/,\s?/)) {
-    let mm;
-    if ((mm = seg.match(/^(\d+)[–-](\d+):(\d+)$/))) {           // cross-chapter
-      const sv = +mm[1], eCh = +mm[2], eV = +mm[3];
-      for (let v = sv; ; v++) { const r = `${book} ${ch}:${v}`; if (hasRef(r)) refs.push(r); else break; }
-      for (let c = ch + 1; c < eCh; c++) for (let v = 1; ; v++) { const r = `${book} ${c}:${v}`; if (hasRef(r)) refs.push(r); else break; }
-      for (let v = 1; v <= eV; v++) { const r = `${book} ${eCh}:${v}`; if (hasRef(r)) refs.push(r); }
-    } else if ((mm = seg.match(/^(\d+)[–-](\d+)$/))) {          // same-chapter range
-      for (let v = +mm[1]; v <= +mm[2]; v++) { const r = `${book} ${ch}:${v}`; if (hasRef(r)) refs.push(r); }
-    } else if ((mm = seg.match(/^(\d+)$/))) {                   // single verse
-      const r = `${book} ${ch}:${mm[1]}`; if (hasRef(r)) refs.push(r);
-    }
-  }
-  return refs;
+  return citationVerses(refString).map(v => `${v.book} ${v.chapter}:${v.verse}`).filter(hasRef);
 }
 
 // Length of the longest common subsequence of two word arrays.

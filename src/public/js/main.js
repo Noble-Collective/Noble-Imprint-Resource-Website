@@ -198,7 +198,8 @@
       var refText = ref.getAttribute('data-ref');
       var translation = ncPreferredTranslation();
 
-      titleEl.textContent = refText;
+      // The title attribute is the reference as written, with its book ('Genesis 1–50').
+      titleEl.textContent = ref.getAttribute('title') || refText;
       bodyEl.innerHTML = '<div class="verse-popup-loading">Loading...</div>';
       translationEl.textContent = '';
       linkEl.href = '#';
@@ -207,7 +208,8 @@
       // Normalize en-dash to hyphen for API
       var apiRef = refText.replace(/\u2013/g, '-');
 
-      fetch('/api/verses?ref=' + encodeURIComponent(apiRef) + '&translation=' + translation)
+      // At most 3 chapters; a longer passage says where it continues (Steve, 2026-10-02).
+      fetch('/api/verses?ref=' + encodeURIComponent(apiRef) + '&translation=' + translation + '&maxChapters=3')
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (data.error || !data.verses || data.verses.length === 0) {
@@ -248,6 +250,11 @@
             html += '<sup class="verse-num">' + v.verse + '</sup> ' + v.text + ' ';
           });
           if (inParagraph) html += '</p>';
+          var cont = data.continuesThrough;
+          if (cont) {
+            html += '<p class="verse-popup-continues">… continues through ' + cont.book + ' ' + cont.chapter +
+              ' — <a href="#" data-verse-continues>Read in context ›</a></p>';
+          }
           bodyEl.innerHTML = html;
           translationEl.textContent = ncTranslationTitle(translation);
 
@@ -256,6 +263,8 @@
           var match = firstRef.match(/^(.+?)\s+(\d+):/);
           if (match) {
             linkEl.href = '/bible/' + translation + '/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + data.verses[0].verse;
+            var contLink = bodyEl.querySelector('[data-verse-continues]');
+            if (contLink) contLink.href = linkEl.href;
           }
         })
         .catch(function () {

@@ -1,0 +1,2281 @@
+{
+  "about": "The specification of @noble-collective/userdata/scripture (ARCHITECTURE §9c). Hand-reviewed: every case states what a reader should get. The TypeScript module and the mobile app's Dart copy must both pass it exactly. chapterLengths = the BSB (Noble-Imprint-Resources bibles/bsb/references.json), verses per chapter, chapter 1 first. find: refs omit \"implied\"/\"continuation\" when false; \"context\" (when given) is the whole text the bare-group book is read from, and \"text\" sits inside it. resolve: \"passage\" = formatPassage of the verses, \"problems\" defaults to [].",
+  "canonicalBook": [
+    ["Genesis", "Genesis"],
+    ["Gen", "Genesis"],
+    ["gen.", "Genesis"],
+    ["1 Sam", "1 Samuel"],
+    ["1Sam", "1 Samuel"],
+    ["I Samuel", "1 Samuel"],
+    ["First Samuel", "1 Samuel"],
+    ["2nd Kings", "2 Kings"],
+    ["II Kings", "2 Kings"],
+    ["III John", "3 John"],
+    ["3 jn", "3 John"],
+    ["Psalms", "Psalm"],
+    ["psalm", "Psalm"],
+    ["Ps", "Psalm"],
+    ["Song of Songs", "Song of Solomon"],
+    ["Canticles", "Song of Solomon"],
+    ["song of solomon", "Song of Solomon"],
+    ["jn", "John"],
+    ["John", "John"],
+    ["1 jn", "1 John"],
+    ["Rev", "Revelation"],
+    ["Revelations", "Revelation"],
+    ["Phil", "Philippians"],
+    ["Phlm", "Philemon"],
+    ["Eph.", "Ephesians"],
+    ["Jude", "Jude"],
+    ["Mark", "Mark"],
+    ["Job", "Job"],
+    ["Isaiah", "Isaiah"],
+    ["is", "Isaiah"],
+    ["  Romans  ", "Romans"],
+    ["Actes", "Acts"],
+    ["Ésaïe", "Isaiah"],
+    ["Isaïe", "Isaiah"],
+    ["Psaumes", "Psalm"],
+    ["1 Jean", "1 John"],
+    ["Apocalypse", "Revelation"],
+    ["Cantique des cantiques", "Song of Solomon"],
+    ["Hezekiah", null],
+    ["", null],
+    ["Book", null]
+  ],
+  "find": [
+    {
+      "name": "chapter ranges are references (Steve, 2026-10-02: \"Genesis 1–50\" opened Genesis 50)",
+      "text": "Read Genesis 1–50 and Job 1–42 this week.",
+      "refs": [
+        {
+          "text": "Genesis 1–50",
+          "book": "Genesis",
+          "spec": "1-50"
+        },
+        {
+          "text": "Job 1–42",
+          "book": "Job",
+          "spec": "1-42"
+        }
+      ]
+    },
+    {
+      "name": "chapter-only references link; a chapter past the book's last does not",
+      "text": "Pray Psalm 23 and study Romans 9–11, not John 1990.",
+      "refs": [
+        {
+          "text": "Psalm 23",
+          "book": "Psalm",
+          "spec": "23"
+        },
+        {
+          "text": "Romans 9–11",
+          "book": "Romans",
+          "spec": "9-11"
+        }
+      ]
+    },
+    {
+      "name": "one-chapter books are cited by verse",
+      "text": "See Jude 3, Philemon 6 and 3 John 1–15.",
+      "refs": [
+        {
+          "text": "Jude 3",
+          "book": "Jude",
+          "spec": "3"
+        },
+        {
+          "text": "Philemon 6",
+          "book": "Philemon",
+          "spec": "6"
+        },
+        {
+          "text": "3 John 1–15",
+          "book": "3 John",
+          "spec": "1-15"
+        }
+      ]
+    },
+    {
+      "name": "a \";\"-continuation belongs to the named book, not the section's (\"Exodus 20:5; 23:25\" was tagged Genesis)",
+      "text": "Biblical Narrative (Genesis 1:1–2:3) God is jealous (Exodus 20:5; 23:25) and Psalms 77:15; 78:67.",
+      "refs": [
+        {
+          "text": "Genesis 1:1–2:3",
+          "book": "Genesis",
+          "spec": "1:1-2:3"
+        },
+        {
+          "text": "Exodus 20:5",
+          "book": "Exodus",
+          "spec": "20:5"
+        },
+        {
+          "text": "23:25",
+          "book": "Exodus",
+          "spec": "23:25",
+          "continuation": true
+        },
+        {
+          "text": "Psalms 77:15",
+          "book": "Psalm",
+          "spec": "77:15"
+        },
+        {
+          "text": "78:67",
+          "book": "Psalm",
+          "spec": "78:67",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "a cf. continuation",
+      "text": "Job 1:6–12; cf. 2:1–6.",
+      "refs": [
+        {
+          "text": "Job 1:6–12",
+          "book": "Job",
+          "spec": "1:6-12"
+        },
+        {
+          "text": "2:1–6",
+          "book": "Job",
+          "spec": "2:1-6",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "\", 19:6\" after \"7:9\" is a new chapter, not the verse \", 19\" (was cut to \"7:9, 19\")",
+      "text": "Revelation 7:9, 19:6 speaks of a multitude.",
+      "refs": [
+        {
+          "text": "Revelation 7:9, 19:6",
+          "book": "Revelation",
+          "spec": "7:9,19:6"
+        }
+      ]
+    },
+    {
+      "name": "a comma before another book ends the list",
+      "text": "Psalm 23, 1 Corinthians 13:4–7, Romans 8:28, 30 and more.",
+      "refs": [
+        {
+          "text": "Psalm 23",
+          "book": "Psalm",
+          "spec": "23"
+        },
+        {
+          "text": "1 Corinthians 13:4–7",
+          "book": "1 Corinthians",
+          "spec": "13:4-7"
+        },
+        {
+          "text": "Romans 8:28, 30",
+          "book": "Romans",
+          "spec": "8:28,30"
+        }
+      ]
+    },
+    {
+      "name": "clock times are never references",
+      "context": "Biblical Narrative (Mark 15:1–47) Jesus suffered (9:00 am to 3:00 pm) and (3:30 pm).",
+      "text": "Biblical Narrative (Mark 15:1–47) Jesus suffered (9:00 am to 3:00 pm) and (3:30 pm).",
+      "refs": [
+        {
+          "text": "Mark 15:1–47",
+          "book": "Mark",
+          "spec": "15:1-47"
+        }
+      ]
+    },
+    {
+      "name": "a verse written 00/05 is a clock time even without am/pm",
+      "text": "Biblical Narrative (Mark 15:1–47) at noon (12:00) and (6:05).",
+      "refs": [
+        {
+          "text": "Mark 15:1–47",
+          "book": "Mark",
+          "spec": "15:1-47"
+        }
+      ]
+    },
+    {
+      "name": "abbreviations link only with chapter:verse",
+      "text": "Compare Eph. 6:4 and Gen 1:1, but not Col 3.",
+      "refs": [
+        {
+          "text": "Eph. 6:4",
+          "book": "Ephesians",
+          "spec": "6:4"
+        },
+        {
+          "text": "Gen 1:1",
+          "book": "Genesis",
+          "spec": "1:1"
+        }
+      ]
+    },
+    {
+      "name": "Song of Songs is Song of Solomon; 1 John is not John",
+      "text": "Song of Songs 2:1 and 1 John 2:3, not Johnson 3:16.",
+      "refs": [
+        {
+          "text": "Song of Songs 2:1",
+          "book": "Song of Solomon",
+          "spec": "2:1"
+        },
+        {
+          "text": "1 John 2:3",
+          "book": "1 John",
+          "spec": "2:3"
+        }
+      ]
+    },
+    {
+      "name": "an italic book title is still a reference",
+      "text": "Mathews, _Genesis 11:27–50:26_, NAC.",
+      "refs": [
+        {
+          "text": "Genesis 11:27–50:26",
+          "book": "Genesis",
+          "spec": "11:27-50:26"
+        }
+      ]
+    },
+    {
+      "name": "nothing inside a markup tag",
+      "text": "<Callout ref=\"John 3:16\">Love</Callout>\n\n<< Proverbs 17:17",
+      "refs": [
+        {
+          "text": "Proverbs 17:17",
+          "book": "Proverbs",
+          "spec": "17:17"
+        }
+      ]
+    },
+    {
+      "name": "a non-breaking space between book and chapter",
+      "text": "Romans 8:28 is a promise.",
+      "refs": [
+        {
+          "text": "Romans 8:28",
+          "book": "Romans",
+          "spec": "8:28"
+        }
+      ]
+    },
+    {
+      "name": "a part-verse letter stays in the spec",
+      "text": "John 3:16a.",
+      "refs": [
+        {
+          "text": "John 3:16a",
+          "book": "John",
+          "spec": "3:16a"
+        }
+      ]
+    },
+    {
+      "name": "a trailing \";\" is not a continuation (it crashed the app's pop-up)",
+      "text": "Isaiah 52:13–53:12; and more.",
+      "refs": [
+        {
+          "text": "Isaiah 52:13–53:12",
+          "book": "Isaiah",
+          "spec": "52:13-53:12"
+        }
+      ]
+    },
+    {
+      "name": "a space after the dash",
+      "text": "Conflicts (Romans 14:1– 15:7).",
+      "refs": [
+        {
+          "text": "Romans 14:1– 15:7",
+          "book": "Romans",
+          "spec": "14:1-15:7"
+        }
+      ]
+    },
+    {
+      "name": "bare groups take the last named book when there are no sections",
+      "text": "In Romans 8:28 Paul says more (8:29; cf. 8:30).",
+      "refs": [
+        {
+          "text": "Romans 8:28",
+          "book": "Romans",
+          "spec": "8:28"
+        },
+        {
+          "text": "8:29",
+          "book": "Romans",
+          "spec": "8:29",
+          "implied": true
+        },
+        {
+          "text": "8:30",
+          "book": "Romans",
+          "spec": "8:30",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "a cf. or \";\"-joined named reference doesn't change the book",
+      "text": "John 3:16 (cf. Psalm 23:1) and Acts 2:1; Joel 2:28, then (3:17).",
+      "refs": [
+        {
+          "text": "John 3:16",
+          "book": "John",
+          "spec": "3:16"
+        },
+        {
+          "text": "Psalm 23:1",
+          "book": "Psalm",
+          "spec": "23:1"
+        },
+        {
+          "text": "Acts 2:1",
+          "book": "Acts",
+          "spec": "2:1"
+        },
+        {
+          "text": "Joel 2:28",
+          "book": "Joel",
+          "spec": "2:28"
+        },
+        {
+          "text": "3:17",
+          "book": "Acts",
+          "spec": "3:17",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "section declarations win over named references; before the first, the first declaration's book (Steve 2026-10-02)",
+      "text": "Intro (1:1). Biblical Narrative (Daniel 2:1–49) He fell down (2:46–47) as Romans 5:1 says (5:2).",
+      "refs": [
+        { "text": "1:1", "book": "Daniel", "spec": "1:1", "implied": true },
+        {
+          "text": "Daniel 2:1–49",
+          "book": "Daniel",
+          "spec": "2:1-49"
+        },
+        {
+          "text": "2:46–47",
+          "book": "Daniel",
+          "spec": "2:46-47",
+          "implied": true
+        },
+        {
+          "text": "Romans 5:1",
+          "book": "Romans",
+          "spec": "5:1"
+        },
+        {
+          "text": "5:2",
+          "book": "Daniel",
+          "spec": "5:2",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "a chapter-only section declaration (The Sacred Script)",
+      "text": "_Biblical Narrative (Genesis 12-23)_. Abram obeyed (12:1-9). _Biblical Narrative (Job 1-42)_. Job answered (23:1-17).",
+      "refs": [
+        {
+          "text": "Genesis 12-23",
+          "book": "Genesis",
+          "spec": "12-23"
+        },
+        {
+          "text": "12:1-9",
+          "book": "Genesis",
+          "spec": "12:1-9",
+          "implied": true
+        },
+        {
+          "text": "Job 1-42",
+          "book": "Job",
+          "spec": "1-42"
+        },
+        {
+          "text": "23:1-17",
+          "book": "Job",
+          "spec": "23:1-17",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "bare and named parts in one parenthesis",
+      "context": "Biblical Narrative (Acts 2:22–47) Prophesied (2:25–28, 31; cf. Psalm 16:8–11) and witnessed (2:32).",
+      "text": "Prophesied (2:25–28, 31; cf. Psalm 16:8–11) and witnessed (2:32).",
+      "refs": [
+        {
+          "text": "2:25–28, 31",
+          "book": "Acts",
+          "spec": "2:25-28,31",
+          "implied": true
+        },
+        {
+          "text": "Psalm 16:8–11",
+          "book": "Psalm",
+          "spec": "16:8-11"
+        },
+        {
+          "text": "2:32",
+          "book": "Acts",
+          "spec": "2:32",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "a new chapter after a comma inside a bare group",
+      "context": "Biblical Narrative (Revelation 19:1–5) A great multitude (19:1; cf. 7:9, 19:6).",
+      "text": "A great multitude (19:1; cf. 7:9, 19:6).",
+      "refs": [
+        {
+          "text": "19:1",
+          "book": "Revelation",
+          "spec": "19:1",
+          "implied": true
+        },
+        {
+          "text": "7:9, 19:6",
+          "book": "Revelation",
+          "spec": "7:9,19:6",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "cf. and cp. written without \";\"",
+      "context": "Biblical Narrative (Ruth 1:1–22) Your God (1:16 cf. 1:15), wings (2:12; cp. 3:9), mercy (4:27, cf. 4:37).",
+      "text": "Your God (1:16 cf. 1:15), wings (2:12; cp. 3:9), mercy (4:27, cf. 4:37).",
+      "refs": [
+        {
+          "text": "1:16 cf. 1:15",
+          "book": "Ruth",
+          "spec": "1:16,1:15",
+          "implied": true
+        },
+        {
+          "text": "2:12",
+          "book": "Ruth",
+          "spec": "2:12",
+          "implied": true
+        },
+        {
+          "text": "3:9",
+          "book": "Ruth",
+          "spec": "3:9",
+          "implied": true
+        },
+        {
+          "text": "4:27, cf. 4:37",
+          "book": "Ruth",
+          "spec": "4:27,4:37",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "a backwards range is still found (resolvePassage reports it)",
+      "context": "Biblical Narrative (1 Samuel 20:1–42) Generations (20:41–2).",
+      "text": "Generations (20:41–2).",
+      "refs": [
+        {
+          "text": "20:41–2",
+          "book": "1 Samuel",
+          "spec": "20:41-2",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "the section heading itself is a reference",
+      "text": "###### Biblical Narrative (John 13:31–30)",
+      "refs": [
+        {
+          "text": "John 13:31–30",
+          "book": "John",
+          "spec": "13:31-30"
+        }
+      ]
+    },
+    {
+      "name": "Steve 2026-10-02: bare chapter:verse links anywhere a book is in effect: in prose, \"(Focus on …)\", [brackets], and parentheses with words",
+      "text": "Biblical Narrative (Esther 1:1–22) As 1:12 says (Focus on 1:10–12) [1:19] (see 1:20) (1:21).",
+      "refs": [
+        { "text": "Esther 1:1–22", "book": "Esther", "spec": "1:1-22" },
+        { "text": "1:12", "book": "Esther", "spec": "1:12", "implied": true },
+        { "text": "1:10–12", "book": "Esther", "spec": "1:10-12", "implied": true },
+        { "text": "1:19", "book": "Esther", "spec": "1:19", "implied": true },
+        { "text": "1:20", "book": "Esther", "spec": "1:20", "implied": true },
+        { "text": "1:21", "book": "Esther", "spec": "1:21", "implied": true }
+      ]
+    },
+    {
+      "name": "\"(Focus on …)\" is read like \"cf.\": each \";\" part links (Steve 2026-10-02; The Best Possible Life s12)",
+      "text": "How did Esther become Queen of Persia? (Focus on 1:10–12, 16–17; 2:1–4, 7–11, 15–17)",
+      "context": "###### Biblical Narrative (Esther 1:1–2:23)\n\nHow did Esther become Queen of Persia? (Focus on 1:10–12, 16–17; 2:1–4, 7–11, 15–17)",
+      "refs": [
+        { "text": "1:10–12, 16–17", "book": "Esther", "spec": "1:10-12,16-17", "implied": true },
+        { "text": "2:1–4, 7–11, 15–17", "book": "Esther", "spec": "2:1-4,7-11,15-17", "implied": true }
+      ]
+    },
+    {
+      "name": "square brackets are read like parentheses (Steve 2026-10-02; The Glory Due His Name s1, The Kingdom Come s1)",
+      "text": "The floodwaters remained for about five months (150 days [7:24]). Jonah faced death (\"Sheol\" [2:1]).",
+      "context": "###### Biblical Narrative (Genesis 7:1–24)\n\nThe floodwaters remained for about five months (150 days [7:24]). Jonah faced death (\"Sheol\" [2:1]).",
+      "refs": [
+        { "text": "7:24", "book": "Genesis", "spec": "7:24", "implied": true },
+        { "text": "2:1", "book": "Genesis", "spec": "2:1", "implied": true }
+      ]
+    },
+    {
+      "name": "\" and C:V\" right after a named reference continues it; a lone number after \"and\" doesn't (Steve 2026-10-02)",
+      "text": "In Daniel 1:1–2:49 and 4:1–6:28, we meet Daniel. Psalm 127:1–5 and 128:1–6 portray a home. Psalm 23 and 24 are short.",
+      "refs": [
+        { "text": "Daniel 1:1–2:49", "book": "Daniel", "spec": "1:1-2:49" },
+        { "text": "4:1–6:28", "book": "Daniel", "spec": "4:1-6:28", "continuation": true },
+        { "text": "Psalm 127:1–5", "book": "Psalm", "spec": "127:1-5" },
+        { "text": "128:1–6", "book": "Psalm", "spec": "128:1-6", "continuation": true },
+        { "text": "Psalm 23", "book": "Psalm", "spec": "23" }
+      ]
+    },
+    {
+      "name": "before a session's first \"Biblical Narrative\" heading, bare groups take that heading's book (Steve 2026-10-02; The Best Possible Life s7)",
+      "text": "Humans were made to represent God's rule (1:26–28).\n\n###### Biblical Narrative (Genesis 4:1–7)\n\nCain was angry (4:5).",
+      "refs": [
+        { "text": "1:26–28", "book": "Genesis", "spec": "1:26-28", "implied": true },
+        { "text": "Genesis 4:1–7", "book": "Genesis", "spec": "4:1-7" },
+        { "text": "4:5", "book": "Genesis", "spec": "4:5", "implied": true }
+      ]
+    },
+    {
+      "name": "French book names, \"Récit biblique\" headings and the French \" ; \" (Steve 2026-10-02; L'Appel du Christ)",
+      "text": "Récit biblique (Actes 2:41). Ils furent baptisés (2:38). Le Messie promis (2 Samuel 7:12-16 ; Isaïe 11:1-5, 10 ; 52:13-53:12 ; Jérémie 23:5-6). Voir Éphésiens 4:4-6 et Psaume 16:8-11.",
+      "refs": [
+        { "text": "Actes 2:41", "book": "Acts", "spec": "2:41" },
+        { "text": "2:38", "book": "Acts", "spec": "2:38", "implied": true },
+        { "text": "2 Samuel 7:12-16", "book": "2 Samuel", "spec": "7:12-16" },
+        { "text": "Isaïe 11:1-5, 10", "book": "Isaiah", "spec": "11:1-5,10" },
+        { "text": "52:13-53:12", "book": "Isaiah", "spec": "52:13-53:12", "continuation": true },
+        { "text": "Jérémie 23:5-6", "book": "Jeremiah", "spec": "23:5-6" },
+        { "text": "Éphésiens 4:4-6", "book": "Ephesians", "spec": "4:4-6" },
+        { "text": "Psaume 16:8-11", "book": "Psalm", "spec": "16:8-11" }
+      ]
+    },
+    {
+      "name": "French chapter.verse / chapter,verse doesn't link until Steve decides the separator (Decisions tab, 2026-10-02); never read as chapters",
+      "text": "Dans Actes 2.42-47 et Actes 2,24-32, puis Psaume 90.17 et Jean 10,10. Mais Actes 2:41 oui.",
+      "refs": [
+        { "text": "Actes 2:41", "book": "Acts", "spec": "2:41" }
+      ]
+    },
+    {
+      "name": "bare chapter:verse in prose links, with the book in effect (Steve 2026-10-02; The Bond Between Us s6, The Kingdom Come s2)",
+      "text": "The detailed work log of 3:1–32 highlights the group effort. Recall the affirmation in 2:5 here.",
+      "context": "###### Biblical Narrative (Nehemiah 3:1–32)\n\nThe detailed work log of 3:1–32 highlights the group effort. Recall the affirmation in 2:5 here.",
+      "refs": [
+        { "text": "3:1–32", "book": "Nehemiah", "spec": "3:1-32", "implied": true },
+        { "text": "2:5", "book": "Nehemiah", "spec": "2:5", "implied": true }
+      ]
+    },
+    {
+      "name": "never a bare link inside Scripture itself: a verse-number superscript, or the number that starts a quoted Bible line (Steve 2026-10-02; HomeStead, Venture)",
+      "text": "<sup>23:1</sup> The Lord is my shepherd; I shall not want.\n> 17:1 Now the Philistines gathered their forces for war.",
+      "context": "###### Biblical Narrative (Psalm 23:1–6)\n\n<sup>23:1</sup> The Lord is my shepherd; I shall not want.\n> 17:1 Now the Philistines gathered their forces for war.",
+      "refs": []
+    },
+    {
+      "name": "never a bare link in a bibliography: after or inside a work's italic title, or under a \"Bibliography\" heading (Steve 2026-10-02; Further Resources, Oration II)",
+      "text": "Read Acts 1:8.\n\n- Keener, Craig S. _Acts: An Exegetical Commentary:_ 3:1–14:28.\n- Edwards, Jonathan. In _The Works of President Edwards_, 3:1–89.\n- Bock, Darrell. _Luke: 1:1–9:50_.\n\n## Bibliography\n\nElm, Susanna. \"The Pastor as Physician of Souls in Gregory of Nazianzus's Oration 2:16–34.\"",
+      "refs": [
+        { "text": "Acts 1:8", "book": "Acts", "spec": "1:8" }
+      ]
+    },
+    {
+      "name": "no book in effect: bare prose stays plain text",
+      "text": "As noted in 3:16, and again (3:17).",
+      "refs": []
+    },
+    {
+      "name": "no book in effect: a bare group is plain text",
+      "text": "As noted (3:16).",
+      "refs": []
+    },
+    {
+      "name": "a colon after a reference ends it (P2 audit: ~350 \"Read Ruth 1:1–22:\" prompts linked only \"Ruth 1:1\")",
+      "text": "<Accent>Read Ruth 1:1–22:</Accent> What happened? Read Jude 3: and Romans 8:",
+      "refs": [
+        {
+          "text": "Ruth 1:1–22",
+          "book": "Ruth",
+          "spec": "1:1-22"
+        },
+        {
+          "text": "Jude 3",
+          "book": "Jude",
+          "spec": "3"
+        },
+        {
+          "text": "Romans 8",
+          "book": "Romans",
+          "spec": "8"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N (1219×; The Best Possible Life › 01-The-Way)",
+      "text": "Essentially, Naomi was all that was \"left\" (1:3, 5) in a string of personal tragedies and excruciating losses",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\nEssentially, Naomi was all that was \"left\" (1:3, 5) in a string of personal tragedies and excruciating losses",
+      "refs": [
+        {
+          "text": "1:3, 5",
+          "book": "Ruth",
+          "spec": "1:3,5",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N-N (229×; Come Let Us Adore Him › 4-Part Two-Readings)",
+      "text": "<< Romans 16:25-27",
+      "refs": [
+        {
+          "text": "Romans 16:25-27",
+          "book": "Romans",
+          "spec": "16:25-27"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N–N (213×; The Best Possible Life › 01-The-Way)",
+      "text": "The act of redemption resulted in the birth of a child (4:13, 16–17), which secured the blessing of the family and the generations to come (4:11–12, 14–15)",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\nThe act of redemption resulted in the birth of a child (4:13, 16–17), which secured the blessing of the family and the generations to come (4:11–12, 14–15)",
+      "refs": [
+        {
+          "text": "4:13, 16–17",
+          "book": "Ruth",
+          "spec": "4:13,16-17",
+          "implied": true
+        },
+        {
+          "text": "4:11–12, 14–15",
+          "book": "Ruth",
+          "spec": "4:11-12,14-15",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N–N (175×; The Best Possible Life › 01-The-Way)",
+      "text": "Surely, this work was not without physical and social risk (2:8–9, 21–22)",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\nSurely, this work was not without physical and social risk (2:8–9, 21–22)",
+      "refs": [
+        {
+          "text": "2:8–9, 21–22",
+          "book": "Ruth",
+          "spec": "2:8-9,21-22",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N–N (83×; The Best Possible Life › 01-The-Way)",
+      "text": "Ruth's child, Obed, would be the grandfather of David, the great king of Israel (4:13, 17, 18–22)",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\nRuth's child, Obed, would be the grandfather of David, the great king of Israel (4:13, 17, 18–22)",
+      "refs": [
+        {
+          "text": "4:13, 17, 18–22",
+          "book": "Ruth",
+          "spec": "4:13,17,18-22",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N–N, N (61×; The Best Possible Life › 01-The-Way)",
+      "text": "(2:8, 14–15, 17, 21; 3:11, 15, 17)",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\n(2:8, 14–15, 17, 21; 3:11, 15, 17)",
+      "refs": [
+        {
+          "text": "2:8, 14–15, 17, 21",
+          "book": "Ruth",
+          "spec": "2:8,14-15,17,21",
+          "implied": true
+        },
+        {
+          "text": "3:11, 15, 17",
+          "book": "Ruth",
+          "spec": "3:11,15,17",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N-N:N (53×; The Best Possible Life › 00-The-Opening)",
+      "text": "The first narrative provides an example of godliness in the life of a heroine named Ruth (Ruth 1:1-4:22), whose faithfulness to God is put on display in the midst of great loss and suffering",
+      "refs": [
+        {
+          "text": "Ruth 1:1-4:22",
+          "book": "Ruth",
+          "spec": "1:1-4:22"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N–N, N (44×; The Best Possible Life › 01-The-Way)",
+      "text": "Her life was characterized by faithfulness (1:14, 16–17; 3:10, 12), service (2:2–7, 11–12, 17, 23; 3:9), love (1:8; 3:10; 4:15), obedience (3:5–6), honor (3:3, 7), humility (2:10; 3:9), discretion (3:4, 7, 14), and virtue (3:11; 4:11)",
+      "context": "###### Biblical Narrative (Ruth 1:1)\n\nHer life was characterized by faithfulness (1:14, 16–17; 3:10, 12), service (2:2–7, 11–12, 17, 23; 3:9), love (1:8; 3:10; 4:15), obedience (3:5–6), honor (3:3, 7), humility (2:10; 3:9), discretion (3:4, 7, 14), and virtue (3:11; 4:11)",
+      "refs": [
+        {
+          "text": "1:14, 16–17",
+          "book": "Ruth",
+          "spec": "1:14,16-17",
+          "implied": true
+        },
+        {
+          "text": "3:10, 12",
+          "book": "Ruth",
+          "spec": "3:10,12",
+          "implied": true
+        },
+        {
+          "text": "2:2–7, 11–12, 17, 23",
+          "book": "Ruth",
+          "spec": "2:2-7,11-12,17,23",
+          "implied": true
+        },
+        {
+          "text": "3:9",
+          "book": "Ruth",
+          "spec": "3:9",
+          "implied": true
+        },
+        {
+          "text": "1:8",
+          "book": "Ruth",
+          "spec": "1:8",
+          "implied": true
+        },
+        {
+          "text": "3:10",
+          "book": "Ruth",
+          "spec": "3:10",
+          "implied": true
+        },
+        {
+          "text": "4:15",
+          "book": "Ruth",
+          "spec": "4:15",
+          "implied": true
+        },
+        {
+          "text": "3:5–6",
+          "book": "Ruth",
+          "spec": "3:5-6",
+          "implied": true
+        },
+        {
+          "text": "3:3, 7",
+          "book": "Ruth",
+          "spec": "3:3,7",
+          "implied": true
+        },
+        {
+          "text": "2:10",
+          "book": "Ruth",
+          "spec": "2:10",
+          "implied": true
+        },
+        {
+          "text": "3:9",
+          "book": "Ruth",
+          "spec": "3:9",
+          "implied": true
+        },
+        {
+          "text": "3:4, 7, 14",
+          "book": "Ruth",
+          "spec": "3:4,7,14",
+          "implied": true
+        },
+        {
+          "text": "3:11",
+          "book": "Ruth",
+          "spec": "3:11",
+          "implied": true
+        },
+        {
+          "text": "4:11",
+          "book": "Ruth",
+          "spec": "4:11",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N:N (35×; The Best Possible Life › 06-The-Anointed)",
+      "text": "David eclipsed Saul in military exploits (17:1–18:30), demonstrating God's favor on his life (16:13, 18; 18:12, 14, 28) and winning public praise (18:6–30)",
+      "context": "###### Biblical Narrative (1 Samuel 1:1)\n\nDavid eclipsed Saul in military exploits (17:1–18:30), demonstrating God's favor on his life (16:13, 18; 18:12, 14, 28) and winning public praise (18:6–30)",
+      "refs": [
+        {
+          "text": "17:1–18:30",
+          "book": "1 Samuel",
+          "spec": "17:1-18:30",
+          "implied": true
+        },
+        {
+          "text": "16:13, 18",
+          "book": "1 Samuel",
+          "spec": "16:13,18",
+          "implied": true
+        },
+        {
+          "text": "18:12, 14, 28",
+          "book": "1 Samuel",
+          "spec": "18:12,14,28",
+          "implied": true
+        },
+        {
+          "text": "18:6–30",
+          "book": "1 Samuel",
+          "spec": "18:6-30",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N, N–N (32×; The Best Possible Life › 03-The-Idol)",
+      "text": "Idolatry is the worship of a man-made creation in the place of the Creator God (32:1–6, 8, 23–24)",
+      "context": "###### Biblical Narrative (Exodus 1:1)\n\nIdolatry is the worship of a man-made creation in the place of the Creator God (32:1–6, 8, 23–24)",
+      "refs": [
+        {
+          "text": "32:1–6, 8, 23–24",
+          "book": "Exodus",
+          "spec": "32:1-6,8,23-24",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N-N:N (27×; The Ends of the Earth › session1)",
+      "text": "In light of Stephen’s seizure and martyrdom (6:8-7:60), Saul’s persecution (8:1-8), and the threat against Saul’s own life after his conversion, the church multiplied and matured in the face of persecution",
+      "context": "Acts 1:1 says so.\n\nIn light of Stephen’s seizure and martyrdom (6:8-7:60), Saul’s persecution (8:1-8), and the threat against Saul’s own life after his conversion, the church multiplied and matured in the face of persecution",
+      "refs": [
+        {
+          "text": "6:8-7:60",
+          "book": "Acts",
+          "spec": "6:8-7:60",
+          "implied": true
+        },
+        {
+          "text": "8:1-8",
+          "book": "Acts",
+          "spec": "8:1-8",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape continuation: N:N-N (21×; The Making of a Shepherd › session1)",
+      "text": "**Read Genesis 30:22-24, 25; 33:2, 7; 35:24; 37:1-36**: What were important elements of Joseph’s birth and early youth",
+      "refs": [
+        {
+          "text": "Genesis 30:22-24, 25",
+          "book": "Genesis",
+          "spec": "30:22-24,25"
+        },
+        {
+          "text": "33:2, 7",
+          "book": "Genesis",
+          "spec": "33:2,7",
+          "continuation": true
+        },
+        {
+          "text": "35:24",
+          "book": "Genesis",
+          "spec": "35:24",
+          "continuation": true
+        },
+        {
+          "text": "37:1-36",
+          "book": "Genesis",
+          "spec": "37:1-36",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N–N, N (20×; The Best Possible Life › 03-The-Idol)",
+      "text": "False worship and idolatry lead to immoral living (32:6, 21, 18–19, 25)",
+      "context": "###### Biblical Narrative (Exodus 1:1)\n\nFalse worship and idolatry lead to immoral living (32:6, 21, 18–19, 25)",
+      "refs": [
+        {
+          "text": "32:6, 21, 18–19, 25",
+          "book": "Exodus",
+          "spec": "32:6,21,18-19,25",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape continuation: N:N–N:N (16×; The Bond Between Us › 00-The-Opening)",
+      "text": "The journey taken through these six stories teaches believers how to live in the context of family (Genesis 15:1–19:38), marriage (Genesis 24:1–67), parenting (1 Samuel 1:1–3:21), friendship (1 Samuel 18:1–20:42), government (Daniel 1:1–2:49; 4:1–6:28), and work (Nehemiah 1:1–7:4)",
+      "refs": [
+        {
+          "text": "Genesis 15:1–19:38",
+          "book": "Genesis",
+          "spec": "15:1-19:38"
+        },
+        {
+          "text": "Genesis 24:1–67",
+          "book": "Genesis",
+          "spec": "24:1-67"
+        },
+        {
+          "text": "1 Samuel 1:1–3:21",
+          "book": "1 Samuel",
+          "spec": "1:1-3:21"
+        },
+        {
+          "text": "1 Samuel 18:1–20:42",
+          "book": "1 Samuel",
+          "spec": "18:1-20:42"
+        },
+        {
+          "text": "Daniel 1:1–2:49",
+          "book": "Daniel",
+          "spec": "1:1-2:49"
+        },
+        {
+          "text": "4:1–6:28",
+          "book": "Daniel",
+          "spec": "4:1-6:28",
+          "continuation": true
+        },
+        {
+          "text": "Nehemiah 1:1–7:4",
+          "book": "Nehemiah",
+          "spec": "1:1-7:4"
+        }
+      ]
+    },
+    {
+      "name": "content shape continuation: N:N, N (15×; Come Let Us Adore Him › 2-Preface and Introduction)",
+      "text": "Festal seasons provide annual moments to deepen our delight in gospel truth (Psalm 19:7–14; 119:14, 16, 24, 35, 47, 70, 77, 92, 143, 174)",
+      "refs": [
+        {
+          "text": "Psalm 19:7–14",
+          "book": "Psalm",
+          "spec": "19:7-14"
+        },
+        {
+          "text": "119:14, 16, 24, 35, 47, 70, 77, 92, 143, 174",
+          "book": "Psalm",
+          "spec": "119:14,16,24,35,47,70,77,92,143,174",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N-N, N (14×; The Aim of Our Charge › session1)",
+      "text": "Affirming Abram along his journey, God again spoke to him and said that the entirety of the land of Canaan God would given to Abram and his offspring (13:14-15, 17) and his offspring would multiple innumerably (13:16)",
+      "context": "###### Biblical Narrative (Genesis 1:1)\n\nAffirming Abram along his journey, God again spoke to him and said that the entirety of the land of Canaan God would given to Abram and his offspring (13:14-15, 17) and his offspring would multiple innumerably (13:16)",
+      "refs": [
+        {
+          "text": "13:14-15, 17",
+          "book": "Genesis",
+          "spec": "13:14-15,17",
+          "implied": true
+        },
+        {
+          "text": "13:16",
+          "book": "Genesis",
+          "spec": "13:16",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N-N (11×; The Aim of Our Charge › session1)",
+      "text": "For instance, although Lot aimed for a land that was “like the garden of the Lord” it was fundamentally more “like the land of Egypt” and wicked like Sodom (13:10, 12-13)",
+      "context": "###### Biblical Narrative (Genesis 1:1)\n\nFor instance, although Lot aimed for a land that was “like the garden of the Lord” it was fundamentally more “like the land of Egypt” and wicked like Sodom (13:10, 12-13)",
+      "refs": [
+        {
+          "text": "13:10, 12-13",
+          "book": "Genesis",
+          "spec": "13:10,12-13",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N–N, N–N (9×; Come Let Us Adore Him › 4-Part Two-Readings)",
+      "text": "<< Luke 1:46–55, 67–79",
+      "refs": [
+        {
+          "text": "Luke 1:46–55, 67–79",
+          "book": "Luke",
+          "spec": "1:46-55,67-79"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N-N, N-N (8×; The Ends of the Earth › session1)",
+      "text": "The speeches and proclamations in Acts shift from evangelistic (2:14-41; 3:11-26; 4:8-12; 7:1-52; 10:34-43; 13:15-41; 16:31; 17:3, 22-31) to apologetic (22:1-21; 23:1-10; 24:10-21, 22-27; 25:13-22; 26:1-29)",
+      "context": "Acts 1:1 says so.\n\nThe speeches and proclamations in Acts shift from evangelistic (2:14-41; 3:11-26; 4:8-12; 7:1-52; 10:34-43; 13:15-41; 16:31; 17:3, 22-31) to apologetic (22:1-21; 23:1-10; 24:10-21, 22-27; 25:13-22; 26:1-29)",
+      "refs": [
+        {
+          "text": "2:14-41",
+          "book": "Acts",
+          "spec": "2:14-41",
+          "implied": true
+        },
+        {
+          "text": "3:11-26",
+          "book": "Acts",
+          "spec": "3:11-26",
+          "implied": true
+        },
+        {
+          "text": "4:8-12",
+          "book": "Acts",
+          "spec": "4:8-12",
+          "implied": true
+        },
+        {
+          "text": "7:1-52",
+          "book": "Acts",
+          "spec": "7:1-52",
+          "implied": true
+        },
+        {
+          "text": "10:34-43",
+          "book": "Acts",
+          "spec": "10:34-43",
+          "implied": true
+        },
+        {
+          "text": "13:15-41",
+          "book": "Acts",
+          "spec": "13:15-41",
+          "implied": true
+        },
+        {
+          "text": "16:31",
+          "book": "Acts",
+          "spec": "16:31",
+          "implied": true
+        },
+        {
+          "text": "17:3, 22-31",
+          "book": "Acts",
+          "spec": "17:3,22-31",
+          "implied": true
+        },
+        {
+          "text": "22:1-21",
+          "book": "Acts",
+          "spec": "22:1-21",
+          "implied": true
+        },
+        {
+          "text": "23:1-10",
+          "book": "Acts",
+          "spec": "23:1-10",
+          "implied": true
+        },
+        {
+          "text": "24:10-21, 22-27",
+          "book": "Acts",
+          "spec": "24:10-21,22-27",
+          "implied": true
+        },
+        {
+          "text": "25:13-22",
+          "book": "Acts",
+          "spec": "25:13-22",
+          "implied": true
+        },
+        {
+          "text": "26:1-29",
+          "book": "Acts",
+          "spec": "26:1-29",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N–N, N, N–N (6×; The Bond Between Us › 04-The-Bond)",
+      "text": "Saul's campaign against the Philistines (18:5) decomposed into a preoccupation to harm (and kill) David (18:9, 11, 13–14, 17, 21, 25–27)",
+      "context": "###### Biblical Narrative (1 Samuel 1:1)\n\nSaul's campaign against the Philistines (18:5) decomposed into a preoccupation to harm (and kill) David (18:9, 11, 13–14, 17, 21, 25–27)",
+      "refs": [
+        {
+          "text": "18:5",
+          "book": "1 Samuel",
+          "spec": "18:5",
+          "implied": true
+        },
+        {
+          "text": "18:9, 11, 13–14, 17, 21, 25–27",
+          "book": "1 Samuel",
+          "spec": "18:9,11,13-14,17,21,25-27",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N–N, N (5×; Come Let Us Adore Him › 4-Part Two-Readings)",
+      "text": "<< Luke 1:26–45, 56",
+      "refs": [
+        {
+          "text": "Luke 1:26–45, 56",
+          "book": "Luke",
+          "spec": "1:26-45,56"
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N–N:N (5×; The Bond Between Us › 14-Further-Resources)",
+      "text": "_Mark 1–8:26_",
+      "refs": [
+        {
+          "text": "Mark 1–8:26",
+          "book": "Mark",
+          "spec": "1-8:26"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N-N (4×; The Making of a Shepherd › session1)",
+      "text": "God gave Joseph such favor with those around him (39:4, 21) as well as such charge and authority in his sphere of influence (39:4, 6, 22-23; 40:4) that he became a channel of blessing to those around him (39:5)",
+      "context": "###### Biblical Narrative (Genesis 1:1)\n\nGod gave Joseph such favor with those around him (39:4, 21) as well as such charge and authority in his sphere of influence (39:4, 6, 22-23; 40:4) that he became a channel of blessing to those around him (39:5)",
+      "refs": [
+        {
+          "text": "39:4, 21",
+          "book": "Genesis",
+          "spec": "39:4,21",
+          "implied": true
+        },
+        {
+          "text": "39:4, 6, 22-23",
+          "book": "Genesis",
+          "spec": "39:4,6,22-23",
+          "implied": true
+        },
+        {
+          "text": "40:4",
+          "book": "Genesis",
+          "spec": "40:4",
+          "implied": true
+        },
+        {
+          "text": "39:5",
+          "book": "Genesis",
+          "spec": "39:5",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N–N, N, N–N, N (3×; The Best Possible Life › 08-The-Appeal)",
+      "text": "This scene teaches us that our devotion to God is fueled by an encounter with God (13:3, 6, 8–10, 13, 15–23, 25), the revelation of God's word (13:3–7, 12–14, 23), the experience of God's glory (13:18, 20), and submission to God's power (13:19, 23; 14:5–6, 19; 15:4–5, 8, 14–17; 16:3, 9, 12, 20, 30)",
+      "context": "###### Biblical Narrative (Judges 1:1)\n\nThis scene teaches us that our devotion to God is fueled by an encounter with God (13:3, 6, 8–10, 13, 15–23, 25), the revelation of God's word (13:3–7, 12–14, 23), the experience of God's glory (13:18, 20), and submission to God's power (13:19, 23; 14:5–6, 19; 15:4–5, 8, 14–17; 16:3, 9, 12, 20, 30)",
+      "refs": [
+        {
+          "text": "13:3, 6, 8–10, 13, 15–23, 25",
+          "book": "Judges",
+          "spec": "13:3,6,8-10,13,15-23,25",
+          "implied": true
+        },
+        {
+          "text": "13:3–7, 12–14, 23",
+          "book": "Judges",
+          "spec": "13:3-7,12-14,23",
+          "implied": true
+        },
+        {
+          "text": "13:18, 20",
+          "book": "Judges",
+          "spec": "13:18,20",
+          "implied": true
+        },
+        {
+          "text": "13:19, 23",
+          "book": "Judges",
+          "spec": "13:19,23",
+          "implied": true
+        },
+        {
+          "text": "14:5–6, 19",
+          "book": "Judges",
+          "spec": "14:5-6,19",
+          "implied": true
+        },
+        {
+          "text": "15:4–5, 8, 14–17",
+          "book": "Judges",
+          "spec": "15:4-5,8,14-17",
+          "implied": true
+        },
+        {
+          "text": "16:3, 9, 12, 20, 30",
+          "book": "Judges",
+          "spec": "16:3,9,12,20,30",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N–N, N, N–N (3×; The Best Possible Life › 11-The-Craving)",
+      "text": "Disciples experience hardships (11:1), unmet expectations (11:4–6, 11–12, 18, 20–22), and insecurities (11:13–15)",
+      "context": "###### Biblical Narrative (Numbers 1:1)\n\nDisciples experience hardships (11:1), unmet expectations (11:4–6, 11–12, 18, 20–22), and insecurities (11:13–15)",
+      "refs": [
+        {
+          "text": "11:1",
+          "book": "Numbers",
+          "spec": "11:1",
+          "implied": true
+        },
+        {
+          "text": "11:4–6, 11–12, 18, 20–22",
+          "book": "Numbers",
+          "spec": "11:4-6,11-12,18,20-22",
+          "implied": true
+        },
+        {
+          "text": "11:13–15",
+          "book": "Numbers",
+          "spec": "11:13-15",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N, N–N (3×; The Bond Between Us › 11-The-Worlds)",
+      "text": "Luke 6:24; 1 Timothy 6:9, 17–19; James 2:1–7; 5:1–6)",
+      "refs": [
+        {
+          "text": "Luke 6:24",
+          "book": "Luke",
+          "spec": "6:24"
+        },
+        {
+          "text": "1 Timothy 6:9, 17–19",
+          "book": "1 Timothy",
+          "spec": "6:9,17-19"
+        },
+        {
+          "text": "James 2:1–7",
+          "book": "James",
+          "spec": "2:1-7"
+        },
+        {
+          "text": "5:1–6",
+          "book": "James",
+          "spec": "5:1-6",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N-N, N (3×; Proverbs and Faith Formation › 07-Do-Not-Forget-My-Teaching)",
+      "text": "Humans must grow in godly _attractions_: to be drawn toward that which is honorable, noble, dignified, excellent, and praisworthy (1:9-10; 3:16, 22, 35; 4:8-9; 5:9; 6:24, 33; 8:6, 15-16, 18; 9:13)",
+      "context": "Proverbs 1:1 says so.\n\nHumans must grow in godly _attractions_: to be drawn toward that which is honorable, noble, dignified, excellent, and praisworthy (1:9-10; 3:16, 22, 35; 4:8-9; 5:9; 6:24, 33; 8:6, 15-16, 18; 9:13)",
+      "refs": [
+        {
+          "text": "1:9-10",
+          "book": "Proverbs",
+          "spec": "1:9-10",
+          "implied": true
+        },
+        {
+          "text": "3:16, 22, 35",
+          "book": "Proverbs",
+          "spec": "3:16,22,35",
+          "implied": true
+        },
+        {
+          "text": "4:8-9",
+          "book": "Proverbs",
+          "spec": "4:8-9",
+          "implied": true
+        },
+        {
+          "text": "5:9",
+          "book": "Proverbs",
+          "spec": "5:9",
+          "implied": true
+        },
+        {
+          "text": "6:24, 33",
+          "book": "Proverbs",
+          "spec": "6:24,33",
+          "implied": true
+        },
+        {
+          "text": "8:6, 15-16, 18",
+          "book": "Proverbs",
+          "spec": "8:6,15-16,18",
+          "implied": true
+        },
+        {
+          "text": "9:13",
+          "book": "Proverbs",
+          "spec": "9:13",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N– N (2×; Come Let Us Adore Him › 2-Preface and Introduction)",
+      "text": "God’s people—the covenant community bound to God in faith— have long been understood as pilgrims, exiles, and strangers on the earth (Leviticus 25:23; John 17:14; Philippians 3:20; 1 Peter 2:11– 12)",
+      "refs": [
+        {
+          "text": "Leviticus 25:23",
+          "book": "Leviticus",
+          "spec": "25:23"
+        },
+        {
+          "text": "John 17:14",
+          "book": "John",
+          "spec": "17:14"
+        },
+        {
+          "text": "Philippians 3:20",
+          "book": "Philippians",
+          "spec": "3:20"
+        },
+        {
+          "text": "1 Peter 2:11– 12",
+          "book": "1 Peter",
+          "spec": "2:11-12"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N–N, N, N–N, N (2×; The Best Possible Life › 04-The-Fire)",
+      "text": "The Jewish priestly structure and sacrificial system teach us about what it means to have complete and wholehearted devotion to God (8:10–11, 16–17, 20–21, 25, 27–28, 32, 36; 9:5, 23; 10:3, 6, 11)",
+      "context": "###### Biblical Narrative (Leviticus 1:1)\n\nThe Jewish priestly structure and sacrificial system teach us about what it means to have complete and wholehearted devotion to God (8:10–11, 16–17, 20–21, 25, 27–28, 32, 36; 9:5, 23; 10:3, 6, 11)",
+      "refs": [
+        {
+          "text": "8:10–11, 16–17, 20–21, 25, 27–28, 32, 36",
+          "book": "Leviticus",
+          "spec": "8:10-11,16-17,20-21,25,27-28,32,36",
+          "implied": true
+        },
+        {
+          "text": "9:5, 23",
+          "book": "Leviticus",
+          "spec": "9:5,23",
+          "implied": true
+        },
+        {
+          "text": "10:3, 6, 11",
+          "book": "Leviticus",
+          "spec": "10:3,6,11",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N-N (2×; The Bond Between Us › 02-The-Union)",
+      "text": "<Accent>_Community Discernment in Choosing a Spouse._</Accent> Practically, it is noteworthy that both Abraham and his servant were involved in the search for Isaac's wife (24:1–4, 6-7)",
+      "context": "###### Biblical Narrative (Genesis 1:1)\n\n<Accent>_Community Discernment in Choosing a Spouse._</Accent> Practically, it is noteworthy that both Abraham and his servant were involved in the search for Isaac's wife (24:1–4, 6-7)",
+      "refs": [
+        {
+          "text": "24:1–4, 6-7",
+          "book": "Genesis",
+          "spec": "24:1-4,6-7",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N:N–N, N (2×; The Bond Between Us › 05-The-Public)",
+      "text": "(4:2, 5:2–4, 23)",
+      "context": "###### Biblical Narrative (Daniel 1:1)\n\n(4:2, 5:2–4, 23)",
+      "refs": [
+        {
+          "text": "4:2, 5:2–4, 23",
+          "book": "Daniel",
+          "spec": "4:2,5:2-4,23",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N, N (2×; The Open Invitation › 03-The-Retreat)",
+      "text": "Matthew 11:28; Mark 14:41; 1 Corinthians 16:18; Philemon 7, 20; Revelation 14:13)",
+      "refs": [
+        {
+          "text": "Matthew 11:28",
+          "book": "Matthew",
+          "spec": "11:28"
+        },
+        {
+          "text": "Mark 14:41",
+          "book": "Mark",
+          "spec": "14:41"
+        },
+        {
+          "text": "1 Corinthians 16:18",
+          "book": "1 Corinthians",
+          "spec": "16:18"
+        },
+        {
+          "text": "Philemon 7, 20",
+          "book": "Philemon",
+          "spec": "7,20"
+        },
+        {
+          "text": "Revelation 14:13",
+          "book": "Revelation",
+          "spec": "14:13"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:Nx (2×; The Call of Christ › 6-Session3-TheWay)",
+      "text": "In the context of a vibrant and worshiping community life, these Christ-followers were “praising God and having favor with all the people” (2:47a)",
+      "context": "###### Biblical Narrative (Acts 1:1)\n\nIn the context of a vibrant and worshiping community life, these Christ-followers were “praising God and having favor with all the people” (2:47a)",
+      "refs": [
+        {
+          "text": "2:47a",
+          "book": "Acts",
+          "spec": "2:47a",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N– N (2×; HomeStead › 02-PartOne-Preparation)",
+      "text": "(78:57– 58)",
+      "context": "Psalm 1:1 says so.\n\n(78:57– 58)",
+      "refs": [
+        {
+          "text": "78:57– 58",
+          "book": "Psalm",
+          "spec": "78:57-58",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N–N, N–N, N (1×; Come Let Us Adore Him › 4-Part Two-Readings)",
+      "text": "<< Luke 1:1–25, 57–66, 80",
+      "refs": [
+        {
+          "text": "Luke 1:1–25, 57–66, 80",
+          "book": "Luke",
+          "spec": "1:1-25,57-66,80"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N:N–N:N (1×; The Best Possible Life › 12-The-Contest)",
+      "text": "Faith maturity requires conviction (3:1–6), wisdom (5:1–8, 6:14–7:6; 8:1–17), respect (5:4, 8; 8:3–6), and courage (4:16; 5:1–2; 9:1–19)",
+      "context": "###### Biblical Narrative (Esther 1:1)\n\nFaith maturity requires conviction (3:1–6), wisdom (5:1–8, 6:14–7:6; 8:1–17), respect (5:4, 8; 8:3–6), and courage (4:16; 5:1–2; 9:1–19)",
+      "refs": [
+        {
+          "text": "3:1–6",
+          "book": "Esther",
+          "spec": "3:1-6",
+          "implied": true
+        },
+        {
+          "text": "5:1–8, 6:14–7:6",
+          "book": "Esther",
+          "spec": "5:1-8,6:14-7:6",
+          "implied": true
+        },
+        {
+          "text": "8:1–17",
+          "book": "Esther",
+          "spec": "8:1-17",
+          "implied": true
+        },
+        {
+          "text": "5:4, 8",
+          "book": "Esther",
+          "spec": "5:4,8",
+          "implied": true
+        },
+        {
+          "text": "8:3–6",
+          "book": "Esther",
+          "spec": "8:3-6",
+          "implied": true
+        },
+        {
+          "text": "4:16",
+          "book": "Esther",
+          "spec": "4:16",
+          "implied": true
+        },
+        {
+          "text": "5:1–2",
+          "book": "Esther",
+          "spec": "5:1-2",
+          "implied": true
+        },
+        {
+          "text": "9:1–19",
+          "book": "Esther",
+          "spec": "9:1-19",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N:N, N–N, N (1×; The Bond Between Us › 05-The-Public)",
+      "text": "Christians should make themselves fit for civic engagement: physical appearance/condition (1:3, 10–17), armed with special revelation (1:17, 2:19, 21–23, 25, 30, 36, 47; 4:8–9; 5:11–12, 14; 6:3), and competent for service (1:14–19)",
+      "context": "###### Biblical Narrative (Daniel 1:1)\n\nChristians should make themselves fit for civic engagement: physical appearance/condition (1:3, 10–17), armed with special revelation (1:17, 2:19, 21–23, 25, 30, 36, 47; 4:8–9; 5:11–12, 14; 6:3), and competent for service (1:14–19)",
+      "refs": [
+        {
+          "text": "1:3, 10–17",
+          "book": "Daniel",
+          "spec": "1:3,10-17",
+          "implied": true
+        },
+        {
+          "text": "1:17, 2:19, 21–23, 25, 30, 36, 47",
+          "book": "Daniel",
+          "spec": "1:17,2:19,21-23,25,30,36,47",
+          "implied": true
+        },
+        {
+          "text": "4:8–9",
+          "book": "Daniel",
+          "spec": "4:8-9",
+          "implied": true
+        },
+        {
+          "text": "5:11–12, 14",
+          "book": "Daniel",
+          "spec": "5:11-12,14",
+          "implied": true
+        },
+        {
+          "text": "6:3",
+          "book": "Daniel",
+          "spec": "6:3",
+          "implied": true
+        },
+        {
+          "text": "1:14–19",
+          "book": "Daniel",
+          "spec": "1:14-19",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape continuation: N:N, N–N (1×; The Glory Due His Name › 07-The-Valley)",
+      "text": "Genesis 12:1–3, 5; 13:13, 14–17)",
+      "refs": [
+        {
+          "text": "Genesis 12:1–3, 5",
+          "book": "Genesis",
+          "spec": "12:1-3,5"
+        },
+        {
+          "text": "13:13, 14–17",
+          "book": "Genesis",
+          "spec": "13:13,14-17",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N-N, N (1×; The Glory Due His Name › 10-The-Feeding)",
+      "text": "Believing in Jesus (6:47) is a matter of feeding on Jesus (6:50–51, 53-54, 56)",
+      "context": "###### Biblical Narrative (John 1:1)\n\nBelieving in Jesus (6:47) is a matter of feeding on Jesus (6:50–51, 53-54, 56)",
+      "refs": [
+        {
+          "text": "6:47",
+          "book": "John",
+          "spec": "6:47",
+          "implied": true
+        },
+        {
+          "text": "6:50–51, 53-54, 56",
+          "book": "John",
+          "spec": "6:50-51,53-54,56",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N–N, N-N, N (1×; The Glory Due His Name › 10-The-Feeding)",
+      "text": "Faith is described as eating Jesus' flesh and drinking his blood as a matter of feeding on Jesus (6:47, 50–51, 53-54, 56)",
+      "context": "###### Biblical Narrative (John 1:1)\n\nFaith is described as eating Jesus' flesh and drinking his blood as a matter of feeding on Jesus (6:47, 50–51, 53-54, 56)",
+      "refs": [
+        {
+          "text": "6:47, 50–51, 53-54, 56",
+          "book": "John",
+          "spec": "6:47,50-51,53-54,56",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N:N–N, N (1×; The Open Invitation › 01-The-Temple)",
+      "text": "Spiritual growth is dependent upon a commitment to God expressed in a life of faith (2:25, 38), worship (2:28, 37, 2:13–14, 20), devotion (2:22–25, 37), obedience (2:21–22, 24, 27), and wonder (2:19, 33, 47, 48, 51)",
+      "context": "###### Biblical Narrative (Luke 1:1)\n\nSpiritual growth is dependent upon a commitment to God expressed in a life of faith (2:25, 38), worship (2:28, 37, 2:13–14, 20), devotion (2:22–25, 37), obedience (2:21–22, 24, 27), and wonder (2:19, 33, 47, 48, 51)",
+      "refs": [
+        {
+          "text": "2:25, 38",
+          "book": "Luke",
+          "spec": "2:25,38",
+          "implied": true
+        },
+        {
+          "text": "2:28, 37, 2:13–14, 20",
+          "book": "Luke",
+          "spec": "2:28,37,2:13-14,20",
+          "implied": true
+        },
+        {
+          "text": "2:22–25, 37",
+          "book": "Luke",
+          "spec": "2:22-25,37",
+          "implied": true
+        },
+        {
+          "text": "2:21–22, 24, 27",
+          "book": "Luke",
+          "spec": "2:21-22,24,27",
+          "implied": true
+        },
+        {
+          "text": "2:19, 33, 47, 48, 51",
+          "book": "Luke",
+          "spec": "2:19,33,47,48,51",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N, N–N, N, N–N (1×; The Open Invitation › 05-The-Towel)",
+      "text": "The Christian faith is lived out in the context of a clash of kingdoms: God's kingdom of righteousness triumphing over Satan's kingdom of evil (13:1–3, 11, 18–19, 21, 26–27)",
+      "context": "###### Biblical Narrative (John 1:1)\n\nThe Christian faith is lived out in the context of a clash of kingdoms: God's kingdom of righteousness triumphing over Satan's kingdom of evil (13:1–3, 11, 18–19, 21, 26–27)",
+      "refs": [
+        {
+          "text": "13:1–3, 11, 18–19, 21, 26–27",
+          "book": "John",
+          "spec": "13:1-3,11,18-19,21,26-27",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N–N cf. N:N (1×; The Open Invitation › 05-The-Towel)",
+      "text": "It is also an expression of love for God and others (13:1, 34–35 cf. 13:23)",
+      "context": "###### Biblical Narrative (John 1:1)\n\nIt is also an expression of love for God and others (13:1, 34–35 cf. 13:23)",
+      "refs": [
+        {
+          "text": "13:1, 34–35 cf. 13:23",
+          "book": "John",
+          "spec": "13:1,34-35,13:23",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N–N, N:N–N (1×; The Story Behind It All › 07-The-Cross)",
+      "text": "In contrast, many people respond favorably to Jesus: Simon of Cyrene diligently carried his cross (15:21); the Roman centurion truthfully confessed his identity (15:39); the women who followed him were faithfully devoted to him (15:40–41, 16:1–2); and Joseph of Arimathea respected and reverenced him (15:42–46)",
+      "context": "###### Biblical Narrative (Mark 1:1)\n\nIn contrast, many people respond favorably to Jesus: Simon of Cyrene diligently carried his cross (15:21); the Roman centurion truthfully confessed his identity (15:39); the women who followed him were faithfully devoted to him (15:40–41, 16:1–2); and Joseph of Arimathea respected and reverenced him (15:42–46)",
+      "refs": [
+        {
+          "text": "15:21",
+          "book": "Mark",
+          "spec": "15:21",
+          "implied": true
+        },
+        {
+          "text": "15:39",
+          "book": "Mark",
+          "spec": "15:39",
+          "implied": true
+        },
+        {
+          "text": "15:40–41, 16:1–2",
+          "book": "Mark",
+          "spec": "15:40-41,16:1-2",
+          "implied": true
+        },
+        {
+          "text": "15:42–46",
+          "book": "Mark",
+          "spec": "15:42-46",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N:N, N–N (1×; The Story Behind It All › 10-The-Church)",
+      "text": "God calls the church to grow and mature by remembering its faith (2:5; 3:3) repenting of sin (2:5, 2:16, 21–22; 3:3), obeying God's commands (2:5), staying alert to spiritual danger (3:2–3), and progressing in the faith (3:2)",
+      "context": "###### Biblical Narrative (Revelation 1:1)\n\nGod calls the church to grow and mature by remembering its faith (2:5; 3:3) repenting of sin (2:5, 2:16, 21–22; 3:3), obeying God's commands (2:5), staying alert to spiritual danger (3:2–3), and progressing in the faith (3:2)",
+      "refs": [
+        {
+          "text": "2:5",
+          "book": "Revelation",
+          "spec": "2:5",
+          "implied": true
+        },
+        {
+          "text": "3:3",
+          "book": "Revelation",
+          "spec": "3:3",
+          "implied": true
+        },
+        {
+          "text": "2:5, 2:16, 21–22",
+          "book": "Revelation",
+          "spec": "2:5,2:16,21-22",
+          "implied": true
+        },
+        {
+          "text": "3:3",
+          "book": "Revelation",
+          "spec": "3:3",
+          "implied": true
+        },
+        {
+          "text": "2:5",
+          "book": "Revelation",
+          "spec": "2:5",
+          "implied": true
+        },
+        {
+          "text": "3:2–3",
+          "book": "Revelation",
+          "spec": "3:2-3",
+          "implied": true
+        },
+        {
+          "text": "3:2",
+          "book": "Revelation",
+          "spec": "3:2",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N–N, N, N–N, N (1×; The Call of Christ › 4-Session1-TheGospel)",
+      "text": "_Biblical Narrative (Acts 2:22–23, 27, 30–31, 34, 36)",
+      "refs": [
+        {
+          "text": "Acts 2:22–23, 27, 30–31, 34, 36",
+          "book": "Acts",
+          "spec": "2:22-23,27,30-31,34,36"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N-Nx (1×; The Ends of the Earth › session1)",
+      "text": "Simply put, the disciples were to boldly witness in the power of the Spirit (1:4-8a)",
+      "context": "Acts 1:1 says so.\n\nSimply put, the disciples were to boldly witness in the power of the Spirit (1:4-8a)",
+      "refs": [
+        {
+          "text": "1:4-8a",
+          "book": "Acts",
+          "spec": "1:4-8a",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape named: Book N:N, N-N (1×; The Making of a Shepherd › session1)",
+      "text": "Known as a man of the Spirit who was discerning and wise (Genesis 41:33, 38-39), Joseph displayed the ability to be prudent, judicious, and timely in his words and actions",
+      "refs": [
+        {
+          "text": "Genesis 41:33, 38-39",
+          "book": "Genesis",
+          "spec": "41:33,38-39"
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N– N, N–N (1×; HomeStead › 02-PartOne-Preparation)",
+      "text": "(78:12– 14, 42–53)",
+      "context": "Psalm 1:1 says so.\n\n(78:12– 14, 42–53)",
+      "refs": [
+        {
+          "text": "78:12– 14, 42–53",
+          "book": "Psalm",
+          "spec": "78:12-14,42-53",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N-N, N, N-N (1×; Proverbs and Faith Formation › 05-Every-Good-Path)",
+      "text": "In the quest for wisdom, if the youth obtains and keeps wisdom (3:13-14, 18, 21; 6:20-21; 7:1-4; 8:10-11, 17, 32, 34-35), wisdom will guard and keep him (2:8, 11-12; 3:26; 6:22; 7:5)",
+      "context": "Proverbs 1:1 says so.\n\nIn the quest for wisdom, if the youth obtains and keeps wisdom (3:13-14, 18, 21; 6:20-21; 7:1-4; 8:10-11, 17, 32, 34-35), wisdom will guard and keep him (2:8, 11-12; 3:26; 6:22; 7:5)",
+      "refs": [
+        {
+          "text": "3:13-14, 18, 21",
+          "book": "Proverbs",
+          "spec": "3:13-14,18,21",
+          "implied": true
+        },
+        {
+          "text": "6:20-21",
+          "book": "Proverbs",
+          "spec": "6:20-21",
+          "implied": true
+        },
+        {
+          "text": "7:1-4",
+          "book": "Proverbs",
+          "spec": "7:1-4",
+          "implied": true
+        },
+        {
+          "text": "8:10-11, 17, 32, 34-35",
+          "book": "Proverbs",
+          "spec": "8:10-11,17,32,34-35",
+          "implied": true
+        },
+        {
+          "text": "2:8, 11-12",
+          "book": "Proverbs",
+          "spec": "2:8,11-12",
+          "implied": true
+        },
+        {
+          "text": "3:26",
+          "book": "Proverbs",
+          "spec": "3:26",
+          "implied": true
+        },
+        {
+          "text": "6:22",
+          "book": "Proverbs",
+          "spec": "6:22",
+          "implied": true
+        },
+        {
+          "text": "7:5",
+          "book": "Proverbs",
+          "spec": "7:5",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content shape continuation: N:N-N, N-N, N (1×; Proverbs and Faith Formation › 06-Come-Eat-of-My-Bread)",
+      "text": "The appeal of the father and mother punctuate the text, inviting the son to embrace wisdom (Proverbs 1:8-10, 15; 2:1-5; 3:1-4, 11-12, 21; 4:1-2, 10, 20; 5:1-2, 7; 6:1-3, 20-22; 7:1-5; 8:32)",
+      "refs": [
+        {
+          "text": "Proverbs 1:8-10, 15",
+          "book": "Proverbs",
+          "spec": "1:8-10,15"
+        },
+        {
+          "text": "2:1-5",
+          "book": "Proverbs",
+          "spec": "2:1-5",
+          "continuation": true
+        },
+        {
+          "text": "3:1-4, 11-12, 21",
+          "book": "Proverbs",
+          "spec": "3:1-4,11-12,21",
+          "continuation": true
+        },
+        {
+          "text": "4:1-2, 10, 20",
+          "book": "Proverbs",
+          "spec": "4:1-2,10,20",
+          "continuation": true
+        },
+        {
+          "text": "5:1-2, 7",
+          "book": "Proverbs",
+          "spec": "5:1-2,7",
+          "continuation": true
+        },
+        {
+          "text": "6:1-3, 20-22",
+          "book": "Proverbs",
+          "spec": "6:1-3,20-22",
+          "continuation": true
+        },
+        {
+          "text": "7:1-5",
+          "book": "Proverbs",
+          "spec": "7:1-5",
+          "continuation": true
+        },
+        {
+          "text": "8:32",
+          "book": "Proverbs",
+          "spec": "8:32",
+          "continuation": true
+        }
+      ]
+    },
+    {
+      "name": "content shape implied: N:N, N, N-N, N (1×; Proverbs and Faith Formation › 07-Do-Not-Forget-My-Teaching)",
+      "text": "We are enjoined to develop _attention_: focus, intentionality, and concentration on what is most important (1:8, 25, 33; 2:2; 3:21; 4:1, 10, 20-21, 23; 4:25; 5:1, 11; 7:24; 8:6, 33-34)",
+      "context": "Proverbs 1:1 says so.\n\nWe are enjoined to develop _attention_: focus, intentionality, and concentration on what is most important (1:8, 25, 33; 2:2; 3:21; 4:1, 10, 20-21, 23; 4:25; 5:1, 11; 7:24; 8:6, 33-34)",
+      "refs": [
+        {
+          "text": "1:8, 25, 33",
+          "book": "Proverbs",
+          "spec": "1:8,25,33",
+          "implied": true
+        },
+        {
+          "text": "2:2",
+          "book": "Proverbs",
+          "spec": "2:2",
+          "implied": true
+        },
+        {
+          "text": "3:21",
+          "book": "Proverbs",
+          "spec": "3:21",
+          "implied": true
+        },
+        {
+          "text": "4:1, 10, 20-21, 23",
+          "book": "Proverbs",
+          "spec": "4:1,10,20-21,23",
+          "implied": true
+        },
+        {
+          "text": "4:25",
+          "book": "Proverbs",
+          "spec": "4:25",
+          "implied": true
+        },
+        {
+          "text": "5:1, 11",
+          "book": "Proverbs",
+          "spec": "5:1,11",
+          "implied": true
+        },
+        {
+          "text": "7:24",
+          "book": "Proverbs",
+          "spec": "7:24",
+          "implied": true
+        },
+        {
+          "text": "8:6, 33-34",
+          "book": "Proverbs",
+          "spec": "8:6,33-34",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content: a chapter:verse after a comma is its own item, in the same book (\"25:26, 33, 25:39\"; The Best Possible Life › 06-The-Anointed)",
+      "text": "God protects the innocent (25:26, 33, 25:39; 26:9, 11, 23).",
+      "context": "###### Biblical Narrative (1 Samuel 25:1–44)\n\nGod protects the innocent (25:26, 33, 25:39; 26:9, 11, 23).",
+      "refs": [
+        {
+          "text": "25:26, 33, 25:39",
+          "book": "1 Samuel",
+          "spec": "25:26,33,25:39",
+          "implied": true
+        },
+        {
+          "text": "26:9, 11, 23",
+          "book": "1 Samuel",
+          "spec": "26:9,11,23",
+          "implied": true
+        }
+      ]
+    },
+    {
+      "name": "content: no space after a comma (\"13:16,18, 21\"; The Best Possible Life › 08-The-Appeal)",
+      "text": "Samson spoke to God (13:16,18, 21; 14:4, 6).",
+      "context": "###### Biblical Narrative (Judges 13:1–25)\n\nSamson spoke to God (13:16,18, 21; 14:4, 6).",
+      "refs": [
+        {
+          "text": "13:16,18, 21",
+          "book": "Judges",
+          "spec": "13:16,18,21",
+          "implied": true
+        },
+        {
+          "text": "14:4, 6",
+          "book": "Judges",
+          "spec": "14:4,6",
+          "implied": true
+        }
+      ]
+    }
+  ],
+  "resolve": [
+    {
+      "book": "Genesis",
+      "spec": "1-50",
+      "passage": "Genesis 1:1–50:26",
+      "count": 1533
+    },
+    {
+      "book": "Genesis",
+      "spec": "1-50",
+      "maxChapters": 3,
+      "passage": "Genesis 1:1–3:24",
+      "count": 80,
+      "continuesThrough": "50:26"
+    },
+    {
+      "book": "Romans",
+      "spec": "9-11",
+      "maxChapters": 3,
+      "passage": "Romans 9:1–11:36",
+      "count": 90
+    },
+    {
+      "book": "Psalm",
+      "spec": "119",
+      "maxChapters": 3,
+      "passage": "Psalm 119:1–176",
+      "count": 176
+    },
+    {
+      "book": "Genesis",
+      "spec": "1-11:26",
+      "passage": "Genesis 1:1–11:26",
+      "count": 293
+    },
+    {
+      "book": "Exodus",
+      "spec": "11:1-13:16",
+      "passage": "Exodus 11:1–13:16",
+      "count": 77
+    },
+    {
+      "book": "Isaiah",
+      "spec": "52:13-53:12",
+      "passage": "Isaiah 52:13–53:12",
+      "count": 15
+    },
+    {
+      "book": "Job",
+      "spec": "5",
+      "passage": "Job 5:1–27",
+      "count": 27
+    },
+    {
+      "book": "Psalms",
+      "spec": "127",
+      "passage": "Psalm 127:1–5",
+      "count": 5
+    },
+    {
+      "book": "John",
+      "spec": "3:16",
+      "passage": "John 3:16",
+      "count": 1
+    },
+    {
+      "book": "John",
+      "spec": "3:16a",
+      "passage": "John 3:16",
+      "count": 1
+    },
+    {
+      "book": "John",
+      "spec": "3:16-18,20",
+      "passage": "John 3:16–18, 20",
+      "count": 4
+    },
+    {
+      "book": "John",
+      "spec": "3:16,16",
+      "passage": "John 3:16",
+      "count": 1
+    },
+    {
+      "book": "John",
+      "spec": "3:16,18-4:2",
+      "passage": "John 3:16; 3:18–4:2",
+      "count": 22
+    },
+    {
+      "book": "Revelation",
+      "spec": "7:9,19:6",
+      "passage": "Revelation 7:9; 19:6",
+      "count": 2
+    },
+    {
+      "book": "Ruth",
+      "spec": "1:16,1:15",
+      "passage": "Ruth 1:16, 15",
+      "count": 2
+    },
+    {
+      "book": "Jude",
+      "spec": "3",
+      "passage": "Jude 3",
+      "count": 1
+    },
+    {
+      "book": "Jude",
+      "spec": "3-4",
+      "passage": "Jude 3–4",
+      "count": 2
+    },
+    {
+      "book": "Philemon",
+      "spec": "1:6",
+      "passage": "Philemon 6",
+      "count": 1
+    },
+    {
+      "book": "3 John",
+      "spec": "1-15",
+      "passage": "3 John 1–14",
+      "count": 14,
+      "problems": ["3 John 1:15 does not exist (3 John 1 has 14 verses)"]
+    },
+    {
+      "book": "Psalm",
+      "spec": "45:1-18",
+      "passage": "Psalm 45:1–17",
+      "count": 17,
+      "problems": ["Psalm 45:18 does not exist (Psalm 45 has 17 verses)"]
+    },
+    {
+      "book": "Acts",
+      "spec": "6:9,11-13,23",
+      "passage": "Acts 6:9, 11–13",
+      "count": 4,
+      "problems": ["Acts 6:23 does not exist (Acts 6 has 15 verses)"]
+    },
+    {
+      "book": "1 Samuel",
+      "spec": "20:41-2",
+      "passage": "1 Samuel 20:41",
+      "count": 1,
+      "problems": ["1 Samuel 20:41–2 runs backwards"]
+    },
+    {
+      "book": "John",
+      "spec": "13:31-30",
+      "passage": "John 13:31",
+      "count": 1,
+      "problems": ["John 13:31–30 runs backwards"]
+    },
+    {
+      "book": "Colossians",
+      "spec": "5:20-21",
+      "passage": "Colossians",
+      "count": 0,
+      "problems": ["Colossians 5 does not exist"]
+    },
+    {
+      "book": "Mark",
+      "spec": "6:66",
+      "passage": "Mark",
+      "count": 0,
+      "problems": ["Mark 6:66 does not exist (Mark 6 has 56 verses)"]
+    },
+    {
+      "book": "Hezekiah",
+      "spec": "1:1",
+      "passage": "Hezekiah",
+      "count": 0,
+      "problems": [
+        "no book \"Hezekiah\""
+      ]
+    },
+    {
+      "book": "John",
+      "spec": "abc",
+      "passage": "John",
+      "count": 0,
+      "problems": [
+        "can't read \"abc\""
+      ]
+    }
+  ],
+  "chapterLengths": {
+    "Genesis": [31, 25, 24, 26, 32, 22, 24, 22, 29, 32, 32, 20, 18, 24, 21, 16, 27, 33, 38, 18, 34, 24, 20, 67, 34, 35, 46, 22, 35, 43, 55, 32, 20, 31, 29, 43, 36, 30, 23, 23, 57, 38, 34, 34, 28, 34, 31, 22, 33, 26],
+    "Exodus": [22, 25, 22, 31, 23, 30, 25, 32, 35, 29, 10, 51, 22, 31, 27, 36, 16, 27, 25, 26, 36, 31, 33, 18, 40, 37, 21, 43, 46, 38, 18, 35, 23, 35, 35, 38, 29, 31, 43, 38],
+    "Leviticus": [17, 16, 17, 35, 19, 30, 38, 36, 24, 20, 47, 8, 59, 57, 33, 34, 16, 30, 37, 27, 24, 33, 44, 23, 55, 46, 34],
+    "Numbers": [54, 34, 51, 49, 31, 27, 89, 26, 23, 36, 35, 16, 33, 45, 41, 50, 13, 32, 22, 29, 35, 41, 30, 25, 18, 65, 23, 31, 40, 16, 54, 42, 56, 29, 34, 13],
+    "Deuteronomy": [46, 37, 29, 49, 33, 25, 26, 20, 29, 22, 32, 32, 18, 29, 23, 22, 20, 22, 21, 20, 23, 30, 25, 22, 19, 19, 26, 68, 29, 20, 30, 52, 29, 12],
+    "Joshua": [18, 24, 17, 24, 15, 27, 26, 35, 27, 43, 23, 24, 33, 15, 63, 10, 18, 28, 51, 9, 45, 34, 16, 33],
+    "Judges": [36, 23, 31, 24, 31, 40, 25, 35, 57, 18, 40, 15, 25, 20, 20, 31, 13, 31, 30, 48, 25],
+    "Ruth": [22, 23, 18, 22],
+    "1 Samuel": [28, 36, 21, 22, 12, 21, 17, 22, 27, 27, 15, 25, 23, 52, 35, 23, 58, 30, 24, 42, 15, 23, 29, 22, 44, 25, 12, 25, 11, 31, 13],
+    "2 Samuel": [27, 32, 39, 12, 25, 23, 29, 18, 13, 19, 27, 31, 39, 33, 37, 23, 29, 33, 43, 26, 22, 51, 39, 25],
+    "1 Kings": [53, 46, 28, 34, 18, 38, 51, 66, 28, 29, 43, 33, 34, 31, 34, 34, 24, 46, 21, 43, 29, 53],
+    "2 Kings": [18, 25, 27, 44, 27, 33, 20, 29, 37, 36, 21, 21, 25, 29, 38, 20, 41, 37, 37, 21, 26, 20, 37, 20, 30],
+    "1 Chronicles": [54, 55, 24, 43, 26, 81, 40, 40, 44, 14, 47, 40, 14, 17, 29, 43, 27, 17, 19, 8, 30, 19, 32, 31, 31, 32, 34, 21, 30],
+    "2 Chronicles": [17, 18, 17, 22, 14, 42, 22, 18, 31, 19, 23, 16, 22, 15, 19, 14, 19, 34, 11, 37, 20, 12, 21, 27, 28, 23, 9, 27, 36, 27, 21, 33, 25, 33, 27, 23],
+    "Ezra": [11, 70, 13, 24, 17, 22, 28, 36, 15, 44],
+    "Nehemiah": [11, 20, 32, 23, 19, 19, 73, 18, 38, 39, 36, 47, 31],
+    "Esther": [22, 23, 15, 17, 14, 14, 10, 17, 32, 3],
+    "Job": [22, 13, 26, 21, 27, 30, 21, 22, 35, 22, 20, 25, 28, 22, 35, 22, 16, 21, 29, 29, 34, 30, 17, 25, 6, 14, 23, 28, 25, 31, 40, 22, 33, 37, 16, 33, 24, 41, 30, 24, 34, 17],
+    "Psalm": [6, 12, 8, 8, 12, 10, 17, 9, 20, 18, 7, 8, 6, 7, 5, 11, 15, 50, 14, 9, 13, 31, 6, 10, 22, 12, 14, 9, 11, 12, 24, 11, 22, 22, 28, 12, 40, 22, 13, 17, 13, 11, 5, 26, 17, 11, 9, 14, 20, 23, 19, 9, 6, 7, 23, 13, 11, 11, 17, 12, 8, 12, 11, 10, 13, 20, 7, 35, 36, 5, 24, 20, 28, 23, 10, 12, 20, 72, 13, 19, 16, 8, 18, 12, 13, 17, 7, 18, 52, 17, 16, 15, 5, 23, 11, 13, 12, 9, 9, 5, 8, 28, 22, 35, 45, 48, 43, 13, 31, 7, 10, 10, 9, 8, 18, 19, 2, 29, 176, 7, 8, 9, 4, 8, 5, 6, 5, 6, 8, 8, 3, 18, 3, 3, 21, 26, 9, 8, 24, 13, 10, 7, 12, 15, 21, 10, 20, 14, 9, 6],
+    "Proverbs": [33, 22, 35, 27, 23, 35, 27, 36, 18, 32, 31, 28, 25, 35, 33, 33, 28, 24, 29, 30, 31, 29, 35, 34, 28, 28, 27, 28, 27, 33, 31],
+    "Ecclesiastes": [18, 26, 22, 16, 20, 12, 29, 17, 18, 20, 10, 14],
+    "Song of Solomon": [17, 17, 11, 16, 16, 13, 13, 14],
+    "Isaiah": [31, 22, 26, 6, 30, 13, 25, 22, 21, 34, 16, 6, 22, 32, 9, 14, 14, 7, 25, 6, 17, 25, 18, 23, 12, 21, 13, 29, 24, 33, 9, 20, 24, 17, 10, 22, 38, 22, 8, 31, 29, 25, 28, 28, 25, 13, 15, 22, 26, 11, 23, 15, 12, 17, 13, 12, 21, 14, 21, 22, 11, 12, 19, 12, 25, 24],
+    "Jeremiah": [19, 37, 25, 31, 31, 30, 34, 22, 26, 25, 23, 17, 27, 22, 21, 21, 27, 23, 15, 18, 14, 30, 40, 10, 38, 24, 22, 17, 32, 24, 40, 44, 26, 22, 19, 32, 21, 28, 18, 16, 18, 22, 13, 30, 5, 28, 7, 47, 39, 46, 64, 34],
+    "Lamentations": [22, 22, 66, 22, 22],
+    "Ezekiel": [28, 10, 27, 17, 17, 14, 27, 18, 11, 22, 25, 28, 23, 23, 8, 63, 24, 32, 14, 49, 32, 31, 49, 27, 17, 21, 36, 26, 21, 26, 18, 32, 33, 31, 15, 38, 28, 23, 29, 49, 26, 20, 27, 31, 25, 24, 23, 35],
+    "Daniel": [21, 49, 30, 37, 31, 28, 28, 27, 27, 21, 45, 13],
+    "Hosea": [11, 23, 5, 19, 15, 11, 16, 14, 17, 15, 12, 14, 16, 9],
+    "Joel": [20, 32, 21],
+    "Amos": [15, 16, 15, 13, 27, 14, 17, 14, 15],
+    "Obadiah": [21],
+    "Jonah": [17, 10, 10, 11],
+    "Micah": [16, 13, 12, 13, 15, 16, 20],
+    "Nahum": [15, 13, 19],
+    "Habakkuk": [17, 20, 19],
+    "Zephaniah": [18, 15, 20],
+    "Haggai": [15, 23],
+    "Zechariah": [21, 13, 10, 14, 11, 15, 14, 23, 17, 12, 17, 14, 9, 21],
+    "Malachi": [14, 17, 18, 6],
+    "Matthew": [25, 23, 17, 25, 48, 34, 29, 34, 38, 42, 30, 50, 58, 36, 39, 28, 27, 35, 30, 34, 46, 46, 39, 51, 46, 75, 66, 20],
+    "Mark": [45, 28, 35, 41, 43, 56, 37, 38, 50, 52, 33, 44, 37, 72, 47, 20],
+    "Luke": [80, 52, 38, 44, 39, 49, 50, 56, 62, 42, 54, 59, 35, 35, 32, 31, 37, 43, 48, 47, 38, 71, 56, 53],
+    "John": [51, 25, 36, 54, 47, 71, 53, 59, 41, 42, 57, 50, 38, 31, 27, 33, 26, 40, 42, 31, 25],
+    "Acts": [26, 47, 26, 37, 42, 15, 60, 40, 43, 48, 30, 25, 52, 28, 41, 40, 34, 28, 41, 38, 40, 30, 35, 27, 27, 32, 44, 31],
+    "Romans": [32, 29, 31, 25, 21, 23, 25, 39, 33, 21, 36, 21, 14, 23, 33, 27],
+    "1 Corinthians": [31, 16, 23, 21, 13, 20, 40, 13, 27, 33, 34, 31, 13, 40, 58, 24],
+    "2 Corinthians": [24, 17, 18, 18, 21, 18, 16, 24, 15, 18, 33, 21, 14],
+    "Galatians": [24, 21, 29, 31, 26, 18],
+    "Ephesians": [23, 22, 21, 32, 33, 24],
+    "Philippians": [30, 30, 21, 23],
+    "Colossians": [29, 23, 25, 18],
+    "1 Thessalonians": [10, 20, 13, 18, 28],
+    "2 Thessalonians": [12, 17, 18],
+    "1 Timothy": [20, 15, 16, 16, 25, 21],
+    "2 Timothy": [18, 26, 17, 22],
+    "Titus": [16, 15, 15],
+    "Philemon": [25],
+    "Hebrews": [14, 18, 19, 16, 14, 20, 28, 13, 28, 39, 40, 29, 25],
+    "James": [27, 26, 18, 17, 20],
+    "1 Peter": [25, 25, 22, 19, 14],
+    "2 Peter": [21, 22, 18],
+    "1 John": [10, 29, 24, 21, 21],
+    "2 John": [13],
+    "3 John": [14],
+    "Jude": [25],
+    "Revelation": [20, 29, 22, 11, 14, 17, 17, 13, 21, 11, 19, 17, 18, 20, 8, 21, 18, 24, 21, 15, 27, 21]
+  }
+}

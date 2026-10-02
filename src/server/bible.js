@@ -3,6 +3,7 @@ const usfmAudio = require('./usfm-audio');
 const cache = require('./cache');
 const fs = require('fs');
 const path = require('path');
+const scripture = require('../vendor/scripture.cjs');
 
 const translations = {};
 let loaded = false;
@@ -284,94 +285,65 @@ function getVerse(translation, ref) {
   return t.verses[ref] || null;
 }
 
-// Look up a range like "Acts 2:1-5" or complex refs like "Acts 2:23, 25-31"
-// Returns array of { ref, text } objects
-function getVerses(translation, refString) {
+// Per-translation index for the shared resolver: chapter lengths from the verse keys, and the
+// translation's own spelling of each canonical (BSB) book name. Rebuilt when a reload replaces t.
+const passageIndex = new WeakMap();
+function indexFor(t) {
+  let ix = passageIndex.get(t);
+  if (!ix) {
+    const names = new Map();
+    for (const name of t.books.keys()) names.set(scripture.canonicalBook(name) || name, name);
+    ix = { names, lengths: scripture.chapterLengthsFromKeys(Object.keys(t.verses)) };
+    passageIndex.set(t, ix);
+  }
+  return ix;
+}
+
+// The verses a reference names, through the shared resolver (Collective-Shared ARCHITECTURE §9c):
+// "Genesis 1-50" (whole chapters), "Exodus 11:1-13:16" (every chapter between), "Acts 2:23, 25-31",
+// "2 Samuel 7:12-16; Isaiah 11:1-5" (";" parts; a part without a book keeps the previous one's).
+// Returns { verses: [{ ref, verse, text, paragraphStart?, sectionHeading? } | { gap: true }],
+// continuesThrough: { book, chapter, verse } | null, problems }. With maxChapters, each part
+// stops after that many chapters and continuesThrough names where it would have ended.
+function getPassage(translation, refString, { maxChapters } = {}) {
+  const out = { verses: [], continuesThrough: null, problems: [] };
   const t = translations[translation];
-  if (!t) return [];
+  if (!t) return out;
+  const { names, lengths } = indexFor(t);
 
-  const results = [];
-
-  // Split on semicolons for multi-book refs: "2 Samuel 7:12-16; Isaiah 11:1-5"
-  const parts = refString.split(/;\s*/);
-
-  for (const part of parts) {
-    // Match "Book Chapter:Verse" pattern
-    const bookMatch = part.match(/^(.+?)\s+(\d+):(.+)$/);
-    if (!bookMatch) continue;
-
-    const [, bookName, chapter, verseSpec] = bookMatch;
-
-    // Parse verse spec: "1-5" or "23, 25-31" or "1-19:38" (cross-chapter)
-    const segments = verseSpec.split(/,\s*/);
-
-    const ch = parseInt(chapter);
-    const book = t.books.get(bookName);
-    const chapterVerses = book ? book.chapters.get(ch) : null;
-
-    let lastVerse = null;
-    for (const seg of segments) {
-      // Cross-chapter range: "1-19:38" means chapter:1 through chapter 19:38
-      const crossMatch = seg.trim().match(/^(\d+)[–-](\d+):(\d+)$/);
-      if (crossMatch && book) {
-        const startVerse = parseInt(crossMatch[1]);
-        const endChapter = parseInt(crossMatch[2]);
-        const endVerse = parseInt(crossMatch[3]);
-
-        for (let c = ch; c <= endChapter; c++) {
-          const cVerses = book.chapters.get(c);
-          if (!cVerses) continue;
-          const vStart = (c === ch) ? startVerse : 1;
-          const vEnd = (c === endChapter) ? endVerse : Math.max(...cVerses.map(v => v.verse));
-
-          for (let v = vStart; v <= vEnd; v++) {
-            const key = `${bookName} ${c}:${v}`;
-            const text = t.verses[key];
-            if (text) {
-              const entry = { ref: key, verse: v, text };
-              const verseObj = cVerses.find(cv => cv.verse === v);
-              if (verseObj) {
-                if (verseObj.paragraphStart) entry.paragraphStart = true;
-                if (verseObj.sectionHeading) entry.sectionHeading = verseObj.sectionHeading;
-              }
-              results.push(entry);
-            }
-          }
-        }
-        continue;
+  let book = null;
+  let prev = null; // the last verse added, for gaps
+  for (const part of String(refString).split(/;\s*/)) {
+    const m = part.trim().match(/^(?:(.+?)\s+)?(\d[\d:,\s\-–—a-c]*)$/);
+    if (!m) continue;
+    if (m[1]) book = scripture.canonicalBook(m[1]);
+    if (!book) continue;
+    const p = scripture.resolvePassage(book, m[2], lengths, maxChapters ? { maxChapters } : {});
+    out.problems.push(...p.problems);
+    if (p.continuesThrough && !out.continuesThrough) out.continuesThrough = { book: p.book, ...p.continuesThrough };
+    const name = names.get(p.book) || p.book;
+    const chapters = t.books.get(name) ? t.books.get(name).chapters : null;
+    for (const { chapter, verse } of p.verses) {
+      const key = `${name} ${chapter}:${verse}`;
+      const text = t.verses[key];
+      if (!text) continue;
+      if (prev && prev.book === p.book && prev.chapter === chapter && verse !== prev.verse + 1) out.verses.push({ gap: true });
+      const entry = { ref: key, verse, text };
+      const verseObj = chapters && (chapters.get(chapter) || []).find(cv => cv.verse === verse);
+      if (verseObj) {
+        if (verseObj.paragraphStart) entry.paragraphStart = true;
+        if (verseObj.sectionHeading) entry.sectionHeading = verseObj.sectionHeading;
       }
-
-      // Single-chapter range: "1-5" or just "1"
-      const rangeMatch = seg.trim().match(/^(\d+)(?:[–-](\d+))?$/);
-      if (!rangeMatch) continue;
-
-      const start = parseInt(rangeMatch[1]);
-      const end = rangeMatch[2] ? parseInt(rangeMatch[2]) : start;
-
-      if (lastVerse !== null && start !== lastVerse + 1) {
-        results.push({ gap: true });
-      }
-
-      for (let v = start; v <= end; v++) {
-        const key = `${bookName} ${chapter}:${v}`;
-        const text = t.verses[key];
-        if (text) {
-          const entry = { ref: key, verse: v, text };
-          if (chapterVerses) {
-            const verseObj = chapterVerses.find(cv => cv.verse === v);
-            if (verseObj) {
-              if (verseObj.paragraphStart) entry.paragraphStart = true;
-              if (verseObj.sectionHeading) entry.sectionHeading = verseObj.sectionHeading;
-            }
-          }
-          results.push(entry);
-          lastVerse = v;
-        }
-      }
+      out.verses.push(entry);
+      prev = { book: p.book, chapter, verse };
     }
   }
+  return out;
+}
 
-  return results;
+// The verses alone (see getPassage).
+function getVerses(translation, refString) {
+  return getPassage(translation, refString).verses;
 }
 
 function getTranslation(id) {
@@ -503,6 +475,7 @@ module.exports = {
   getServedVerses,
   getVerse,
   getVerses,
+  getPassage,
   getTranslation,
   getAllTranslations,
   getBookList,

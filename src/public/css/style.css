@@ -2197,6 +2197,21 @@ body.text-mode .home-text {
   margin: 1rem 0;
 }
 
+/* A passage cut at 3 chapters: "… continues through Genesis 50 — Read in context ›" */
+.verse-popup-body .verse-popup-continues {
+  margin-top: 1rem;
+  font-style: italic;
+  color: var(--color-text-light);
+}
+
+.verse-popup-continues a {
+  font-style: normal;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-green-dark);
+  white-space: nowrap;
+}
+
 .verse-popup-loading {
   text-align: center;
   padding: 2rem;

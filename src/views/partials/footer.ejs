@@ -82,7 +82,7 @@
   window.__NC_USER = <%- user ? JSON.stringify({ email: user.email, displayName: user.displayName, photoURL: user.photoURL, isAdmin: !!user.isAdmin, isEditor: !!user.isEditor }).replace(/</g, '\\u003c') : 'null' %>;
 </script>
 <% } %>
-<script src="/static/js/main.js?v=18"></script>
+<script src="/static/js/main.js?v=19"></script>
 <script>window.__NC_TRANSLATIONS = <%- typeof bibleTranslations !== 'undefined' && bibleTranslations ? JSON.stringify(bibleTranslations).replace(/</g, '\\u003c') : '[]' %>;</script>
 <script>window.__analyticsContext = <%- analyticsContext ? JSON.stringify(analyticsContext).replace(/</g, '\\u003c') : 'null' %>;</script>
 <script src="/static/js/analytics.js?v=2"></script>

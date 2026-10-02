@@ -1,5 +1,6 @@
 const MarkdownIt = require('markdown-it');
 const footnotePlugin = require('markdown-it-footnote');
+const scripture = require('../vendor/scripture.cjs');
 
 // ── Common-content includes ──────────────────────────────────────────────
 // Resolves `<!-- @include: KeyName param="value" -->` directives against a
@@ -533,6 +534,65 @@ function preprocess(raw, options = {}) {
   return text;
 }
 
+// ── Scripture references ──────────────────────────────────────────────────
+// What links is decided by the shared parser (@noble-collective/userdata/scripture, vendored in
+// src/vendor/scripture.cjs; Collective-Shared ARCHITECTURE §9c), run on the session MARKDOWN the
+// way the mobile app and Collective-Shared scripts/scripture-audit read it: each paragraph on its
+// own, with the whole session's book context. Rendering then mustn't move the references, so each
+// one is wrapped in private-use marks before markdown-it ("\uE000" + its index in \uE010–\uE019
+// digits … "\uE001") and the marks become <a class="bible-ref"> links after it. The marks behave
+// like letters to markdown-it (not punctuation or space), so emphasis and smart quotes around a
+// reference render exactly as before.
+const SCRIPTURE_OPEN = '\uE000';
+const SCRIPTURE_CLOSE = '\uE001';
+const SCRIPTURE_MARK = /\uE000[\uE010-\uE019]*|\uE001/g;
+const PARAGRAPH = /[^\n]+(?:\n(?!\s*\n)[^\n]+)*/g;
+
+function markScriptureReferences(text) {
+  text = text.replace(/[\uE000-\uE01F]/g, '');
+  const context = scripture.bookContext(text);
+  const refs = [];
+  for (const p of text.matchAll(PARAGRAPH)) {
+    for (const r of scripture.findReferences(p[0], { context, contextOffset: p.index })) {
+      refs.push({ ...r, start: r.start + p.index, end: r.end + p.index });
+    }
+  }
+  let out = '';
+  let at = 0;
+  refs.forEach((r, i) => {
+    const index = String(i).replace(/\d/g, (d) => String.fromCharCode(0xE010 + +d));
+    out += text.slice(at, r.start) + SCRIPTURE_OPEN + index + text.slice(r.start, r.end) + SCRIPTURE_CLOSE;
+    at = r.end;
+  });
+  return { text: out + text.slice(at), refs };
+}
+
+const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+// data-ref is "Book spec" with the shared parser's normal-form spec ("John 3:16-18,20",
+// "Genesis 1-50"); /api/verses resolves it. A mark inside a tag or a comment (an image's alt text)
+// is dropped, and so is one inside an existing link (no nested <a>).
+function linkScriptureReferences(html, refs) {
+  const stack = [];
+  let inLink = 0;
+  return html.replace(/<!--[\s\S]*?-->|<[^>]*>|\uE000([\uE010-\uE019]+)|\uE001/g, (m, digits) => {
+    if (m[0] === '<') {
+      if (/^<a[\s>]/i.test(m)) inLink++;
+      else if (/^<\/a\s*>/i.test(m)) inLink = Math.max(0, inLink - 1);
+      return m.replace(SCRIPTURE_MARK, '');
+    }
+    if (m === SCRIPTURE_CLOSE) return stack.pop() ? '</a>' : '';
+    const r = refs[+digits.replace(/./g, (c) => c.charCodeAt(0) - 0xE010)];
+    if (!r || inLink) {
+      stack.push(false);
+      return '';
+    }
+    stack.push(true);
+    const shown = r.implied || r.continuation ? `${r.book} ${r.text}` : r.text;
+    return `<a class="bible-ref" href="#" data-ref="${escapeAttr(`${r.book} ${r.spec}`)}" title="${escapeAttr(shown)}">`;
+  });
+}
+
 function createRenderer(options = {}) {
   const headingColors = options.color || {};
   const maxNavHeadingLevel = options.maxNavHeadingLevel || 2;
@@ -562,7 +622,8 @@ function createRenderer(options = {}) {
     if (levelNum >= 2 && levelNum <= maxNavHeadingLevel) {
       const contentToken = tokens[idx + 1];
       if (contentToken && contentToken.content) {
-        let slug = contentToken.content.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        // Scripture marks aren't heading text: the slug must match extractHeadings' (index.js).
+        let slug = contentToken.content.replace(SCRIPTURE_MARK, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         // Deduplicate slugs
         if (slugCounts[slug]) {
           slugCounts[slug]++;
@@ -582,7 +643,8 @@ function createRenderer(options = {}) {
 
 function renderMarkdown(content, options = {}) {
   if (options.includeBlocks) content = resolveIncludes(content, options.includeBlocks);
-  const processed = preprocess(content, options);
+  const marked = markScriptureReferences(content);
+  const processed = preprocess(marked.text, options);
   const md = createRenderer(options);
   let html = md.render(processed);
 
@@ -649,206 +711,8 @@ function renderMarkdown(content, options = {}) {
     '<p class="sub-para"><strong>$1</strong>'
   );
 
-  // Detect Bible references and wrap in clickable links.
-  // Tracks "current book" context so shorthand refs like (2:1) get expanded
-  // to full refs like "Acts 2:1" based on the nearest preceding full citation.
-
-  // Known Bible book names
-  const BIBLE_BOOKS = [
-    'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
-    'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
-    '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles',
-    'Ezra', 'Nehemiah', 'Esther', 'Job', 'Psalm', 'Psalms', 'Proverbs',
-    'Ecclesiastes', 'Song of Solomon', 'Isaiah', 'Jeremiah',
-    'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos',
-    'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah',
-    'Haggai', 'Zechariah', 'Malachi',
-    'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans',
-    '1 Corinthians', '2 Corinthians', 'Galatians', 'Ephesians',
-    'Philippians', 'Colossians', '1 Thessalonians', '2 Thessalonians',
-    '1 Timothy', '2 Timothy', 'Titus', 'Philemon', 'Hebrews',
-    'James', '1 Peter', '2 Peter', '1 John', '2 John', '3 John',
-    'Jude', 'Revelation',
-  ];
-  // Build regex from known names (longest first to avoid partial matches)
-  const bookNamePat = BIBLE_BOOKS.sort((a, b) => b.length - a.length)
-    .map(b => b.replace(/\s/g, '\\s')).join('|');
-  // Verse spec: "15:1-19:38" or "2:1-47" or "2:23, 25-31, 33-35"
-  // Cross-chapter range: \d+:\d+ optionally followed by –\d+:\d+ or –\d+
-  const verseSpecPat = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
-  const fullRefPat = new RegExp(`(${bookNamePat})\\s(${verseSpecPat})`, 'g');
-  // Shorthand refs inside parens — handles semicolons, cf., cross-chapter ranges
-  const shorthandVerseSpec = '\\d+:\\d+(?:[–\\-]\\d+:\\d+|[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*';
-  const shorthandPat = new RegExp(`\\(((?:cf\\.\\s?)?(?:${shorthandVerseSpec})(?:;\\s?(?:cf\\.\\s?)?(?:${shorthandVerseSpec}))*)\\)`, 'g');
-
-  // KEEP IN STEP with the mobile app's port of this bare-citation rule
-  // (Noble-Imprint-App lib/features/reader/presentation/custom-syntaxes/
-  // bible-reference/implied_scripture_book.dart, since 2026-09-29): full-ref
-  // pattern, cf./; skips, section declarations, shorthandPat. Change one, change both.
-  // First pass: find all full references to build a context map.
-  // Section declarations ("Biblical Narrative (Book Ch:V)") are authoritative.
-  // Inline refs only update context when no section declaration is active.
-  const bookAtPosition = []; // [{pos, book, isSection}]
-
-  // Look for "Biblical Narrative (Book Ch:V)" pattern — the section declarations
-  const sectionDeclPat = new RegExp(`Biblical Narrative \\((${bookNamePat})\\s${verseSpecPat}`, 'g');
-  let sd;
-  while ((sd = sectionDeclPat.exec(html)) !== null) {
-    bookAtPosition.push({ pos: sd.index, book: sd[1], isSection: true });
-  }
-  const hasSectionDecls = bookAtPosition.length > 0;
-
-  // Also track from standalone full references (not cf., not compound)
-  let fm;
-  fullRefPat.lastIndex = 0;
-  while ((fm = fullRefPat.exec(html)) !== null) {
-    const before = html.substring(Math.max(0, fm.index - 1), fm.index);
-    if (before === '"' || before === '=' || before === '/') continue;
-    // Skip if inside an HTML tag
-    const afterTag = html.lastIndexOf('<', fm.index);
-    const afterClose = html.lastIndexOf('>', fm.index);
-    if (afterTag > afterClose) continue;
-    // Skip cf. references
-    const preceding = html.substring(Math.max(0, fm.index - 5), fm.index);
-    if (/cf\.\s?$/.test(preceding)) continue;
-    // Skip if preceded by semicolon (part of a compound ref like "; Psalm 16:8-11")
-    const precSemicolon = html.substring(Math.max(0, fm.index - 3), fm.index);
-    if (/;\s?$/.test(precSemicolon)) continue;
-    // If section declarations exist, inline refs don't change context —
-    // they're incidental quotes within a declared section
-    if (hasSectionDecls) continue;
-    // No section declarations (e.g., HomeStead) — inline refs set context
-    bookAtPosition.push({ pos: fm.index, book: fm[1], isSection: false });
-  }
-
-  function getBookAt(pos) {
-    let book = null;
-    for (const entry of bookAtPosition) {
-      if (entry.pos <= pos) book = entry.book;
-      else break;
-    }
-    return book;
-  }
-
-  // Second pass: wrap all references (full and shorthand) in links
-  // Process from end to start so positions don't shift
-
-  const replacements = [];
-
-  // Helper: check if position is inside an HTML tag's attribute (not just inside element content)
-  function isInsideTagAttribute(pos) {
-    const afterTag = html.lastIndexOf('<', pos);
-    const afterClose = html.lastIndexOf('>', pos);
-    if (afterTag <= afterClose) return false; // We're in element content, not a tag
-    // We're between < and > — check if it's an opening/closing tag definition
-    const tagContent = html.substring(afterTag, pos);
-    // If we see a quote before our position (attribute value), skip
-    return /=\s*["'][^"']*$/.test(tagContent) || /^<\/?[a-z]/.test(tagContent) && !/>\s*$/.test(tagContent);
-  }
-
-  // Collect full references
-  fullRefPat.lastIndex = 0;
-  while ((fm = fullRefPat.exec(html)) !== null) {
-    if (isInsideTagAttribute(fm.index)) continue; // Inside a tag
-
-    const fullRef = fm[0];
-    const fullBook = fm[1];
-    replacements.push({
-      start: fm.index,
-      end: fm.index + fm[0].length,
-      original: fm[0],
-      ref: fullRef,
-    });
-
-    // Also link semicolon-separated chapter:verse continuations that follow the
-    // full ref, even when NOT inside parentheses — e.g. "Job 1:6–12; 2:1–6" links
-    // "2:1–6" too (same book). Otherwise these are only caught inside parens.
-    let tailStart = fm.index + fm[0].length;
-    const contPat = /^(;\s?)((?:cf\.\s?)?\d+:\d+(?:[–\-]\d+:\d+|[–\-]\d+)?(?:,\s?\d+(?:[–\-]\d+)?)*)/;
-    let cm;
-    while ((cm = contPat.exec(html.slice(tailStart))) !== null) {
-      const sep = cm[1];
-      const verseSpec = cm[2].replace(/^cf\.\s?/, '');
-      const segStart = tailStart + sep.length + (cm[2].length - verseSpec.length);
-      const segEnd = segStart + verseSpec.length;
-      if (!isInsideTagAttribute(segStart)) {
-        replacements.push({
-          start: segStart,
-          end: segEnd,
-          original: verseSpec,
-          ref: `${fullBook} ${verseSpec}`,
-        });
-      }
-      tailStart = segEnd;
-    }
-  }
-
-  // Collect shorthand references — split on semicolons inside parens
-  let sm;
-  while ((sm = shorthandPat.exec(html)) !== null) {
-    const book = getBookAt(sm.index);
-    if (!book) continue;
-
-    if (isInsideTagAttribute(sm.index)) continue;
-
-    // The full match is everything inside parens. Split on semicolons.
-    const innerContent = sm[1];
-    const verseRefPat = /(?:cf\.\s?)?(\d+:\d+(?:[–\-]\d+)?(?:,\s?\d+(?:[–\-]\d+)?)*)/g;
-    let vm;
-    while ((vm = verseRefPat.exec(innerContent)) !== null) {
-      const verseSpec = vm[1];
-      const fullRef = `${book} ${verseSpec}`;
-      // Find position of this verse spec in the original HTML
-      const innerStart = sm.index + 1 + vm.index + (vm[0].length - vm[1].length); // +1 for opening paren
-      const innerEnd = innerStart + vm[1].length;
-
-      replacements.push({
-        start: innerStart,
-        end: innerEnd,
-        original: vm[1],
-        ref: fullRef,
-      });
-    }
-  }
-
-  // Single-chapter books cited without a chapter (e.g. "Jude 3", "Philemon 6",
-  // "2 John 4-6", "Obadiah 15") — the colon-based patterns above require a
-  // chapter:verse and miss these. The (?!:) guard avoids stealing the chapter of
-  // a rare "Jude 1:3"-style ref (which the full-ref pass already handles).
-  const singleChapterBooks = ['Obadiah', 'Philemon', '2 John', '3 John', 'Jude'];
-  const scBookPat = singleChapterBooks.map(b => b.replace(/\s/g, '\\s')).join('|');
-  const scPat = new RegExp(`(${scBookPat})\\s(\\d+(?:[–\\-]\\d+)?(?:,\\s?\\d+(?:[–\\-]\\d+)?)*)(?!:)`, 'g');
-  let scm;
-  while ((scm = scPat.exec(html)) !== null) {
-    if (isInsideTagAttribute(scm.index)) continue;
-    const before = html.substring(Math.max(0, scm.index - 1), scm.index);
-    if (before === '"' || before === '=' || before === '/') continue;
-    // Single-chapter books live under chapter 1 in the verse data; the display
-    // text stays "Jude 3" but the lookup ref needs the implicit chapter ("Jude 1:3").
-    replacements.push({
-      start: scm.index,
-      end: scm.index + scm[0].length,
-      original: scm[0],
-      ref: `${scm[1]} 1:${scm[2]}`,
-    });
-  }
-
-  // Sort by position descending and apply replacements
-  replacements.sort((a, b) => b.start - a.start);
-
-  // Deduplicate overlapping replacements (keep the one that starts first)
-  const used = new Set();
-  for (const r of replacements) {
-    let overlap = false;
-    for (let p = r.start; p < r.end; p++) {
-      if (used.has(p)) { overlap = true; break; }
-    }
-    if (overlap) continue;
-    for (let p = r.start; p < r.end; p++) used.add(p);
-
-    const link = `<a class="bible-ref" href="#" data-ref="${r.ref.replace(/[–]/g, '-').replace(/"/g, '&quot;')}" title="${r.ref}">${r.original}</a>`;
-    html = html.substring(0, r.start) + link + html.substring(r.end);
-  }
+  // Scripture references found on the markdown (markScriptureReferences) become links.
+  html = linkScriptureReferences(html, marked.refs);
 
   // Merge 1-cell heading tables with the body table that follows.
   // Pattern: <table> with a single <th> immediately followed by another <table>.

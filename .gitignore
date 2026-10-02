@@ -22,3 +22,6 @@ test-screenshots/
 temp/
 cookies.txt
 .claude/
+
+# Relay hand-off prompts between Claude sessions (local only)
+plans/relay/

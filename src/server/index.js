@@ -328,17 +328,23 @@ app.post('/api/cleanup-test-data', async (req, res) => {
   }
 });
 
-// Verse lookup API
+// Verse lookup API. Resolves through the shared parser (bible.getPassage). `maxChapters` (the
+// site's pop-up sends 3 — Steve's cap, Collective-Shared plan §2) cuts a long passage and returns
+// `continuesThrough` ({ book, chapter, verse }) so the pop-up can say "… continues through …".
+// Without it the whole passage comes back (the Institute proxies this endpoint).
 app.get('/api/verses', (req, res) => {
   const ref = req.query.ref;
   const translation = req.query.translation || 'bsb';
   if (!ref) return res.status(400).json({ error: 'ref parameter required' });
 
-  const verses = bible.getVerses(translation, ref);
-  if (verses.length === 0) {
+  const max = parseInt(req.query.maxChapters, 10);
+  const passage = bible.getPassage(translation, ref, { maxChapters: max > 0 ? max : undefined });
+  if (passage.verses.length === 0) {
     return res.status(404).json({ error: 'No verses found', ref, translation });
   }
-  res.json({ ref, translation, verses });
+  const body = { ref, translation, verses: passage.verses };
+  if (passage.continuesThrough) body.continuesThrough = passage.continuesThrough;
+  res.json(body);
 });
 
 // Voice comparison test page — side-by-side voice samples of a passage.
