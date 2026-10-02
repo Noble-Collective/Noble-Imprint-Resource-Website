@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read # the change check reads this workflow's past runs
   contents: read
   issues: write
 
@@ -19,7 +20,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Only when there's something new to test. A scheduled night skips (in seconds) if main is still at the commit the
+  # last nightly ran on, pass or fail; every push to main deploys, so this means "once, the night after a deploy". A
+  # failure isn't re-run nightly with no changes: its issue stays open until a fix lands. A manual dispatch always runs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nightly-safari.yml/runs?branch=main&status=completed&per_page=20" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success" or .conclusion == "failure")][0].head_sha // ""')
+          if [ "$last" = "$GITHUB_SHA" ]; then
+            echo "No changes since the last nightly ($last): skipping." && echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New commits since ${last:-none}: running." && echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   webkit:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
