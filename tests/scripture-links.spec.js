@@ -26,10 +26,33 @@ test.describe('scripture links (shared parser)', () => {
     await expect(page.locator('[data-verse-title]')).toHaveText('Genesis 1-50'); // as the author wrote it
     await expect(body.locator('.verse-popup-chapter')).toHaveText(['Genesis 2', 'Genesis 3']);
     await expect(body.locator('.verse-num').last()).toHaveText('24'); // Genesis 3:24
+    // P7 option A (Steve, 2026-10-02): a plain "continues" line, and ONE link, in the footer,
+    // that continues where the pop-up stopped (Genesis 4:1).
     const cont = body.locator('.verse-popup-continues');
-    await expect(cont).toContainText('… continues through Genesis 50');
-    await expect(cont.locator('a')).toHaveText('Read in context ›');
-    await expect(cont.locator('a')).toHaveAttribute('href', /\/bible\/bsb\/Genesis\?chapter=1#v1$/);
+    await expect(cont).toHaveText('… continues through Genesis 50');
+    await expect(cont.locator('a')).toHaveCount(0);
+    const link = page.locator('[data-verse-link]');
+    await expect(link).toHaveText('Continue in Genesis 4 ›');
+    await expect(link).toHaveAttribute('href', /\/bible\/bsb\/Genesis\?chapter=4#v1$/);
+    await expect(page.locator('.verse-popup a', { hasText: 'Read in context' })).toHaveCount(0);
+    expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('an uncut passage keeps "Read in context ›", opening its first verse', async ({ page }) => {
+    const body = await openRef(page, 'Genesis 7:1-8:12');
+    await expect(body.locator('.verse-popup-continues')).toHaveCount(0);
+    const link = page.locator('[data-verse-link]');
+    await expect(link).toHaveText('Read in context ›');
+    await expect(link).toHaveAttribute('href', /\/bible\/bsb\/Genesis\?chapter=7#v1$/);
+  });
+
+  test('after a cut passage, the next pop-up’s footer says "Read in context ›" again', async ({ page }) => {
+    await openRef(page, 'Genesis 1-50');
+    await expect(page.locator('[data-verse-link]')).toHaveText('Continue in Genesis 4 ›');
+    await page.locator('[data-verse-close]').click();
+    await openRef(page, 'Job 1:1-5');
+    await expect(page.locator('[data-verse-link]')).toHaveText('Read in context ›');
+    await expect(page.locator('[data-verse-link]')).toHaveAttribute('href', /\/bible\/bsb\/Job\?chapter=1#v1$/);
   });
 
   test('a bare cross-chapter range opens its whole span', async ({ page }) => {

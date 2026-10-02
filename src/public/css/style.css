@@ -2144,7 +2144,7 @@ body.text-mode .home-text {
 
 .verse-popup-footer {
   border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
+  padding-top: 0.25rem; /* the link's 44px height gives the rest */
   margin-top: 1rem;
   display: flex;
   align-items: center;
@@ -2159,11 +2159,18 @@ body.text-mode .home-text {
   letter-spacing: 0.05em;
 }
 
+/* The one link: "Read in context ›", or "Continue in Genesis 4 ›" for a cut passage. Semibold,
+   with a 44px tap height (P7 design page, option A). */
 .verse-popup-link {
   font-family: var(--font-sans);
   font-size: 0.8rem;
+  font-weight: 600;
   color: var(--color-green);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .verse-popup-link:hover {
@@ -2197,19 +2204,11 @@ body.text-mode .home-text {
   margin: 1rem 0;
 }
 
-/* A passage cut at 3 chapters: "… continues through Genesis 50 — Read in context ›" */
+/* A passage cut at 3 chapters: a plain "… continues through Genesis 50" (the footer has the link) */
 .verse-popup-body .verse-popup-continues {
   margin-top: 1rem;
   font-style: italic;
   color: var(--color-text-light);
-}
-
-.verse-popup-continues a {
-  font-style: normal;
-  font-family: var(--font-sans);
-  font-weight: 600;
-  color: var(--color-green-dark);
-  white-space: nowrap;
 }
 
 .verse-popup-loading {

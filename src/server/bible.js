@@ -303,10 +303,12 @@ function indexFor(t) {
 // "Genesis 1-50" (whole chapters), "Exodus 11:1-13:16" (every chapter between), "Acts 2:23, 25-31",
 // "2 Samuel 7:12-16; Isaiah 11:1-5" (";" parts; a part without a book keeps the previous one's).
 // Returns { verses: [{ ref, verse, text, paragraphStart?, sectionHeading? } | { gap: true }],
-// continuesThrough: { book, chapter, verse } | null, problems }. With maxChapters, each part
-// stops after that many chapters and continuesThrough names where it would have ended.
+// continuesThrough: { book, chapter, verse } | null, continuesAt: { book, chapter, verse, ref } | null,
+// problems }. With maxChapters, each part stops after that many chapters; continuesThrough names
+// where it would have ended, and continuesAt the first verse it didn't show (where the pop-up's
+// "Continue in Genesis 4 ›" opens: P7, Steve 2026-10-02).
 function getPassage(translation, refString, { maxChapters } = {}) {
-  const out = { verses: [], continuesThrough: null, problems: [] };
+  const out = { verses: [], continuesThrough: null, continuesAt: null, problems: [] };
   const t = translations[translation];
   if (!t) return out;
   const { names, lengths } = indexFor(t);
@@ -320,8 +322,12 @@ function getPassage(translation, refString, { maxChapters } = {}) {
     if (!book) continue;
     const p = scripture.resolvePassage(book, m[2], lengths, maxChapters ? { maxChapters } : {});
     out.problems.push(...p.problems);
-    if (p.continuesThrough && !out.continuesThrough) out.continuesThrough = { book: p.book, ...p.continuesThrough };
     const name = names.get(p.book) || p.book;
+    if (p.continuesThrough && !out.continuesThrough) {
+      out.continuesThrough = { book: p.book, ...p.continuesThrough };
+      const next = scripture.resolvePassage(book, m[2], lengths).verses[p.verses.length];
+      if (next) out.continuesAt = { book: p.book, ...next, ref: `${name} ${next.chapter}:${next.verse}` };
+    }
     const chapters = t.books.get(name) ? t.books.get(name).chapters : null;
     for (const { chapter, verse } of p.verses) {
       const key = `${name} ${chapter}:${verse}`;

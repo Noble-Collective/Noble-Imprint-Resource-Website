@@ -330,7 +330,8 @@ app.post('/api/cleanup-test-data', async (req, res) => {
 
 // Verse lookup API. Resolves through the shared parser (bible.getPassage). `maxChapters` (the
 // site's pop-up sends 3 — Steve's cap, Collective-Shared plan §2) cuts a long passage and returns
-// `continuesThrough` ({ book, chapter, verse }) so the pop-up can say "… continues through …".
+// `continuesThrough` ({ book, chapter, verse }) so the pop-up can say "… continues through …", and
+// `continuesAt` ({ book, chapter, verse, ref }: the first verse not shown) for "Continue in Genesis 4 ›".
 // Without it the whole passage comes back (the Institute proxies this endpoint).
 app.get('/api/verses', (req, res) => {
   const ref = req.query.ref;
@@ -344,6 +345,7 @@ app.get('/api/verses', (req, res) => {
   }
   const body = { ref, translation, verses: passage.verses };
   if (passage.continuesThrough) body.continuesThrough = passage.continuesThrough;
+  if (passage.continuesAt) body.continuesAt = passage.continuesAt;
   res.json(body);
 });
 

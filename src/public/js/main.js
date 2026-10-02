@@ -203,6 +203,7 @@
       bodyEl.innerHTML = '<div class="verse-popup-loading">Loading...</div>';
       translationEl.textContent = '';
       linkEl.href = '#';
+      linkEl.textContent = 'Read in context ›';
       overlay.classList.add('is-visible');
 
       // Normalize en-dash to hyphen for API
@@ -252,19 +253,20 @@
           if (inParagraph) html += '</p>';
           var cont = data.continuesThrough;
           if (cont) {
-            html += '<p class="verse-popup-continues">… continues through ' + cont.book + ' ' + cont.chapter +
-              ' — <a href="#" data-verse-continues>Read in context ›</a></p>';
+            // Plain: the footer's link is the only one (P7 option A, Steve 2026-10-02).
+            html += '<p class="verse-popup-continues">… continues through ' + cont.book + ' ' + cont.chapter + '</p>';
           }
           bodyEl.innerHTML = html;
           translationEl.textContent = ncTranslationTitle(translation);
 
-          // Build link to Bible browsing page
-          var firstRef = data.verses[0].ref;
-          var match = firstRef.match(/^(.+?)\s+(\d+):/);
+          // The footer's link to the Bible page: "Read in context ›" opens the passage's first
+          // verse; a cut passage's "Continue in Genesis 4 ›" opens the first verse not shown.
+          var at = data.continuesAt;
+          var target = at ? at.ref : data.verses[0].ref;
+          var match = target.match(/^(.+?)\s+(\d+):(\d+)$/);
           if (match) {
-            linkEl.href = '/bible/' + translation + '/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + data.verses[0].verse;
-            var contLink = bodyEl.querySelector('[data-verse-continues]');
-            if (contLink) contLink.href = linkEl.href;
+            linkEl.href = '/bible/' + translation + '/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + match[3];
+            if (at) linkEl.textContent = 'Continue in ' + at.book + ' ' + at.chapter + ' ›';
           }
         })
         .catch(function () {

@@ -72,6 +72,20 @@ test('getPassage: whole chapters, cross-chapter ranges, and the 3-chapter cap', 
   assert.strictEqual(bible.getPassage('bsb', 'Jude 3').verses[0].ref, 'Jude 1:3');
 });
 
+// P7 (Steve, 2026-10-02, option A): a cut passage's footer says "Continue in Genesis 4 ›" and
+// opens the first verse the pop-up didn't show; a chapter list continues at the next chapter it
+// names ("Matthew 5-7, 13" → 13:1, not 8).
+test('getPassage: continuesAt = the first verse a cut passage did not show', async () => {
+  await bible.loadBibles();
+  const g = bible.getPassage('bsb', 'Genesis 1-50', { maxChapters: 3 });
+  assert.deepStrictEqual(g.continuesAt, { book: 'Genesis', chapter: 4, verse: 1, ref: 'Genesis 4:1' });
+  assert.deepStrictEqual(bible.getPassage('bsb', 'Genesis 11:27-50:26', { maxChapters: 3 }).continuesAt.ref, 'Genesis 14:1');
+  assert.deepStrictEqual(bible.getPassage('bsb', 'Matthew 5-7, 13', { maxChapters: 3 }).continuesAt.ref, 'Matthew 13:1');
+  assert.deepStrictEqual(bible.getPassage('bsb', 'Psalm 119-121', { maxChapters: 3 }).continuesAt, null);
+  assert.deepStrictEqual(bible.getPassage('bsb', 'Romans 8:28').continuesAt, null);
+  assert.deepStrictEqual(bible.getPassage('bsb', 'Genesis 1-50').continuesAt, null, 'no cap, no cut');
+});
+
 test('getPassage: lists keep their gap; a ";" part without a book keeps the previous one', async () => {
   await bible.loadBibles();
   const refs = bible.getPassage('bsb', 'Acts 2:23,25-27').verses.map((v) => v.gap ? 'gap' : v.ref);
