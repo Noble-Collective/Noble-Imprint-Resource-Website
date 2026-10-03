@@ -9,6 +9,8 @@ const accountMerge = require('./account-merge');
 const instituteData = require('./institute-data');
 const bible = require('./bible');
 const osis = require('./osis');
+const permalink = require('./permalink');
+const { refToBookCode } = require('./bible-validation');
 const github = require('./github');
 const audio = require('./audio');
 const auth = require('./auth');
@@ -420,7 +422,12 @@ app.get('/bible/:translationId/:bookName', async (req, res) => {
   // corpus 'bible' + OSIS book code lets the client build the shared SDK's bibleLocator per verse.
   // Only when the book maps to a known OSIS code (all 66 canon books do).
   const osisBook = osis.osisCodeForBook(bookName);
+  const usfmCode = refToBookCode(`${bookName} 1:1`);
+  if (usfmCode) {
+    res.locals.appArgument = `${permalink.PUBLIC_ORIGIN}/s/bible-${encodeURIComponent(t.id)}/${usfmCode}/${chapter}`;
+  }
   const readerContext = osisBook ? {
+    permalink: res.locals.appArgument || null,
     corpus: 'bible',
     translation: String(t.id).toUpperCase(),
     bookName,
@@ -767,6 +774,8 @@ async function getSessionPageData(req, resolvedRoute) {
       bookPath: book.repoPath,
       sessionFile: session.filename,
       contentVersion: sessionData.sha || null,
+      // The permanent link Copy link / Share hand out (/s/<bookKey>/<sessionKey>; permalink.js).
+      permalink: permalink.permalinkFor(book, session),
     },
     editUnavailable,
     rateLimitReset: rateLimitReset ? rateLimitReset.toISOString() : null,
@@ -990,6 +999,54 @@ app.post('/api/account/merge', async (req, res) => {
   }
 });
 
+// The ecosystem permalink /s/<bookKey>/<sessionKey>[/<chapterKey>] (and old app links
+// /s/<deeplinkId>/<sessionId>/<chapterId>, via the frozen table) → 302 to the page, keeping the
+// query (?ncq= passage) and adding the chapter's heading as the #fragment. With the app
+// installed the OS opens the app for /s/* instead (firebase-public/.well-known). See permalink.js.
+app.get(['/s/:a', '/s/:a/:b', '/s/:a/:b/:c'], async (req, res, next) => {
+  try {
+    const tree = await content.buildContentTree();
+    const link = permalink.parsePermalink(tree, [req.params.a, req.params.b, req.params.c]);
+    if (!link) return next();
+    const q = req.originalUrl.indexOf('?');
+    const query = q === -1 ? '' : req.originalUrl.slice(q);
+    res.set('Cache-Control', 'no-store');
+    if (link.bookKey.startsWith('bible-')) {
+      const tx = link.bookKey.slice('bible-'.length);
+      if (!bible.getTranslation(tx)) return next();
+      const names = bible.getBookList(tx).map((b) => b.name);
+      const url = permalink.bibleUrl(tx, link.sessionKey, link.chapterKey, names);
+      const more = query && (url.includes('?') ? '&' + query.slice(1) : query);
+      return res.redirect(302, url + (more || ''));
+    }
+    const hit = permalink.findBookByKey(tree, link.bookKey);
+    if (!hit) return next();
+    const { series, subseries, book } = hit;
+    if (book.status === 'hidden' && !(await content.canAccessBook(req.user, book.repoPath))) return next();
+    const session = link.sessionKey
+      ? (book.sessions || []).find((s) => permalink.sessionKeyOf(s) === link.sessionKey)
+      : null;
+    if (!session) return res.redirect(302, content.bookUrl(series, subseries, book) + query);
+    let hash = '';
+    if (link.chapterKey) {
+      try {
+        const data = await content.loadSessionContent(session);
+        let resolvedText = data.content;
+        try {
+          resolvedText = resolveIncludes(data.content, content.gatherCommonBlocks(series, subseries, book));
+        } catch { /* a bad include: slug the raw session, as the page does */ }
+        const anchor = permalink.chapterAnchor(data.content, resolvedText, link.chapterKey, book.maxNavHeadingLevel || 2);
+        if (anchor) hash = '#' + anchor;
+      } catch (err) {
+        console.warn('[permalink] heading lookup failed:', (err && err.message) || err);
+      }
+    }
+    return res.redirect(302, content.sessionUrl(series, subseries, book, session) + query + hash);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Content routes — catch-all resolver
 app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
   try {
@@ -1065,6 +1122,8 @@ app.get('/:seg1/:seg2?/:seg3?/:seg4?', async (req, res, next) => {
         book: data.book && data.book.title,
         session: data.session && data.session.title,
       };
+      // Smart App Banner (header.ejs): iPhones with the app get "Open" straight to this session.
+      res.locals.appArgument = data.readerContext && data.readerContext.permalink;
       res.render('session', {
         ...data,
         content,

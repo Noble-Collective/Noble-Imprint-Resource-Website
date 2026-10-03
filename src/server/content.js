@@ -103,6 +103,8 @@ async function loadBook(bookPath, dirName) {
     type: 'book',
     dirName,
     slug: slugify(meta.title || dirName),
+    // Permanent book key (meta.json "id"): what /s/ permalinks and the app name a book by.
+    key: typeof meta.id === 'string' ? meta.id : null,
     title: meta.title || dirName,
     subtitle: meta.subtitle || '',
     author: meta.author || '',

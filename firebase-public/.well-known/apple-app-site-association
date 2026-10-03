@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["59VTJ526ML.com.noblecollective.nobleimprint"],
+        "appID": "59VTJ526ML.com.noblecollective.nobleimprint",
+        "components": [
+          { "/": "/s/*", "comment": "The ecosystem permalink /s/<bookKey>/<sessionKey>[/<chapterKey>] opens the Noble Imprint app; every other page stays on the web." }
+        ],
+        "paths": ["/s/*"]
+      }
+    ]
+  }
+}

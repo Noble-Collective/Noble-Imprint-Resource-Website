@@ -550,11 +550,18 @@ function fragParts(text) {
 //  (2) the native `#:~:text=` directive too, so desktop browsers that keep it also highlight for free.
 function ncqParam(p) { return 'ncq=' + fragEnc(p.start) + (p.end ? '|' + fragEnc(p.end) : '') }
 function nativeFrag(p) { return '#:~:text=' + fragEnc(p.start) + (p.end ? ',' + fragEnc(p.end) : '') }
+// The page's link: its permanent /s/<bookKey>/<sessionKey> (or /s/bible-<tx>/<CODE>/<chapter>)
+// permalink when the server gave one — the ecosystem link the app opens too (server/permalink.js)
+// — else this page's own URL.
+function pageLink() {
+  return (CTX && CTX.permalink) || (location.origin + location.pathname + location.search)
+}
 function passageUrl(text) {
+  const base = pageLink()
   const p = fragParts(text)
-  if (!p) return location.origin + location.pathname
-  const sep = location.search ? '&' : '?'
-  return location.origin + location.pathname + sep + ncqParam(p) + nativeFrag(p)
+  if (!p) return base
+  const sep = base.includes('?') ? '&' : '?'
+  return base + sep + ncqParam(p) + nativeFrag(p)
 }
 // Relative variant (path + query + fragment) for stored notebook links.
 export function passageHash(text) {

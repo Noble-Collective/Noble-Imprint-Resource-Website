@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.noblecollective.noble_imprint",
+      "sha256_cert_fingerprints": [
+        "48:90:A3:8A:20:CC:52:7C:76:EB:C5:02:E1:98:67:A7:8E:F1:6B:50:F5:B4:16:CC:86:3E:3A:31:91:CA:F8:7B",
+        "C3:9D:4F:88:46:F3:FC:99:58:17:F0:AF:6E:07:A8:D1:AF:EA:11:CE:6E:C4:BF:3C:DC:FA:48:15:FB:9C:0B:3F"
+      ]
+    }
+  }
+]

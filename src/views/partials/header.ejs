@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %> | Noble Collective Resources</title>
-  <!-- First, so it catches errors from everything after it (Safari-only crashes reach the server log). -->
+<% if (typeof appArgument !== 'undefined' && appArgument) { %>  <!-- Smart App Banner: iPhone Safari offers the Noble Imprint app, opened at this page's /s/ permalink. -->
+  <meta name="apple-itunes-app" content="app-id=6745697286, app-argument=<%= appArgument %>">
+<% } %>  <!-- First, so it catches errors from everything after it (Safari-only crashes reach the server log). -->
   <script src="/static/js/error-beacon.js?v=2"></script>
   <!-- Open connections to the font/icon CDNs early so their stylesheets and font
        files start downloading sooner (shaves first-paint latency). -->
