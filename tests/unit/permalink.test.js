@@ -108,3 +108,19 @@ test('bibleUrl: USFM code → this site\'s chapter page', () => {
   assert.strictEqual(p.bibleUrl('bsb', '1JN', null, names), '/bible/bsb/1%20John');
   assert.strictEqual(p.bibleUrl('kjv', 'TOB', '1', names), '/bible/kjv');
 });
+
+// Stored series locators (shared contract §4, SDK 0.5.0): by bookKey first, else bookPath.
+test('findForLocator: a keyed locator finds its book even after a folder move', () => {
+  const hit = p.findForLocator(tree, { bookKey: 'the-call-of-christ', bookPath: 'series/Old Place/The Call of Christ', sessionFile: '4-Session1-TheGospel.md' });
+  assert.strictEqual(hit.book, callOfChrist);
+  assert.strictEqual(hit.session.slug, 'the-gospel');
+  assert.strictEqual(hit.subseries.slug, 'foundations');
+});
+test('findForLocator: a pre-key locator matches by bookPath; unknown → null', () => {
+  const hit = p.findForLocator(tree, { bookPath: 'series/Vade Mecum/Proverbs and Faith Formation', sessionFile: '03-Wisdom-Calls-Out.md' });
+  assert.strictEqual(hit.book, hearMySon);
+  assert.strictEqual(hit.subseries, null);
+  assert.strictEqual(hit.session.filename, '03-Wisdom-Calls-Out.md');
+  assert.strictEqual(p.findForLocator(tree, { bookKey: 'nope', sessionFile: 'x.md' }), null);
+  assert.strictEqual(p.findForLocator(tree, { bookPath: 'series/Vade Mecum/Proverbs and Faith Formation', sessionFile: 'gone.md' }).session, null);
+});

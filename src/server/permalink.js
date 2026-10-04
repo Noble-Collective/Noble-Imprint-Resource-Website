@@ -54,6 +54,22 @@ function findBookByKey(tree, bookKey) {
   return bySlug;
 }
 
+// A stored series locator -> its route nodes { series, subseries, book, session? }, or null. By the
+// permanent bookKey first (a folder move can't break it), else by the folder path (docs written
+// before keys — the shared contract's sameSeriesBook rule, Collective-Shared ARCHITECTURE §4).
+function findForLocator(tree, { bookKey, bookPath, sessionFile } = {}) {
+  let hit = null;
+  if (bookKey) {
+    for (const h of allBooks(tree)) if (h.book.key === bookKey) { hit = h; break; }
+  }
+  if (!hit && bookPath) {
+    for (const h of allBooks(tree)) if (h.book.repoPath === bookPath) { hit = h; break; }
+  }
+  if (!hit) return null;
+  const session = sessionFile ? (hit.book.sessions || []).find((s) => s.filename === sessionFile) || null : null;
+  return { series: hit.series, subseries: hit.subseries || null, book: hit.book, session };
+}
+
 // The permanent link of a session (+ chapter), or null when the book has no key.
 function permalinkFor(book, session, chapterKey) {
   const bookKey = book && (book.key || null);
@@ -136,6 +152,7 @@ module.exports = {
   chapterSlug,
   sessionKeyOf,
   findBookByKey,
+  findForLocator,
   permalinkFor,
   parsePermalink,
   chapterAnchor,

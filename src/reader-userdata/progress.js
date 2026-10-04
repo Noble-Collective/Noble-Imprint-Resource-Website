@@ -17,7 +17,7 @@ async function recordNow(client) {
   if (!client || !recCtx || !recCtx.bookPath || !recCtx.sessionFile) return
   const [sessionTitle, bookTitle] = (document.title || '').split(' — ')
   try {
-    await client.recordActivity(seriesLocator(recCtx.bookPath, recCtx.sessionFile), {
+    await client.recordActivity(seriesLocator(recCtx.bookPath, recCtx.sessionFile, { bookKey: recCtx.bookKey || undefined }), {
       title: (sessionTitle || 'Session').trim(),
       bookTitle: (bookTitle || '').trim() || undefined,
       href: location.pathname,

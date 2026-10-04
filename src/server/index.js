@@ -771,6 +771,9 @@ async function getSessionPageData(req, resolvedRoute) {
     // Always-present reader context for the per-user data layer (answers/bookmarks). Keyed to the
     // shared convergence store; independent of edit access. contentVersion = the session file SHA.
     readerContext: {
+      // The book's permanent key (meta.json "id") — stamped on every series locator (shared
+      // contract §4, SDK 0.5.0); bookPath stays for matching docs written before keys.
+      bookKey: book.key || null,
       bookPath: book.repoPath,
       sessionFile: session.filename,
       contentVersion: sessionData.sha || null,
@@ -917,17 +920,18 @@ app.get('/notes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Resolve a stored annotation locator (bookPath + sessionFile) to its session URL + title, so the
+// Resolve a stored annotation locator (bookKey/bookPath + sessionFile) to its session URL + title, so the
 // reader's Notebook / "My Notes" can navigate to an annotation whose denormalized `href` is absent
 // (e.g. a bookmark created in the mobile app, which stores only the locator). Public content-route
 // info — no auth needed. Serves the committed content-tree snapshot, so it's fast + offline-safe.
 app.get('/api/reader/resolve-locator', async (req, res) => {
   try {
+    const bookKey = String(req.query.bookKey || '');
     const bookPath = String(req.query.bookPath || '');
     const sessionFile = String(req.query.sessionFile || '');
-    if (!bookPath || !sessionFile) return res.status(400).json({ error: 'bookPath and sessionFile required' });
+    if ((!bookPath && !bookKey) || !sessionFile) return res.status(400).json({ error: 'bookKey or bookPath, and sessionFile required' });
     const tree = await content.buildContentTree();
-    const hit = content.findByRepoPath(tree, bookPath, sessionFile);
+    const hit = permalink.findForLocator(tree, { bookKey, bookPath, sessionFile });
     if (!hit || !hit.session) return res.status(404).json({ error: 'not found' });
     const url = content.sessionUrl(hit.series, hit.subseries, hit.book, hit.session);
     res.json({ url, sessionTitle: hit.session.title || hit.session.displayName || null });

@@ -1,7 +1,7 @@
 // Highlights, notes, and positioned bookmarks on the reading content — the superset feature set,
 // built on the shared anchor module. Selection -> floating toolbar (colors / note / bookmark / copy);
 // clicking a painted mark -> edit (recolor / remove) or note popover.
-import { seriesLocator, bibleLocator } from '@noble-collective/userdata/core'
+import { seriesLocator, bibleLocator, sameSeriesBook } from '@noble-collective/userdata/core'
 import { getClient, onUser } from './firebase.js'
 import { el, ICONS, HIGHLIGHT_COLORS, warn, debounce } from './util.js'
 import { buildIndex, selectionToNorm, rangeToNorm, anchorFromNorm, anchorToDomRange, paintRange, unpaint } from './anchor-dom.js'
@@ -47,7 +47,7 @@ function sameUnit(loc) {
 function inThisBookSet(loc) {
   if (!loc) return false
   if (isBible()) return loc.corpus === 'bible' && typeof loc.osisRef === 'string' && loc.osisRef.startsWith(`${CTX.osisBook}.`)
-  return loc.bookPath === CTX.bookPath
+  return sameSeriesBook(loc, CTX) // by bookKey, else bookPath (docs from before keys)
 }
 // Title stored on each annotation for list views ("which session"/"which chapter").
 const unitTitle = () => (isBible() ? (CTX.title || `${CTX.bookName} ${CTX.chapter}`) : pageSessionTitle())
@@ -168,7 +168,7 @@ function locFor(anchor, verse) {
     if (CTX.translation) extra.translation = CTX.translation
     return bibleLocator({ osisRef }, extra)
   }
-  return seriesLocator(CTX.bookPath, CTX.sessionFile, { textAnchor: anchor, contentVersion: CTX.contentVersion || undefined })
+  return seriesLocator(CTX.bookPath, CTX.sessionFile, { bookKey: CTX.bookKey || undefined, textAnchor: anchor, contentVersion: CTX.contentVersion || undefined })
 }
 function displayFor(text) {
   const quote = (text || '').trim()
@@ -579,9 +579,9 @@ export async function navigateToAnnotation(a) {
   if (!a) return
   if (a.href) { window.location.href = a.href; return }
   const loc = a.locator
-  if (!loc || !loc.bookPath || !loc.sessionFile) return
+  if (!loc || !(loc.bookPath || loc.bookKey) || !loc.sessionFile) return
   try {
-    const q = `bookPath=${encodeURIComponent(loc.bookPath)}&sessionFile=${encodeURIComponent(loc.sessionFile)}`
+    const q = `bookKey=${encodeURIComponent(loc.bookKey || '')}&bookPath=${encodeURIComponent(loc.bookPath || '')}&sessionFile=${encodeURIComponent(loc.sessionFile)}`
     const r = await fetch(`/api/reader/resolve-locator?${q}`)
     if (!r.ok) return
     const { url } = await r.json()

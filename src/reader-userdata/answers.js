@@ -1,6 +1,6 @@
 // Per-question answers: a textarea under each <div class="question-block" data-question-id>, with
 // debounced autosave to users/{uid}/answers/{deterministic id}. Loads existing answers on sign-in.
-import { seriesLocator } from '@noble-collective/userdata/core'
+import { seriesLocator, sameSeriesBook } from '@noble-collective/userdata/core'
 import { getClient, onUser } from './firebase.js'
 import { el, warn, debounce } from './util.js'
 
@@ -13,6 +13,9 @@ const fields = new Map()
 const listeners = []
 export const onAnswers = (cb) => listeners.push(cb)
 const answersState = new Map() // questionId -> text (for the notebook)
+// questionId -> the doc id its answer lives in. A doc from before book keys keeps its legacy id until
+// the go-live re-key, so an edit must write THERE, never a second copy (Collective-Shared §4).
+const answerDocIds = new Map()
 export const getAnswers = () => answersState
 
 // One-time wiring (auth subscription) + first attach. Safe to call once per page load.
@@ -51,9 +54,17 @@ function manageAnswerSub(client) {
 function applyAnswersToFields() {
   if (!CTX || !getClient()) return
   const mine = new Map()
+  const at = new Map()
+  answerDocIds.clear()
   for (const a of ansSnapshot) {
     const l = a.locator || {}
-    if (l.bookPath === CTX.bookPath && l.sessionFile === CTX.sessionFile && l.questionId) mine.set(l.questionId, a.answer)
+    if (!sameSeriesBook(l, CTX) || l.sessionFile !== CTX.sessionFile || !l.questionId) continue
+    // Two docs for one question (another product wrote the keyed id): the newest wins.
+    const t = a.updatedAt || 0
+    if (mine.has(l.questionId) && at.get(l.questionId) > t) continue
+    mine.set(l.questionId, a.answer)
+    at.set(l.questionId, t)
+    answerDocIds.set(l.questionId, a.id)
   }
   for (const [id, f] of fields) {
     const { ta, status } = f
@@ -91,8 +102,8 @@ function buildFields() {
       const v = ta.value.trim()
       answersState.set(id, v)
       try {
-        const loc = seriesLocator(CTX.bookPath, CTX.sessionFile, { questionId: id, contentVersion: CTX.contentVersion || undefined })
-        if (v) await client.putAnswer(loc, v, { href: location.pathname, sessionTitle: pageSessionTitle(), questionText })
+        const loc = seriesLocator(CTX.bookPath, CTX.sessionFile, { bookKey: CTX.bookKey || undefined, questionId: id, contentVersion: CTX.contentVersion || undefined })
+        if (v) await client.putAnswer(loc, v, { href: location.pathname, sessionTitle: pageSessionTitle(), questionText }, { docId: answerDocIds.get(id) })
         else await client.deleteAnswer(loc)
         status.textContent = 'Saved'
         if (ta.value.trim() === v) rec.dirty = false // no new typing during the save → safe to unshield
