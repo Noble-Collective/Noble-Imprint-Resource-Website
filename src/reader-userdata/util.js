@@ -70,3 +70,24 @@ export const safeColor = (c) => (/^[a-z]+$/.test(String(c)) ? String(c) : 'amber
 // such items still render their text instead of a blank row. Bible whole-verse annotations carry a
 // `ref` and no textAnchor, so they resolve via the first branch. Never returns undefined.
 export const annotationText = (a) => String((a && (a.ref || a.locator?.textAnchor?.quote)) || '').trim()
+
+/**
+ * Exchange a 463519 ID token for the server __session cookie. → 'ok' | 'email-not-verified' (the
+ * server refuses accounts without a verified email: no server session, the reader still works
+ * client-side) | 'error'. Never throws.
+ */
+export async function postSession(idToken, profile, fetchImpl = fetch) {
+  try {
+    const res = await fetchImpl('/api/auth/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, profile }),
+    })
+    if (res.ok) return 'ok'
+    if (res.status === 403) {
+      const body = await res.json().catch(() => null)
+      if (body && body.error === 'email-not-verified') return 'email-not-verified'
+    }
+    return 'error'
+  } catch {
+    return 'error'
+  }
+}

@@ -1,6 +1,9 @@
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const cache = require('./cache');
+// The shared session-identity rule (SDK 0.6.0, vendored: the server can't load the SDK — see
+// scripts/vendor-session-identity.sh). trustedEmail = the only email an authorization decision may use.
+const { sessionIdentity, trustedEmail } = require('../vendor/session-identity.cjs');
 
 const SUPER_ADMIN_EMAIL = 'steve@noblecollective.org';
 const SESSION_EXPIRES_IN = 5 * 24 * 60 * 60 * 1000; // 5 days
@@ -67,6 +70,35 @@ async function createSessionCookie(idToken) {
 // Verify a Google ID token from whichever project owns identity under the current flag.
 async function verifyIdToken(idToken) {
   return authAuth().verifyIdToken(idToken);
+}
+
+// POST /api/auth/session's core: verify the ID token FIRST, refuse an unverified email, and only then
+// mint the cookie. → { error: 'email-not-verified', uid } or { cookie, identity } (sessionIdentity:
+// token name wins, a bounded client name only fills a gap). A bad token rejects with nothing minted.
+async function establishSession(idToken, profile, { verify = verifyIdToken, mint = createSessionCookie } = {}) {
+  const decoded = await verify(idToken);
+  const identity = sessionIdentity(decoded, profile);
+  if (!identity.trustedEmail) return { error: 'email-not-verified', uid: identity.uid };
+  const cookie = await mint(idToken);
+  return { cookie, identity };
+}
+
+// A verified session cookie → the request's user, or null when it carries no verified email (then no
+// server session and no roles; the client-side reader session is unaffected). `flags` = getRoleFlags.
+function userFromDecoded(decoded, flags) {
+  const email = trustedEmail(decoded);
+  if (!email) return null;
+  const superAdmin = !!isSuperAdmin(email);
+  return {
+    uid: decoded.uid,
+    email,
+    // Session cookies don't always carry name/picture — fall back to the stored profile.
+    displayName: decoded.name || flags.displayName || email,
+    photoURL: decoded.picture || flags.photoURL || null,
+    isSuperAdmin: superAdmin,
+    isAdmin: !!flags.isAdmin || superAdmin,
+    isEditor: !!flags.isEditor || superAdmin,
+  };
 }
 
 async function verifySessionCookie(cookie) {
@@ -143,29 +175,24 @@ function attachUser(req, res, next) {
       return next();
     }
 
-    const email = decoded.email;
-    const user = {
-      uid: decoded.uid,
-      email,
-      displayName: decoded.name || email,
-      photoURL: decoded.picture || null,
-      isSuperAdmin: isSuperAdmin(email),
-      isAdmin: false,
-    };
+    const email = trustedEmail(decoded);
+    if (!email) {
+      console.warn('attachUser: session cookie without a verified email, uid', decoded.uid);
+      res.clearCookie('__session');
+      req.user = null;
+      res.locals.user = null;
+      return next();
+    }
 
     // Resolve admin + editor flags with caching (one Firestore read, cached 60s)
-    const cacheKey = `roleflags:${email.toLowerCase()}`;
+    const cacheKey = `roleflags:${email}`;
     let flags = cache.get(cacheKey);
     if (!flags) {
       const firestore = require('./firestore');
       flags = await firestore.getRoleFlags(email);
       cache.set(cacheKey, flags, ADMIN_CACHE_TTL);
     }
-    user.isAdmin = flags.isAdmin || user.isSuperAdmin;
-    user.isEditor = flags.isEditor || user.isSuperAdmin;
-    // Session cookies don't always carry name/picture — fall back to the stored Google profile.
-    user.displayName = decoded.name || flags.displayName || email;
-    user.photoURL = decoded.picture || flags.photoURL || null;
+    const user = userFromDecoded(decoded, flags);
 
     req.user = user;
     res.locals.user = user;
@@ -227,6 +254,9 @@ module.exports = {
   createSessionCookie,
   verifyIdToken,
   verifySessionCookie,
+  establishSession,
+  userFromDecoded,
+  trustedEmail,
   getReaderFirestore,
   getReaderLegacyFirestore,
   readerAuth,

@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth'
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { createUserDataClient } from '@noble-collective/userdata/client'
-import { warn } from './util.js'
+import { warn, postSession } from './util.js'
 
 const CONFIG = {
   apiKey: 'AIzaSyC3dwU9dR59QncPWsSgHG2CQxg4_jVqbrc',
@@ -74,9 +74,10 @@ async function bridgeSession(cred) {
   if (photoURL && !cred.user.photoURL) patch.photoURL = photoURL
   if (Object.keys(patch).length) { try { await updateProfile(cred.user, patch) } catch { /* non-fatal */ } }
   const idToken = await cred.user.getIdToken(true) // force-refresh so the new name/picture ride the token
-  await fetch('/api/auth/session', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken, profile: { displayName, photoURL } }),
-  })
+  const r = await postSession(idToken, { displayName, photoURL })
+  // No verified email → the server keeps no session (and no roles); the reader works client-side.
+  // Don't reload into a signed-out page (and a heal attempt) for nothing.
+  if (r === 'email-not-verified') { warn('session', r); return }
   location.reload()
 }
 
@@ -92,10 +93,9 @@ async function healServerSession(u) {
     if (sessionStorage.getItem('nc:session-heal')) return
     sessionStorage.setItem('nc:session-heal', '1')
     const idToken = await u.getIdToken()
-    await fetch('/api/auth/session', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken, profile: { displayName: u.displayName || null, photoURL: u.photoURL || null } }),
-    })
+    // A 403 email-not-verified is final for this tab (the flag above), so it can't loop.
+    const r = await postSession(idToken, { displayName: u.displayName || null, photoURL: u.photoURL || null })
+    if (r !== 'ok') warn('session heal', r)
   } catch (e) { warn('session heal', e) }
 }
 

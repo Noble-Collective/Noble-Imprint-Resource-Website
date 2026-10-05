@@ -466,9 +466,16 @@ app.post('/api/auth/session', async (req, res) => {
   if (!idToken) return res.status(400).json({ error: 'ID token required' });
 
   try {
-    const sessionCookie = await auth.createSessionCookie(idToken);
+    // Verify FIRST; an unverified email gets no cookie and no users doc (ARCHITECTURE §9a.7). The
+    // client is untrusted: its profile is bounded and only fills a gap the token leaves (Apple sends
+    // no name in the token, and never a photo) — sessionIdentity, vendored from the shared SDK.
+    const result = await auth.establishSession(idToken, profile);
+    if (result.error) {
+      console.warn('Session refused (email-not-verified), uid', result.uid);
+      return res.status(403).json({ error: result.error });
+    }
     const secure = process.env.NODE_ENV === 'production';
-    res.cookie('__session', sessionCookie, {
+    res.cookie('__session', result.cookie, {
       httpOnly: true,
       secure,
       sameSite: 'lax',
@@ -476,17 +483,10 @@ app.post('/api/auth/session', async (req, res) => {
       maxAge: auth.SESSION_EXPIRES_IN,
     });
 
-    // Create or update user in Firestore. Verify the ID token against whichever project owns
-    // identity under the current flag (463519 when AUTH_UNIFIED, else noble-imprint-website).
-    const decoded = await auth.verifyIdToken(idToken);
-    // Prefer the client-sent Google profile (session cookies drop name/picture sometimes), but the
-    // client is untrusted: accept ONLY bounded strings, else fall back to the verified token's claims.
-    const str = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : undefined);
-    const displayName = str(profile && profile.displayName, 200) || decoded.name;
-    const photoURL = str(profile && profile.photoURL, 1000) || decoded.picture;
-    await firestore.createOrUpdateUser(decoded.email, displayName, photoURL);
+    const { trustedEmail: email, displayName, photoURL } = result.identity;
+    await firestore.createOrUpdateUser(email, displayName || undefined, photoURL || undefined);
     // Drop any cached role/profile flags so the next request reflects the fresh profile immediately.
-    try { require('./cache').del('roleflags:' + String(decoded.email).toLowerCase()); } catch { /* ignore */ }
+    try { require('./cache').del('roleflags:' + email); } catch { /* ignore */ }
 
     res.json({ status: 'ok' });
   } catch (err) {
