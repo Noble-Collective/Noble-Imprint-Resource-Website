@@ -111,7 +111,7 @@ html.nc-verse-line .bible-content .bible-paragraph sup:first-child::before{ marg
 .nc-acct__avatar--initials{display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:600;color:var(--nc-text)}
 /* Account BUTTON avatar (signed in) — replaces the account icon, matching Coram Deo. */
 .nc-sbtn__avatar{width:22px;height:22px;border-radius:999px;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center}
-.nc-sbtn__avatar--initials{background:var(--color-gold,#dfb53b);color:#fff;font-size:.7rem;font-weight:700;line-height:1}
+.nc-sbtn__avatar--initials{background:var(--color-gold,#dfb53b);color:#fff;font-size:.62rem;font-weight:700;line-height:1;letter-spacing:.02em}
 .nc-sbtn--avatar{padding:.34rem}
 .nc-acct__info{min-width:0}
 .nc-acct__name{font-size:.85rem;font-weight:600;color:var(--nc-text);margin-bottom:.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -126,18 +126,69 @@ html.nc-verse-line .bible-content .bible-paragraph sup:first-child::before{ marg
 .nc-acct__data-sum:hover{color:var(--nc-text)}
 .nc-acct__link--danger{color:var(--nc-rose)}
 .nc-acct__link--danger:hover{background:var(--nc-rose-wash)}
-.nc-signin{width:260px}
-.nc-signin__body{font-size:.82rem;color:var(--nc-muted);line-height:1.4;margin:.15rem 0 .7rem}
-.nc-signin .nc-btn--primary{width:100%;justify-content:center;padding:.5rem}
-/* "Continue reading" strip on the home page */
-.nc-continue{margin:0 0 1.6rem;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
-.nc-continue__title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--nc-muted);margin-bottom:.5rem}
-.nc-continue__row{display:flex;gap:.6rem;overflow-x:auto;padding-bottom:.35rem}
-.nc-continue__card{flex:0 0 auto;min-width:190px;max-width:240px;border:1px solid var(--nc-border);border-radius:10px;
-  padding:.6rem .7rem;text-decoration:none;color:var(--nc-text);background:var(--nc-surface);transition:border-color .12s}
-.nc-continue__card:hover{border-color:var(--nc-accent)}
-.nc-continue__book{font-size:.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nc-continue__sess{font-size:.75rem;color:var(--nc-muted);margin-top:.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---- the shared sign-in kit (@noble-collective/userdata/signin) in this site's skin: --si-* tokens
+   (light = the kit's resources defaults, plans/2026-10-05-common-web-sign-in.md §2) + dark ---- */
+html.nc-dark{
+  --si-surface:#1c1917; --si-ink:#e7e5e4; --si-muted:#a8a29e; --si-line:#3a3633; --si-line-soft:#292524;
+  --si-btn-bg:#1c1917; --si-btn-ink:#e7e5e4; --si-btn-line:#44403c; --si-eyebrow:#a7c48f; --si-link:#a7c48f;
+  --si-chip:#26221f; --si-accent:#6b8a55; --si-accent-ink:#fff; --si-field:#12100e; --si-ok:#a7c48f;
+  --si-danger:#f87171; --si-scrim:rgba(0,0,0,.55); --si-shadow:0 18px 40px -14px rgba(0,0,0,.6);
+}
+/* The sheet (res-flow-phone-sheet): bottom sheet on phones, a centred card on wide screens. */
+.nc-si-sheet{position:fixed;inset:0;z-index:9900;display:flex;align-items:flex-end;justify-content:center}
+.nc-si-sheet__scrim{position:absolute;inset:0;background:var(--si-scrim,rgba(20,22,18,.4));animation:nc-si-fade .18s ease}
+.nc-si-sheet__panel{position:relative;width:100%;max-height:92vh;overflow:auto;animation:nc-si-up .22s ease}
+.nc-si-sheet__panel .ncsi--sheet{max-width:none}
+.nc-si-sheet__x{position:absolute;right:10px;top:8px;z-index:1;width:36px;height:36px;border:0;border-radius:999px;background:transparent;
+  color:var(--si-muted,#6b6b6b);font-size:22px;line-height:1;cursor:pointer}
+.nc-si-sheet__x:hover{background:var(--nc-hover)}
+@media (min-width:769px){
+  .nc-si-sheet{align-items:center;padding:16px}
+  .nc-si-sheet__panel{width:420px;animation:nc-si-fade .18s ease}
+  .nc-si-sheet__panel .ncsi--sheet{border-radius:var(--si-radius,14px);border-bottom:1px solid var(--si-line,#e2e6df);padding:30px 32px 24px}
+  .nc-si-sheet__panel .ncsi-grab{display:none}
+}
+@keyframes nc-si-up{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes nc-si-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.nc-si-sheet__scrim,.nc-si-sheet__panel{animation:none}}
+/* Connected accounts inside the account menu: the kit's card, flattened into the menu. */
+.nc-acct__accounts{margin-top:.55rem;border-top:1px solid var(--nc-border);padding-top:.15rem}
+.nc-acct__accounts .ncsi-card{border:0;box-shadow:none;padding:.35rem 0 0;background:transparent}
+.nc-acct__accounts .ncsi-card h3{font-size:15px;margin:0 0 4px}
+.nc-acct__accounts .ncsi-card p{font-size:12px;margin:0 0 8px}
+.nc-acct__accounts .ncsi-row{padding:9px 0}
+.nc-acct__accounts .ncsi-row .nm{font-size:13px}
+/* "Signed in as …" toast (res-flow-3) */
+.nc-signed-toast{position:fixed;right:24px;bottom:24px;z-index:9700;display:flex;gap:10px;align-items:center;max-width:calc(100vw - 32px);
+  background:#242833;color:#fff;border-radius:10px;padding:12px 16px;font:400 13.5px/1.4 'Poppins',system-ui,sans-serif;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s}
+.nc-signed-toast svg{width:16px;height:16px;flex:none;stroke:#a7c48f;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.nc-signed-toast--show{opacity:1;transform:none}
+@media (max-width:480px){.nc-signed-toast{left:16px;right:16px;bottom:16px}}
+/* "Continue reading" on the home page (res-flow-3) */
+.nc-continue{margin:0 0 1.8rem}
+.nc-continue__head{display:flex;align-items:baseline;flex-wrap:wrap;gap:.35rem 1rem;margin:0 0 .8rem}
+.nc-continue__title{font:600 1.15rem/1.3 'Poppins',system-ui,sans-serif;color:var(--color-charcoal,#242833);margin:0;letter-spacing:0;text-transform:none}
+.nc-continue__sync{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--nc-muted)}
+.nc-continue__sync svg{width:14px;height:14px;fill:none;stroke:#536942;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+html.nc-dark .nc-continue__sync svg{stroke:#a7c48f}
+.nc-continue__row{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.85rem}
+.nc-continue__card{display:flex;gap:.75rem;min-width:0;border:1px solid var(--color-border,#e2e6df);border-radius:10px;padding:.65rem;
+  text-decoration:none;color:var(--nc-text);background:var(--nc-surface);box-shadow:0 2px 8px rgba(36,40,51,.05);transition:border-color .12s}
+.nc-continue__card:hover{border-color:#536942}
+.nc-continue__cover{width:46px;height:69px;border-radius:3px;object-fit:cover;flex:none;background:var(--nc-hover)}
+.nc-continue__cover--none{display:block;background:#536942;opacity:.25}
+.nc-continue__info{min-width:0;flex:1}
+.nc-continue__book{font:600 .84rem/1.3 'Poppins',system-ui,sans-serif;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.nc-continue__sess{font-size:.78rem;color:var(--color-text-light,#4a4a4a);margin:.15rem 0 .35rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nc-continue__where{display:flex;align-items:center;gap:.3rem;font-size:.74rem;font-weight:500;color:#536942}
+html.nc-dark .nc-continue__where{color:#a7c48f}
+.nc-continue__where svg{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:2}
+.nc-continue__bar{height:3px;background:#e7ebe2;border-radius:2px;margin-top:.45rem;overflow:hidden}
+html.nc-dark .nc-continue__bar{background:#3a3633}
+.nc-continue__bar i{display:block;height:100%;background:#536942;border-radius:2px}
+html.nc-dark .nc-continue__bar i{background:#a7c48f}
+@media (max-width:480px){.nc-continue__row{grid-template-columns:1fr}}
 /* one-time onboarding coach-mark */
 .nc-coach{position:fixed;z-index:9800;width:280px;background:var(--nc-surface);color:var(--nc-text);
   border:1px solid var(--nc-border);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:.8rem .85rem;

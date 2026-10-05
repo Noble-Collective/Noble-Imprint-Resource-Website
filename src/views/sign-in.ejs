@@ -1,0 +1,33 @@
+<%- include('partials/header') %>
+
+  <!-- ===== SIDEBAR: Library Navigation Tree (as on home) ===== -->
+  <aside class="sidebar">
+    <%- include('partials/library-nav') %>
+    <%- include('partials/sidebar-auth') %>
+  </aside>
+
+  <!-- ===== /sign-in (web sign-in plan P3, res-flow-2). The reader bundle mounts the shared sign-in
+       kit's page panel into [data-nc-signin-panel]; returnTo is already a safe same-site path. ===== -->
+  <main class="main nc-signin-page">
+    <div class="nc-sp">
+      <div class="nc-sp__hero">
+        <h1 class="nc-sp__title">Pick up any book where you left off</h1>
+        <p class="nc-sp__lede">Start a session on your laptop and finish it on your phone. Your place, and everything you've marked along the way, follows you.</p>
+        <ul class="nc-sp__list">
+          <li><span class="nc-sp__ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span><div><b>Your place in every book</b>Open any book on any device and continue from the last page you read.</div></li>
+          <li><span class="nc-sp__ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></span><div><b>Highlights, notes and bookmarks</b>Mark a passage once and see it everywhere you read.</div></li>
+          <li><span class="nc-sp__ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><div><b>Answers to reflection questions</b>Write on the website, review them on your phone before your group meets.</div></li>
+          <li><span class="nc-sp__ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v4h-4M6 22v-4h4"/></svg></span><div><b>In sync with the Noble Imprint app</b>Sign in the same way on iPhone or Android and it's all there.</div></li>
+        </ul>
+        <div class="nc-sp__apps">
+          <a class="nc-store" href="https://apps.apple.com/app/id6745697286" target="_blank" rel="noopener">Download on the<b>App Store</b></a>
+          <a class="nc-store" href="https://play.google.com/store/apps/details?id=com.noblecollective.noble_imprint" target="_blank" rel="noopener">Get it on<b>Google Play</b></a>
+        </div>
+      </div>
+      <div class="nc-sp__panel" data-nc-signin-panel data-return-to="<%= returnTo %>" data-return-label="<%= returnLabel %>">
+        <noscript><p class="text-muted">Signing in needs JavaScript.</p></noscript>
+      </div>
+    </div>
+  </main>
+
+<%- include('partials/footer') %>

@@ -90,7 +90,13 @@ function buildFields() {
     ta.placeholder = 'Sign in to write your answer'
     ta.readOnly = true // readOnly (not disabled) so it still receives clicks → prompt sign-in
     // Clicking the locked prompt opens the sign-in flow.
-    ta.addEventListener('click', () => { if (ta.readOnly) { ta.blur(); document.dispatchEvent(new CustomEvent('nc:need-signin')) } })
+    ta.addEventListener('click', () => {
+      if (!ta.readOnly) return
+      ta.blur()
+      // Held (sign-in plan P3): after sign-in the box unlocks live, then we put the cursor in it.
+      const resume = () => { if (!ta.readOnly) { ta.scrollIntoView({ block: 'center' }); ta.focus() } }
+      document.dispatchEvent(new CustomEvent('nc:need-signin', { detail: { kind: 'answer', resume } }))
+    })
     const status = el('span', 'nc-answer__status', '')
     wrap.append(ta, status)
     block.appendChild(wrap)

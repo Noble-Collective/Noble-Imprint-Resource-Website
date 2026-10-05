@@ -1,0 +1,27 @@
+<%# Home, signed out (web sign-in plan P3, res-flow-1 / res-flow-phone-home): the closable prompt in the
+    "Continue reading" slot. Server-rendered so it doesn't pop in; the reader bundle wires Sign in /
+    Get the app / close and removes it once the reader turns out to be signed in. The cards on the
+    right are decoration (aria-hidden, muted), not the visitor's data. %>
+<section class="nc-prompt" data-nc-signin-prompt data-nc-skip aria-labelledby="nc-prompt-title">
+  <button type="button" class="nc-prompt__x" data-nc-prompt-close aria-label="Close">&times;</button>
+  <div class="nc-prompt__body">
+    <p class="nc-prompt__eyebrow">Your library, on every device</p>
+    <h2 class="nc-prompt__title" id="nc-prompt-title">Pick up any book right where you left off</h2>
+    <p class="nc-prompt__text nc-prompt__text--wide">Sign in and we'll keep your place in every book, along with your highlights, notes, bookmarks and answers. It all stays in sync with the Noble Imprint app on iPhone and Android.</p>
+    <p class="nc-prompt__text nc-prompt__text--narrow">Sign in to keep your place, highlights, notes, bookmarks and answers. Everything stays in sync with the Noble Imprint app.</p>
+    <div class="nc-prompt__acts">
+      <a class="nc-prompt__btn" href="/sign-in?returnTo=%2F" data-nc-prompt-signin>Sign in</a>
+      <a class="nc-prompt__app" href="https://apps.apple.com/app/id6745697286" target="_blank" rel="noopener" data-nc-prompt-app>Get the app</a>
+    </div>
+  </div>
+  <% var _deco = (typeof shelf !== 'undefined' && shelf ? shelf : []).filter(function (b) { return b.cover && b.total; }).slice(0, 2); %>
+  <div class="nc-prompt__deco" aria-hidden="true">
+    <% _deco.forEach(function (b, i) { %>
+    <div class="nc-prompt__card">
+      <img class="nc-prompt__cover" src="<%= b.cover %>" alt="" loading="lazy">
+      <div><b><%= b.title %></b><span><%= i === 0 ? 'Session ' + Math.min(3, b.total) : 'Session ' + Math.min(7, b.total) + ' · 3 highlights' %></span><span class="nc-prompt__dev"><% if (i === 0) { %><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>Last read on your phone<% } else { %><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M1 20h22"/></svg>Last read here<% } %></span></div>
+    </div>
+    <% }); %>
+  </div>
+</section>
+<script>try { if (localStorage.getItem('nc:signin-prompt-closed')) document.querySelector('[data-nc-signin-prompt]').remove() } catch (e) { /* storage blocked: keep the prompt */ }</script>

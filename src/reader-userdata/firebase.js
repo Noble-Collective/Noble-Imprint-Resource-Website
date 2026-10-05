@@ -2,9 +2,7 @@
 // shared convergence project + the collective-user-data database, auth state, and the SDK client.
 import { initializeApp } from 'firebase/app'
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut,
-  onAuthStateChanged, setPersistence, browserLocalPersistence, connectAuthEmulator,
-  deleteUser, reauthenticateWithPopup, getAdditionalUserInfo, updateProfile,
+  getAuth, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, connectAuthEmulator, deleteUser,
 } from 'firebase/auth'
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { createUserDataClient } from '@noble-collective/userdata/client'
@@ -23,6 +21,7 @@ let _auth = null
 let _db = null
 let _client = null
 let _user = null
+let _emu = false
 const cbs = []
 
 export function initFirebase() {
@@ -34,8 +33,7 @@ export function initFirebase() {
     try {
       connectFirestoreEmulator(_db, '127.0.0.1', 8080)
       connectAuthEmulator(_auth, 'http://127.0.0.1:9099')
-      window.__ncTestSignIn = (email = 'tester@example.com', sub = 'testuser-1', name = 'Test Reader') =>
-        signInWithCredential(_auth, GoogleAuthProvider.credential(JSON.stringify({ sub, email, email_verified: true, name })))
+      _emu = true // signin.js adds the __ncTestSignIn / __ncTestLink seams over the sign-in kit
     } catch (e) { warn('emu', e) }
   }
   setPersistence(_auth, browserLocalPersistence).catch(() => {})
@@ -56,29 +54,31 @@ export function onUser(cb) {
 }
 export const getClient = () => _client
 export const getUser = () => _user
+export const getAuthInstance = () => _auth
+export const isEmulated = () => _emu
+
+/** Resolves with the data client once someone is signed in (immediately if they already are). */
+export function whenClient() {
+  return new Promise((resolve) => {
+    let done = false
+    onUser((u, client) => { if (!done && client) { done = true; resolve(client) } })
+  })
+}
 
 // Convergence Phase 1b: when identity is unified (window.__NC_UNIFIED), the reader sign-in is ALSO
-// the site's sign-in — after the popup we exchange the 463519 ID token for the server __session
-// cookie (so editor/admin access + role-aware UI light up), then reload to reflect server state.
-async function bridgeSession(cred) {
-  if (!window.__NC_UNIFIED || !cred || !cred.user) return
-  // Prefer the RAW Google profile from this sign-in (getAdditionalUserInfo) over the Firebase user
-  // record: a pre-existing 463519 auth record can have a null displayName/photoURL even when the
-  // Google account has them, which left the account menu showing "Signed in" with no avatar.
-  const gp = (getAdditionalUserInfo(cred) || {}).profile || {}
-  const displayName = cred.user.displayName || gp.name || gp.given_name || null
-  const photoURL = cred.user.photoURL || gp.picture || null
-  // Backfill the Firebase auth record too, so the CLIENT user (getUser) carries it going forward.
-  const patch = {}
-  if (displayName && !cred.user.displayName) patch.displayName = displayName
-  if (photoURL && !cred.user.photoURL) patch.photoURL = photoURL
-  if (Object.keys(patch).length) { try { await updateProfile(cred.user, patch) } catch { /* non-fatal */ } }
-  const idToken = await cred.user.getIdToken(true) // force-refresh so the new name/picture ride the token
-  const r = await postSession(idToken, { displayName, photoURL })
-  // No verified email → the server keeps no session (and no roles); the reader works client-side.
-  // Don't reload into a signed-out page (and a heal attempt) for nothing.
-  if (r === 'email-not-verified') { warn('session', r); return }
-  location.reload()
+// the site's sign-in — the sign-in kit (signin.js) calls this after every sign-in to exchange the
+// 463519 ID token for the server __session cookie (editor/admin access + role-aware UI). The kit has
+// already backfilled the auth record's name/photo from the provider (Apple gives no photo, and its
+// name only once — the kit asks for one). → undefined, or { error: 'email-not-verified' } (the P2
+// 403: the kit signs back out and says why). Any other failure is not fatal: the reader works
+// client-side and healServerSession retries on the next load.
+export async function bridgeSession(user, profile) {
+  if (!window.__NC_UNIFIED || !user) return undefined
+  const idToken = await user.getIdToken(true) // force-refresh so the new name/picture ride the token
+  const r = await postSession(idToken, { displayName: (profile && profile.displayName) || null, photoURL: (profile && profile.photoURL) || null })
+  if (r === 'email-not-verified') return { error: r }
+  if (r !== 'ok') warn('session', r)
+  return undefined
 }
 
 // The server __session cookie lives 5 days (auth.SESSION_EXPIRES_IN); the Firebase client sign-in
@@ -99,15 +99,6 @@ async function healServerSession(u) {
   } catch (e) { warn('session heal', e) }
 }
 
-function googleProvider() {
-  const p = new GoogleAuthProvider()
-  p.addScope('profile') // ensure the ID token carries the avatar (picture) + name
-  p.addScope('email')
-  return p
-}
-export const signIn = () =>
-  signInWithPopup(_auth, googleProvider()).then(bridgeSession).catch((e) => warn('sign-in', e))
-
 export const doSignOut = async () => {
   try {
     if (window.__NC_UNIFIED) await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
@@ -123,16 +114,19 @@ export async function deleteAllData() {
   try { localStorage.removeItem('nc:reader-settings') } catch { /* ignore */ }
 }
 
-// Erase all data, then delete the Firebase account itself (re-auth if the session is too old), and
-// clear the server session. Irreversible.
-export async function deleteAccount() {
+// Erase all data, then delete the Firebase account itself, and clear the server session.
+// Irreversible. `reauth` = the kit's reauthForDelete (whichever provider the account has — never
+// assume Google). → 'deleted' | 'cancelled'.
+export async function deleteAccount(reauth) {
   const user = _auth && _auth.currentUser
-  if (!user) { await deleteAllData(); return }
+  if (!user) { await deleteAllData(); return 'deleted' }
   // Reauthenticate UP FRONT: if the user cancels, we abort with NOTHING deleted (avoids the
-  // half-completed state where data is erased but a reauth prompt then fails). Firestore erase must
-  // run while still authed, so it happens after reauth but before the account is removed.
-  await reauthenticateWithPopup(user, new GoogleAuthProvider())
+  // half-completed state where data is erased but a reauth prompt then fails). The kit returns
+  // 'cancelled' rather than throwing, so check it explicitly. Firestore erase must run while still
+  // authed, so it happens after reauth but before the account is removed.
+  if ((await reauth()) !== 'ok') return 'cancelled'
   await deleteAllData()
   await deleteUser(user)
   if (window.__NC_UNIFIED) { try { await fetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ } }
+  return 'deleted'
 }

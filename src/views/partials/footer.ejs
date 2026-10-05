@@ -80,6 +80,7 @@
 <script>
   window.__NC_UNIFIED = true;
   window.__NC_USER = <%- user ? JSON.stringify({ email: user.email, displayName: user.displayName, photoURL: user.photoURL, isAdmin: !!user.isAdmin, isEditor: !!user.isEditor }).replace(/</g, '\\u003c') : 'null' %>;
+  window.__NC_FLAGS = { appleSignin: <%= typeof featureAppleSignin !== 'undefined' && featureAppleSignin ? 'true' : 'false' %> };
 </script>
 <% } %>
 <script src="/static/js/main.js?v=20"></script>
@@ -90,7 +91,7 @@
 <!-- Convergence per-user data layer — loaded site-wide so the account/settings controls appear on
      every page. Reading features (highlights/notes/bookmarks/answers/notebook) self-gate on the
      session context (window.__READER_CTX) that session pages set just above this include. -->
-<script type="module" src="/static/js/reader-userdata-bundle.js?v=60"></script>
+<script type="module" src="/static/js/reader-userdata-bundle.js?v=61"></script>
 <% } %>
 </body>
 </html>

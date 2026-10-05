@@ -2,81 +2,7 @@
 
   <!-- ===== SIDEBAR: Library Navigation Tree ===== -->
   <aside class="sidebar">
-    <ul class="nav-series">
-      <% tree.series.forEach(function(series, si) { %>
-        <li class="nav-series-group">
-          <button class="nav-series-link" data-toggle-series aria-expanded="false">
-            <span><%= series.title %></span>
-            <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <% if (series.children && series.children.length > 0) { %>
-            <ul class="nav-subseries">
-              <% series.children.forEach(function(child) { %>
-                <% if (child.type === 'subseries') { %>
-                  <li class="nav-subseries-group">
-                    <button class="nav-sub-label" data-toggle-subseries aria-expanded="true">
-                      <span><%= child.title %></span>
-                      <svg class="nav-sub-caret" width="8" height="5" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <ul class="nav-sub-books is-expanded">
-                      <% child.books.forEach(function(book) { %>
-                        <li>
-                          <a href="<%= content.bookUrl(series, child, book) %>" class="nav-book-item">
-                            <div class="nav-thumb<% if (!book.coverPath) { %> cover-green<% } %>"><% if (book.coverPath) { %><img src="/cover/<%= book.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
-                            <div>
-                              <div class="nav-book-name"><%= book.title %></div>
-                              <% if (book.banner === 'Preview') { %>
-                                <span class="badge badge-preview">Preview</span>
-                              <% } else if (book.banner === 'Pre-Release') { %>
-                                <span class="badge badge-prerelease">Pre-Release</span>
-                              <% } %>
-                            </div>
-                          </a>
-                        </li>
-                      <% }); %>
-                    </ul>
-                  </li>
-                <% } else if (child.type === 'book') { %>
-                  <li>
-                    <a href="<%= content.bookUrl(series, null, child) %>" class="nav-book-item">
-                      <div class="nav-thumb<% if (!child.coverPath) { %> cover-green<% } %>"><% if (child.coverPath) { %><img src="/cover/<%= child.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
-                      <div>
-                        <div class="nav-book-name"><%= child.title %></div>
-                        <% if (child.banner === 'Preview') { %>
-                          <span class="badge badge-preview">Preview</span>
-                        <% } else if (child.banner === 'Pre-Release') { %>
-                          <span class="badge badge-prerelease">Pre-Release</span>
-                        <% } %>
-                      </div>
-                    </a>
-                  </li>
-                <% } %>
-              <% }); %>
-            </ul>
-          <% } %>
-        </li>
-      <% }); %>
-      <% if (bibles && bibles.length > 0) { %>
-        <li class="nav-series-group">
-          <button class="nav-series-link" data-toggle-series aria-expanded="false">
-            <span>Bibles</span>
-            <svg class="nav-caret" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <ul class="nav-subseries">
-            <% bibles.forEach(function(b) { %>
-              <li>
-                <a href="/bible/<%= b.id %>" class="nav-book-item">
-                  <div class="nav-thumb<% if (!b.coverPath) { %> cover-green<% } %>"><% if (b.coverPath) { %><img src="/cover/<%= b.coverPath %>" alt="" class="nav-thumb-img"><% } %></div>
-                  <div>
-                    <div class="nav-book-name"><%= b.title %></div>
-                  </div>
-                </a>
-              </li>
-            <% }); %>
-          </ul>
-        </li>
-      <% } %>
-    </ul>
+    <%- include('partials/library-nav') %>
     <%- include('partials/sidebar-auth') %>
   </aside>
 
@@ -96,6 +22,8 @@
       </div>
     </div>
     <p class="page-subtitle">A growing collection of discipleship resources for the church.</p>
+    <% if (typeof featureUserData !== 'undefined' && featureUserData && !user) { %><%- include('partials/signin-prompt') %><% } %>
+    <script>window.__NC_SHELF = <%- typeof shelf !== 'undefined' && shelf ? JSON.stringify(shelf).replace(/</g, '\\u003c') : '[]' %>;</script>
 
     <!-- ===== VISUAL MODE (default) ===== -->
     <div class="home-visual">

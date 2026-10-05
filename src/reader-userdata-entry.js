@@ -5,7 +5,13 @@
 // Entirely additive and self-contained; any failure is swallowed so reading is never affected.
 import { injectStyles } from './reader-userdata/styles.js'
 import { applyCachedSettings, initSettings, toggleSettingsMenu } from './reader-userdata/settings.js'
-import { initFirebase, onUser, getUser, signIn, doSignOut, deleteAllData, deleteAccount } from './reader-userdata/firebase.js'
+import { initFirebase, onUser, getUser, doSignOut, deleteAllData, deleteAccount } from './reader-userdata/firebase.js'
+import {
+  initSignIn, openSheet, startSignIn, mountSignInPage, mountConnectedAccounts, unmountConnectedAccounts,
+  reauthForDelete, showSignedInToast,
+} from './reader-userdata/signin.js'
+import { mountSignInPrompt } from './reader-userdata/signin-prompt.js'
+import { initialsOf, displayEmail } from './reader-userdata/signin-model.js'
 import { initAnswers, attachAnswers } from './reader-userdata/answers.js'
 import { initAnnotations, attachAnnotations } from './reader-userdata/annotations.js'
 import { openLibrary } from './reader-userdata/library.js'
@@ -64,14 +70,14 @@ let isSession = false // true only on a reading page (has a session context + .s
 let acctMenu = null
 const ncUser = () => (typeof window !== 'undefined' ? window.__NC_USER : null) // server-resolved (unified only)
 
-// The signed-in user's avatar as an element (Google photo → <img>, else an initials chip) — used as
+// The signed-in user's avatar as an element (provider photo → <img>, else an initials chip) — used as
 // the account BUTTON face (matches Coram Deo). `base` is the class prefix so it works on the button
 // (nc-sbtn__avatar) or elsewhere.
 function userAvatarEl(base) {
   const u = getUser(); const su = ncUser()
   const name = (u?.displayName || (su && su.displayName) || u?.email || (su && su.email) || '?').trim()
   const photo = u?.photoURL || (su && su.photoURL) || ''
-  const initials = () => el('span', `${base} ${base}--initials`, (name[0] || '?').toUpperCase())
+  const initials = () => el('span', `${base} ${base}--initials`, initialsOf(name))
   if (!photo) return initials()
   const img = el('img', base)
   img.alt = ''; img.referrerPolicy = 'no-referrer' // Google photo URLs 403 without this
@@ -79,8 +85,13 @@ function userAvatarEl(base) {
   img.src = photo
   return img
 }
-const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn') && !e.target.closest('.nc-sbtn')) closeAcct() }
-function closeAcct() { acctMenu?.remove(); acctMenu = null; document.removeEventListener('pointerdown', acctOutside) }
+// (A kit dialog — Remove / Combine — opens over the menu; clicks in it must not close the menu.)
+const acctOutside = (e) => { if (acctMenu && !acctMenu.contains(e.target) && !e.target.closest('.nc-hbtn') && !e.target.closest('.nc-sbtn') && !e.target.closest('.ncsi-overlay')) closeAcct() }
+let acctAccounts = null // the menu's Connected accounts mount (the shared kit)
+function closeAcct() {
+  if (acctAccounts) { unmountConnectedAccounts(acctAccounts); acctAccounts = null }
+  acctMenu?.remove(); acctMenu = null; document.removeEventListener('pointerdown', acctOutside)
+}
 
 function placeMenu(anchor, w) {
   const r = anchor.getBoundingClientRect()
@@ -89,21 +100,6 @@ function placeMenu(anchor, w) {
   // pointerdown, not mousedown: iOS sends mouse events only for taps on "clickable" elements, so a tap
   // on blank space never closed the menu (Safari audit #10).
   setTimeout(() => document.addEventListener('pointerdown', acctOutside), 0)
-}
-
-// Signed OUT: a short intro popover (Coram-Deo-style) before the OAuth popup, rather than firing
-// the Google popup immediately.
-function showSignInIntro(anchor) {
-  if (acctMenu) { closeAcct(); return }
-  acctMenu = el('div', 'nc-menu nc-acct nc-signin')
-  acctMenu.setAttribute('data-nc-skip', '')
-  acctMenu.appendChild(el('div', 'nc-acct__name', 'Sign in'))
-  acctMenu.appendChild(el('div', 'nc-signin__body', 'Sign in to save your bookmarks, highlights, and notes across devices.'))
-  const go = el('button', 'nc-btn nc-btn--primary', 'Continue with Google')
-  go.onclick = () => { closeAcct(); signIn() }
-  acctMenu.appendChild(go)
-  document.body.appendChild(acctMenu)
-  placeMenu(anchor, 240)
 }
 
 // Signed IN: identity + role-aware links (Notifications for editors, then Sign out).
@@ -117,12 +113,12 @@ function toggleAccountMenu(anchor) {
   // email for the name (not a bare "Signed in") and to an email-initial avatar.
   const email = u?.email || su?.email || ''
   const displayName = u?.displayName || su?.displayName || ''
-  const name = displayName || email || 'Signed in'
+  const name = displayName || displayEmail(email) || 'Signed in' // a relay address never shows raw
   // The avatar now lives on the account BUTTON (see updateClusters) — the menu shows just name/email.
   const head = el('div', 'nc-acct__head')
   const info = el('div', 'nc-acct__info')
   info.appendChild(el('div', 'nc-acct__name', name))
-  if (email && email !== name) info.appendChild(el('div', 'nc-acct__email', email))
+  if (email && displayEmail(email) !== name) info.appendChild(el('div', 'nc-acct__email', displayEmail(email)))
   head.appendChild(info)
   acctMenu.appendChild(head)
   // My Notes — everything saved across all books (any signed-in user).
@@ -139,6 +135,14 @@ function toggleAccountMenu(anchor) {
   const out = el('button', 'nc-btn', 'Sign out')
   out.onclick = () => { doSignOut(); closeAcct() }
   acctMenu.appendChild(out)
+
+  // Connected accounts (the shared kit, flows.png): Connect / Remove, and Combine when the login
+  // already has its own account (POST /api/account/merge). Needs the client user (not just __NC_USER).
+  if (u) {
+    acctAccounts = el('div', 'nc-acct__accounts')
+    acctMenu.appendChild(acctAccounts)
+    mountConnectedAccounts(acctAccounts)
+  }
 
   // Data & privacy (parity with the app: Privacy Policy · Delete my data · Delete account)
   const data = el('details', 'nc-acct__data')
@@ -163,13 +167,17 @@ function toggleAccountMenu(anchor) {
       'Permanently delete your ACCOUNT and all your data?\n\nThis erases your saved data and removes your Noble Collective sign-in. It cannot be undone.',
       'Last chance — are you absolutely sure you want to delete your account?',
     )) return
-    try { await deleteAccount(); location.href = '/' } catch (e) { warn('delete account', e); window.alert('Could not delete your account. Please sign in again and retry.') }
+    try {
+      // Re-auth with whichever provider the account has; a cancel deletes NOTHING.
+      if ((await deleteAccount(reauthForDelete)) === 'cancelled') return
+      location.href = '/'
+    } catch (e) { warn('delete account', e); window.alert('Could not delete your account. Please sign in again and retry.') }
   }
   data.appendChild(delAcct)
   acctMenu.appendChild(data)
 
   document.body.appendChild(acctMenu)
-  placeMenu(anchor, 214)
+  placeMenu(anchor, 280)
 }
 
 const clusters = [] // every rendered control cluster (desktop sidebar + mobile header), for onUser
@@ -181,7 +189,8 @@ function buildCluster(host, { atTop, extraClass } = {}) {
   wrap.setAttribute('data-nc-skip', '')
   const homeBtn = sbtn(ICONS.bookOpen, 'Resource Library — home', () => { location.href = '/' })
   wrap.append(homeBtn)
-  const userBtn = sbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser() || ncUser()) toggleAccountMenu(b); else showSignInIntro(b) })
+  // Signed out: /sign-in on desktop, the sheet in place on a phone (signin.js startSignIn).
+  const userBtn = sbtn(ICONS.user, 'Sign in', (e, b) => { if (getUser() || ncUser()) toggleAccountMenu(b); else { closeAcct(); startSignIn() } })
   userBtn.setAttribute('data-nc-account-btn', '')
   if (ncUser()) userBtn.classList.add('nc-sbtn--in') // server already knows we're signed in (unified)
   const setBtn = sbtn(ICONS.gear, 'Reading settings', (e, b) => toggleSettingsMenu(b))
@@ -247,6 +256,7 @@ function buildSidebarControls() {
 
   updateClusters() // paint the avatar immediately from the server-resolved user (unified), pre client restore
   onUser(() => updateClusters())
+  document.addEventListener('nc:signed-in', () => updateClusters()) // e.g. a name just saved
 }
 
 // Re-attach the reader to freshly-swapped session content (AJAX nav within a book). ajax-nav.js
@@ -282,23 +292,25 @@ function boot() {
   isSession = !!root
   injectStyles()
   initFirebase()
+  initSignIn() // the shared kit; also resumes a popup-blocked → redirect sign-in
   initSettings()
   // Under unified identity the reader owns the site's sign-in, so back the legacy globals the mobile
-  // header drawer (header.ejs) still calls onto the 463519 flow.
+  // header drawer (header.ejs) still calls onto the 463519 flow: Sign In opens the sheet.
   if (window.__NC_UNIFIED) {
-    window.loginWithGoogle = () => signIn()
+    window.loginWithGoogle = () => openSheet()
     window.logout = () => doSignOut()
   }
   buildSidebarControls() // account + settings on every page; notebook + reading features only on sessions
   // A signed-out action that needs an account (highlight/note/bookmark/answer) dispatches this →
-  // show the sign-in intro popover anchored to the account icon.
-  document.addEventListener('nc:need-signin', () => {
+  // the sheet opens in place (the reader keeps their spot) with the action held: detail.resume runs
+  // after a successful sign-in, a cancel drops it.
+  document.addEventListener('nc:need-signin', (e) => {
     if (getUser()) return
-    const b = [...document.querySelectorAll('.nc-side [data-nc-account-btn]')].find((x) => x.offsetParent !== null)
-    if (!b) return
     if (acctMenu) closeAcct()
-    showSignInIntro(b)
+    const d = (e && e.detail) || {}
+    openSheet(d.kind, d.resume)
   })
+  showSignedInToast() // once, after a sign-in that navigated here (/sign-in → returnTo)
   window.__ncReattach = reattach // let ajax-nav re-bind the reader after an in-page session swap
   if (isSession) {
     ctx.root = root
@@ -311,7 +323,10 @@ function boot() {
       maybeOnboard()
     }
   } else if (location.pathname === '/') {
+    mountSignInPrompt() // signed out: the closable prompt (server-rendered) — wire it / drop it if signed in
     mountContinueReading() // resume strip at the top of the home page
+  } else if (location.pathname === '/sign-in') {
+    mountSignInPage(document.querySelector('[data-nc-signin-panel]'))
   } else if (location.pathname === '/notes') {
     mountMyNotes() // the cross-book "My Notes" page
   }

@@ -5959,3 +5959,70 @@ body:has(.audio-player:not([style*="none"])) .reading-content {
 .hm-actions{margin-top:16px;display:flex;align-items:center;gap:12px}
 .hm-saved{font-size:.85rem;color:#666}
 @media (max-width:600px){.hm-grid{grid-template-columns:1fr}.hm-book-btns{margin-left:0}}
+
+/* ===== Sign-in (web sign-in plan P3, Collective-Shared plans/2026-10-05-common-web-sign-in.md) =====
+   The kit's own panel/dialog styles are injected by the reader bundle (.ncsi*, --si-* tokens in
+   reader-userdata/styles.js). These are the server-rendered pieces around it. */
+
+/* Home, signed out: the closable prompt in the "Continue reading" slot (res-flow-1, res-flow-phone-home) */
+.nc-prompt{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:36px;align-items:center;
+  background:linear-gradient(180deg,#f3f6ef,#eef2e8);border:1px solid #dde4d4;border-radius:14px;padding:26px 30px;margin:0 0 30px}
+.nc-prompt__x{position:absolute;right:10px;top:8px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;
+  color:#8b957f;font-size:22px;line-height:1;cursor:pointer}
+.nc-prompt__x:hover{background:rgba(83,105,66,.1);color:var(--color-green)}
+.nc-prompt__eyebrow{font:600 11px var(--font-sans);letter-spacing:.14em;text-transform:uppercase;color:var(--color-green);margin:0 0 6px}
+.nc-prompt__title{font:400 28px/1.15 var(--font-serif);color:var(--color-charcoal);margin:0 0 10px;text-wrap:balance}
+.nc-prompt__text{font:400 14.5px/1.6 var(--font-sans);color:#4a4a4a;margin:0 0 18px;max-width:540px}
+.nc-prompt__text--narrow{display:none}
+.nc-prompt__acts{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.nc-prompt__btn{display:inline-flex;align-items:center;min-height:44px;padding:0 22px;border-radius:8px;background:var(--color-green);
+  color:#fff;font:600 14.5px var(--font-sans);text-decoration:none}
+.nc-prompt__btn:hover{background:var(--color-green-dark);color:#fff}
+.nc-prompt__app{font:500 14px var(--font-sans);color:var(--color-green);text-decoration:underline;text-underline-offset:3px}
+/* Decoration only (aria-hidden): muted so it can't read as the visitor's own library. */
+.nc-prompt__deco{display:flex;flex-direction:column;gap:10px;opacity:.8;pointer-events:none;user-select:none}
+.nc-prompt__card{display:flex;gap:11px;align-items:center;background:#fff;border:1px solid #e1e6da;border-radius:10px;padding:9px 11px;
+  box-shadow:0 2px 6px rgba(36,40,51,.05)}
+.nc-prompt__cover{width:34px;height:51px;border-radius:2px;object-fit:cover;flex:none;filter:saturate(.75)}
+.nc-prompt__card b{display:block;font:600 13px/1.3 var(--font-sans);color:var(--color-charcoal)}
+.nc-prompt__card span{display:block;font-size:12px;color:var(--color-text-light)}
+.nc-prompt__card .nc-prompt__dev{display:flex;align-items:center;gap:5px;margin-top:3px;font-weight:500;color:var(--color-green)}
+.nc-prompt__dev svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+@media (max-width:989px){
+  .nc-prompt{grid-template-columns:1fr;padding:22px 22px 20px;margin-bottom:24px}
+  .nc-prompt__deco,.nc-prompt__eyebrow,.nc-prompt__text--wide{display:none}
+  .nc-prompt__text--narrow{display:block}
+  .nc-prompt__title{font-size:23px;padding-right:28px}
+}
+html.nc-dark .nc-prompt{background:#1f1d1a;border-color:#3a3633}
+html.nc-dark .nc-prompt__title{color:#f2efe9}
+html.nc-dark .nc-prompt__text{color:#c9c4bd}
+html.nc-dark .nc-prompt__eyebrow,html.nc-dark .nc-prompt__app{color:#a7c48f}
+html.nc-dark .nc-prompt__card{background:#26221f;border-color:#3a3633}
+html.nc-dark .nc-prompt__card b{color:#e6e3df}
+html.nc-dark .nc-prompt__card .nc-prompt__dev{color:#a7c48f}
+
+/* /sign-in?returnTo= (res-flow-2): hero + four items + store links, and the kit's page panel */
+.nc-sp{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);gap:56px;align-items:start;padding-top:12px;max-width:1120px}
+.nc-sp__title{font:400 44px/1.1 var(--font-serif);color:var(--color-charcoal);margin:0 0 16px;text-wrap:balance}
+.nc-sp__lede{font:400 17px/1.7 var(--font-reading);color:var(--color-text);margin:0 0 26px;max-width:560px}
+.nc-sp__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:18px}
+.nc-sp__list li{display:grid;grid-template-columns:38px 1fr;gap:14px;font-size:14px;line-height:1.55;color:#4a4a4a}
+.nc-sp__list b{display:block;color:var(--color-charcoal);font-weight:600;font-size:15px}
+.nc-sp__ico{width:38px;height:38px;border-radius:50%;background:#e6ecdf;display:grid;place-items:center}
+.nc-sp__ico svg{width:17px;height:17px;stroke:var(--color-green);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nc-sp__apps{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+.nc-store{display:inline-block;background:#111;color:#fff;border-radius:8px;padding:7px 14px;font:500 11.5px/1.25 var(--font-sans);text-decoration:none}
+.nc-store b{display:block;font-size:14.5px;font-weight:600}
+.nc-store:hover{background:#333;color:#fff}
+.nc-sp__panel{min-height:380px}
+.nc-sp__panel .ncsi{max-width:none}
+@media (max-width:989px){
+  .nc-sp{grid-template-columns:1fr;gap:32px;padding-top:0}
+  .nc-sp__panel{order:-1;min-height:0}
+  .nc-sp__title{font-size:32px}
+}
+html.nc-dark .nc-sp__title,html.nc-dark .nc-sp__list b{color:#f2efe9}
+html.nc-dark .nc-sp__lede,html.nc-dark .nc-sp__list li{color:#c9c4bd}
+html.nc-dark .nc-sp__ico{background:#26221f}
+html.nc-dark .nc-sp__ico svg{stroke:#a7c48f}

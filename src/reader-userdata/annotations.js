@@ -444,15 +444,19 @@ function showEditToolbar(rect, annot) {
   setTimeout(() => document.addEventListener('pointerdown', editOutside, true), 0) // pointerdown: see openShareMenu
 }
 
-// Signed out: creating anything needs an account — nudge to sign in (Copy stays free).
-function needSignIn() {
+// Signed out: creating anything needs an account — nudge to sign in (Copy stays free). The action is
+// HELD (sign-in plan P3): `resume` re-runs it with the same selection once sign-in succeeds; a cancel
+// or failure drops it (reader-userdata/signin.js).
+function needSignIn(kind, resume) {
   hideToolbar()
-  document.dispatchEvent(new CustomEvent('nc:need-signin'))
+  document.dispatchEvent(new CustomEvent('nc:need-signin', { detail: { kind, resume } }))
 }
+// The selection as it was when the signed-out reader tapped, restored for the held action.
+const heldSel = (run) => { const sel = pendingSel; return () => { pendingSel = sel; return run() } }
 
 // ---------- create / edit ----------
 async function createHighlight(color) {
-  if (!getClient()) return needSignIn()
+  if (!getClient()) return needSignIn('highlight', heldSel(() => createHighlight(color)))
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
@@ -508,7 +512,7 @@ async function removeAnnot(annot) {
   await Promise.all(members.map((m) => client.deleteAnnotation(m.id).catch((e) => warn('remove', e))))
 }
 async function createBookmark() {
-  if (!getClient()) return needSignIn()
+  if (!getClient()) return needSignIn('bookmark', heldSel(() => createBookmark()))
   const sel = pendingSel
   if (!sel) return
   hideToolbar(); window.getSelection()?.removeAllRanges()
@@ -614,7 +618,7 @@ function showToast(msg, rect) {
 
 // ---------- notes ----------
 function startNote(rect) {
-  if (!getClient()) return needSignIn()
+  if (!getClient()) return needSignIn('note', heldSel(() => startNote(rect)))
   const sel = pendingSel
   if (!sel) return
   hideToolbar()

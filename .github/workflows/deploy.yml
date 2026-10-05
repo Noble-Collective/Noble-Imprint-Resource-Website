@@ -37,6 +37,13 @@ jobs:
             echo "::error::codemirror-bundle.js is stale — run 'npm run build:editor' and commit the result."
             exit 1
           fi
+      - name: Verify committed reader bundle is up to date
+        run: |
+          npm run build:reader
+          if ! git diff --exit-code --ignore-cr-at-eol --stat src/public/js/reader-userdata-bundle.js; then
+            echo "::error::reader-userdata-bundle.js is stale — run 'npm run build:reader', bump its ?v= in footer.ejs, and commit."
+            exit 1
+          fi
 
   deploy:
     needs: check

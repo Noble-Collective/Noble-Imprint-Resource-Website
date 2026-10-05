@@ -4,6 +4,7 @@ const compression = require('compression');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const content = require('./content');
+const signinPage = require('./signin-page');
 const home = require('./home');
 const accountMerge = require('./account-merge');
 const instituteData = require('./institute-data');
@@ -94,6 +95,9 @@ app.use((req, res, next) => {
   // bundle owns sign-in (mints the __session cookie via the 463519 admin app), the legacy compat
   // login is dropped, and the account menu carries role-aware links (admin/notifications).
   res.locals.featureAuthUnified = process.env.AUTH_UNIFIED === '1';
+  // Sign in with Apple (web sign-in plan P3). Apple exists only on the unified 463519 identity, so
+  // it needs AUTH_UNIFIED too. Off = the same sign-in kit and screens with Google only.
+  res.locals.featureAppleSignin = process.env.FEATURE_APPLE_SIGNIN === '1' && process.env.AUTH_UNIFIED === '1';
   // Available Bible translations (id + title) for the reader's "Default Bible Translation" setting
   // + the verse-popup translation switch. Cheap in-memory read.
   try { res.locals.bibleTranslations = bible.getAllTranslations().map((t) => ({ id: t.id, title: t.title })); }
@@ -554,6 +558,32 @@ app.get('/', async (req, res, next) => {
       content,
       bibles,
       title: 'Resource Library',
+      // Cover + numbered-session order per book, for the signed-in "Continue reading" cards.
+      shelf: signinPage.shelfFromTree(filtered, content),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// /sign-in?returnTo= — the full sign-in page (web sign-in plan P3, res-flow-2): the reader bundle
+// mounts the shared kit's page panel into [data-nc-signin-panel]. Someone already signed in on the
+// server goes straight back. returnTo is a same-site path only (signin-page.safeReturnTo).
+app.get('/sign-in', async (req, res, next) => {
+  if (process.env.FEATURE_USER_DATA !== '1') return next();
+  try {
+    const returnTo = signinPage.safeReturnTo(req.query.returnTo);
+    if (req.user) return res.redirect(302, returnTo);
+    const tree = await content.buildContentTree();
+    const filtered = await content.filterContentTree(tree, req.user);
+    res.locals.analyticsContext = { content_type: 'other' };
+    res.render('sign-in', {
+      tree: filtered,
+      content,
+      bibles: bible.getAllTranslations(),
+      title: 'Sign in',
+      returnTo,
+      returnLabel: signinPage.returnLabel(returnTo, filtered, content),
     });
   } catch (err) {
     next(err);
