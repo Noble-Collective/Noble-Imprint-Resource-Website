@@ -50,13 +50,46 @@ test('the reading-settings menu closes on a tap on blank space (pointerdown, no 
   await expect(page.locator('.nc-menu')).toHaveCount(0);
 });
 
-test('the sign-in popover closes on a tap on blank space (pointerdown, no click)', async ({ page }) => {
+// Signed out, the account icon opens the shared sign-in kit (web sign-in plan P3): the sheet in place on a
+// phone, the /sign-in page on desktop (signin.js startSignIn). The sheet is modal: a tap anywhere outside the
+// panel lands on its scrim, which closes it on click — a real touch tap, so iOS has to deliver that click.
+const SHEET = '[data-nc-signin-sheet]';
+const isPhone = (page) => page.evaluate(() => matchMedia('(max-width: 989px)').matches);
+
+async function openSheet(page) {
   await page.goto(SESSION);
   await expect.poll(() => page.evaluate(() => !!window.__ncBooted)).toBe(true);
+  await page.locator('[data-nc-account-btn]:visible').first().tap();
+  await expect(page.locator(SHEET + ' .ncsi-btn').first()).toBeVisible();
+}
+
+test('phone: the sign-in sheet closes on a tap on the scrim', async ({ page, hasTouch }) => {
+  test.skip(!hasTouch, 'touch devices only (desktop goes to /sign-in)');
+  await openSheet(page);
+  expect(await isPhone(page)).toBe(true);
+  // Let the sheet's open animation settle, then tap above the panel: the scrim must be what's there.
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+  const vw = page.viewportSize().width;
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.nc-si-sheet__scrim'), [vw / 2, 30])).toBe(true);
+  await page.touchscreen.tap(vw / 2, 30);
+  await expect(page.locator(SHEET)).toHaveCount(0);
+});
+
+test('phone: the sign-in sheet closes on its × button', async ({ page, hasTouch }) => {
+  test.skip(!hasTouch, 'touch devices only (desktop goes to /sign-in)');
+  await openSheet(page);
+  await page.locator(SHEET + ' .nc-si-sheet__x').tap();
+  await expect(page.locator(SHEET)).toHaveCount(0);
+});
+
+test('desktop: the account icon goes to /sign-in with a returnTo back to the session', async ({ page }) => {
+  await page.goto(SESSION);
+  await expect.poll(() => page.evaluate(() => !!window.__ncBooted)).toBe(true);
+  test.skip(await isPhone(page), 'desktop only (a phone opens the sheet)');
   await page.locator('[data-nc-account-btn]:visible').first().click();
-  await expect(page.locator('.nc-signin')).toBeVisible();
-  await blankTap(page);
-  await expect(page.locator('.nc-signin')).toHaveCount(0);
+  await page.waitForURL((u) => u.pathname === '/sign-in');
+  expect(new URL(page.url()).searchParams.get('returnTo')).toBe(SESSION);
+  await expect(page.locator(SHEET)).toHaveCount(0);
 });
 
 async function stubMediaSession(page) {
