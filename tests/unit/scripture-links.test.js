@@ -72,7 +72,7 @@ test('getPassage: whole chapters, cross-chapter ranges, and the 3-chapter cap', 
   assert.strictEqual(bible.getPassage('bsb', 'Jude 3').verses[0].ref, 'Jude 1:3');
 });
 
-// P7 (Steve, 2026-10-02, option A): a cut passage's footer says "Continue in Genesis 4 ›" and
+// P7 (Steve, 2026-10-02, option A): a cut passage's footer ("Go to Genesis 4 ›" since the app's P5c) and
 // opens the first verse the pop-up didn't show; a chapter list continues at the next chapter it
 // names ("Matthew 5-7, 13" → 13:1, not 8).
 test('getPassage: continuesAt = the first verse a cut passage did not show', async () => {

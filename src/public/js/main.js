@@ -202,8 +202,11 @@
       titleEl.textContent = ref.getAttribute('title') || refText;
       bodyEl.innerHTML = '<div class="verse-popup-loading">Loading...</div>';
       translationEl.textContent = '';
+      // The link's words depend on the answer (a cut passage goes on at its next chapter), so it
+      // stays invisible (keeping its height) until the verses arrive.
       linkEl.href = '#';
-      linkEl.textContent = 'Read in context ›';
+      linkEl.textContent = '';
+      linkEl.style.visibility = 'hidden';
       overlay.classList.add('is-visible');
 
       // Normalize en-dash to hyphen for API
@@ -259,14 +262,14 @@
           bodyEl.innerHTML = html;
           translationEl.textContent = ncTranslationTitle(translation);
 
-          // The footer's link to the Bible page: "Read in context ›" opens the passage's first
-          // verse; a cut passage's "Continue in Genesis 4 ›" opens the first verse not shown.
-          var at = data.continuesAt;
-          var target = at ? at.ref : data.verses[0].ref;
-          var match = target.match(/^(.+?)\s+(\d+):(\d+)$/);
-          if (match) {
-            linkEl.href = '/bible/' + translation + '/' + encodeURIComponent(match[1]) + '?chapter=' + match[2] + '#v' + match[3];
-            if (at) linkEl.textContent = 'Continue in ' + at.book + ' ' + at.chapter + ' ›';
+          // The footer's link to the Bible page, the same words as the app + the Institute (settings
+          // plan P5c): "Go to Hebrews 11 ›" at the first verse quoted; a cut passage's "Go to
+          // Genesis 4 ›" at the first verse not shown (verse-go-to.js).
+          var goTo = window.ncVerseGoTo && window.ncVerseGoTo(data, translation);
+          if (goTo) {
+            linkEl.href = goTo.href;
+            linkEl.textContent = goTo.label;
+            linkEl.style.visibility = '';
           }
         })
         .catch(function () {

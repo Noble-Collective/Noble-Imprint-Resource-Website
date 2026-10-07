@@ -52,7 +52,7 @@
       <div class="verse-popup-body" data-verse-body></div>
       <div class="verse-popup-footer">
         <span class="verse-popup-translation" data-verse-translation></span>
-        <a class="verse-popup-link" data-verse-link href="#">Read in context &rsaquo;</a>
+        <a class="verse-popup-link" data-verse-link href="#" style="visibility: hidden"></a>
       </div>
     </div>
   </div>
@@ -83,7 +83,8 @@
   window.__NC_FLAGS = { appleSignin: <%= typeof featureAppleSignin !== 'undefined' && featureAppleSignin ? 'true' : 'false' %> };
 </script>
 <% } %>
-<script src="/static/js/main.js?v=20"></script>
+<script src="/static/js/verse-go-to.js?v=1"></script>
+<script src="/static/js/main.js?v=21"></script>
 <script>window.__NC_TRANSLATIONS = <%- typeof bibleTranslations !== 'undefined' && bibleTranslations ? JSON.stringify(bibleTranslations).replace(/</g, '\\u003c') : '[]' %>;</script>
 <script>window.__analyticsContext = <%- analyticsContext ? JSON.stringify(analyticsContext).replace(/</g, '\\u003c') : 'null' %>;</script>
 <script src="/static/js/analytics.js?v=2"></script>

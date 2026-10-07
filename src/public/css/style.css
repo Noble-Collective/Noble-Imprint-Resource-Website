@@ -2159,7 +2159,7 @@ body.text-mode .home-text {
   letter-spacing: 0.05em;
 }
 
-/* The one link: "Read in context ›", or "Continue in Genesis 4 ›" for a cut passage. Semibold,
+/* The one link: "Go to Hebrews 11 ›", or "Go to Genesis 4 ›" for a cut passage (settings plan P5c). Semibold,
    with a 44px tap height (P7 design page, option A). */
 .verse-popup-link {
   font-family: var(--font-sans);
