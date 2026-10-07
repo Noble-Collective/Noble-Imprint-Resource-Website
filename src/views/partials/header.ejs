@@ -15,7 +15,30 @@
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" referrerpolicy="no-referrer">
-  <link rel="stylesheet" href="/static/css/style.css?v=119">
+<% if (typeof featureUserData !== 'undefined' && featureUserData) { %>  <!-- The reader's saved settings BEFORE the first paint (Bryan, 2026-10: pages flashed white 2-3 times
+       in dark mode). The reader bundle applies them too, but it's a module script on the page's last
+       line — the light page, in the default font, was drawn first. Mirrors apply() in
+       src/reader-userdata/settings.js (same cache key, FONT_SCALE and font stacks — keep in step);
+       the rules these feed live in style.css ("Reader settings"). -->
+  <script>
+  (function () {
+    var r = document.documentElement, s = {};
+    try { s = JSON.parse(localStorage.getItem('nc:reader-settings') || '{}') || {}; } catch (e) { s = {}; }
+    var t = s.theme || 'system';
+    var dark = t === 'dark' || (t !== 'light' && !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
+    if (dark) r.classList.add('nc-dark');
+    if (s.verseLayout === 'line') r.classList.add('nc-verse-line');
+    var scale = { sm: 0.9, base: 1, lg: 1.2, xl: 1.75 }[s.fontSize || 'base'];
+    r.style.setProperty('--nc-font-scale', String(scale || 1));
+    r.style.setProperty('--font-reading', s.fontFamily === 'serif'
+      ? "'Lora', Georgia, 'Times New Roman', serif"
+      : 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+  })();
+  </script>
+  <%# Dark from the very first frame, before style.css arrives (follows the class, so a later toggle in the gear menu still works). %>
+  <style>html.nc-dark{color-scheme:dark;background:#0c0a09}</style>
+<% } %>
+  <link rel="stylesheet" href="/static/css/style.css?v=120">
 </head>
 <body>
 

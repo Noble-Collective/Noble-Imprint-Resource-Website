@@ -6026,3 +6026,56 @@ html.nc-dark .nc-sp__title,html.nc-dark .nc-sp__list b{color:#f2efe9}
 html.nc-dark .nc-sp__lede,html.nc-dark .nc-sp__list li{color:#c9c4bd}
 html.nc-dark .nc-sp__ico{background:#26221f}
 html.nc-dark .nc-sp__ico svg{stroke:#a7c48f}
+
+/* ============================================================
+   Reader settings from the first paint (Bryan, 2026-10: pages flashed white 2-3 times in dark mode).
+   The head script in partials/header.ejs sets html.nc-dark / --nc-font-scale / --font-reading before
+   anything is drawn; these are the rules they feed. They used to exist only inside the reader bundle
+   (src/reader-userdata/styles.js, injected at the end of the page load) — that copy stays, identical,
+   for the reader's own UI; keep the two in step.
+   ============================================================ */
+.session-content p, .reading-content p, .session-content li, .reading-content li{ font-size:calc(17px * var(--nc-font-scale,1)) !important; }
+.session-content h1, .reading-content h1{ font-size:calc(2rem * var(--nc-font-scale,1)) !important; }
+.session-content h2, .reading-content h2{ font-size:calc(1.6rem * var(--nc-font-scale,1)) !important; }
+.session-content h3, .reading-content h3{ font-size:calc(1.35rem * var(--nc-font-scale,1)) !important; }
+.session-content h4, .reading-content h4{ font-size:calc(1.15rem * var(--nc-font-scale,1)) !important; }
+
+html.nc-dark{
+  color-scheme:dark;
+  --color-bg:#1c1917; --color-bg-warm:#26221f; --color-bg-sidebar:#12100e;
+  --color-border:#3a3633; --color-text:#e6e3df; --color-text-light:#a8a29e; --color-charcoal:#e6e3df;
+}
+html.nc-dark, html.nc-dark body{ background:#0c0a09; }
+html.nc-dark body{ color:var(--color-text); }
+html.nc-dark .reading-content, html.nc-dark .session-content,
+html.nc-dark .session-content p, html.nc-dark .session-content li,
+html.nc-dark .session-content blockquote, html.nc-dark .session-content td,
+html.nc-dark .session-content strong, html.nc-dark .session-content em{ color:var(--color-text); }
+html.nc-dark .session-content h1, html.nc-dark .session-content h2, html.nc-dark .session-content h3,
+html.nc-dark .session-content h4, html.nc-dark .session-content h5, html.nc-dark .session-content h6{ color:#f2efe9; }
+html.nc-dark .session-content a{ color:#93c5fd; }
+html.nc-dark .question-block{ background:var(--color-bg-warm); }
+html.nc-dark img:not([src*=".svg"]){ filter:brightness(.88); }
+html.nc-verse-line .bible-content .bible-verse{ display:block; margin:.2rem 0; padding-left:1.5rem; text-indent:-1.5rem; }
+html.nc-verse-line .bible-content .bible-verse .verse-num{ font-weight:700; }
+html.nc-verse-line .bible-content .bible-paragraph sup{ font-weight:700; }
+html.nc-verse-line .bible-content .bible-paragraph sup::before{ content:''; display:block; margin-top:.35rem; }
+html.nc-verse-line .bible-content .bible-paragraph sup:first-child::before{ margin-top:0; }
+
+/* Surfaces that were hard-coded white and stayed white in dark mode. */
+html.nc-dark .site-footer{ background:#12100e; color:#a7c48f; border-top-color:#2a2623; }
+html.nc-dark .site-footer a, html.nc-dark .footer-heading{ color:#a7c48f; }
+html.nc-dark .footer-link-list a, html.nc-dark .footer-description,
+html.nc-dark .footer-bottom small, html.nc-dark .footer-bottom a{ color:#c9c4bd; }
+html.nc-dark .footer-bottom{ border-top-color:#2a2623; }
+html.nc-dark .menu-drawer, html.nc-dark .menu-drawer__submenu{ background-color:#1c1917; color:#a7c48f; }
+html.nc-dark .menu-drawer .menu-drawer__menu-item, html.nc-dark .menu-drawer__back-btn{ color:#c9c4bd; }
+html.nc-dark .menu-drawer .menu-drawer__menu-item:hover,
+html.nc-dark .menu-drawer .menu-drawer__menu-item:focus,
+html.nc-dark .menu-drawer .menu-drawer__menu-item--active{ color:#e6e3df; background-color:rgba(167,196,143,.08); }
+html.nc-dark .user-dropdown{ background:#1f1d1a; box-shadow:0 4px 24px rgba(0,0,0,.5); }
+html.nc-dark .user-dropdown-name{ color:#f2efe9; }
+html.nc-dark .user-dropdown-email{ color:#a8a29e; }
+html.nc-dark .user-dropdown-divider{ background:#3a3633; }
+html.nc-dark .user-dropdown-item{ color:#e6e3df; }
+html.nc-dark .user-dropdown-item:hover{ background:#2a2623; }
