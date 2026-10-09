@@ -558,6 +558,8 @@ app.get('/', async (req, res, next) => {
       content,
       bibles,
       title: 'Resource Library',
+      // The Home search box (?q= opens with results; library-search plan P4). Searched by the client.
+      searchQuery: require('./library-search').queryText(req.query.q),
       // Cover + numbered-session order per book, for the signed-in "Continue reading" cards.
       shelf: signinPage.shelfFromTree(filtered, content),
     });

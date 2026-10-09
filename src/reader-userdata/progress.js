@@ -80,8 +80,9 @@ function renderContinue(main, acts) {
     row.appendChild(card)
   }
   sec.appendChild(row)
-  // The "Continue reading" slot: under the page title + subtitle (where the signed-out prompt sits).
-  const sub = main.querySelector(':scope > .page-subtitle')
+  // The "Continue reading" slot: under the page title + subtitle and the library search box (where the
+  // signed-out prompt sits).
+  const sub = main.querySelector(':scope > .nc-libsearch') || main.querySelector(':scope > .page-subtitle')
   if (sub) sub.after(sec)
   else main.insertBefore(sec, main.firstChild)
 }
