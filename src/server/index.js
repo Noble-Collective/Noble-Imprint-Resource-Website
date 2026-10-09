@@ -997,6 +997,14 @@ app.get('/api/home', async (req, res) => {
   }
 });
 
+// Library search for the websites: GET /api/library/search?q=&limit= + GET /api/library/index (public,
+// CORS *, cached 10 min, per-IP 120/min). The shared matcher + search-terms.json from the content tree;
+// see src/server/library-search.js and Collective-Shared plans/2026-10-09-library-search-terms.md.
+app.use(require('./library-search').router({
+  getTree: () => content.buildContentTree(),
+  getBibles: () => bible.getAllTranslations(),
+}));
+
 // Combine accounts — the client tried to connect a sign-in method that already belongs to another
 // account, signed in to that account on a secondary Firebase app, and sends both ID tokens. See
 // src/server/account-merge.js + Collective-Shared/plans/2026-09-24-account-merge.md.

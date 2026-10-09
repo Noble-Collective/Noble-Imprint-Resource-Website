@@ -258,6 +258,25 @@ function hasServableTree() {
   return !!(snap && countBooks(snap) > 0);
 }
 
+// The Library search terms (content repo root `search-terms.json`; Collective-Shared
+// plans/2026-10-09-library-search-terms.md §3a) ride in the tree as `searchTerms`, so they reach the
+// committed snapshot by the same rebuild that refresh-cache.yml and /api/refresh run. A fetch or
+// parse failure keeps the previous snapshot's terms (or none): never fatal, books still search by title.
+async function loadSearchTerms(prevTree) {
+  const prev = (prevTree && prevTree.searchTerms) || null;
+  try {
+    const { content } = await github.getFileContent('search-terms.json');
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== 'object' || !parsed.nodes || typeof parsed.nodes !== 'object' || Array.isArray(parsed.nodes)) {
+      throw new Error('no "nodes" object');
+    }
+    return parsed;
+  } catch (err) {
+    console.error(`[content] search-terms.json not loaded (${err.message}); ${prev ? 'keeping the previous terms' : 'no terms'}`);
+    return prev;
+  }
+}
+
 let treeRebuildInFlight = null;
 
 // The real build: hits the GitHub API (~90 directory calls + per-book meta),
@@ -300,7 +319,8 @@ async function rebuildContentTree() {
   }
 
   series.sort((a, b) => a.order - b.order);
-  const tree = { series };
+  const prevSnapshot = readTreeSnapshot();
+  const tree = { series, searchTerms: await loadSearchTerms(prevSnapshot) };
 
   // Bake H1 titles into the tree so the snapshot is complete — otherwise a cold
   // page load would still fan out one GitHub call per session to fill them in,
@@ -310,7 +330,6 @@ async function rebuildContentTree() {
   // Floor guard: never let a degraded build overwrite the good snapshot (the outage
   // fallback) or get committed by the nightly job. If the new tree looks content-poor
   // vs. the existing snapshot, keep the old one and serve it instead.
-  const prevSnapshot = readTreeSnapshot();
   const sanity = isTreeSane(tree, prevSnapshot);
   if (!sanity.ok) {
     console.error(`[content] REFUSING to persist degraded content tree: ${sanity.reason}. Keeping existing snapshot.`);
@@ -755,6 +774,7 @@ async function warmDiskCache() {
 module.exports = {
   buildContentTree,
   rebuildContentTree,
+  loadSearchTerms,
   resolveRoute,
   bookUrl,
   sessionUrl,

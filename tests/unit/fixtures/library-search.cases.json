@@ -1,0 +1,1578 @@
+{
+ "about": "The specification of @noble-collective/userdata/library-search (ARCHITECTURE §9d; plan plans/2026-10-09-library-search-terms.md §3b). Hand-reviewed: every case states what a reader should get. The TypeScript module and the mobile app's Dart copy must both pass it exactly. terms = library-search.terms.json (the approved draft). catalog = the 24 visible books (22 + the 2 Bibles) + the hidden Test Book, in Library order (series, shelf, book; Bibles last); key = meta.json id (bsb/kjv for the Bibles). search: \"keys\" = the exact result keys in order; \"top\" = the results start with these; \"contains\"/\"absent\" = present/absent anywhere; \"count\" = the number of results; \"matched\" = the expected matched {text, field, via?} for those keys (no via = none). index: resolveIndex(terms, catalog) facts. validate: validateTerms(terms, folders) problems compare as a set of {level, code, key, term?} (message not compared); \"fixture\" = this file's folders / library-search.terms.json.",
+ "normalize": [
+  [
+   "L’Appel du Christ",
+   "lappel du christ"
+  ],
+  [
+   "Lord's Prayer",
+   "lords prayer"
+  ],
+  [
+   "Catéchisme",
+   "catechisme"
+  ],
+  [
+   "Français",
+   "francais"
+  ],
+  [
+   "  Ten   Commandments!! ",
+   "ten commandments"
+  ],
+  [
+   "Hear, My Son",
+   "hear my son"
+  ],
+  [
+   "Proverbs 1–9",
+   "proverbs 1 9"
+  ],
+  [
+   "C. S. Lewis",
+   "c s lewis"
+  ],
+  [
+   "`back`tick",
+   "backtick"
+  ],
+  [
+   "Saint-Esprit",
+   "saint esprit"
+  ],
+  [
+   "Ésaïe",
+   "esaie"
+  ],
+  [
+   "KJV",
+   "kjv"
+  ],
+  [
+   "!!!",
+   ""
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "bi-vocational",
+   "bi vocational"
+  ]
+ ],
+ "catalog": [
+  {
+   "key": "the-call-of-christ",
+   "id": "the-call-of-christ",
+   "title": "The Call of Christ",
+   "subtitle": "A Narrative Journey of Christian Faith",
+   "path": "series/Narrative Journey Series/Foundations/The Call of Christ",
+   "hidden": false,
+   "order": 0
+  },
+  {
+   "key": "lappel-du-christ",
+   "id": "lappel-du-christ",
+   "title": "L'Appel du Christ",
+   "subtitle": "Un voyage narratif de la foi chrétienne",
+   "path": "series/Narrative Journey Series/Foundations/L’Appel du Christ",
+   "hidden": false,
+   "order": 1
+  },
+  {
+   "key": "test-book",
+   "id": null,
+   "title": "Test Book",
+   "subtitle": "A test book for development",
+   "path": "series/Narrative Journey Series/Foundations/Test Book",
+   "hidden": true,
+   "order": 2
+  },
+  {
+   "key": "the-story-behind-it-all",
+   "id": "the-story-behind-it-all",
+   "title": "The Story Behind It All",
+   "subtitle": "A Narrative Journey of Christian Belief",
+   "path": "series/Narrative Journey Series/Essentials/The Story Behind It All",
+   "hidden": false,
+   "order": 3
+  },
+  {
+   "key": "the-best-possible-life",
+   "id": "the-best-possible-life",
+   "title": "The Best Possible Life",
+   "subtitle": "A Narrative Journey of Christian Living",
+   "path": "series/Narrative Journey Series/Essentials/The Best Possible Life",
+   "hidden": false,
+   "order": 4
+  },
+  {
+   "key": "the-open-invitation",
+   "id": "the-open-invitation",
+   "title": "The Open Invitation",
+   "subtitle": "A Narrative Journey of Christian Formation",
+   "path": "series/Narrative Journey Series/Essentials/The Open Invitation",
+   "hidden": false,
+   "order": 5
+  },
+  {
+   "key": "the-bond-between-us",
+   "id": "the-bond-between-us",
+   "title": "The Bond Between Us",
+   "subtitle": "A Narrative Journey of Christian Community",
+   "path": "series/Narrative Journey Series/Essentials/The Bond Between Us",
+   "hidden": false,
+   "order": 6
+  },
+  {
+   "key": "the-glory-due-his-name",
+   "id": "the-glory-due-his-name",
+   "title": "The Glory Due His Name",
+   "subtitle": "A Narrative Journey of Christian Devotion",
+   "path": "series/Narrative Journey Series/Essentials/The Glory Due His Name",
+   "hidden": false,
+   "order": 7
+  },
+  {
+   "key": "the-kingdom-come",
+   "id": "the-kingdom-come",
+   "title": "The Kingdom Come",
+   "subtitle": "A Narrative Journey of Christian Witness",
+   "path": "series/Narrative Journey Series/Essentials/The Kingdom Come",
+   "hidden": false,
+   "order": 8
+  },
+  {
+   "key": "the-ends-of-the-earth",
+   "id": "the-ends-of-the-earth",
+   "title": "The Ends of the Earth",
+   "subtitle": "A Narrative Journey of Christian Mission",
+   "path": "series/Narrative Journey Series/Pathways/The Ends of the Earth",
+   "hidden": false,
+   "order": 9
+  },
+  {
+   "key": "the-sacred-script",
+   "id": "the-sacred-script",
+   "title": "The Sacred Script",
+   "subtitle": "A Narrative Journey of Christian Worldview",
+   "path": "series/Narrative Journey Series/Pathways/The Sacred Script",
+   "hidden": false,
+   "order": 10
+  },
+  {
+   "key": "the-making-of-a-shepherd",
+   "id": "the-making-of-a-shepherd",
+   "title": "The Making of a Shepherd",
+   "subtitle": "A Narrative Journey of Christian Leadership",
+   "path": "series/Narrative Journey Series/Pathways/The Making of a Shepherd",
+   "hidden": false,
+   "order": 11
+  },
+  {
+   "key": "the-aim-of-our-charge",
+   "id": "the-aim-of-our-charge",
+   "title": "The Aim of Our Charge",
+   "subtitle": "A Narrative Journey of Christian Instruction",
+   "path": "series/Narrative Journey Series/Pathways/The Aim of Our Charge",
+   "hidden": false,
+   "order": 12
+  },
+  {
+   "key": "sacred-markings",
+   "id": "sacred-markings",
+   "title": "Sacred Markings",
+   "subtitle": "Journaling Toward Second Nature",
+   "path": "series/Spiritual Journals/Sacred Markings",
+   "hidden": false,
+   "order": 13
+  },
+  {
+   "key": "homestead",
+   "id": "homestead",
+   "title": "HomeStead",
+   "subtitle": "A Rite of Passage into Christian Hearth and Home",
+   "path": "series/Passage Series/HomeStead",
+   "hidden": false,
+   "order": 14
+  },
+  {
+   "key": "base-camp",
+   "id": "base-camp",
+   "title": "Base Camp",
+   "subtitle": "A Rite of Passage into Christian Responsibility and Accountability",
+   "path": "series/Passage Series/BaseCamp",
+   "hidden": false,
+   "order": 15
+  },
+  {
+   "key": "venture",
+   "id": "venture",
+   "title": "Venture",
+   "subtitle": "A Rite of Passage into Christian Risk and Valor",
+   "path": "series/Passage Series/Venture",
+   "hidden": false,
+   "order": 16
+  },
+  {
+   "key": "come-let-us-adore-him",
+   "id": "come-let-us-adore-him",
+   "title": "Come, Let Us Adore Him",
+   "subtitle": "A Community Liturgy for Advent, Nativity, and Epiphany",
+   "path": "series/Liturgies/Come Let Us Adore Him",
+   "hidden": false,
+   "order": 17
+  },
+  {
+   "key": "a-table-in-the-wilderness",
+   "id": "a-table-in-the-wilderness",
+   "title": "A Table in the Wilderness",
+   "subtitle": "A Celebration Feast for Good Friday",
+   "path": "series/Liturgies/A Table In the Wilderness",
+   "hidden": false,
+   "order": 18
+  },
+  {
+   "key": "oration-ii",
+   "id": "oration-ii",
+   "title": "Oration II",
+   "subtitle": "In Defense of His Flight to Pontus",
+   "path": "series/A Library of Classics/A Pastoral Shelf/Oration II",
+   "hidden": false,
+   "order": 19
+  },
+  {
+   "key": "on-the-shortness-of-life",
+   "id": "on-the-shortness-of-life",
+   "title": "On the Shortness of Life",
+   "subtitle": "A Philosophical Exploration of Time, Wisdom, and the Good Life",
+   "path": "series/A Library of Classics/A Philosophical Shelf/On the Shortness of Life",
+   "hidden": false,
+   "order": 20
+  },
+  {
+   "key": "hear-my-son",
+   "id": "hear-my-son",
+   "title": "Hear, My Son",
+   "subtitle": "A Primer on Proverbs 1–9 as a Tool for Faith Formation",
+   "path": "series/Vade Mecum/Proverbs and Faith Formation",
+   "hidden": false,
+   "order": 21
+  },
+  {
+   "key": "from-among-you",
+   "id": "from-among-you",
+   "title": "From Among You",
+   "subtitle": "Scaling the Global Church with a Vocationed Pastor Model",
+   "path": "series/Vade Mecum/The Vocationed Pastor",
+   "hidden": false,
+   "order": 22
+  },
+  {
+   "key": "bsb",
+   "id": null,
+   "title": "Berean Standard Bible",
+   "subtitle": null,
+   "path": "bibles/bsb",
+   "hidden": false,
+   "order": 23
+  },
+  {
+   "key": "kjv",
+   "id": null,
+   "title": "King James Bible",
+   "subtitle": null,
+   "path": "bibles/kjv",
+   "hidden": false,
+   "order": 24
+  }
+ ],
+ "folders": [
+  {
+   "path": "bibles"
+  },
+  {
+   "path": "bibles/bsb",
+   "title": "Berean Standard Bible"
+  },
+  {
+   "path": "bibles/kjv",
+   "title": "King James Bible"
+  },
+  {
+   "path": "series/A Library of Classics",
+   "title": "A Library of Classics"
+  },
+  {
+   "path": "series/A Library of Classics/A Literary Shelf",
+   "title": "A Literary Shelf"
+  },
+  {
+   "path": "series/A Library of Classics/A Missionary Shelf",
+   "title": "A Missionary Shelf"
+  },
+  {
+   "path": "series/A Library of Classics/A Pastoral Shelf",
+   "title": "A Pastoral Shelf"
+  },
+  {
+   "path": "series/A Library of Classics/A Pastoral Shelf/Oration II",
+   "title": "Oration II",
+   "id": "oration-ii"
+  },
+  {
+   "path": "series/A Library of Classics/A Philosophical Shelf",
+   "title": "A Philosophical Shelf"
+  },
+  {
+   "path": "series/A Library of Classics/A Philosophical Shelf/On the Shortness of Life",
+   "title": "On the Shortness of Life",
+   "id": "on-the-shortness-of-life"
+  },
+  {
+   "path": "series/Liturgies",
+   "title": "Liturgies"
+  },
+  {
+   "path": "series/Liturgies/A Table In the Wilderness",
+   "title": "A Table in the Wilderness",
+   "id": "a-table-in-the-wilderness"
+  },
+  {
+   "path": "series/Liturgies/Come Let Us Adore Him",
+   "title": "Come, Let Us Adore Him",
+   "id": "come-let-us-adore-him"
+  },
+  {
+   "path": "series/Narrative Journey Series",
+   "title": "Narrative Journey Series"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials",
+   "title": "Essentials"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Best Possible Life",
+   "title": "The Best Possible Life",
+   "id": "the-best-possible-life"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Bond Between Us",
+   "title": "The Bond Between Us",
+   "id": "the-bond-between-us"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Glory Due His Name",
+   "title": "The Glory Due His Name",
+   "id": "the-glory-due-his-name"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Kingdom Come",
+   "title": "The Kingdom Come",
+   "id": "the-kingdom-come"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Open Invitation",
+   "title": "The Open Invitation",
+   "id": "the-open-invitation"
+  },
+  {
+   "path": "series/Narrative Journey Series/Essentials/The Story Behind It All",
+   "title": "The Story Behind It All",
+   "id": "the-story-behind-it-all"
+  },
+  {
+   "path": "series/Narrative Journey Series/Foundations",
+   "title": "Foundations"
+  },
+  {
+   "path": "series/Narrative Journey Series/Foundations/L’Appel du Christ",
+   "title": "L'Appel du Christ",
+   "id": "lappel-du-christ"
+  },
+  {
+   "path": "series/Narrative Journey Series/Foundations/Test Book",
+   "title": "Test Book"
+  },
+  {
+   "path": "series/Narrative Journey Series/Foundations/The Call of Christ",
+   "title": "The Call of Christ",
+   "id": "the-call-of-christ"
+  },
+  {
+   "path": "series/Narrative Journey Series/Pathways",
+   "title": "Pathways"
+  },
+  {
+   "path": "series/Narrative Journey Series/Pathways/The Aim of Our Charge",
+   "title": "The Aim of Our Charge",
+   "id": "the-aim-of-our-charge"
+  },
+  {
+   "path": "series/Narrative Journey Series/Pathways/The Ends of the Earth",
+   "title": "The Ends of the Earth",
+   "id": "the-ends-of-the-earth"
+  },
+  {
+   "path": "series/Narrative Journey Series/Pathways/The Making of a Shepherd",
+   "title": "The Making of a Shepherd",
+   "id": "the-making-of-a-shepherd"
+  },
+  {
+   "path": "series/Narrative Journey Series/Pathways/The Sacred Script",
+   "title": "The Sacred Script",
+   "id": "the-sacred-script"
+  },
+  {
+   "path": "series/Passage Series",
+   "title": "Passage"
+  },
+  {
+   "path": "series/Passage Series/BaseCamp",
+   "title": "Base Camp",
+   "id": "base-camp"
+  },
+  {
+   "path": "series/Passage Series/HomeStead",
+   "title": "HomeStead",
+   "id": "homestead"
+  },
+  {
+   "path": "series/Passage Series/Venture",
+   "title": "Venture",
+   "id": "venture"
+  },
+  {
+   "path": "series/Spiritual Journals",
+   "title": "Spiritual Journals"
+  },
+  {
+   "path": "series/Spiritual Journals/Sacred Markings",
+   "title": "Sacred Markings",
+   "id": "sacred-markings"
+  },
+  {
+   "path": "series/Vade Mecum",
+   "title": "Vade Mecum"
+  },
+  {
+   "path": "series/Vade Mecum/Proverbs and Faith Formation",
+   "title": "Hear, My Son",
+   "id": "hear-my-son"
+  },
+  {
+   "path": "series/Vade Mecum/The Vocationed Pastor",
+   "title": "From Among You",
+   "id": "from-among-you"
+  }
+ ],
+ "index": {
+  "unusedKeys": [
+   "series/A Library of Classics/A Literary Shelf",
+   "series/A Library of Classics/A Missionary Shelf"
+  ],
+  "books": [
+   {
+    "key": "the-open-invitation",
+    "seriesPath": [
+     "Narrative Journey Series",
+     "Essentials"
+    ],
+    "fieldCount": 72,
+    "first": [
+     {
+      "text": "The Open Invitation",
+      "weight": 60,
+      "field": "title"
+     },
+     {
+      "text": "lord's prayer",
+      "weight": 50,
+      "field": "primary"
+     }
+    ],
+    "last": {
+     "text": "A Narrative Journey of Christian Formation",
+     "weight": 10,
+     "field": "subtitle"
+    }
+   },
+   {
+    "key": "bsb",
+    "seriesPath": [
+     "Bibles"
+    ]
+   },
+   {
+    "key": "oration-ii",
+    "seriesPath": [
+     "A Library of Classics",
+     "A Pastoral Shelf"
+    ]
+   }
+  ],
+  "absent": [
+   "test-book"
+  ]
+ },
+ "search": [
+  {
+   "name": "bsb: the Berean Standard Bible only",
+   "q": "bsb",
+   "keys": [
+    "bsb"
+   ],
+   "matched": {
+    "bsb": {
+     "text": "bsb",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "kjv: the King James Bible only",
+   "q": "kjv",
+   "keys": [
+    "kjv"
+   ],
+   "matched": {
+    "kjv": {
+     "text": "kjv",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "KJV in capitals with punctuation",
+   "q": "KJV!",
+   "keys": [
+    "kjv"
+   ]
+  },
+  {
+   "name": "berean: a title word, so a title match",
+   "q": "berean",
+   "keys": [
+    "bsb"
+   ],
+   "matched": {
+    "bsb": {
+     "text": "Berean Standard Bible",
+     "field": "title"
+    }
+   }
+  },
+  {
+   "name": "king james: the title wins (no \"Matches\" line)",
+   "q": "king james",
+   "keys": [
+    "kjv"
+   ],
+   "matched": {
+    "kjv": {
+     "text": "King James Bible",
+     "field": "title"
+    }
+   }
+  },
+  {
+   "name": "kjv bible: AND across a primary term and the title",
+   "q": "kjv bible",
+   "keys": [
+    "kjv"
+   ]
+  },
+  {
+   "name": "holy bible: inherited from the Bibles shelf, ties in Library order",
+   "q": "holy bible",
+   "top": [
+    "bsb",
+    "kjv"
+   ],
+   "matched": {
+    "bsb": {
+     "text": "holy bible",
+     "field": "terms",
+     "via": "Bibles"
+    },
+    "kjv": {
+     "text": "holy bible",
+     "field": "terms",
+     "via": "Bibles"
+    }
+   }
+  },
+  {
+   "name": "catechism: all 12 visible Narrative Journey books; own terms first, then Library order",
+   "q": "catechism",
+   "keys": [
+    "the-call-of-christ",
+    "lappel-du-christ",
+    "the-story-behind-it-all",
+    "the-best-possible-life",
+    "the-open-invitation",
+    "the-bond-between-us",
+    "the-glory-due-his-name",
+    "the-kingdom-come",
+    "the-ends-of-the-earth",
+    "the-sacred-script",
+    "the-making-of-a-shepherd",
+    "the-aim-of-our-charge"
+   ],
+   "matched": {
+    "the-call-of-christ": {
+     "text": "catechism questions",
+     "field": "terms"
+    },
+    "lappel-du-christ": {
+     "text": "catéchisme",
+     "field": "terms"
+    },
+    "the-story-behind-it-all": {
+     "text": "catechism",
+     "field": "primary",
+     "via": "Narrative Journey Series"
+    },
+    "the-aim-of-our-charge": {
+     "text": "catechism",
+     "field": "primary",
+     "via": "Narrative Journey Series"
+    }
+   }
+  },
+  {
+   "name": "cate: a prefix finds the same 12",
+   "q": "cate",
+   "count": 12,
+   "contains": [
+    "the-call-of-christ",
+    "lappel-du-christ",
+    "the-story-behind-it-all",
+    "the-best-possible-life",
+    "the-open-invitation",
+    "the-bond-between-us",
+    "the-glory-due-his-name",
+    "the-kingdom-come",
+    "the-ends-of-the-earth",
+    "the-sacred-script",
+    "the-making-of-a-shepherd",
+    "the-aim-of-our-charge"
+   ],
+   "matched": {
+    "the-story-behind-it-all": {
+     "text": "catechism",
+     "field": "primary",
+     "via": "Narrative Journey Series"
+    }
+   }
+  },
+  {
+   "name": "catechisme (French): L'Appel first, the rest by typo tolerance",
+   "q": "catechisme",
+   "count": 12,
+   "top": [
+    "lappel-du-christ",
+    "the-call-of-christ",
+    "the-story-behind-it-all"
+   ],
+   "contains": [
+    "the-call-of-christ",
+    "lappel-du-christ",
+    "the-story-behind-it-all",
+    "the-best-possible-life",
+    "the-open-invitation",
+    "the-bond-between-us",
+    "the-glory-due-his-name",
+    "the-kingdom-come",
+    "the-ends-of-the-earth",
+    "the-sacred-script",
+    "the-making-of-a-shepherd",
+    "the-aim-of-our-charge"
+   ],
+   "matched": {
+    "lappel-du-christ": {
+     "text": "catéchisme",
+     "field": "terms"
+    },
+    "the-story-behind-it-all": {
+     "text": "catechism",
+     "field": "primary",
+     "via": "Narrative Journey Series"
+    }
+   }
+  },
+  {
+   "name": "catéchisme typed with the accent is the same query",
+   "q": "catéchisme",
+   "count": 12,
+   "top": [
+    "lappel-du-christ",
+    "the-call-of-christ"
+   ]
+  },
+  {
+   "name": "catechsim: a transposed typo still finds the 12",
+   "q": "catechsim",
+   "keys": [
+    "the-call-of-christ",
+    "lappel-du-christ",
+    "the-story-behind-it-all",
+    "the-best-possible-life",
+    "the-open-invitation",
+    "the-bond-between-us",
+    "the-glory-due-his-name",
+    "the-kingdom-come",
+    "the-ends-of-the-earth",
+    "the-sacred-script",
+    "the-making-of-a-shepherd",
+    "the-aim-of-our-charge"
+   ],
+   "matched": {
+    "the-story-behind-it-all": {
+     "text": "catechism",
+     "field": "primary",
+     "via": "Narrative Journey Series"
+    }
+   }
+  },
+  {
+   "name": "francais: accents folded",
+   "q": "francais",
+   "keys": [
+    "lappel-du-christ"
+   ],
+   "matched": {
+    "lappel-du-christ": {
+     "text": "francais",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "Français with the cedilla",
+   "q": "Français",
+   "keys": [
+    "lappel-du-christ"
+   ]
+  },
+  {
+   "name": "lappel: the apostrophe drops out of the title",
+   "q": "lappel",
+   "keys": [
+    "lappel-du-christ"
+   ],
+   "matched": {
+    "lappel-du-christ": {
+     "text": "L'Appel du Christ",
+     "field": "title"
+    }
+   }
+  },
+  {
+   "name": "L’Appel with a curly apostrophe",
+   "q": "L’Appel",
+   "keys": [
+    "lappel-du-christ"
+   ]
+  },
+  {
+   "name": "appel: not a word start in the title, but a primary term",
+   "q": "appel",
+   "keys": [
+    "lappel-du-christ"
+   ],
+   "matched": {
+    "lappel-du-christ": {
+     "text": "appel du christ",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "lords prayer: the apostrophe is optional",
+   "q": "lords prayer",
+   "top": [
+    "the-open-invitation"
+   ],
+   "matched": {
+    "the-open-invitation": {
+     "text": "lord's prayer",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "Lord's Prayer typed with the apostrophe",
+   "q": "Lord's Prayer",
+   "top": [
+    "the-open-invitation"
+   ]
+  },
+  {
+   "name": "ten commandments: AND + phrase",
+   "q": "ten commandments",
+   "keys": [
+    "the-best-possible-life"
+   ],
+   "matched": {
+    "the-best-possible-life": {
+     "text": "ten commandments",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "commandments ten: AND without the phrase still finds it",
+   "q": "commandments ten",
+   "keys": [
+    "the-best-possible-life"
+   ]
+  },
+  {
+   "name": "advent ranks Come, Let Us Adore Him above Venture's \"adventure camp\"",
+   "q": "advent",
+   "keys": [
+    "come-let-us-adore-him",
+    "venture"
+   ],
+   "matched": {
+    "come-let-us-adore-him": {
+     "text": "advent",
+     "field": "primary"
+    },
+    "venture": {
+     "text": "adventure camp",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "adventure camp: Venture only",
+   "q": "adventure camp",
+   "keys": [
+    "venture"
+   ]
+  },
+  {
+   "name": "advnet: a 6-letter typo",
+   "q": "advnet",
+   "keys": [
+    "come-let-us-adore-him"
+   ]
+  },
+  {
+   "name": "seneca",
+   "q": "seneca",
+   "keys": [
+    "on-the-shortness-of-life"
+   ],
+   "matched": {
+    "on-the-shortness-of-life": {
+     "text": "seneca",
+     "field": "primary"
+    }
+   }
+  },
+  {
+   "name": "shepherd: the title match outranks term matches",
+   "q": "shepherd",
+   "top": [
+    "the-making-of-a-shepherd"
+   ],
+   "contains": [
+    "oration-ii",
+    "homestead"
+   ],
+   "matched": {
+    "the-making-of-a-shepherd": {
+     "text": "The Making of a Shepherd",
+     "field": "title"
+    }
+   }
+  },
+  {
+   "name": "kingd: a title prefix",
+   "q": "kingd",
+   "top": [
+    "the-kingdom-come"
+   ],
+   "matched": {
+    "the-kingdom-come": {
+     "text": "The Kingdom Come",
+     "field": "title"
+    }
+   }
+  },
+  {
+   "name": "stoicism: inherited from the shelf by a book with no such term of its own",
+   "q": "stoicism",
+   "keys": [
+    "on-the-shortness-of-life"
+   ],
+   "matched": {
+    "on-the-shortness-of-life": {
+     "text": "stoicism",
+     "field": "primary",
+     "via": "A Philosophical Shelf"
+    }
+   }
+  },
+  {
+   "name": "patristics: inherited from A Pastoral Shelf",
+   "q": "patristics",
+   "keys": [
+    "oration-ii"
+   ],
+   "matched": {
+    "oration-ii": {
+     "text": "patristics",
+     "field": "primary",
+     "via": "A Pastoral Shelf"
+    }
+   }
+  },
+  {
+   "name": "essentials: six books tie, kept in Library order",
+   "q": "essentials",
+   "keys": [
+    "the-story-behind-it-all",
+    "the-best-possible-life",
+    "the-open-invitation",
+    "the-bond-between-us",
+    "the-glory-due-his-name",
+    "the-kingdom-come"
+   ],
+   "matched": {
+    "the-story-behind-it-all": {
+     "text": "essentials",
+     "field": "primary",
+     "via": "Essentials"
+    }
+   }
+  },
+  {
+   "name": "liturgies: an ancestor title is a \"series\" match",
+   "q": "liturgies",
+   "keys": [
+    "come-let-us-adore-him",
+    "a-table-in-the-wilderness"
+   ],
+   "matched": {
+    "come-let-us-adore-him": {
+     "text": "Liturgies",
+     "field": "series",
+     "via": "Liturgies"
+    }
+   }
+  },
+  {
+   "name": "passage: a book term beats the series it would inherit",
+   "q": "passage",
+   "keys": [
+    "hear-my-son",
+    "homestead",
+    "base-camp",
+    "venture"
+   ],
+   "matched": {
+    "hear-my-son": {
+     "text": "rites of passage",
+     "field": "terms"
+    },
+    "homestead": {
+     "text": "rite of passage",
+     "field": "primary",
+     "via": "Passage"
+    }
+   }
+  },
+  {
+   "name": "scaling: a subtitle-only word",
+   "q": "scaling",
+   "keys": [
+    "from-among-you"
+   ],
+   "matched": {
+    "from-among-you": {
+     "text": "Scaling the Global Church with a Vocationed Pastor Model",
+     "field": "subtitle"
+    }
+   }
+  },
+  {
+   "name": "leadership: equal primaries tie in Library order",
+   "q": "leadership",
+   "top": [
+    "the-making-of-a-shepherd",
+    "from-among-you"
+   ]
+  },
+  {
+   "name": "parenting",
+   "q": "parenting",
+   "top": [
+    "homestead"
+   ],
+   "contains": [
+    "the-bond-between-us",
+    "hear-my-son"
+   ]
+  },
+  {
+   "name": "gregory",
+   "q": "gregory",
+   "keys": [
+    "oration-ii",
+    "hear-my-son"
+   ]
+  },
+  {
+   "name": "good friday",
+   "q": "good friday",
+   "keys": [
+    "a-table-in-the-wilderness"
+   ]
+  },
+  {
+   "name": "c s lewis: one-letter words must hit too (as a word start)",
+   "q": "C. S. Lewis",
+   "keys": [
+    "the-story-behind-it-all",
+    "sacred-markings"
+   ]
+  },
+  {
+   "name": "acts 2: a one-letter word narrows the results (AND)",
+   "q": "acts 2",
+   "keys": [
+    "the-call-of-christ",
+    "lappel-du-christ",
+    "the-ends-of-the-earth",
+    "from-among-you"
+   ]
+  },
+  {
+   "name": "advent seneca: every word must hit (AND)",
+   "q": "advent seneca",
+   "keys": []
+  },
+  {
+   "name": "test book: hidden books are never results",
+   "q": "test book",
+   "keys": []
+  },
+  {
+   "name": "test: hidden excluded even when other books match",
+   "q": "test",
+   "absent": [
+    "test-book"
+   ],
+   "contains": [
+    "the-call-of-christ"
+   ]
+  },
+  {
+   "name": "empty query",
+   "q": "",
+   "keys": []
+  },
+  {
+   "name": "spaces only",
+   "q": "   ",
+   "keys": []
+  },
+  {
+   "name": "one letter",
+   "q": "a",
+   "keys": []
+  },
+  {
+   "name": "one-letter words only",
+   "q": "a b c",
+   "keys": []
+  },
+  {
+   "name": "punctuation only",
+   "q": "!!! '' —",
+   "keys": []
+  },
+  {
+   "name": "kvj: no typo tolerance under 5 letters",
+   "q": "kvj",
+   "keys": []
+  },
+  {
+   "name": "zzzz: nothing",
+   "q": "zzzz",
+   "keys": []
+  }
+ ],
+ "validate": [
+  {
+   "name": "the approved draft: no errors, eight warnings",
+   "terms": "fixture",
+   "folders": "fixture",
+   "problems": [
+    {
+     "level": "warning",
+     "code": "duplicate-normalized",
+     "key": "series/Narrative Journey Series/Essentials/The Open Invitation",
+     "term": "lords prayer"
+    },
+    {
+     "level": "warning",
+     "code": "duplicate-normalized",
+     "key": "series/Narrative Journey Series/Essentials/The Story Behind It All",
+     "term": "apostles creed"
+    },
+    {
+     "level": "warning",
+     "code": "duplicate-normalized",
+     "key": "series/Narrative Journey Series/Foundations/L’Appel du Christ",
+     "term": "francais"
+    },
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/Narrative Journey Series/Essentials/The Bond Between Us",
+     "term": "mentoring"
+    },
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/Narrative Journey Series/Foundations",
+     "term": "discipleship"
+    },
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/Narrative Journey Series/Foundations/L’Appel du Christ",
+     "term": "catechisme"
+    },
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/Narrative Journey Series/Foundations/L’Appel du Christ",
+     "term": "devotion"
+    },
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/Narrative Journey Series/Pathways",
+     "term": "mentoring"
+    }
+   ]
+  },
+  {
+   "name": "a key with no folder",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/Y": {
+      "title": "Y",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": []
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "missing-folder",
+     "key": "series/Y"
+    }
+   ]
+  },
+  {
+   "name": "id differs from meta.json",
+   "folders": [
+    {
+     "path": "series/X",
+     "id": "x-book",
+     "title": "X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [],
+      "id": "x"
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "id-mismatch",
+     "key": "series/X"
+    }
+   ]
+  },
+  {
+   "name": "the same term twice in a node",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [
+       "dup",
+       "Dup "
+      ]
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "duplicate",
+     "key": "series/X",
+     "term": "dup"
+    }
+   ]
+  },
+  {
+   "name": "a primary also listed in terms",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [
+       "a1"
+      ]
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "duplicate",
+     "key": "series/X",
+     "term": "a1"
+    }
+   ]
+  },
+  {
+   "name": "a term repeated from an ancestor",
+   "folders": [
+    {
+     "path": "series/X"
+    },
+    {
+     "path": "series/X/B",
+     "id": "b"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [
+       "shared"
+      ]
+     },
+     "series/X/B": {
+      "title": "B",
+      "id": "b",
+      "primary": [
+       "d1",
+       "e1",
+       "f1"
+      ],
+      "terms": [
+       "Shared"
+      ]
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "warning",
+     "code": "repeats-ancestor",
+     "key": "series/X/B",
+     "term": "shared"
+    }
+   ]
+  },
+  {
+   "name": "a node title that differs from meta.json",
+   "folders": [
+    {
+     "path": "series/X",
+     "title": "The X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": []
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "warning",
+     "code": "title-mismatch",
+     "key": "series/X"
+    }
+   ]
+  },
+  {
+   "name": "fewer than 3 primary terms",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1"
+      ],
+      "terms": []
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "warning",
+     "code": "primary-count",
+     "key": "series/X"
+    }
+   ]
+  },
+  {
+   "name": "a book folder (one with an id) with no node",
+   "folders": [
+    {
+     "path": "series/X"
+    },
+    {
+     "path": "series/X/B",
+     "id": "b"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": []
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "warning",
+     "code": "no-terms",
+     "key": "series/X/B"
+    }
+   ]
+  },
+  {
+   "name": "bad shape: terms not a list",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": "oops"
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "bad-shape",
+     "key": "series/X"
+    }
+   ]
+  },
+  {
+   "name": "bad shape: an unknown field",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [],
+      "keywords": []
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "bad-shape",
+     "key": "series/X"
+    }
+   ]
+  },
+  {
+   "name": "bad shape: a term with no letters or digits",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [
+       "—"
+      ]
+     }
+    }
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "bad-shape",
+     "key": "series/X",
+     "term": "—"
+    }
+   ]
+  },
+  {
+   "name": "bad shape: wrong version",
+   "folders": [],
+   "terms": {
+    "version": 2,
+    "nodes": {}
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "bad-shape",
+     "key": ""
+    }
+   ]
+  },
+  {
+   "name": "bad shape: no nodes",
+   "folders": [],
+   "terms": {
+    "version": 1
+   },
+   "problems": [
+    {
+     "level": "error",
+     "code": "bad-shape",
+     "key": ""
+    }
+   ]
+  },
+  {
+   "name": "underscore keys are comments",
+   "folders": [
+    {
+     "path": "series/X"
+    }
+   ],
+   "terms": {
+    "_about": "x",
+    "version": 1,
+    "nodes": {
+     "series/X": {
+      "title": "X",
+      "primary": [
+       "a1",
+       "b1",
+       "c1"
+      ],
+      "terms": [],
+      "_note": "y"
+     }
+    }
+   },
+   "problems": []
+  }
+ ]
+}

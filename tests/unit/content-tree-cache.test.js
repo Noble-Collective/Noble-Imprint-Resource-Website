@@ -74,3 +74,59 @@ test('falls back to a blocking build when no snapshot exists', async () => {
 function readCount(fsMod) {
   return fsMod.readFileSync.mock ? fsMod.readFileSync.mock.calls.length : 0;
 }
+
+// ---- search-terms.json rides in the snapshot (library search plan P3) ----
+
+// A one-series, one-book repo; `terms` is what GitHub returns for search-terms.json (an Error = the fetch fails).
+function stubRepo(terms) {
+  mock.method(github, 'getDirectoryContents', async (p) => ({
+    series: [{ type: 'dir', name: 'S' }],
+    'series/S': [{ type: 'dir', name: 'B' }],
+    'series/S/B': [{ type: 'dir', name: 'sessions' }],
+    'series/S/B/sessions': [{ type: 'file', name: '1-One.md' }],
+  }[p] || []));
+  mock.method(github, 'getFileContent', async (p) => {
+    if (p === 'search-terms.json') {
+      if (terms instanceof Error) throw terms;
+      return { content: typeof terms === 'string' ? terms : JSON.stringify(terms) };
+    }
+    if (p === 'series/S/B/meta.json') return { content: '{"title":"B","id":"b"}' };
+    if (p.endsWith('.md')) return { content: '# 1 One\n' };
+    throw new Error('404');
+  });
+}
+const TERMS = { version: 1, nodes: { 'series/S/B': { title: 'B', primary: ['bee'], terms: [] } } };
+
+test('rebuildContentTree loads search-terms.json into the tree and the snapshot it writes', async () => {
+  cache.invalidateAll();
+  stubSnapshot(null);
+  const written = [];
+  mock.method(fs, 'writeFileSync', (p, data) => { if (String(p).includes('.content-tree-cache.json')) written.push(JSON.parse(data)); });
+  stubRepo(TERMS);
+  const tree = await content.rebuildContentTree();
+  assert.deepStrictEqual(tree.searchTerms, TERMS);
+  assert.strictEqual(written.length, 1);
+  assert.deepStrictEqual(written[0].searchTerms, TERMS);
+});
+
+test('search terms that fail to load or parse keep the previous snapshot\'s terms (never fatal)', async () => {
+  const prev = { ...SNAPSHOT, searchTerms: TERMS };
+  for (const bad of [new Error('rate limited'), '{not json', JSON.stringify({ nodes: 'x' }), 'null']) {
+    cache.invalidateAll();
+    mock.restoreAll();
+    stubSnapshot(prev);
+    stubRepo(bad);
+    const errs = [];
+    mock.method(console, 'error', (...a) => errs.push(a.join(' ')));
+    assert.deepStrictEqual(await content.loadSearchTerms(prev), TERMS, String(bad));
+    assert.ok(errs.some((e) => e.includes('search-terms.json')), errs.join('\n'));
+  }
+});
+
+test('no search-terms.json anywhere → null terms (books still search by title)', async () => {
+  cache.invalidateAll();
+  stubSnapshot(null);
+  stubRepo(new Error('404'));
+  mock.method(console, 'error', () => {});
+  assert.strictEqual(await content.loadSearchTerms(null), null);
+});
