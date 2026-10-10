@@ -29,6 +29,23 @@ npx playwright test -g "suggestion auto-saves to Firestore"
 
 **Important:** The test suite hits the real GitHub API via the local server. Two things keep it affordable: (1) tests call `/api/refresh?scope=files` (a scoped invalidation that skips the full 22-book tree rebuild — ~10x fewer API calls than the old full `/api/refresh`); (2) point the server at an isolated **GitHub App** identity (see Testing → GitHub App auth) so a test run gets its own 5,000/hr bucket instead of sharing the personal token's limit with `gh` and the audiobook workflow. Run serially (`workers: 1`, set in `playwright.config.js`).
 
+## Planned: the site redesign (design only, nothing built)
+
+**START HERE before any redesign work:** [`plans/2026-10-08-site-redesign-and-ecosystem-nav.md`](plans/2026-10-08-site-redesign-and-ecosystem-nav.md).
+- It is the full design record:
+  - the app 2.0 look for Home, Library, series pages, `/settings` and the reader shell;
+  - the noblecollective.org ecosystem dropdown;
+  - the naming options;
+  - the suggested build phases.
+- Canvases: https://claude.ai/artifact/NpVnZb8Nj4cadzvxZJ1xAw (the main one). The page-numbers canvas is linked from §6.
+- **§6 = print page numbers ("Page numbers")**, phase 7 of the redesign. The app shipped it in 2.0.0 (232).
+  - The web approach: the renderer replaces the kept `<!-- page N -->` comment with an empty `data-nc-skip` element.
+  - The label is CSS generated content, so anchors, narration and copy are unchanged.
+  - It is shown only by `html.nc-print-pages`.
+  - It needs SDK 0.7.1 for the shared `printPages` setting.
+  - Steve's decisions D1–D4 are open.
+  - The app's reference is `../Noble-Imprint-App/docs/PRINT-PAGE-NUMBERS.md`.
+
 ## Architecture
 
 ### Content Pipeline
